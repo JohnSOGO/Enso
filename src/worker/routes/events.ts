@@ -17,6 +17,7 @@ export interface EventRow {
   recurrence: string | null; exdates: string; assigned_to: string;
   remind_offset_min: number | null; remind_channels: string | null; renotify_min: number | null; max_alerts: number;
   created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
+  is_alarm: number;
 }
 
 export function eventView(e: EventRow) {
@@ -37,10 +38,10 @@ export function eventView(e: EventRow) {
   };
 }
 
-type EventInput = Omit<EventRow, 'id' | 'exdates' | 'created_by' | 'created_at' | 'updated_at' | 'deleted_at'>;
+type EventInput = Omit<EventRow, 'id' | 'exdates' | 'created_by' | 'created_at' | 'updated_at' | 'deleted_at' | 'is_alarm'>;
 
 /** Validates untrusted event input → row fields, or an error message. */
-async function parseEventInput(db: D1Database, b: Record<string, unknown>): Promise<EventInput | string> {
+export async function parseEventInput(db: D1Database, b: Record<string, unknown>): Promise<EventInput | string> {
   const title = str(b.title, 120);
   if (!title) return 'Title is required (up to 120 characters).';
   const notes = optStr(b.notes);
@@ -92,7 +93,7 @@ async function parseEventInput(db: D1Database, b: Record<string, unknown>): Prom
 }
 
 async function loadEditable(c: Context<AppEnv>): Promise<EventRow | Response> {
-  const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL', c.req.param('id'));
+  const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND is_alarm = 0', c.req.param('id'));
   if (!e) return fail(c, 404, 'not_found', 'That event no longer exists.');
   const me = c.get('member');
   if (e.created_by !== me.id && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the creator or the owner can change this event.');
@@ -100,7 +101,7 @@ async function loadEditable(c: Context<AppEnv>): Promise<EventRow | Response> {
 }
 
 /** §5.6 — an edit makes future scheduled fires obsolete; the next tick re-materializes. */
-function removeFutureFires(db: D1Database, eventId: string, now: string): D1PreparedStatement {
+export function removeFutureFires(db: D1Database, eventId: string, now: string): D1PreparedStatement {
   return db.prepare(
     `UPDATE fires SET state = 'closed', close_reason = 'removed', closed_at = ?
       WHERE event_id = ? AND state = 'scheduled' AND due_at > ?`).bind(now, eventId, now);
@@ -114,7 +115,7 @@ events.get('/calendar', requireMember, async (c) => {
   if (diffDays(to, from) > MAX_RANGE_DAYS) return fail(c, 400, 'invalid_input', `The range can be at most ${MAX_RANGE_DAYS} days.`);
   const rows = await all<EventRow & { color: string; creator_name: string }>(c.env.DB,
     `SELECT e.*, m.color, m.display_name AS creator_name FROM events e JOIN members m ON m.id = e.created_by
-      WHERE e.deleted_at IS NULL AND e.start_date <= ? AND (e.recurrence IS NOT NULL OR e.end_date >= ?)`, to, from);
+      WHERE e.deleted_at IS NULL AND e.is_alarm = 0 AND e.start_date <= ? AND (e.recurrence IS NOT NULL OR e.end_date >= ?)`, to, from);
   const occ = [];
   for (const e of rows) {
     const span = diffDays(e.end_date, e.start_date);
@@ -147,7 +148,7 @@ events.post('/events', requireMember, async (c) => {
 });
 
 events.get('/events/:id', requireMember, async (c) => {
-  const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL', c.req.param('id'));
+  const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND is_alarm = 0', c.req.param('id'));
   return e ? c.json(eventView(e)) : fail(c, 404, 'not_found', 'That event no longer exists.');
 });
 

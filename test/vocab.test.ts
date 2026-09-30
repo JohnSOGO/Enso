@@ -21,6 +21,7 @@ it('every CHECK IN-list in the migrations matches vocab.ts', () => {
   expect(found.length).toBeGreaterThan(0);
   const seen = new Set<string>();
   for (const [, column, list] of found) {
+    if (!list.includes("'")) continue; // numeric flags like is_alarm IN (0, 1) are not vocabularies
     const values = [...list.matchAll(/'([^']*)'/g)].map((m) => m[1]);
     expect(EXPECTED[column], `no vocab mapping for CHECK on column "${column}"`).toBeDefined();
     expect(values, `CHECK list for ${column}`).toEqual([...EXPECTED[column]]);

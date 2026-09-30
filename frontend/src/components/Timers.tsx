@@ -18,7 +18,8 @@ export function minutesText(min: number) {
   return m ? `${h} h ${m} min` : `${h} h`;
 }
 
-export function Timers({ onEdit }: { onEdit: (t: Timer | null) => void }) {
+/** The "Rolling timers" section of the Alarms tab (SPEC §8.5). */
+export function TimersSection({ onEdit }: { onEdit: (t: Timer | null) => void }) {
   const { version, localTime, refresh } = useApp();
   const [timers, setTimers] = useState<Timer[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,23 +48,24 @@ export function Timers({ onEdit }: { onEdit: (t: Timer | null) => void }) {
   };
 
   return (
-    <section style={{ padding: 12, overflowY: 'auto', height: '100%' }} aria-label="Timers">
-      <div className="row" style={{ marginBottom: 10 }}>
-        <h1 style={{ fontSize: '1.15rem', flex: 1 }}>Timers</h1>
+    <section className={s.section} aria-label="Rolling timers">
+      <div className="row" style={{ marginBottom: 6 }}>
+        <h2 style={{ flex: 1, marginBottom: 0 }}>Rolling timers</h2>
+        <button onClick={() => onEdit(null)}>＋ Add</button>
       </div>
-      <p className="muted" style={{ fontSize: '.85rem', marginBottom: 12 }}>
+      <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>
         A timer rings after its interval and restarts from the moment someone taps <b>Ack</b>.
       </p>
       {error && <div role="alert" className="alert-error">{error}</div>}
       {timers === null && !error && <p className="muted">Loading…</p>}
-      {timers?.length === 0 && <p className="muted">No timers yet. Tap ＋ to add one.</p>}
+      {timers?.length === 0 && <p className="muted">No timers yet.</p>}
       {!!timers?.length && (
         <table className={s.table}>
           <thead>
             <tr>
               <th scope="col">Timer</th>
               <th scope="col">Status</th>
-              <th scope="col">Next / ringing</th>
+              <th scope="col">Next</th>
               <th scope="col"><span className="visually-hidden">Start or stop</span></th>
             </tr>
           </thead>

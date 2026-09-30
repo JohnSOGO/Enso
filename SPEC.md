@@ -36,12 +36,17 @@ exactly these points.
 
 ## 1. What it is
 
-A calendar PWA for one household. It has two kinds of alert:
+A calendar PWA for one household. It has three kinds of alert:
 
-| Kind | What it does | Example |
-|------|--------------|---------|
-| **Reminder** | Fires at a set time — once, or on a repeating schedule. Always attached to a calendar event. | "Take out trash" every Tue 19:00 |
-| **Rolling timer** ⚑ name | A countdown that **restarts when acknowledged**, not on a fixed clock. | "Check on the dog", 60 min |
+| Kind | What it does | Where it lives | Example |
+|------|--------------|----------------|---------|
+| **Event reminder** | Fires before/at a calendar event. | On the calendar, inside the event | "Dentist" at 14:30, remind 30 min before |
+| **Scheduled alarm** | Fires at a set time on chosen **days of the week**, every week. Not a calendar entry. | **Alarms** tab, not drawn on the calendar | "Take out trash" Tue 19:00 · "Morning meds" every day 08:00 |
+| **Rolling timer** ⚑ name | A countdown that **restarts when acknowledged**, not on a fixed clock. | **Alarms** tab | "Check on the dog", 60 min |
+
+**Why scheduled alarms are not calendar events:** a daily alarm drawn on the
+calendar puts the same chip on every single day and buries the real events. Alarms
+are managed as a list — each row shows its days and time — and edited in place.
 
 **The rolling timer, precisely:** set to 60 minutes and started at 12:00, it rings
 at 13:00. It keeps ringing (re-alerting per §5.3) until someone taps **Ack**. If
@@ -378,6 +383,18 @@ The `CHECK` lists above necessarily repeat §3 as SQL text. Test **M1-VOCAB** as
 that each `CHECK` list matches the corresponding `vocab.ts` tuple exactly. That
 test is what keeps the two in step.
 
+### 4.2a Schema change — `migrations/0002_alarms.sql`
+
+```sql
+-- A scheduled alarm (§1) is stored as an event with is_alarm = 1. It reuses the
+-- event recurrence + reminder + fire machinery unchanged; only its presentation differs.
+ALTER TABLE events ADD COLUMN is_alarm INTEGER NOT NULL DEFAULT 0 CHECK (is_alarm IN (0, 1));
+```
+
+An alarm row always has: `start_time` set (never all-day), `recurrence =
+{"freq":"WEEKLY","byDay":[...]}` with at least one day, `remind_offset_min = 0`,
+`start_date` = the local date it was created, `end_date = start_date`.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -611,6 +628,8 @@ email return 429 for 15 minutes.
 - **All-day multi-day events** draw one continuous bar across the days (wrapping to
   the next week row). Timed events are single-day in v1.
 - **Tapping a day** opens the **day sheet** (§8.3).
+- **Scheduled alarms (`is_alarm = 1`) are never drawn on the calendar** and never
+  appear in `/calendar`. They are listed on the Alarms tab (§8.5).
 
 Correct sample for Sep–Oct 2026 (2026-09-01 is a Tuesday; ▣ = public holiday):
 
@@ -684,12 +703,12 @@ the dialog with `role="alert"`, and there are no wizards.
 |  S   M   T   W   T   F   S          |
 |  ...continuous weeks...             |
 +-------------------------------------+
-|  📅 Calendar   ⏱ Timers   ⚙ Settings |  <- bottom tab bar
+|  📅 Calendar   ⏰ Alarms   ⚙ Settings |  <- bottom tab bar
 +-------------------------------------+
 ```
 
-- The **＋** floating button on Calendar creates an event; on Timers it creates a
-  timer.
+- The **＋** floating button appears on Calendar only and creates an event. The
+  Alarms tab has its own **＋ Add** button in each section header.
 - **Status badges:**
   - A **red badge** "House offline" appears in the header when `relay_last_seen`
     is more than 2 min old.
@@ -751,14 +770,35 @@ they mean holidays:
 #F59E0B amber    #06B6D4 cyan    #84CC16 lime     #A16207 brown
 ```
 
-### 8.5 Timers screen
+### 8.5 Alarms screen (replaces the v2.0 "Timers screen")
 
-A single-line list (per the table rules), one row per timer:
+Two sections, each a single-line list (per the table rules), each with a **＋ Add**
+button in its header.
 
-- Row layout: `⏱ Check on the dog · every 60 min · next 14:45` plus a status badge
-  (running / ringing / stopped) and **[Start]/[Stop]**.
-- Tapping a row opens the timer form: title, interval (minutes, 1–1440), channels,
-  repeat alert every, assigned to, Delete.
+**Scheduled** — one row per alarm, sorted by time of day:
+
+```
+Time   Alarm                    Days            Next
+08:00  💊 Morning meds          Every day       Wed 08:00
+19:00  🗑 Take out trash         Tue             Tue 19:00
+07:30  Wake kids               Weekdays        Wed 07:30   [ringing]
+```
+
+- **Days** text: all 7 → "Every day"; Mon–Fri → "Weekdays"; Sat+Sun → "Weekends";
+  otherwise short names in week order ("Mon Wed Fri").
+- **Next** = the alarm's next due time in household local time (weekday + time), or a
+  red `ringing` badge while it rings.
+- Tapping a row opens the **alarm form** (modal): title · time · day chips (Sun…Sat,
+  plus "Every day" / "Weekdays" shortcuts) · channels (☐ Phone ☐ House) · repeat
+  alert every (Off / 5 / 10 / 15 / 30 min) · assigned to · Save / Cancel / Delete.
+- Editing an alarm changes it **in place** — its future fires are re-planned
+  (§5.6 event edits); nothing has to be deleted and re-created.
+- At least one day must be chosen; the form says so in the dialog if not.
+
+**Rolling timers** — as before: `⏱ Check on the dog · every 60 min · next 14:45`, a
+status badge (running / ringing / stopped) and **[Start]/[Stop]**; tapping a row
+opens the timer form (title, interval 1–1440 min, channels, repeat alert every,
+assigned to, Delete).
 
 ### 8.6 Settings
 
@@ -898,6 +938,9 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | GET/POST | `/timers` | member | |
 | PATCH/DELETE | `/timers/{id}` | creator or owner | |
 | POST | `/timers/{id}/commands` | member | `{ cmd: TimerCmd }` |
+| GET | `/alarms` | member | → alarms: `{ id, title, time, days: Weekday[], channels, renotifyMin, assignedTo, createdBy, nextDueAt, ringing }` |
+| POST | `/alarms` | member | `{ title, time: "HH:MM", days: Weekday[], channels, renotifyMin?, assignedTo? }` → alarm |
+| PATCH/DELETE | `/alarms/{id}` | creator or owner | same fields as POST, all optional; closes future scheduled fires like an event edit |
 | GET | `/fires?state=ringing` | member | → open fires with titles |
 | POST | `/fires/{id}/actions` | member | `{ action: Action }` → fire (+ next); 409 on `invalid_action` |
 | POST | `/push/subscriptions` | member | `PushSubscriptionJSON` + userAgent |
@@ -987,6 +1030,13 @@ checks.
   through the database.
 - ✅ Manual: create a 1-min timer, tick, see it ring in the bar, Ack, and see
   "next" update.
+
+**M4a — Scheduled alarms**
+- Migration 0002, `/alarms` API, Alarms tab (Scheduled + Rolling timers), alarm form;
+  `/calendar` excludes alarms.
+- ✅ API tests: an alarm Mon/Wed/Fri 08:00 is absent from `/calendar`, listed by
+  `/alarms` with its days, and rings via `/dev/tick` at 08:00 local on a Wednesday
+  but not on a Tuesday; an alarm with no days is rejected with a message.
 
 **M5 — Web Push**
 - Spike first: send one push from a Worker to Chrome desktop and record which

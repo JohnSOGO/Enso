@@ -21,16 +21,16 @@ const inv = await call(c, 'POST', '/invites', { displayName: seed.member.display
 const m = await call(null, 'POST', '/auth/signup', { code: inv.json.code, ...seed.member });
 
 const events = [
-  { title: 'Take out trash', startDate: plus(0), startTime: '19:00', recurrence: { freq: 'WEEKLY', byDay: ['TU'] }, reminder: { offsetMin: 0, channels: ['push', 'house'] } },
-  { title: 'Morning meds', startDate: plus(-3), startTime: '08:00', recurrence: { freq: 'DAILY' }, reminder: { offsetMin: 0, channels: ['push'], renotifyMin: 10 } },
   { title: 'Dentist', startDate: plus(2), startTime: '14:30', endTime: '15:30', assignedTo: [m.json.id] },
   { title: 'Grandma visiting', startDate: plus(5), endDate: plus(8) },
   { title: 'Soccer practice with a very long title that must truncate', startDate: plus(1), startTime: '17:00', recurrence: { freq: 'WEEKLY', interval: 2 } },
   { title: 'Pay rent', startDate: `${today.slice(0, 8)}01`, recurrence: { freq: 'MONTHLY' } },
 ];
 for (const e of events) await call(c, 'POST', '/events', e);
+await call(c, 'POST', '/alarms', { title: 'Take out trash', time: '19:00', days: ['TU'], channels: ['push', 'house'] });
+await call(c, 'POST', '/alarms', { title: 'Morning meds', time: '08:00', days: ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'], channels: ['push'], renotifyMin: 10 });
 await call(c, 'PUT', '/school-holidays', { from: plus(20), to: plus(24), label: 'Fall break' });
 const t = await call(c, 'POST', '/timers', { title: 'Check on the dog', intervalMin: 60, channels: ['push'], renotifyMin: 15 });
 await call(c, 'POST', '/timers', { title: 'Drink water', intervalMin: 90, channels: ['push'], renotifyMin: null });
 await call(c, 'POST', `/timers/${t.json.id}/commands`, { cmd: 'start' });
-console.log(`seeded: owner ${seed.owner.email}, member ${seed.member.email}, ${events.length} events, 2 timers`);
+console.log(`seeded: owner ${seed.owner.email}, member ${seed.member.email}, ${events.length} events, 2 alarms, 2 timers`);

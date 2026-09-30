@@ -5,24 +5,29 @@ import { AppProvider, useApp, type Me } from './state';
 import { Calendar, type DayData, type Occurrence } from './components/Calendar';
 import { DaySheet } from './components/DaySheet';
 import { EventForm } from './components/EventForm';
-import { Timers, TimerForm, type Timer } from './components/Timers';
+import { TimerForm, type Timer } from './components/Timers';
+import { Alarms, AlarmForm, type Alarm } from './components/Alarms';
 import { Settings } from './components/Settings';
 import { RingingBar } from './components/RingingBar';
 import { SignIn } from './components/SignIn';
 import { Modal } from './components/Modal';
 import s from './App.module.css';
 
-type Tab = 'calendar' | 'timers' | 'settings';
+type Tab = 'calendar' | 'alarms' | 'settings';
+const TABS: Tab[] = ['calendar', 'alarms', 'settings'];
 type Overlay =
   | { kind: 'day'; date: string; data: DayData | undefined }
   | { kind: 'event'; date: string; eventId?: string }
   | { kind: 'timer'; timer: Timer | null }
+  | { kind: 'alarm'; alarm: Alarm | null }
   | { kind: 'explain'; title: string; text: string }
   | null;
 
 function Shell({ onLogout }: { onLogout: () => void }) {
   const { status, today } = useApp();
-  const [tab, setTab] = useState<Tab>(() => (localStorage.getItem('hrc.tab') as Tab) || 'calendar');
+  const [tab, setTab] = useState<Tab>(() => {
+    try { const t = localStorage.getItem('hrc.tab') as Tab; return TABS.includes(t) ? t : 'calendar'; } catch { return 'calendar'; }
+  });
   const [overlay, setOverlay] = useState<Overlay>(null);
   useEffect(() => { try { localStorage.setItem('hrc.tab', tab); } catch { /* storage may be blocked */ } }, [tab]);
 
@@ -50,15 +55,14 @@ function Shell({ onLogout }: { onLogout: () => void }) {
       )}
       <main className={s.main}>
         {tab === 'calendar' && <Calendar onOpenDay={(date, data) => setOverlay({ kind: 'day', date, data })} />}
-        {tab === 'timers' && <Timers onEdit={(timer) => setOverlay({ kind: 'timer', timer })} />}
+        {tab === 'alarms' && <Alarms onEditAlarm={(alarm) => setOverlay({ kind: 'alarm', alarm })} onEditTimer={(timer) => setOverlay({ kind: 'timer', timer })} />}
         {tab === 'settings' && <Settings onLogout={onLogout} />}
       </main>
-      {tab !== 'settings' && (
-        <button className={s.fab} aria-label={tab === 'calendar' ? 'Add event' : 'Add timer'} title={tab === 'calendar' ? 'Add event' : 'Add timer'}
-          onClick={() => setOverlay(tab === 'calendar' ? { kind: 'event', date: today() } : { kind: 'timer', timer: null })}>＋</button>
+      {tab === 'calendar' && (
+        <button className={s.fab} aria-label="Add event" title="Add event" onClick={() => setOverlay({ kind: 'event', date: today() })}>＋</button>
       )}
       <nav className={s.tabs} aria-label="Sections">
-        {([['calendar', '📅', 'Calendar'], ['timers', '⏱', 'Timers'], ['settings', '⚙', 'Settings']] as const).map(([id, icon, label]) => (
+        {([['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alarms'], ['settings', '⚙', 'Settings']] as const).map(([id, icon, label]) => (
           <button key={id} className={tab === id ? s.active : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id)}>
             <span aria-hidden>{icon}</span> {label}
           </button>
@@ -72,6 +76,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
       )}
       {overlay?.kind === 'event' && <EventForm date={overlay.date} eventId={overlay.eventId} onClose={() => setOverlay(null)} />}
       {overlay?.kind === 'timer' && <TimerForm timer={overlay.timer} onClose={() => setOverlay(null)} />}
+      {overlay?.kind === 'alarm' && <AlarmForm alarm={overlay.alarm} onClose={() => setOverlay(null)} />}
       {overlay?.kind === 'explain' && (
         <Modal title={overlay.title} onClose={() => setOverlay(null)} footer={<button onClick={() => setOverlay(null)}>OK</button>}>
           <p>{overlay.text}</p>

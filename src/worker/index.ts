@@ -7,6 +7,7 @@ import { auth } from './routes/auth';
 import { members } from './routes/members';
 import { events } from './routes/events';
 import { alerts } from './routes/alerts';
+import { alarms } from './routes/alarms';
 import { household } from './routes/household';
 import { relay } from './routes/relay';
 
@@ -28,6 +29,7 @@ api.route('/', auth);
 api.route('/', members);
 api.route('/', events);
 api.route('/', alerts);
+api.route('/', alarms);
 api.route('/', household);
 api.route('/', relay);
 
