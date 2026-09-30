@@ -1,0 +1,10 @@
+{
+  "serverUrl": "http://localhost:8787",
+  "relayToken": "dev-relay-token",
+  "haUrl": "http://192.168.0.123:8123",
+  "haTokenPath": "C:\Users\Public\git\HomeAssistant\secrets\ha_token.txt",
+  "echoTargets": ["Game Room", "Kid's Room - Echo", "Sogo", "Toasty"],
+  "echoType": "announce",
+  "satelliteEntity": "assist_satellite.home_assistant_voice_09eb97_assist_satellite",
+  "pollSeconds": 10
+}

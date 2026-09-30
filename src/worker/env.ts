@@ -22,6 +22,8 @@ declare global {
   namespace Cloudflare {
     interface Env {
       DB: D1Database;
+      SETUP_TOKEN: string;
+      RELAY_TOKEN: string;
       TEST_MIGRATIONS: { name: string; queries: string[] }[];
     }
   }
