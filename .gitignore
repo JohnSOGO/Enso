@@ -1,0 +1,9 @@
+node_modules/
+frontend/dist/
+.wrangler/
+.dev.vars
+relay/relay.config.json
+relay/relay.log
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+packages/*/node_modules/
+
+# Build output
+dist/
+packages/frontend/dist/
+
+# Environment secrets
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Cloudflare
+.wrangler/
+
+# SQLite data (local dev)
+data/*.db
+data/*.db-wal
+data/*.db-shm

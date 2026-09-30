@@ -1,0 +1,30 @@
+{
+  "name": "home-reminder-calendar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Household calendar + reminder app with Home Assistant integration",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "db:init": "node scripts/init-db.js",
+    "build:frontend": "npm run build --workspace=packages/frontend",
+    "deploy": "wrangler deploy && wrangler pages deploy packages/frontend/dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "dependencies": {
+    "@cloudflare/workers-types": "latest",
+    "@hono/node-server": "^1.19.17",
+    "hono": "^4.7.8",
+    "jose": "^6.0.10",
+    "sql.js": "^1.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "@types/sql.js": "^1.4.9",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.9.1"
+  }
+}

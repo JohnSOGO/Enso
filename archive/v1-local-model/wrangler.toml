@@ -1,0 +1,17 @@
+name = "home-reminder-calendar"
+main = "src/workers/index.ts"
+compatibility_date = "2026-09-21"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "hrc"
+database_id = "<replace-with-d1-id>"
+
+# Cloudflare R2 bucket (for file storage)
+#[[r2_buckets]]
+#binding = "BUCKET"
+#bucket_name = "hrc-files"
+
+# Environment variables (set via `wrangler secret put`)
+# HA_TOKEN, JWT_SECRET, WEBHOOK_SECRET

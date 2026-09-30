@@ -1,0 +1,35 @@
+{
+  "name": "home-reminder-calendar",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n api,web \"wrangler dev --port 8787\" \"vite --config frontend/vite.config.ts\"",
+    "dev:api": "wrangler dev --port 8787",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p frontend/tsconfig.json && tsc --noEmit -p relay/tsconfig.json",
+    "db:migrate:local": "wrangler d1 migrations apply hrc --local",
+    "db:migrate:remote": "wrangler d1 migrations apply hrc --remote",
+    "build": "vite build --config frontend/vite.config.ts",
+    "deploy": "npm run build && wrangler deploy",
+    "relay": "tsx relay/relay.ts"
+  },
+  "dependencies": {
+    "hono": "^4.13.11"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/workers-types": "^5.20260930.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.144.0"
+  }
+}

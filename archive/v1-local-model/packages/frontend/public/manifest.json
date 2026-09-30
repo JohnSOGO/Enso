@@ -1,0 +1,11 @@
+{
+  "name": "Home Reminder Calendar",
+  "short_name": "HRC",
+  "description": "Household calendar + reminder app with Home Assistant integration",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#0F172A",
+  "background_color": "#0F172A",
+  "icons": []
+}
