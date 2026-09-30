@@ -123,7 +123,8 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
         s.cell,
         (y * 12 + m) % 2 ? s.toneB : s.toneA,
         date === todayStr ? s.today : '',
-        pub.length ? s.pub : school.length ? s.school : '',
+        pub.length ? s.pub : '',
+        school.length ? s.school : '',
         date < todayStr ? s.past : '',
       ].join(' ');
       const label = [

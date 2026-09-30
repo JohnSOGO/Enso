@@ -647,42 +647,56 @@ Oct '26   4    5    6    7    8    9   10
 
 | Type | Source | Treatment |
 |------|--------|-----------|
-| Public | Computed in `src/shared/holidays.ts` — no table, no hand-typed yearly dates | Red (`--holiday-public`) date number + red circle behind it; name in the day sheet |
+| Public (days off) | Computed in `src/shared/holidays.ts`, filtered to the household's **days off** (§7.3) — no hand-typed yearly dates | **Whole cell highlighted light yellow** (`--holiday-public-cell`); name in the day sheet |
 | School | `school_holidays` table, edited by the owner in Settings → School holidays (add a single date or a date range + label) | Blue (`--holiday-school`) date number + circle; label in the day sheet |
 
 - **Legend:** shown once, directly under the sticky month header.
 - **Toggles:** each member can hide either type (`member_prefs`).
-- **Both on one day:** public wins the circle; the day sheet lists both.
+- **Both on one day:** the cell is yellow *and* the date has the blue circle; the day
+  sheet lists both.
 
-### 7.3 US federal holidays (`holidays.ts`)
+### 7.3 Holidays and household days off (`holidays.ts`)
 
-`publicHolidays(year): { date: string; name: string; observed: boolean }[]`
+`HOLIDAYS` is the one table of known holidays — key, name, rule:
 
-| Holiday | Rule |
-|---------|------|
-| New Year's Day | Jan 1 |
-| Martin Luther King Jr. Day | 3rd Monday of January |
-| Presidents' Day | 3rd Monday of February |
-| Memorial Day | last Monday of May |
-| Juneteenth | Jun 19 |
-| Independence Day | Jul 4 |
-| Labor Day | 1st Monday of September |
-| Columbus Day | 2nd Monday of October |
-| Veterans Day | Nov 11 |
-| Thanksgiving | 4th Thursday of November |
-| Christmas | Dec 25 |
+| Key | Holiday | Rule | Day off by default |
+|-----|---------|------|:---:|
+| `new_years_day` | New Year's Day | Jan 1 | ✓ |
+| `mlk_day` | Martin Luther King Jr. Day | 3rd Monday of January | |
+| `presidents_day` | Presidents' Day | 3rd Monday of February | |
+| `memorial_day` | Memorial Day | last Monday of May | ✓ |
+| `juneteenth` | Juneteenth | Jun 19 | |
+| `independence_day` | Independence Day | Jul 4 | ✓ |
+| `labor_day` | Labor Day | 1st Monday of September | ✓ |
+| `columbus_day` | Columbus Day | 2nd Monday of October | |
+| `veterans_day` | Veterans Day | Nov 11 | |
+| `thanksgiving` | Thanksgiving | 4th Thursday of November | ✓ |
+| `day_after_thanksgiving` | Day after Thanksgiving | the Friday after Thanksgiving | ✓ |
+| `christmas_eve` | Christmas Eve | Dec 24 | ⚑ off — MojoSOGO's list says "New Year's Eve **or** Christmas Eve" |
+| `christmas` | Christmas | Dec 25 | ✓ |
+| `new_years_eve` | New Year's Eve | Dec 31 | ⚑ off — see above |
 
-**Observed rule:** for a fixed-date holiday falling on a Saturday, the Friday before
-is also marked, `observed: true`, name + " (observed)". For one on a Sunday, the
-Monday after is marked. The actual date is always marked too. New Year's Day on a
-Saturday is observed on Dec 31 of the **previous** year, so `publicHolidays(2027)`
-includes `2027-12-31` for 2028's New Year.
+- `publicHolidays(year, keys?)` returns the holidays (actual + observed dates) whose
+  key is in `keys` (all when omitted).
+- **Household days off** = `settings.days_off` (JSON array of keys, migration
+  `0003_days_off.sql`); `NULL` means `DEFAULT_DAYS_OFF` from `holidays.ts` (the ✓
+  column). The owner edits it in Settings → Household → **Days off** (a checklist of
+  every key in `HOLIDAYS`). `/calendar` returns only days-off holidays.
+
+**Observed rule:** applies to the fixed-date holidays Jan 1, Jun 19, Jul 4, Nov 11 and
+Dec 25 (not to the eves). On a Saturday the Friday before is also marked,
+`observed: true`, name + " (observed)"; on a Sunday, the Monday after. The actual date
+is always marked too. New Year's Day on a Saturday is observed on Dec 31 of the
+**previous** year, so `publicHolidays(2027)` includes `2027-12-31` for 2028's New Year.
 
 **Acceptance (M1):**
 
-- 2026: Labor Day `2026-09-07`, Thanksgiving `2026-11-26`, Memorial Day
-  `2026-05-25`, Independence Day `2026-07-04` plus observed `2026-07-03`.
+- 2026: Labor Day `2026-09-07`, Thanksgiving `2026-11-26`, Day after Thanksgiving
+  `2026-11-27`, Memorial Day `2026-05-25`, Independence Day `2026-07-04` plus observed
+  `2026-07-03`.
 - 2027: Christmas observed `2027-12-24`; New Year observed `2027-12-31`.
+- With the default days off, 2026 has no Columbus Day (`2026-10-12`) and no
+  Veterans Day (`2026-11-11`).
 
 ---
 
@@ -823,7 +837,7 @@ Dark by default. Colors are defined as tokens on `:root`:
 | `--accent` | `#6366F1` (indigo — kept apart from school-holiday blue ⚑) |
 | `--month-a` | `#0F172A` |
 | `--month-b` | `#162033` |
-| `--holiday-public` | `#EF4444` |
+| `--holiday-public-cell` | `#FEF08A` (light yellow; date text on it is dark `#1E293B`) ⚑ |
 | `--holiday-school` | `#3B82F6` |
 
 ---

@@ -2,7 +2,8 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { addDays, diffDays, isDate, isValidTimeZone } from '../../shared/time';
-import { all, first, newId, nowIso, run } from '../db';
+import { DEFAULT_DAYS_OFF, HOLIDAYS, HOLIDAY_KEYS, isHolidayKey, type HolidayKey } from '../../shared/holidays';
+import { all, first, newId, nowIso, parseJson, run } from '../db';
 import { body, fail, str } from '../http';
 import { requireMember, requireOwner } from '../session';
 
@@ -10,10 +11,21 @@ export const RELAY_STALE_MS = 2 * 60_000;
 
 export const household = new Hono<AppEnv>();
 
-household.get('/settings', requireMember, async (c) => {
-  const s = await first<{ household_name: string; timezone: string }>(c.env.DB, 'SELECT household_name, timezone FROM settings WHERE id = 1');
-  return c.json({ householdName: s!.household_name, timezone: s!.timezone });
-});
+/** The household's days off (§7.3): stored keys, or the defaults when never set. */
+export async function daysOff(db: D1Database): Promise<HolidayKey[]> {
+  const row = await first<{ days_off: string | null }>(db, 'SELECT days_off FROM settings WHERE id = 1');
+  return parseJson<string[] | null>(row?.days_off ?? null, null)?.filter(isHolidayKey) ?? DEFAULT_DAYS_OFF;
+}
+
+async function settingsView(db: D1Database) {
+  const s = await first<{ household_name: string; timezone: string }>(db, 'SELECT household_name, timezone FROM settings WHERE id = 1');
+  return {
+    householdName: s!.household_name, timezone: s!.timezone, daysOff: await daysOff(db),
+    holidays: HOLIDAY_KEYS.map((key) => ({ key, name: HOLIDAYS[key].name })),
+  };
+}
+
+household.get('/settings', requireMember, async (c) => c.json(await settingsView(c.env.DB)));
 
 household.patch('/settings', requireMember, requireOwner, async (c) => {
   const b = await body(c);
@@ -27,9 +39,12 @@ household.patch('/settings', requireMember, requireOwner, async (c) => {
     if (typeof b.timezone !== 'string' || !isValidTimeZone(b.timezone)) return fail(c, 400, 'invalid_input', 'Timezone must be an IANA name like America/Los_Angeles.');
     stmts.push(c.env.DB.prepare('UPDATE settings SET timezone = ? WHERE id = 1').bind(b.timezone));
   }
+  if (b.daysOff !== undefined) {
+    if (!Array.isArray(b.daysOff) || !b.daysOff.every(isHolidayKey)) return fail(c, 400, 'invalid_input', `daysOff must be a list of: ${HOLIDAY_KEYS.join(', ')}.`);
+    stmts.push(c.env.DB.prepare('UPDATE settings SET days_off = ? WHERE id = 1').bind(JSON.stringify([...new Set(b.daysOff)])));
+  }
   if (stmts.length) await c.env.DB.batch(stmts);
-  const s = await first<{ household_name: string; timezone: string }>(c.env.DB, 'SELECT household_name, timezone FROM settings WHERE id = 1');
-  return c.json({ householdName: s!.household_name, timezone: s!.timezone });
+  return c.json(await settingsView(c.env.DB));
 });
 
 household.get('/school-holidays', requireMember, async (c) =>

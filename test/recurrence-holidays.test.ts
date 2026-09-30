@@ -1,7 +1,7 @@
 // SPEC §5.8 R4–R7 and §7.3 acceptance.
 import { describe, expect, it } from 'vitest';
 import { occurrences, recurrenceError } from '../src/shared/recurrence';
-import { publicHolidays } from '../src/shared/holidays';
+import { DEFAULT_DAYS_OFF, HOLIDAY_KEYS, publicHolidays } from '../src/shared/holidays';
 
 const first = (n: number, xs: string[]) => xs.slice(0, n);
 
@@ -65,12 +65,21 @@ describe('public holidays', () => {
   });
 
   it('2027 Christmas and next New Year observed', () => {
-    expect(on(2027, '2027-12-24')).toEqual(['Christmas (observed)']);
-    expect(on(2027, '2027-12-31')).toEqual(["New Year's Day (observed)"]);
+    expect(on(2027, '2027-12-24')).toContain('Christmas (observed)'); // also Christmas Eve
+    expect(on(2027, '2027-12-31')).toContain("New Year's Day (observed)"); // also New Year's Eve
     expect(on(2028, '2027-12-31')).toEqual([]);
   });
 
-  it('11 holidays each year (plus observed days)', () => {
-    expect(publicHolidays(2026).filter((h) => !h.observed)).toHaveLength(11);
+  it('every known holiday once a year (plus observed days)', () => {
+    expect(publicHolidays(2026).filter((h) => !h.observed)).toHaveLength(HOLIDAY_KEYS.length);
+    expect(on(2026, '2026-11-27')).toEqual(['Day after Thanksgiving']);
+  });
+
+  it("default days off are MojoSOGO's list: the core six + day after Thanksgiving", () => {
+    expect(DEFAULT_DAYS_OFF).toEqual(['new_years_day', 'memorial_day', 'independence_day', 'labor_day', 'thanksgiving', 'day_after_thanksgiving', 'christmas']);
+    const dates = publicHolidays(2026, DEFAULT_DAYS_OFF).map((h) => h.date);
+    expect(dates).not.toContain('2026-10-12'); // Columbus Day
+    expect(dates).not.toContain('2026-11-11'); // Veterans Day
+    expect(dates).toContain('2026-11-27');
   });
 });

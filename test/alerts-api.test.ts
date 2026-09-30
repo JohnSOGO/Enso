@@ -13,7 +13,17 @@ describe('calendar', () => {
     const cal = await o.get('/calendar?from=2026-10-25&to=2026-11-14');
     expect(cal.json.occurrences.filter((x: any) => x.eventId === ev.json.id).map((x: any) => x.date))
       .toEqual(['2026-10-27', '2026-11-03', '2026-11-10']);
-    expect(cal.json.publicHolidays.map((h: any) => h.date)).toEqual(['2026-11-11']);
+    expect(cal.json.publicHolidays.map((h: any) => h.date)).toEqual([]); // Veterans Day is not a default day off
+  });
+
+  it('the owner chooses the household days off; the calendar follows', async () => {
+    const o = await owner();
+    const s = await o.patch('/settings', { daysOff: ['veterans_day', 'christmas_eve'] });
+    expect(s.json.daysOff).toEqual(['veterans_day', 'christmas_eve']);
+    const cal = await o.get('/calendar?from=2026-11-01&to=2026-12-31');
+    expect(cal.json.publicHolidays.map((h: any) => h.date)).toEqual(['2026-11-11', '2026-12-24']);
+    expect((await o.patch('/settings', { daysOff: ['not_a_holiday'] })).status).toBe(400);
+    await o.patch('/settings', { daysOff: s.json.holidays.filter((h: any) => ['thanksgiving'].includes(h.key)).map((h: any) => h.key) });
   });
 
   it('rejects ranges over 120 days and bad input with a message', async () => {

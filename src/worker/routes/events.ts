@@ -8,6 +8,7 @@ import { publicHolidaysBetween } from '../../shared/holidays';
 import { all, first, newId, nowIso, parseJson, run } from '../db';
 import { body, fail, intIn, optStr, str } from '../http';
 import { requireMember } from '../session';
+import { daysOff } from './household';
 
 const MAX_RANGE_DAYS = 120;
 
@@ -130,7 +131,7 @@ events.get('/calendar', requireMember, async (c) => {
   }
   occ.sort((a, b) => (a.date + (a.startTime ?? '')).localeCompare(b.date + (b.startTime ?? '')));
   const schoolHolidays = await all(c.env.DB, 'SELECT date, label FROM school_holidays WHERE date BETWEEN ? AND ? ORDER BY date', from, to);
-  return c.json({ occurrences: occ, publicHolidays: publicHolidaysBetween(from, to), schoolHolidays });
+  return c.json({ occurrences: occ, publicHolidays: publicHolidaysBetween(from, to, await daysOff(c.env.DB)), schoolHolidays });
 });
 
 events.post('/events', requireMember, async (c) => {
