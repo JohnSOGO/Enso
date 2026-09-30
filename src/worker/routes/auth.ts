@@ -42,7 +42,8 @@ async function createMember(db: D1Database, b: Record<string, unknown>, role: 'o
 export async function memberView(db: D1Database, id: string) {
   return first(db,
     `SELECT m.id, m.email, m.display_name AS displayName, m.color, m.role,
-            p.show_public_holidays AS showPublicHolidays, p.show_school_holidays AS showSchoolHolidays
+            p.show_public_holidays AS showPublicHolidays, p.show_school_holidays AS showSchoolHolidays,
+            p.show_options_expiration AS showOptionsExpiration
        FROM members m LEFT JOIN member_prefs p ON p.member_id = m.id WHERE m.id = ?`, id);
 }
 
@@ -132,7 +133,7 @@ auth.patch('/me', requireMember, async (c) => {
     if (typeof b.color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(b.color)) return fail(c, 400, 'invalid_input', 'Color must look like #RRGGBB.');
     stmts.push(c.env.DB.prepare('UPDATE members SET color = ? WHERE id = ?').bind(b.color, id));
   }
-  for (const [key, col] of [['showPublicHolidays', 'show_public_holidays'], ['showSchoolHolidays', 'show_school_holidays']] as const) {
+  for (const [key, col] of [['showPublicHolidays', 'show_public_holidays'], ['showSchoolHolidays', 'show_school_holidays'], ['showOptionsExpiration', 'show_options_expiration']] as const) {
     if (b[key] !== undefined) {
       if (typeof b[key] !== 'boolean') return fail(c, 400, 'invalid_input', `${key} must be true or false.`);
       stmts.push(c.env.DB.prepare(`UPDATE member_prefs SET ${col} = ? WHERE member_id = ?`).bind(b[key] ? 1 : 0, id));

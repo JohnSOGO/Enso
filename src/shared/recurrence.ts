@@ -6,9 +6,14 @@ export interface Recurrence {
   freq: Freq;
   interval?: number;
   byDay?: Weekday[];
+  /** MONTHLY only: the nth `byDay` of the month; -1 = last (RRULE "BYDAY=3FR"). */
+  setPos?: SetPos;
   until?: string;
   count?: number;
 }
+
+export const SET_POS = [1, 2, 3, 4, -1] as const;
+export type SetPos = (typeof SET_POS)[number];
 
 export interface Recurring {
   start_date: string;
@@ -26,13 +31,35 @@ export function recurrenceError(r: unknown): string | null {
   if (!isOneOf(FREQ, x.freq)) return `freq must be one of ${FREQ.join(', ')}`;
   if (x.interval !== undefined && !(Number.isInteger(x.interval) && (x.interval as number) >= 1 && (x.interval as number) <= 99)) return 'interval must be 1–99';
   if (x.byDay !== undefined) {
-    if (x.freq !== 'WEEKLY') return 'byDay is only allowed with WEEKLY';
+    if (x.freq !== 'WEEKLY' && x.freq !== 'MONTHLY') return 'byDay is only allowed with WEEKLY or MONTHLY';
     if (!Array.isArray(x.byDay) || x.byDay.length === 0 || !x.byDay.every((d) => isOneOf(WEEKDAY, d))) return 'byDay must be a non-empty list of SU..SA';
   }
+  if (x.freq === 'MONTHLY' && (x.byDay !== undefined || x.setPos !== undefined)) {
+    if (!Array.isArray(x.byDay) || x.byDay.length !== 1) return 'MONTHLY by weekday needs exactly one byDay';
+    if (!(SET_POS as readonly unknown[]).includes(x.setPos)) return 'setPos must be 1, 2, 3, 4 or -1 (last)';
+  }
+  if (x.setPos !== undefined && x.freq !== 'MONTHLY') return 'setPos is only allowed with MONTHLY';
   if (x.until !== undefined && !isDate(x.until)) return 'until must be YYYY-MM-DD';
   if (x.count !== undefined && !(Number.isInteger(x.count) && (x.count as number) >= 1)) return 'count must be a positive integer';
   if (x.until !== undefined && x.count !== undefined) return 'use until or count, not both';
   return null;
+}
+
+/** The nth (1–4) or last (-1) given weekday (0 = Sunday) of a month, as YYYY-MM-DD. */
+export function nthWeekdayOfMonth(year: number, month1: number, weekday: number, n: SetPos): string {
+  if (n === -1) {
+    const last = ymd(year, month1, daysInMonth(year, month1));
+    return addDays(last, -((weekdayOf(last) - weekday + 7) % 7));
+  }
+  const first = ymd(year, month1, 1);
+  return addDays(first, ((weekday - weekdayOf(first) + 7) % 7) + (n - 1) * 7);
+}
+
+/** How the form describes a date's position: 16 Oct 2026 (a Friday) → { weekday: 'FR', setPos: 3 }. */
+export function positionInMonth(date: string): { weekday: Weekday; setPos: SetPos } {
+  const day = Number(date.slice(8, 10));
+  const n = Math.ceil(day / 7);
+  return { weekday: WEEKDAY[weekdayOf(date)], setPos: (n >= 5 ? -1 : n) as SetPos };
 }
 
 /** Occurrence start dates (local) within [from, to], inclusive, in order. */
@@ -89,7 +116,11 @@ export function occurrences(ev: Recurring, from: string, to: string): string[] {
         const yy = y + Math.floor(mi / 12);
         const mm = (mi % 12) + 1;
         if (ymd(yy, mm, 1) > last) break;
-        if (day <= daysInMonth(yy, mm) && !emit(ymd(yy, mm, day))) break;
+        if (r.byDay && r.setPos) {
+          const d = nthWeekdayOfMonth(yy, mm, WEEKDAY.indexOf(r.byDay[0]), r.setPos);
+          if (d < ev.start_date) continue;
+          if (!emit(d)) break;
+        } else if (day <= daysInMonth(yy, mm) && !emit(ymd(yy, mm, day))) break;
       }
       break;
     }

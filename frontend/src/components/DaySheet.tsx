@@ -17,7 +17,7 @@ interface Props {
 }
 
 export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
-  const { memberById } = useApp();
+  const { memberById, me } = useApp();
   const items = data?.items ?? [];
   const allDay = items.filter((o) => o.allDay);
   const timed = items.filter((o) => !o.allDay);
@@ -42,6 +42,7 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
     <Modal title={longDate(date)} onClose={onClose} footer={<button className="primary" onClick={onAdd}>＋ Add event</button>}>
       {data?.publicHolidays.map((h) => <p key={h.name} className={s.holiday} style={{ background: 'var(--holiday-public-cell)', borderRadius: 6, padding: '2px 8px' }}>{h.emoji} {h.name} — day off</p>)}
       {data?.schoolHolidays.map((h) => <p key={h} className={s.holiday} style={{ color: 'var(--holiday-school)' }}>🏫 {h} (school)</p>)}
+      {!!me.showOptionsExpiration && data?.marketDays.map((m) => <p key={m.name} className={s.holiday}>{m.emoji} {m.name}</p>)}
       {items.length === 0 && <p className="muted">Nothing on this day.</p>}
       <ul className={s.list}>
         {allDay.map(row)}

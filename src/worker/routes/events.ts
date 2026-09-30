@@ -5,6 +5,7 @@ import { CHANNEL, isOneOf, type Channel } from '../../shared/vocab';
 import { addDays, diffDays, isDate, isTime } from '../../shared/time';
 import { occurrences, recurrenceError, type Recurrence } from '../../shared/recurrence';
 import { publicHolidaysBetween } from '../../shared/holidays';
+import { marketDaysBetween } from '../../shared/markets';
 import { all, first, newId, nowIso, parseJson, run } from '../db';
 import { body, fail, intIn, optStr, str } from '../http';
 import { requireMember } from '../session';
@@ -131,7 +132,7 @@ events.get('/calendar', requireMember, async (c) => {
   }
   occ.sort((a, b) => (a.date + (a.startTime ?? '')).localeCompare(b.date + (b.startTime ?? '')));
   const schoolHolidays = await all(c.env.DB, 'SELECT date, label FROM school_holidays WHERE date BETWEEN ? AND ? ORDER BY date', from, to);
-  return c.json({ occurrences: occ, publicHolidays: publicHolidaysBetween(from, to, await daysOff(c.env.DB)), schoolHolidays });
+  return c.json({ occurrences: occ, publicHolidays: publicHolidaysBetween(from, to, await daysOff(c.env.DB)), schoolHolidays, marketDays: marketDaysBetween(from, to) });
 });
 
 events.post('/events', requireMember, async (c) => {

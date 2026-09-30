@@ -48,6 +48,9 @@ function MeSection({ onLogout }: { onLogout: () => void }) {
       <label className="row" style={{ marginBottom: 12 }}>
         <input type="checkbox" checked={!!me.showSchoolHolidays} onChange={(e) => save({ showSchoolHolidays: e.target.checked })} /> Show school holidays
       </label>
+      <label className="row" style={{ marginBottom: 12, marginTop: -4 }}>
+        <input type="checkbox" checked={!!me.showOptionsExpiration} onChange={(e) => save({ showOptionsExpiration: e.target.checked })} /> 📈 Show monthly options expiration
+      </label>
       <PhoneAlerts />
       <button onClick={() => run(async () => { await post('/auth/logout'); onLogout(); })}>Log out</button>
     </Section>

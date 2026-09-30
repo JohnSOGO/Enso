@@ -14,6 +14,7 @@ export interface DayData {
   items: (Occurrence & { continued: boolean })[];
   publicHolidays: { name: string; emoji: string }[];
   schoolHolidays: string[];
+  marketDays: { name: string; emoji: string }[];
 }
 
 const WEEKS_BACK = 520; // ±10 years of scrollable weeks
@@ -64,7 +65,7 @@ function buildDays(json: any, from: string, to: string): Map<string, DayData> {
   const days = new Map<string, DayData>();
   const day = (d: string) => {
     let x = days.get(d);
-    if (!x) { x = { items: [], publicHolidays: [], schoolHolidays: [] }; days.set(d, x); }
+    if (!x) { x = { items: [], publicHolidays: [], schoolHolidays: [], marketDays: [] }; days.set(d, x); }
     return x;
   };
   for (const o of json.occurrences as Occurrence[]) {
@@ -76,6 +77,7 @@ function buildDays(json: any, from: string, to: string): Map<string, DayData> {
   }
   for (const h of json.publicHolidays) day(h.date).publicHolidays.push({ name: h.name, emoji: h.emoji });
   for (const h of json.schoolHolidays) day(h.date).schoolHolidays.push(h.label);
+  for (const m of json.marketDays ?? []) day(m.date).marketDays.push({ name: m.name, emoji: m.emoji });
   return days;
 }
 
@@ -158,13 +160,14 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
       const data = dayData(date, w);
       const pub = me.showPublicHolidays ? data?.publicHolidays ?? [] : [];
       const school = me.showSchoolHolidays ? data?.schoolHolidays ?? [] : [];
+      const market = me.showOptionsExpiration ? data?.marketDays ?? [] : [];
       const items = data?.items ?? [];
       const single = items.filter((o) => !isMultiDay(o)); // multi-day events are drawn as bars
       const stay = spans.find((sp) => sp.start <= i && i <= sp.end);
       // Beside the date number when there is room; on phone widths, first on the line below it.
-      const holidayEmoji = (pub.length > 0 || school.length > 0) && (
-        <span className={s.hEmoji} aria-hidden title={[...pub.map((h) => h.name), ...school].join(', ')}>
-          {pub.length > 0 && pub[0].emoji}{school.length > 0 && '🏫'}
+      const holidayEmoji = (pub.length > 0 || school.length > 0 || market.length > 0) && (
+        <span className={s.hEmoji} aria-hidden title={[...pub.map((h) => h.name), ...school, ...market.map((m) => m.name)].join(', ')}>
+          {pub.length > 0 && pub[0].emoji}{school.length > 0 && '🏫'}{market.length > 0 && market[0].emoji}
         </span>
       );
       const cls = [
@@ -178,7 +181,7 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
       const label = [
         new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }),
         items.length ? `${items.length} event${items.length > 1 ? 's' : ''}` : '',
-        ...pub.map((h) => h.name), ...school,
+        ...pub.map((h) => h.name), ...school, ...market.map((m) => m.name),
       ].filter(Boolean).join(', ');
       cells.push(
         <button key={date} className={cls} aria-label={label} onClick={() => onOpenDay(date, data)}
@@ -247,6 +250,7 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
       <div className={s.legend}>
         {!!me.showPublicHolidays && <span><i className={s.legendPub} /> Public holiday</span>}
         {!!me.showSchoolHolidays && <span><i className={s.legendSchool} /> School holiday</span>}
+        {!!me.showOptionsExpiration && <span>📈 Options expiration</span>}
         {loadError && <span className="badge bad" role="alert">Calendar failed to load: {loadError}</span>}
       </div>
       <div className={s.dow} aria-hidden>{DOW.map((d, i) => <span key={i}>{d}</span>)}</div>

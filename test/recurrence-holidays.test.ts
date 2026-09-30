@@ -1,6 +1,7 @@
 // SPEC §5.8 R4–R7 and §7.3 acceptance.
 import { describe, expect, it } from 'vitest';
-import { occurrences, recurrenceError } from '../src/shared/recurrence';
+import { occurrences, positionInMonth, recurrenceError } from '../src/shared/recurrence';
+import { easter, optionsExpirations } from '../src/shared/markets';
 import { DEFAULT_DAYS_OFF, HOLIDAY_KEYS, publicHolidays } from '../src/shared/holidays';
 
 const first = (n: number, xs: string[]) => xs.slice(0, n);
@@ -81,5 +82,39 @@ describe('public holidays', () => {
     expect(dates).not.toContain('2026-10-12'); // Columbus Day
     expect(dates).not.toContain('2026-11-11'); // Veterans Day
     expect(dates).toContain('2026-11-27');
+  });
+});
+
+describe('monthly by weekday (SPEC §4.3)', () => {
+  it('3rd Friday', () => {
+    const ev = { start_date: '2026-10-16', recurrence: { freq: 'MONTHLY' as const, byDay: ['FR' as const], setPos: 3 as const }, exdates: [] };
+    expect(first(3, occurrences(ev, '2026-01-01', '2027-12-31'))).toEqual(['2026-10-16', '2026-11-20', '2026-12-18']);
+  });
+  it('last Friday', () => {
+    const ev = { start_date: '2026-10-30', recurrence: { freq: 'MONTHLY' as const, byDay: ['FR' as const], setPos: -1 as const }, exdates: [] };
+    expect(first(3, occurrences(ev, '2026-01-01', '2027-12-31'))).toEqual(['2026-10-30', '2026-11-27', '2026-12-25']);
+  });
+  it('the form derives the position from the date', () => {
+    expect(positionInMonth('2026-10-16')).toEqual({ weekday: 'FR', setPos: 3 });
+    expect(positionInMonth('2026-10-30')).toEqual({ weekday: 'FR', setPos: -1 });
+  });
+  it('validates', () => {
+    expect(recurrenceError({ freq: 'MONTHLY', byDay: ['FR'] })).toMatch(/setPos/);
+    expect(recurrenceError({ freq: 'MONTHLY', byDay: ['FR', 'MO'], setPos: 3 })).toMatch(/exactly one/);
+    expect(recurrenceError({ freq: 'WEEKLY', setPos: 3 })).toMatch(/only allowed with MONTHLY/);
+  });
+});
+
+describe('monthly options expiration (SPEC §7.4)', () => {
+  const on = (year: number) => optionsExpirations(year).map((d) => d.date);
+  it('Easter', () => {
+    expect([easter(2025), easter(2026), easter(2027)]).toEqual(['2025-04-20', '2026-04-05', '2027-03-28']);
+  });
+  it('3rd Friday, or Thursday when the exchange is closed', () => {
+    expect(on(2026)).toContain('2026-10-16');
+    expect(on(2026)).toContain('2026-06-18'); // Fri 06-19 is Juneteenth
+    expect(on(2025)).toContain('2025-04-17'); // Fri 04-18 is Good Friday
+    expect(on(2026)).toContain('2026-04-17'); // Good Friday 2026 is 04-03
+    expect(on(2026)).toHaveLength(12);
   });
 });

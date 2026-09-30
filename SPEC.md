@@ -376,6 +376,7 @@ CREATE TABLE member_prefs (
   member_id            TEXT PRIMARY KEY REFERENCES members(id),
   show_public_holidays INTEGER NOT NULL DEFAULT 1,
   show_school_holidays INTEGER NOT NULL DEFAULT 1
+  -- + show_options_expiration INTEGER NOT NULL DEFAULT 0   (migration 0004, §7.4)
 );
 ```
 
@@ -401,7 +402,8 @@ An alarm row always has: `start_time` set (never all-day), `recurrence =
 interface Recurrence {
   freq: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
   interval?: number;          // default 1; "every 2 weeks" = WEEKLY, interval 2
-  byDay?: ('SU'|'MO'|'TU'|'WE'|'TH'|'FR'|'SA')[];   // WEEKLY only; default = weekday of start_date
+  byDay?: ('SU'|'MO'|'TU'|'WE'|'TH'|'FR'|'SA')[];   // WEEKLY: days; MONTHLY: exactly one day, with setPos
+  setPos?: 1 | 2 | 3 | 4 | -1;  // MONTHLY only: the nth byDay of the month (-1 = last) — RRULE "BYDAY=3FR"
   until?: string;             // local YYYY-MM-DD, inclusive
   count?: number;             // total occurrences; not together with until
 }
@@ -409,7 +411,11 @@ interface Recurrence {
 
 - All expansion happens on **local dates**, then each occurrence is converted to
   UTC with `localToUtc`.
-- `MONTHLY` repeats on the start date's day-of-month. Months without that day are
+- `MONTHLY` with `byDay` + `setPos` repeats on the nth weekday of the month
+  ("3rd Friday" = `{"freq":"MONTHLY","byDay":["FR"],"setPos":3}`; `-1` = last).
+  The event form derives it from the start date: n = ceil(day ÷ 7); a 5th weekday
+  is offered as "last".
+- `MONTHLY` without `byDay` repeats on the start date's day-of-month. Months without that day are
   **skipped** (the 31st does not fire in February). `YEARLY` on 29 Feb fires only
   in leap years. Both follow RFC 5545 behavior.
 - `exdates` removes individual occurrences.
@@ -419,6 +425,8 @@ interface Recurrence {
   `occurrences(event, fromDate, toDate): string[]` (local dates, inclusive).
 - The same module expands events for the calendar view **and** for the engine.
   There is one recurrence format in the whole app.
+- **Acceptance:** 3rd Friday from 2026-10-16 → 2026-10-16, 2026-11-20, 2026-12-18;
+  last Friday from 2026-10-30 → 2026-10-30, 2026-11-27, 2026-12-25.
 
 ---
 
@@ -704,6 +712,24 @@ is always marked too. New Year's Day on a Saturday is observed on Dec 31 of the
 - With the default days off, 2026 has no Columbus Day (`2026-10-12`) and no
   Veterans Day (`2026-11-11`).
 
+### 7.4 Monthly options expiration 📈 (`src/shared/markets.ts`)
+
+A per-member marker, off by default, switched on in Settings → Me ("📈 Show monthly
+options expiration"; `member_prefs.show_options_expiration`, migration
+`0004_options_expiration.sql`).
+
+- The date is the **3rd Friday** of each month; if that day is an exchange holiday
+  (Good Friday, or Juneteenth — actual or observed), it is the **Thursday before**.
+  Good Friday = Easter Sunday − 2 days (Gregorian computus).
+- Rendering: 📈 next to the date number (the holiday-emoji slot, §7.2 — both show when
+  a day has both). No cell tint. The day sheet lists "📈 Monthly options expiration".
+  The legend shows "📈 Options expiration" while it is on.
+- `/calendar` always returns `marketDays: { date, name, emoji }[]` for the range; the
+  client shows them only when the member's switch is on (same pattern as holidays).
+- **Acceptance:** 2026-10-16 (3rd Fri); 2026-06-18 (Thu — Fri 06-19 is Juneteenth);
+  2025-04-17 (Thu — Fri 04-18 is Good Friday); 2026-04-17 (Good Friday 2026 is 04-03,
+  unaffected). Easter: 2025-04-20, 2026-04-05, 2027-03-28.
+
 ---
 
 ## 8. Screens
@@ -767,7 +793,8 @@ Fields:
 - All-day toggle
 - Start / end time (hidden when all-day)
 - End date (all-day only)
-- Repeat: Never / Daily / Weekly (day checkboxes) / Every 2 weeks / Monthly /
+- Repeat: Never / Daily / Weekly (day checkboxes) / Every 2 weeks / Monthly on day N /
+  Monthly on the nth weekday (e.g. "Monthly on the 3rd Friday", derived from the date) /
   Yearly, plus an optional end date
 - Assigned to (member chips, none = everyone)
 - **Reminder:**
@@ -822,7 +849,8 @@ assigned to, Delete).
 
 ### 8.6 Settings
 
-- **Me:** name, color, enable phone alerts (subscribe), show/hide holiday types, log
+- **Me:** name, color, enable phone alerts (subscribe), show/hide holiday types,
+  show/hide 📈 options expiration (§7.4), log
   out.
 - **Household (owner):** name, timezone, members list (disable), invites (create,
   list, revoke), school holidays.

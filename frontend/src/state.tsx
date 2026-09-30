@@ -6,7 +6,7 @@ import { utcToLocal } from '../../src/shared/time';
 
 export interface Me {
   id: string; email: string; displayName: string; color: string; role: 'owner' | 'member';
-  showPublicHolidays: number; showSchoolHolidays: number;
+  showPublicHolidays: number; showSchoolHolidays: number; showOptionsExpiration: number;
 }
 export interface Member { id: string; displayName: string; color: string; role: string; email?: string; disabledAt: string | null }
 export interface Fire {
