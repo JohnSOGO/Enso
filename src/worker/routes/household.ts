@@ -21,7 +21,7 @@ async function settingsView(db: D1Database) {
   const s = await first<{ household_name: string; timezone: string }>(db, 'SELECT household_name, timezone FROM settings WHERE id = 1');
   return {
     householdName: s!.household_name, timezone: s!.timezone, daysOff: await daysOff(db),
-    holidays: HOLIDAY_KEYS.map((key) => ({ key, name: HOLIDAYS[key].name })),
+    holidays: HOLIDAY_KEYS.map((key) => ({ key, name: HOLIDAYS[key].name, emoji: HOLIDAYS[key].emoji })),
   };
 }
 

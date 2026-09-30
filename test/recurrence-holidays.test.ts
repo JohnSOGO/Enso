@@ -75,8 +75,8 @@ describe('public holidays', () => {
     expect(on(2026, '2026-11-27')).toEqual(['Day after Thanksgiving']);
   });
 
-  it("default days off are MojoSOGO's list: the core six + day after Thanksgiving", () => {
-    expect(DEFAULT_DAYS_OFF).toEqual(['new_years_day', 'memorial_day', 'independence_day', 'labor_day', 'thanksgiving', 'day_after_thanksgiving', 'christmas']);
+  it("default days off are MojoSOGO's list: the core six + day after Thanksgiving + both eves", () => {
+    expect(DEFAULT_DAYS_OFF).toEqual(['new_years_day', 'memorial_day', 'independence_day', 'labor_day', 'thanksgiving', 'day_after_thanksgiving', 'christmas_eve', 'christmas', 'new_years_eve']);
     const dates = publicHolidays(2026, DEFAULT_DAYS_OFF).map((h) => h.date);
     expect(dates).not.toContain('2026-10-12'); // Columbus Day
     expect(dates).not.toContain('2026-11-11'); // Veterans Day

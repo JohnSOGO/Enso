@@ -619,14 +619,20 @@ email return 429 for 15 minutes.
   - The view renders a window of weeks around the viewport and extends it as the
     user scrolls, in both directions. It is virtualized: never more than about 30
     week rows in the DOM.
-- **Today:** the date number gets an accent-colored circle.
+- **Today:** the date number gets an accent-colored circle, and the whole cell has a
+  **pulsing accent border** (a steady border when the OS asks for reduced motion).
 - **Event display in a cell:**
   - At ≥ 480px, up to 3 lines per cell, each a 1-line event title chip in the
     creator's color, truncated with an ellipsis. Beyond 3, a `+N` badge.
   - Below 480px, **colored dots only** (max 4, then `+`); titles appear in the day
     sheet. At 320px a cell is about 44px wide, and titles do not fit.
-- **All-day multi-day events** draw one continuous bar across the days (wrapping to
-  the next week row). Timed events are single-day in v1.
+- **Multi-day (all-day) events are grouped:** one continuous bar in the event's
+  color spans the days, and those day cells get a faint tint of the same color so
+  the stay reads as one block. The title is written **once**, at the start of the
+  bar — and again at the start of a week row if the stay wraps onto it. The bar sits
+  above the per-day entries and does not take taps: each day stays individually
+  tappable and still shows its own events. Overlapping stays stack in lanes. Timed
+  events are single-day in v1.
 - **Tapping a day** opens the **day sheet** (§8.3).
 - **Scheduled alarms (`is_alarm = 1`) are never drawn on the calendar** and never
   appear in `/calendar`. They are listed on the Alarms tab (§8.5).
@@ -647,8 +653,8 @@ Oct '26   4    5    6    7    8    9   10
 
 | Type | Source | Treatment |
 |------|--------|-----------|
-| Public (days off) | Computed in `src/shared/holidays.ts`, filtered to the household's **days off** (§7.3) — no hand-typed yearly dates | **Whole cell highlighted light yellow** (`--holiday-public-cell`); name in the day sheet |
-| School | `school_holidays` table, edited by the owner in Settings → School holidays (add a single date or a date range + label) | Blue (`--holiday-school`) date number + circle; label in the day sheet |
+| Public (days off) | Computed in `src/shared/holidays.ts`, filtered to the household's **days off** (§7.3) — no hand-typed yearly dates | **Whole cell highlighted light yellow** (`--holiday-public-cell`) + the holiday's **emoji next to the date number**; name in the day sheet |
+| School | `school_holidays` table, edited by the owner in Settings → School holidays (add a single date or a date range + label) | Blue (`--holiday-school`) date number + circle + 🏫 next to it; label in the day sheet |
 
 - **Legend:** shown once, directly under the sticky month header.
 - **Toggles:** each member can hide either type (`member_prefs`).
@@ -659,22 +665,22 @@ Oct '26   4    5    6    7    8    9   10
 
 `HOLIDAYS` is the one table of known holidays — key, name, rule:
 
-| Key | Holiday | Rule | Day off by default |
-|-----|---------|------|:---:|
-| `new_years_day` | New Year's Day | Jan 1 | ✓ |
-| `mlk_day` | Martin Luther King Jr. Day | 3rd Monday of January | |
-| `presidents_day` | Presidents' Day | 3rd Monday of February | |
-| `memorial_day` | Memorial Day | last Monday of May | ✓ |
-| `juneteenth` | Juneteenth | Jun 19 | |
-| `independence_day` | Independence Day | Jul 4 | ✓ |
-| `labor_day` | Labor Day | 1st Monday of September | ✓ |
-| `columbus_day` | Columbus Day | 2nd Monday of October | |
-| `veterans_day` | Veterans Day | Nov 11 | |
-| `thanksgiving` | Thanksgiving | 4th Thursday of November | ✓ |
-| `day_after_thanksgiving` | Day after Thanksgiving | the Friday after Thanksgiving | ✓ |
-| `christmas_eve` | Christmas Eve | Dec 24 | ⚑ off — MojoSOGO's list says "New Year's Eve **or** Christmas Eve" |
-| `christmas` | Christmas | Dec 25 | ✓ |
-| `new_years_eve` | New Year's Eve | Dec 31 | ⚑ off — see above |
+| Key | Emoji | Holiday | Rule | Day off by default |
+|-----|:---:|---------|------|:---:|
+| `new_years_day` | 🎉 | New Year's Day | Jan 1 | ✓ |
+| `mlk_day` | 🕊️ | Martin Luther King Jr. Day | 3rd Monday of January |  |
+| `presidents_day` | 🏛️ | Presidents' Day | 3rd Monday of February |  |
+| `memorial_day` | 🎖️ | Memorial Day | last Monday of May | ✓ |
+| `juneteenth` | ✊ | Juneteenth | Jun 19 |  |
+| `independence_day` | 🎆 | Independence Day | Jul 4 | ✓ |
+| `labor_day` | 🛠️ | Labor Day | 1st Monday of September | ✓ |
+| `columbus_day` | ⛵ | Columbus Day | 2nd Monday of October |  |
+| `veterans_day` | 🪖 | Veterans Day | Nov 11 |  |
+| `thanksgiving` | 🦃 | Thanksgiving | 4th Thursday of November | ✓ |
+| `day_after_thanksgiving` | 🛍️ | Day after Thanksgiving | the Friday after Thanksgiving | ✓ |
+| `christmas_eve` | 🎄 | Christmas Eve | Dec 24 | ✓ |
+| `christmas` | 🎁 | Christmas | Dec 25 | ✓ |
+| `new_years_eve` | 🥂 | New Year's Eve | Dec 31 | ✓ |
 
 - `publicHolidays(year, keys?)` returns the holidays (actual + observed dates) whose
   key is in `keys` (all when omitted).
@@ -837,7 +843,7 @@ Dark by default. Colors are defined as tokens on `:root`:
 | `--accent` | `#6366F1` (indigo — kept apart from school-holiday blue ⚑) |
 | `--month-a` | `#0F172A` |
 | `--month-b` | `#162033` |
-| `--holiday-public-cell` | `#FEF08A` (light yellow; date text on it is dark `#1E293B`) ⚑ |
+| `--holiday-public-cell` | `#FEFCE8` (super-light yellow; date text on it is dark `#1E293B`) |
 | `--holiday-school` | `#3B82F6` |
 
 ---

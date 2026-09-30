@@ -155,7 +155,7 @@ function HouseholdSection() {
 /** Which public holidays this household gets off — they are highlighted yellow on the calendar (SPEC §7.3). */
 function DaysOff() {
   const { version, refresh } = useApp();
-  const [data, setData] = useState<{ daysOff: string[]; holidays: { key: string; name: string }[] } | null>(null);
+  const [data, setData] = useState<{ daysOff: string[]; holidays: { key: string; name: string; emoji: string }[] } | null>(null);
   const { run, busy, errorEl } = useAction();
   useEffect(() => { get('/settings').then(setData).catch(() => undefined); }, [version]);
   if (!data) return null;
@@ -172,7 +172,7 @@ function DaysOff() {
       <div className="row wrap" role="group" aria-label="Days off">
         {data.holidays.map((h) => (
           <label key={h.key} className="chip" style={{ padding: '4px 8px' }}>
-            <input type="checkbox" disabled={busy} checked={data.daysOff.includes(h.key)} onChange={(e) => toggle(h.key, e.target.checked)} /> {h.name}
+            <input type="checkbox" disabled={busy} checked={data.daysOff.includes(h.key)} onChange={(e) => toggle(h.key, e.target.checked)} /> {h.emoji} {h.name}
           </label>
         ))}
       </div>

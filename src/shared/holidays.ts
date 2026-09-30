@@ -1,7 +1,7 @@
 // SPEC §7.3 — the one table of known holidays, computed (never a hand-typed list of dates).
 import { addDays, daysInMonth, weekdayOf, ymd } from './time';
 
-export interface PublicHoliday { date: string; key: HolidayKey; name: string; observed: boolean }
+export interface PublicHoliday { date: string; key: HolidayKey; name: string; emoji: string; observed: boolean }
 
 function nthWeekday(year: number, month: number, weekday: number, n: number): string {
   const first = ymd(year, month, 1);
@@ -16,6 +16,8 @@ function lastWeekday(year: number, month: number, weekday: number): string {
 const MON = 1, THU = 4;
 
 interface Rule {
+  /** Shown next to the date number on the calendar (no flag emoji — Windows renders them as letters). */
+  emoji: string;
   name: string;
   date: (year: number) => string;
   /** Fixed-date federal holidays get a weekday "observed" day when they fall on a weekend. */
@@ -24,20 +26,20 @@ interface Rule {
 }
 
 export const HOLIDAYS = {
-  new_years_day: { name: "New Year's Day", date: (y) => ymd(y, 1, 1), observed: true, dayOffByDefault: true },
-  mlk_day: { name: 'Martin Luther King Jr. Day', date: (y) => nthWeekday(y, 1, MON, 3), dayOffByDefault: false },
-  presidents_day: { name: "Presidents' Day", date: (y) => nthWeekday(y, 2, MON, 3), dayOffByDefault: false },
-  memorial_day: { name: 'Memorial Day', date: (y) => lastWeekday(y, 5, MON), dayOffByDefault: true },
-  juneteenth: { name: 'Juneteenth', date: (y) => ymd(y, 6, 19), observed: true, dayOffByDefault: false },
-  independence_day: { name: 'Independence Day', date: (y) => ymd(y, 7, 4), observed: true, dayOffByDefault: true },
-  labor_day: { name: 'Labor Day', date: (y) => nthWeekday(y, 9, MON, 1), dayOffByDefault: true },
-  columbus_day: { name: 'Columbus Day', date: (y) => nthWeekday(y, 10, MON, 2), dayOffByDefault: false },
-  veterans_day: { name: 'Veterans Day', date: (y) => ymd(y, 11, 11), observed: true, dayOffByDefault: false },
-  thanksgiving: { name: 'Thanksgiving', date: (y) => nthWeekday(y, 11, THU, 4), dayOffByDefault: true },
-  day_after_thanksgiving: { name: 'Day after Thanksgiving', date: (y) => addDays(nthWeekday(y, 11, THU, 4), 1), dayOffByDefault: true },
-  christmas_eve: { name: 'Christmas Eve', date: (y) => ymd(y, 12, 24), dayOffByDefault: false }, // ⚑ "NYE or Christmas Eve"
-  christmas: { name: 'Christmas', date: (y) => ymd(y, 12, 25), observed: true, dayOffByDefault: true },
-  new_years_eve: { name: "New Year's Eve", date: (y) => ymd(y, 12, 31), dayOffByDefault: false }, // ⚑ see above
+  new_years_day: { emoji: '🎉', name: "New Year's Day", date: (y) => ymd(y, 1, 1), observed: true, dayOffByDefault: true },
+  mlk_day: { emoji: '🕊️', name: 'Martin Luther King Jr. Day', date: (y) => nthWeekday(y, 1, MON, 3), dayOffByDefault: false },
+  presidents_day: { emoji: '🏛️', name: "Presidents' Day", date: (y) => nthWeekday(y, 2, MON, 3), dayOffByDefault: false },
+  memorial_day: { emoji: '🎖️', name: 'Memorial Day', date: (y) => lastWeekday(y, 5, MON), dayOffByDefault: true },
+  juneteenth: { emoji: '✊', name: 'Juneteenth', date: (y) => ymd(y, 6, 19), observed: true, dayOffByDefault: false },
+  independence_day: { emoji: '🎆', name: 'Independence Day', date: (y) => ymd(y, 7, 4), observed: true, dayOffByDefault: true },
+  labor_day: { emoji: '🛠️', name: 'Labor Day', date: (y) => nthWeekday(y, 9, MON, 1), dayOffByDefault: true },
+  columbus_day: { emoji: '⛵', name: 'Columbus Day', date: (y) => nthWeekday(y, 10, MON, 2), dayOffByDefault: false },
+  veterans_day: { emoji: '🪖', name: 'Veterans Day', date: (y) => ymd(y, 11, 11), observed: true, dayOffByDefault: false },
+  thanksgiving: { emoji: '🦃', name: 'Thanksgiving', date: (y) => nthWeekday(y, 11, THU, 4), dayOffByDefault: true },
+  day_after_thanksgiving: { emoji: '🛍️', name: 'Day after Thanksgiving', date: (y) => addDays(nthWeekday(y, 11, THU, 4), 1), dayOffByDefault: true },
+  christmas_eve: { emoji: '🎄', name: 'Christmas Eve', date: (y) => ymd(y, 12, 24), dayOffByDefault: true },
+  christmas: { emoji: '🎁', name: 'Christmas', date: (y) => ymd(y, 12, 25), observed: true, dayOffByDefault: true },
+  new_years_eve: { emoji: '🥂', name: "New Year's Eve", date: (y) => ymd(y, 12, 31), dayOffByDefault: true },
 } satisfies Record<string, Rule>;
 
 export type HolidayKey = keyof typeof HOLIDAYS;
@@ -65,9 +67,9 @@ export function publicHolidays(year: number, keys: readonly HolidayKey[] = HOLID
     const rule: Rule = HOLIDAYS[key];
     for (const y of [year, year + 1]) {
       const date = rule.date(y);
-      if (y === year) out.push({ date, key, name: rule.name, observed: false });
+      if (y === year) out.push({ date, key, name: rule.name, emoji: rule.emoji, observed: false });
       const obs = rule.observed ? observedDate(date) : null;
-      if (obs && obs.startsWith(String(year))) out.push({ date: obs, key, name: `${rule.name} (observed)`, observed: true });
+      if (obs && obs.startsWith(String(year))) out.push({ date: obs, key, name: `${rule.name} (observed)`, emoji: rule.emoji, observed: true });
     }
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));

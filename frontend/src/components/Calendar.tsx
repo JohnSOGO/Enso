@@ -12,7 +12,7 @@ export interface Occurrence {
 }
 export interface DayData {
   items: (Occurrence & { continued: boolean })[];
-  publicHolidays: string[];
+  publicHolidays: { name: string; emoji: string }[];
   schoolHolidays: string[];
 }
 
@@ -22,6 +22,43 @@ const CHUNK_WEEKS = 8; // one /calendar request = 56 days
 const OVERSCAN = 3;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+/** A multi-day event's piece inside one week row (SPEC §7.1 "grouped"). */
+interface Span { key: string; o: Occurrence; start: number; end: number; lane: number; label: boolean }
+
+const isMultiDay = (o: Occurrence) => o.endDate > o.date;
+
+/** Lays out the multi-day events touching one week as bars in lanes. */
+function weekSpans(weekStart: string, dayOf: (date: string) => DayData | undefined): Span[] {
+  const weekEnd = addDays(weekStart, 6);
+  const seen = new Map<string, Occurrence>();
+  for (let i = 0; i < 7; i++) {
+    for (const o of dayOf(addDays(weekStart, i))?.items ?? []) {
+      if (isMultiDay(o)) seen.set(`${o.eventId}|${o.date}`, o);
+    }
+  }
+  const spans = [...seen.entries()]
+    .map(([key, o]) => {
+      const from = o.date > weekStart ? o.date : weekStart;
+      const to = o.endDate < weekEnd ? o.endDate : weekEnd;
+      // Title once at the start of the stay — and again where it wraps onto a new week row.
+      return { key, o, start: diffDays(from, weekStart), end: diffDays(to, weekStart), lane: 0, label: true };
+    })
+    .sort((a, b) => a.start - b.start || b.end - a.end);
+  const laneEnds: number[] = [];
+  for (const sp of spans) {
+    let lane = laneEnds.findIndex((end) => end < sp.start);
+    if (lane === -1) { lane = laneEnds.length; laneEnds.push(sp.end); } else laneEnds[lane] = sp.end;
+    sp.lane = lane;
+  }
+  return spans;
+}
+
+/** '#RRGGBB' → rgba() with the given alpha. */
+function tint(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
 
 function buildDays(json: any, from: string, to: string): Map<string, DayData> {
   const days = new Map<string, DayData>();
@@ -37,7 +74,7 @@ function buildDays(json: any, from: string, to: string): Map<string, DayData> {
       if (d >= from && d <= to) day(d).items.push({ ...o, continued: i > 0 });
     }
   }
-  for (const h of json.publicHolidays) day(h.date).publicHolidays.push(h.name);
+  for (const h of json.publicHolidays) day(h.date).publicHolidays.push({ name: h.name, emoji: h.emoji });
   for (const h of json.schoolHolidays) day(h.date).schoolHolidays.push(h.label);
   return days;
 }
@@ -111,6 +148,9 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
   const rows = [];
   for (let w = first; w <= last; w++) {
     const weekStart = addDays(origin, w * 7);
+    const spans = weekSpans(weekStart, (date) => dayData(date, w));
+    const lanes = spans.reduce((n, sp) => Math.max(n, sp.lane + 1), 0);
+    const barH = narrow ? 14 : 16;
     const cells = [];
     for (let i = 0; i < 7; i++) {
       const date = addDays(weekStart, i);
@@ -119,6 +159,14 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
       const pub = me.showPublicHolidays ? data?.publicHolidays ?? [] : [];
       const school = me.showSchoolHolidays ? data?.schoolHolidays ?? [] : [];
       const items = data?.items ?? [];
+      const single = items.filter((o) => !isMultiDay(o)); // multi-day events are drawn as bars
+      const stay = spans.find((sp) => sp.start <= i && i <= sp.end);
+      // Beside the date number when there is room; on phone widths, first on the line below it.
+      const holidayEmoji = (pub.length > 0 || school.length > 0) && (
+        <span className={s.hEmoji} aria-hidden title={[...pub.map((h) => h.name), ...school].join(', ')}>
+          {pub.length > 0 && pub[0].emoji}{school.length > 0 && '🏫'}
+        </span>
+      );
       const cls = [
         s.cell,
         (y * 12 + m) % 2 ? s.toneB : s.toneA,
@@ -130,33 +178,57 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
       const label = [
         new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }),
         items.length ? `${items.length} event${items.length > 1 ? 's' : ''}` : '',
-        ...pub, ...school,
+        ...pub.map((h) => h.name), ...school,
       ].filter(Boolean).join(', ');
       cells.push(
-        <button key={date} className={cls} aria-label={label} onClick={() => onOpenDay(date, data)}>
+        <button key={date} className={cls} aria-label={label} onClick={() => onOpenDay(date, data)}
+          style={stay ? { backgroundImage: `linear-gradient(${tint(stay.o.color, 0.16)}, ${tint(stay.o.color, 0.16)})` } : undefined}>
           <span className={s.num}>
             {d === 1 ? <><span className={s.monthTag}>{MONTHS[m - 1]}</span> </> : null}
             <span className={s.dot}>{d}</span>
+            {!narrow && holidayEmoji}
           </span>
+          {lanes > 0 && <span aria-hidden style={{ height: lanes * (barH + 1), flex: 'none' }} />}
           {narrow ? (
             <span className={s.dots}>
-              {items.slice(0, 4).map((o, k) => <i key={k} style={{ background: o.color }} />)}
-              {items.length > 4 && <b>+</b>}
+              {holidayEmoji}
+              {single.slice(0, 4).map((o, k) => <i key={k} style={{ background: o.color }} />)}
+              {single.length > 4 && <b>+</b>}
             </span>
           ) : (
             <span className={s.chips}>
-              {items.slice(0, 3).map((o, k) => (
-                <span key={k} className={`${s.ev} ${o.continued ? s.cont : ''}`} style={{ borderLeftColor: o.color }}>
-                  {o.continued ? '↳ ' : o.startTime ? `${o.startTime} ` : ''}{o.title}
+              {single.slice(0, 3 - Math.min(lanes, 2)).map((o, k) => (
+                <span key={k} className={s.ev} style={{ borderLeftColor: o.color }}>
+                  {o.startTime ? `${o.startTime} ` : ''}{o.title}
                 </span>
               ))}
-              {items.length > 3 && <span className="badge neutral">+{items.length - 3}</span>}
+              {single.length > 3 - Math.min(lanes, 2) && <span className="badge neutral">+{single.length - (3 - Math.min(lanes, 2))}</span>}
             </span>
           )}
         </button>,
       );
     }
-    rows.push(<div key={w} className={s.week} style={{ top: w * rowH, height: rowH }}>{cells}</div>);
+    rows.push(
+      <div key={w} className={s.week} style={{ top: w * rowH, height: rowH }}>
+        {cells}
+        {lanes > 0 && (
+          <div className={s.bars} style={{ gridAutoRows: barH }} aria-hidden>
+            {spans.map((sp) => (
+              <span key={sp.key} className={s.bar}
+                style={{
+                  gridColumn: `${sp.start + 1} / ${sp.end + 2}`, gridRow: sp.lane + 1, background: sp.o.color,
+                  borderTopLeftRadius: addDays(weekStart, sp.start) === sp.o.date ? 6 : 0,
+                  borderBottomLeftRadius: addDays(weekStart, sp.start) === sp.o.date ? 6 : 0,
+                  borderTopRightRadius: addDays(weekStart, sp.end) === sp.o.endDate ? 6 : 0,
+                  borderBottomRightRadius: addDays(weekStart, sp.end) === sp.o.endDate ? 6 : 0,
+                }}>
+                {sp.label ? sp.o.title : ''}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>,
+    );
   }
 
   const [hy, hm] = headerDate.split('-').map(Number);
