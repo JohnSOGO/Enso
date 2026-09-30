@@ -12,7 +12,8 @@
     "db:migrate:remote": "wrangler d1 migrations apply hrc --remote",
     "build": "vite build --config frontend/vite.config.ts",
     "deploy": "npm run build && wrangler deploy",
-    "relay": "tsx relay/relay.ts"
+    "relay": "tsx relay/relay.ts",
+    "seed:dev": "node scripts/seed-dev.mjs"
   },
   "dependencies": {
     "hono": "^4.13.11"

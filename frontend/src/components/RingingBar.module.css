@@ -1,0 +1,11 @@
+.bar {
+  background: #3B0D0D;
+  border-bottom: 2px solid var(--bad);
+  padding: 6px 10px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.row { display: flex; align-items: center; gap: 8px; }
+.row button { min-height: 44px; flex: none; }
+.what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { color: #FCA5A5; font-size: .85rem; }
+.more { color: #FCA5A5; align-self: flex-start; font-size: .85rem; }

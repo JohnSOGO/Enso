@@ -1,0 +1,6 @@
+{
+  "_note": "LOCAL DEV ONLY test accounts for wrangler dev. Never use these on a deployed instance.",
+  "setupToken": "dev-setup-token",
+  "owner": { "email": "owner@hrc.test", "password": "dev-owner-pass-1", "displayName": "MojoSOGO" },
+  "member": { "email": "kid@hrc.test", "password": "dev-member-pass-1", "displayName": "Tostig" }
+}

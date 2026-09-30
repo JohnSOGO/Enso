@@ -422,7 +422,7 @@ applyAction(fire: FireRow, action: Action, cfg: AlertConfig, memberId: string, n
   { fire: FireRow; next?: NewFire } | { error: 'invalid_action' }
 
 // Timer start/stop.
-applyTimerCmd(timer: TimerRow, openFire: FireRow | null, cmd: TimerCmd, memberId: string, now: string):
+applyTimerCmd(timer: TimerRow, openFire: FireRow | null, cmd: TimerCmd, intervalMin: number, memberId: string, now: string):
   { timer: TimerRow; closeFire?: FireRow; newFire?: NewFire }
 ```
 
@@ -1055,6 +1055,26 @@ Captured from v1.0-draft so nothing is lost:
 | Q7 | Accent color: v1 used blue, which collides with school-holiday blue | Indigo `#6366F1` |
 | Q8 | Snooze length | 10 min, single option |
 | Q9 | Can any member Done/Ack a fire assigned to someone else? | Yes |
+
+---
+
+## 14. Prototype status (2026-09-29)
+
+Built: M0–M4 fully, M6 code (relay + API + contract test), M5 server side only
+(subscriptions stored; **no sender** — every push delivery is recorded `failed` with
+`push_sender_not_built (M5)` or `no_subscription`, shown in Settings → Status).
+
+Deviations from this spec, deliberately:
+
+- **No service worker / `vite-plugin-pwa` yet.** It arrives with M5, where the push
+  handlers need it; installing a caching SW earlier only adds stale-deploy bugs.
+- `compatibility_date` is `2026-08-20` — the bundled workerd rejects later dates.
+- §10 "Freshness" polls every 30 s. The `phone-ui` skill says *never poll*; polling
+  was kept because a ringing timer must appear without a user action. Revisit when
+  push lands (a push can trigger the refresh instead). ⚑
+- Fixed while building (already reflected above): `login_failures` table; the
+  reminder unique index covers only **open** fires (a closed `removed` fire must not
+  block its rescheduled replacement); all-day reminders fire at 09:00 local ⚑.
 
 ---
 

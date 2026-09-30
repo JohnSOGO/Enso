@@ -12,6 +12,12 @@ import { relay } from './routes/relay';
 
 const api = new Hono<AppEnv>();
 
+// The API is a system of record: never let a browser or iOS heuristically cache it.
+api.use('*', async (c, next) => {
+  await next();
+  c.header('Cache-Control', 'no-store');
+});
+
 api.get('/health', async (c) => {
   let db = false;
   try { db = (await first<{ ok: number }>(c.env.DB, 'SELECT 1 AS ok'))?.ok === 1; } catch { db = false; }

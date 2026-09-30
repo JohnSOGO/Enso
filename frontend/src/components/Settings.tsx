@@ -1,0 +1,231 @@
+// SPEC §8.6 — Me, Household (owner), School holidays (owner), Status.
+import { useEffect, useState, type ReactNode } from 'react';
+import { del, errorText, get, patch, post, put } from '../api';
+import { useApp } from '../state';
+import { MEMBER_PALETTE } from '../../../src/shared/vocab';
+import s from './Lists.module.css';
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return <section className={s.section}><h2>{title}</h2>{children}</section>;
+}
+
+/** Runs an async action and renders its failure in place — never silently. */
+function useAction() {
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true); setError(null);
+    try { await fn(); return true; } catch (e) { setError(errorText(e)); return false; } finally { setBusy(false); }
+  };
+  const errorEl = error ? <div role="alert" className="alert-error">{error}</div> : null;
+  return { run, busy, errorEl };
+}
+
+function MeSection({ onLogout }: { onLogout: () => void }) {
+  const { me, refresh } = useApp();
+  const [name, setName] = useState(me.displayName);
+  const { run, busy, errorEl } = useAction();
+  const save = (body: object) => run(async () => { await patch('/me', body); refresh(); });
+
+  return (
+    <Section title="Me">
+      {errorEl}
+      <label className="field"><span>Display name</span>
+        <div className="row"><input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+          <button disabled={busy || name === me.displayName || !name.trim()} onClick={() => save({ displayName: name })}>Save</button></div>
+      </label>
+      <div className="field"><span className="muted" style={{ fontSize: '.8rem' }}>My color</span>
+        <div className="row wrap" style={{ marginTop: 4 }}>
+          {MEMBER_PALETTE.map((c) => (
+            <button key={c} aria-label={`Color ${c}`} title={c} disabled={busy} onClick={() => save({ color: c })}
+              style={{ background: c, width: 34, height: 34, minHeight: 0, padding: 0, borderRadius: 99, outline: me.color === c ? '3px solid var(--text)' : 'none' }} />
+          ))}
+        </div>
+      </div>
+      <label className="row" style={{ marginBottom: 8 }}>
+        <input type="checkbox" checked={!!me.showPublicHolidays} onChange={(e) => save({ showPublicHolidays: e.target.checked })} /> Show public holidays
+      </label>
+      <label className="row" style={{ marginBottom: 12 }}>
+        <input type="checkbox" checked={!!me.showSchoolHolidays} onChange={(e) => save({ showSchoolHolidays: e.target.checked })} /> Show school holidays
+      </label>
+      <PhoneAlerts />
+      <button onClick={() => run(async () => { await post('/auth/logout'); onLogout(); })}>Log out</button>
+    </Section>
+  );
+}
+
+function PhoneAlerts() {
+  const { status } = useApp();
+  const [key, setKey] = useState<string | null | undefined>(undefined);
+  useEffect(() => { get('/push/vapid-key').then((r) => setKey(r.key)).catch(() => setKey(null)); }, []);
+  const subs = status?.mySubscriptions.length ?? 0;
+  return (
+    <div className="field">
+      <span className="muted" style={{ fontSize: '.8rem' }}>Phone alerts</span>
+      <div className="row" style={{ marginTop: 4 }}>
+        {subs ? <span className="badge good">{subs} device{subs > 1 ? 's' : ''} subscribed</span> : <span className="badge bad">Phone alerts off</span>}
+      </div>
+      {key === null && (
+        <p className="muted" style={{ fontSize: '.85rem', marginTop: 6 }}>
+          Not available yet: the server has no push keys. Phone push is milestone M5 and needs the app deployed on HTTPS.
+          Until then, alerts show in the red Ringing bar and (if chosen) are spoken in the house.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function HouseholdSection() {
+  const { householdName, tz, members, refresh } = useApp();
+  const [name, setName] = useState(householdName);
+  const [zone, setZone] = useState(tz);
+  const [invites, setInvites] = useState<any[]>([]);
+  const [newCode, setNewCode] = useState<{ code: string; for: string; expiresAt: string } | null>(null);
+  const [inviteName, setInviteName] = useState('');
+  const { run, busy, errorEl } = useAction();
+  const loadInvites = () => get('/invites').then(setInvites).catch(() => undefined);
+  useEffect(() => { loadInvites(); }, []);
+
+  return (
+    <Section title="Household">
+      {errorEl}
+      <div className="row">
+        <label className="field" style={{ flex: 1 }}><span>Household name</span><input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} /></label>
+        <label className="field" style={{ flex: 1 }}><span>Time zone</span><input value={zone} onChange={(e) => setZone(e.target.value)} /></label>
+      </div>
+      <button disabled={busy || (name === householdName && zone === tz)} onClick={() => run(async () => { await patch('/settings', { householdName: name, timezone: zone }); refresh(); })}>Save household</button>
+
+      <h3 style={{ fontSize: '.9rem', margin: '16px 0 6px' }}>Members</h3>
+      <table className={s.table}>
+        <thead><tr><th scope="col">Name</th><th scope="col">Role</th><th scope="col"><span className="visually-hidden">Access</span></th></tr></thead>
+        <tbody>
+          {members.map((m) => (
+            <tr key={m.id}>
+              <th scope="row" className={s.flexible} title={m.email}><span style={{ color: m.color }}>●</span> {m.displayName}</th>
+              <td className={s.rigid}>{m.disabledAt ? <span className="badge bad">disabled</span> : <span className="chip">{m.role}</span>}</td>
+              <td className={s.rigid}>
+                {m.role !== 'owner' && (
+                  <button disabled={busy} onClick={() => run(async () => { await patch(`/members/${m.id}`, { disabled: !m.disabledAt }); refresh(); })}>
+                    {m.disabledAt ? 'Enable' : 'Disable'}
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <h3 style={{ fontSize: '.9rem', margin: '16px 0 6px' }}>Invite someone</h3>
+      <div className="row">
+        <input aria-label="Name of person to invite" placeholder="e.g. Tostig" value={inviteName} maxLength={60} onChange={(e) => setInviteName(e.target.value)} />
+        <button className="primary" disabled={busy || !inviteName.trim()} onClick={() => run(async () => {
+          const r = await post('/invites', { displayName: inviteName });
+          setNewCode({ code: r.code, for: inviteName, expiresAt: r.expiresAt }); setInviteName(''); loadInvites();
+        })}>Create code</button>
+      </div>
+      {newCode && (
+        <div className="alert-error" style={{ background: 'rgba(99,102,241,.15)', borderColor: 'var(--accent)', color: 'var(--text)' }} role="status">
+          Code for {newCode.for}: <b style={{ fontSize: '1.2rem', letterSpacing: 1, userSelect: 'all' }}>{newCode.code}</b>
+          <br /><span className="muted">Shown only once. Expires {new Date(newCode.expiresAt).toLocaleDateString()}. They enter it on the sign-in page under “I have an invite code”.</span>
+        </div>
+      )}
+      {invites.length > 0 && (
+        <table className={s.table} style={{ marginTop: 8 }}>
+          <thead><tr><th scope="col">Invite</th><th scope="col">State</th><th scope="col"><span className="visually-hidden">Revoke</span></th></tr></thead>
+          <tbody>
+            {invites.map((i) => {
+              const state = i.usedAt ? `used by ${i.usedBy}` : i.revokedAt ? 'revoked' : Date.parse(i.expiresAt) < Date.now() ? 'expired' : 'open';
+              return (
+                <tr key={i.id}>
+                  <th scope="row" className={s.flexible}>{i.displayName}</th>
+                  <td className={s.rigid}><span className={`badge ${state === 'open' ? 'warn' : 'neutral'}`}>{state}</span></td>
+                  <td className={s.rigid}>{state === 'open' && <button disabled={busy} onClick={() => run(async () => { await del(`/invites/${i.id}`); loadInvites(); })}>Revoke</button>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </Section>
+  );
+}
+
+function SchoolHolidaysSection() {
+  const { version, refresh } = useApp();
+  const [rows, setRows] = useState<{ date: string; label: string }[]>([]);
+  const [f, setF] = useState({ from: '', to: '', label: '' });
+  const { run, busy, errorEl } = useAction();
+  useEffect(() => { get('/school-holidays').then(setRows).catch(() => undefined); }, [version]);
+
+  return (
+    <Section title="School holidays">
+      {errorEl}
+      <div className="row wrap">
+        <label className="field" style={{ flex: 1, minWidth: 130 }}><span>From</span><input type="date" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></label>
+        <label className="field" style={{ flex: 1, minWidth: 130 }}><span>To (optional)</span><input type="date" min={f.from} value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></label>
+      </div>
+      <label className="field"><span>Label</span><input value={f.label} maxLength={80} onChange={(e) => setF({ ...f, label: e.target.value })} placeholder="e.g. Winter break" /></label>
+      <button className="primary" disabled={busy || !f.from || !f.label.trim()} onClick={() => run(async () => {
+        await put('/school-holidays', { from: f.from, to: f.to || f.from, label: f.label }); setF({ from: '', to: '', label: '' }); refresh();
+      })}>Add</button>
+      {rows.length > 0 && (
+        <table className={s.table} style={{ marginTop: 10 }}>
+          <thead><tr><th scope="col">Date</th><th scope="col">Label</th><th scope="col"><span className="visually-hidden">Remove</span></th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.date}>
+                <th scope="row" className={s.rigid}>{r.date}</th>
+                <td className={s.flexible}>{r.label}</td>
+                <td className={s.rigid}><button className="plain" aria-label={`Remove ${r.date}`} title="Remove" disabled={busy} onClick={() => run(async () => { await del(`/school-holidays/${r.date}`); refresh(); })}>🗑</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Section>
+  );
+}
+
+const STATUS_BADGE: Record<string, string> = { sent: 'good', partial: 'warn', failed: 'bad', queued: 'neutral', claimed: 'neutral' };
+
+function StatusSection() {
+  const { status, localTime } = useApp();
+  if (!status) return null;
+  return (
+    <Section title="Status">
+      <p style={{ marginBottom: 8 }}>
+        House announcements: {status.relayOnline
+          ? <span className="badge good">relay online</span>
+          : <span className="badge bad">relay offline{status.relayLastSeen ? ` since ${localTime(status.relayLastSeen)}` : ' (never seen)'}</span>}
+      </p>
+      {status.recentDeliveries.length === 0 ? <p className="muted">No alerts sent yet.</p> : (
+        <table className={s.table}>
+          <thead><tr><th scope="col">Alert</th><th scope="col">Via</th><th scope="col">Result</th><th scope="col">When</th></tr></thead>
+          <tbody>
+            {status.recentDeliveries.map((d) => (
+              <tr key={d.id}>
+                <th scope="row" className={s.flexible} title={`${d.message}${d.detail ? `\n${d.detail}` : ''}`}>{d.message}{d.member ? ` → ${d.member}` : ''}</th>
+                <td className={s.rigid}>{d.channel === 'push' ? '📱' : '🔊'}<span className="visually-hidden">{d.channel}</span></td>
+                <td className={s.rigid}><span className={`badge ${STATUS_BADGE[d.status] ?? 'neutral'}`} title={d.detail ?? ''}>{d.status}</span></td>
+                <td className={s.rigid}>{localTime(d.createdAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Section>
+  );
+}
+
+export function Settings({ onLogout }: { onLogout: () => void }) {
+  const { me } = useApp();
+  return (
+    <div style={{ padding: 12, overflowY: 'auto', height: '100%' }}>
+      <h1 style={{ fontSize: '1.15rem', marginBottom: 12 }}>Settings</h1>
+      <MeSection onLogout={onLogout} />
+      {me.role === 'owner' && <HouseholdSection />}
+      {me.role === 'owner' && <SchoolHolidaysSection />}
+      <StatusSection />
+    </div>
+  );
+}
