@@ -653,7 +653,7 @@ Oct '26   4    5    6    7    8    9   10
 
 | Type | Source | Treatment |
 |------|--------|-----------|
-| Public (days off) | Computed in `src/shared/holidays.ts`, filtered to the household's **days off** (§7.3) — no hand-typed yearly dates | **Whole cell highlighted light yellow** (`--holiday-public-cell`) + the holiday's **emoji next to the date number**; name in the day sheet |
+| Public (days off) | Computed in `src/shared/holidays.ts`, filtered to the household's **days off** (§7.3) — no hand-typed yearly dates | **Whole cell tinted faint yellow** (`--holiday-public-cell`) + the holiday's **emoji next to the date number**; name in the day sheet |
 | School | `school_holidays` table, edited by the owner in Settings → School holidays (add a single date or a date range + label) | Blue (`--holiday-school`) date number + circle + 🏫 next to it; label in the day sheet |
 
 - **Legend:** shown once, directly under the sticky month header.
@@ -843,7 +843,7 @@ Dark by default. Colors are defined as tokens on `:root`:
 | `--accent` | `#6366F1` (indigo — kept apart from school-holiday blue ⚑) |
 | `--month-a` | `#0F172A` |
 | `--month-b` | `#162033` |
-| `--holiday-public-cell` | `#FEFCE8` (super-light yellow; date text on it is dark `#1E293B`) |
+| `--holiday-public-cell` | `rgba(250, 204, 21, .16)` — a faint yellow tint over the dark cell, the same 16% strength as a multi-day event's tint; normal light text |
 | `--holiday-school` | `#3B82F6` |
 
 ---

@@ -9,8 +9,10 @@
   --accent: #6366F1;
   --month-a: #0F172A;
   --month-b: #162033;
-  --holiday-public-cell: #FEFCE8; /* super-light yellow: a public holiday / day off */
-  --on-holiday-cell: #1E293B;
+  /* A public holiday / day off: a faint yellow tint over the dark cell, the same
+     strength as a multi-day event's tint (16%). */
+  --holiday-public-cell: rgba(250, 204, 21, .16);
+  --holiday-public-swatch: #FACC15;
   --holiday-school: #3B82F6;
   --good: #22C55E;
   --warn: #EAB308;

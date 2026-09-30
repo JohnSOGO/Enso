@@ -182,7 +182,13 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
       ].filter(Boolean).join(', ');
       cells.push(
         <button key={date} className={cls} aria-label={label} onClick={() => onOpenDay(date, data)}
-          style={stay ? { backgroundImage: `linear-gradient(${tint(stay.o.color, 0.16)}, ${tint(stay.o.color, 0.16)})` } : undefined}>
+          style={stay ? {
+            // Layer the stay's tint over the holiday tint rather than replacing it.
+            backgroundImage: [
+              `linear-gradient(${tint(stay.o.color, 0.16)}, ${tint(stay.o.color, 0.16)})`,
+              ...(pub.length ? ['linear-gradient(var(--holiday-public-cell), var(--holiday-public-cell))'] : []),
+            ].join(', '),
+          } : undefined}>
           <span className={s.num}>
             {d === 1 ? <><span className={s.monthTag}>{MONTHS[m - 1]}</span> </> : null}
             <span className={s.dot}>{d}</span>

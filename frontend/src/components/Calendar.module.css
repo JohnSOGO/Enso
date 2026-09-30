@@ -5,7 +5,7 @@
 
 .legend { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 12px 6px; font-size: .75rem; color: var(--text-dim); }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 99px; vertical-align: -1px; margin-right: 3px; }
-.legendPub { background: var(--holiday-public-cell); border-radius: 3px !important; }
+.legendPub { background: var(--holiday-public-swatch); opacity: .55; border-radius: 3px !important; }
 .legendSchool { background: var(--holiday-school); }
 
 .dow {
@@ -56,11 +56,11 @@
 }
 @media (prefers-reduced-motion: reduce) { .cell.today { animation: none; } }
 /* Public holiday (a household day off): the whole cell is light yellow. */
-.cell.pub { background: var(--holiday-public-cell); color: var(--on-holiday-cell); }
-.cell.pub .num, .cell.pub .monthTag { color: var(--on-holiday-cell); font-weight: 700; opacity: 1; }
+.cell.pub { background-color: var(--month-a); background-image: linear-gradient(var(--holiday-public-cell), var(--holiday-public-cell)); }
+.cell.pub.toneB { background-color: var(--month-b); }
+.cell.pub .num { font-weight: 700; opacity: 1; }
 .school .dot { background: var(--holiday-school); color: #fff; font-weight: 700; }
 .today.school .dot { box-shadow: 0 0 0 2px var(--accent); }
-.cell.pub .dots b { color: var(--on-holiday-cell); }
 
 .dots { display: flex; gap: 3px; flex-wrap: wrap; align-items: center; padding-left: 2px; }
 .dots i { width: 7px; height: 7px; border-radius: 99px; display: block; }
