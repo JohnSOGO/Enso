@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.10-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.11-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1907,9 +1907,21 @@ checks.
 - ✅ Manual: stop the relay → the "House offline" badge appears within about
   2 min.
 
-**M7 — Production**
-- `wrangler d1 create enso`, `db:migrate:remote`, secrets (§2.4), `deploy`, point
-  the relay at the prod URL.
+**M7 — Production** — `https://enso.sogodojo.com`
+- `wrangler d1 create enso` → its id in `wrangler.toml`; `db:migrate:remote`.
+- `wrangler.toml`: `[[routes]] pattern = "enso.sogodojo.com", custom_domain = true` (the
+  `sogodojo.com` zone is on the same Cloudflare account, like AskRoxy).
+- Secrets (§2.4): `SETUP_TOKEN` and `RELAY_TOKEN`, each 32+ random characters, set with
+  `wrangler secret put`. **`DEV_ENDPOINTS` is never set in production** (no `/dev/*`).
+  VAPID keys wait for M5 — until then the "Phone alerts off" badge stays, honestly.
+- **Production starts clean** (decided by MojoSOGO 2026-10-03): no events, alarms, chores,
+  timers, list items or accounts. It carries over from the local dev database only the
+  household's settings (name, time zone, days off) and its school holidays. Public
+  holidays need nothing — they are computed. Shopping and Wish list exist (migration
+  0007), empty.
+- The owner is created on the live site with the setup token (§6.1); everyone else joins
+  by invite (§6.2a). The local dev database and its test accounts are untouched.
+- Point the relay at the prod URL with the prod `RELAY_TOKEN` when the relay is set up.
 - ✅ The owner can set up, invite a second member, and both receive a shared
   reminder on phone and house.
 
@@ -1965,7 +1977,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q3 | While a timer rings unacknowledged, re-alert or ring once? | Re-alert every 15 min, 4 alerts max, then silent in the Ringing bar |
 | Q4 | Should normal reminders nag too? | Off by default; per-event "repeat alert every" option |
 | Q5 | House announcements go to **all four** Echos (incl. Toasty and Kid's Room) and the Voice PE — also at night? | Yes, all surfaces, always; per-alert speaker choice is Later |
-| Q6 | App URL (e.g. a `sogodojo.com` subdomain like AskRoxy)? | `enso.<account>.workers.dev` until decided |
+| Q6 | App URL | **Decided by MojoSOGO 2026-10-03:** `https://enso.sogodojo.com` (Worker custom domain) |
 | Q7 | Accent color: v1 used blue, which collides with school-holiday blue | Indigo `#6366F1` |
 | Q8 | Snooze length | 10 min, single option |
 | Q9 | Can any member Done/Ack a fire assigned to someone else? | Yes |
