@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.7-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.8-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -92,7 +92,8 @@ usually in the house and hears house announcements. Every feature is judged by:
 ### 1.1 Users
 
 - One household per deployment. No multi-tenancy, no `household_id` columns.
-- Roughly 2–10 members. MojoSOGO is the **owner**.
+- Roughly 2–10 members. MojoSOGO is the **founder** (the first owner); other members
+  can be made **admins** (§6.3).
 - Phone-first. Desktop is a secondary layout of the same app.
 
 ### 1.2 Non-goals
@@ -852,13 +853,42 @@ An invite is something you **hand over**, not a code someone has to type.
 
 ### 6.3 Roles
 
-| | owner | member |
+There are two roles (`ROLE` in §3): `owner` and `member`. **More than one member may
+have `owner`.** In the app the role reads **Admin**; the **founder** — the member created
+by setup (§6.1), i.e. the earliest `created_at` — reads **Owner**. The founder is derived,
+never stored.
+
+| | owner (Admin / Owner) | member |
 |---|---|---|
-| Create events/timers | ✓ | ✓ |
-| Edit/delete **own** events/timers | ✓ | ✓ |
-| Edit/delete **others'** events/timers | ✓ | ✗ |
-| Done / snooze / ack any fire; start/stop any timer | ✓ | ✓ |
+| Create events/timers/alarms/chores | ✓ | ✓ |
+| Edit/delete **own** | ✓ | ✓ |
+| Edit/delete **others'** | ✓ | ✗ |
+| Done / snooze / ack any fire; start/stop any timer; tick any list item or chore | ✓ | ✓ |
 | Invites, disable members, household settings, school holidays | ✓ | ✗ |
+| **Make a member an admin, or remove an admin** | ✓ | ✗ |
+
+**Rules for changing people** (`PATCH /members/{id}`, owner only):
+- **The founder is protected:** their role cannot be changed and they cannot be disabled.
+  The household can never be locked out of its founder.
+- Any admin may make a member an admin, remove another admin, or remove themselves.
+- A disabled member cannot be made an admin (enable them first). Disabling an admin
+  is allowed (they stay an admin, signed out, until enabled).
+- A change takes effect on the person's **next request** — roles are read from the
+  database on every request, never cached in the session.
+- Every refusal is 400 `invalid_input` with a plain message ("The owner can't be
+  made a regular member.").
+
+**Acceptance (API tests):**
+
+| # | Call | Expected |
+|---|------|----------|
+| A1 | founder makes member M an admin | 200; M can now create an invite (201) |
+| A2 | admin M makes member N an admin, then removes N | both 200; N can no longer create an invite (403) |
+| A3 | anyone changes the founder's role, or disables the founder | 400 `invalid_input` |
+| A4 | a regular member tries to make themselves admin | 403 `forbidden` |
+| A5 | make a disabled member an admin | 400 `invalid_input` |
+| A6 | `GET /members` | each row has `role` and `isFounder`; exactly one founder |
+| A7 | admin M removes their own admin role | 200; M's next owner-only request is 403 |
 
 ### 6.4 Login rate limit
 
@@ -1309,8 +1339,12 @@ Time      Chore            Days        This week
 
 - **Me:** name, color, enable phone alerts (subscribe), show/hide holiday types,
   show/hide 📈 options expiration (§7.4), log out.
-- **Household (owner):** name, timezone, days off (§7.3), **invites (§8.9)**, members list (disable),
-  invites (create, list, revoke), school holidays.
+- **Household (admins):** name, timezone, days off (§7.3), **invites (§8.9)**, members list:
+  one line per member — name · **Owner** / **Admin** chip (nothing for a regular member) ·
+  **Make admin** / **Remove admin** (asks first; never on the founder) · **Disable** /
+  **Enable** (never on the founder). An admin removing their own admin role is warned
+  that they will lose these settings at once.
+- **School holidays (admins).**
 - **Status:** relay last seen, the current member's push subscriptions with last
   success/error, and the last 20 deliveries with their status badge.
 
@@ -1592,8 +1626,8 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | POST | `/auth/logout` | member | → 204; clears cookie |
 | GET | `/me` | member | → member + prefs |
 | PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showSchoolHolidays?, showOptionsExpiration? }` |
-| GET | `/members` | member | → members (no hashes, no emails for non-owners) |
-| PATCH | `/members/{id}` | owner | `{ disabled: boolean }` |
+| GET | `/members` | member | → `{ id, email, displayName, color, role, isFounder, disabledAt }[]` (no hashes; `email` only for owners) |
+| PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
 | DELETE | `/invites/{id}` | owner | revoke |
 | GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], schoolHolidays[], marketDays[] }`; recurring events expanded server-side with `recurrence.ts`; alarms excluded; public holidays filtered to days off; max range 120 days |
@@ -1789,7 +1823,7 @@ Captured from v1.0-draft so nothing is lost:
 - Escalation ladders: channel changes per alert number, light blinking, notifying
   the owner on escalation
 - HA entity/automation generation; HA events creating reminders (door/motion)
-- An `admin` role; guest role; multiple households
+- A separate restricted admin role (admins are co-owners, §6.3); guest role; multiple households
 - Holiday calendars for other countries
 - Turso / non-Cloudflare hosting
 - Adding list items by voice (Voice PE / Home Assistant intent → Worker). If built, it
@@ -1836,6 +1870,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q19 | Welcome card content | The three-line tour above; shown once per member per device |
 | Q20 | A signed-in member opens a `/join` link | The app opens as normal and the address becomes `/` |
 | Q21 | Welcome card when an existing member signs in on a new device | No — only right after joining |
+| Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
 
