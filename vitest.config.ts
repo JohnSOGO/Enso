@@ -19,6 +19,8 @@ export default defineConfig(async () => {
             RELAY_TOKEN: 'test-relay-token',
             DEV_ENDPOINTS: '1',
           },
+          // C13 (SPEC §4.2e): an UNMIGRATED database the migration test applies step by step.
+          d1Databases: { MIGRATION_DB: 'migration-db' },
         },
       }),
     ],
