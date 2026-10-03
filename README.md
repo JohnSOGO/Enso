@@ -62,7 +62,7 @@ Put a shortcut to it in your Startup folder:
 
 ```powershell
 $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut("$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\HRC relay.lnk")
-$lnk.TargetPath = "C:\Users\Public\git\HomeReminderCalendar\relay\relay-task.vbs"
+$lnk.TargetPath = "C:\Users\Public\git\Enso\relay\relay-task.vbs"
 $lnk.Save()
 ```
 

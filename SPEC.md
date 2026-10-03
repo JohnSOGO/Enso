@@ -147,7 +147,7 @@ from the Worker and speaks them through HA. This is the same pattern AskRoxy use
 ### 2.2 Repository layout
 
 ```
-HomeReminderCalendar/
+Enso/
 ├── SPEC.md
 ├── CLAUDE.md               # working agreement: spec first, then build
 ├── package.json            # single package; scripts in §10.1

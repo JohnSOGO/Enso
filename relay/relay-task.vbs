@@ -7,7 +7,7 @@ Set procs = wmi.ExecQuery("SELECT ProcessId FROM Win32_Process WHERE Name='node.
 If procs.Count > 0 Then WScript.Quit
 
 Set sh = CreateObject("WScript.Shell")
-sh.CurrentDirectory = "C:\Users\Public\git\HomeReminderCalendar"
+sh.CurrentDirectory = "C:\Users\Public\git\Enso"
 Do
   sh.Run "cmd /c node_modules\.bin\tsx.cmd relay\relay.ts 2>> relay\relay-crash.log", 0, True
   WScript.Sleep 30000
