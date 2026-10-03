@@ -1,4 +1,4 @@
-// SPEC §6 — setup, signup, login, logout, me.
+// SPEC §6 — setup, signup, invite preview, login, logout, me.
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { MEMBER_PALETTE } from '../../shared/vocab';
@@ -13,6 +13,21 @@ const FAIL_LIMIT = 5;
 /** §6.2 — uppercase, strip dashes/spaces, I/L→1, O→0. */
 export function normalizeInviteCode(code: string): string {
   return code.toUpperCase().replace(/[\s-]/g, '').replace(/[IL]/g, '1').replace(/O/g, '0');
+}
+
+/** §6.2 — wrong, expired, used and revoked codes all get this ONE message (preview and signup alike). */
+const INVALID_CODE_MESSAGE = 'That invite code is not valid. Ask the household owner for a new one.';
+
+interface UsableInvite { id: string; displayName: string; expiresAt: string; invitedBy: string | null }
+
+/** §6.2/§6.2a — the invite a code opens, if it is unused, unrevoked and unexpired at `now`. Never writes. */
+async function usableInvite(db: D1Database, code: unknown, now: string): Promise<UsableInvite | null> {
+  if (typeof code !== 'string') return null;
+  return first<UsableInvite>(db,
+    `SELECT i.id, i.display_name AS displayName, i.expires_at AS expiresAt, m.display_name AS invitedBy
+       FROM invites i LEFT JOIN members m ON m.id = i.created_by
+      WHERE i.code_hash = ? AND i.used_by IS NULL AND i.revoked_at IS NULL AND i.expires_at > ?`,
+    await sha256hex(normalizeInviteCode(code)), now);
 }
 
 async function nextColor(db: D1Database): Promise<string> {
@@ -66,16 +81,22 @@ auth.post('/setup', async (c) => {
   return c.json(await memberView(c.env.DB, id), 201);
 });
 
+/** §6.2a — public and read-only: who is inviting whom, before joining. Never uses the invite. */
+auth.post('/auth/invite-preview', async (c) => {
+  const b = await body(c);
+  const invite = await usableInvite(c.env.DB, b.code, nowIso());
+  if (!invite) return fail(c, 400, 'invalid_code', INVALID_CODE_MESSAGE);
+  const s = await first<{ household_name: string }>(c.env.DB, 'SELECT household_name FROM settings WHERE id = 1');
+  return c.json({ displayName: invite.displayName, householdName: s?.household_name ?? null, invitedBy: invite.invitedBy, expiresAt: invite.expiresAt });
+});
+
 auth.post('/auth/signup', async (c) => {
   const b = await body(c);
   const err = credentialsError(b);
   if (err) return fail(c, 400, 'invalid_input', err);
-  const invalid = () => fail(c, 400, 'invalid_code', 'That invite code is not valid. Ask the household owner for a new one.');
-  if (typeof b.code !== 'string') return invalid();
+  const invalid = () => fail(c, 400, 'invalid_code', INVALID_CODE_MESSAGE);
   const now = nowIso();
-  const invite = await first<{ id: string }>(c.env.DB,
-    `SELECT id FROM invites WHERE code_hash = ? AND used_by IS NULL AND revoked_at IS NULL AND expires_at > ?`,
-    await sha256hex(normalizeInviteCode(b.code)), now);
+  const invite = await usableInvite(c.env.DB, b.code, now);
   if (!invite) return invalid();
   if (await first(c.env.DB, 'SELECT id FROM members WHERE email = ?', str(b.email))) {
     return fail(c, 409, 'email_taken', 'An account with that email already exists.');

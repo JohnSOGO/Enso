@@ -84,6 +84,84 @@ describe('accounts', () => {
   });
 });
 
+describe('invite preview (SPEC §6.2a, M4d)', () => {
+  const hex = async (s: string) =>
+    [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const preview = (code: string, c = new Client()) => c.post('/auth/invite-preview', { code });
+  const signup = (code: string, email: string, displayName: string) =>
+    new Client().post('/auth/signup', { code, email, password: 'joiner-password-1', displayName });
+
+  it('I1 preview a fresh code → 200 with the four fields; the invite is still unused', async () => {
+    const o = await owner();
+    const inv = await o.post('/invites', { displayName: 'I1 Kai' });
+    const r = await preview(inv.json.code);
+    expect(r.status).toBe(200);
+    expect(r.json).toEqual({ displayName: 'I1 Kai', householdName: expect.any(String), invitedBy: OWNER.displayName, expiresAt: inv.json.expiresAt });
+    const row = (await o.get('/invites')).json.find((i: any) => i.displayName === 'I1 Kai');
+    expect(row.usedAt).toBeNull();
+    expect(row.usedBy).toBeNull();
+  });
+
+  it('I2 preview with dashes removed, lower-case and I/L/O swapped in → 200', async () => {
+    const o = await owner();
+    await o.post('/invites', { displayName: 'I2 Known' });
+    // Give the invite a known code with 1s and 0s in it, so the I/L/O swaps are really exercised.
+    await env.DB.prepare(`UPDATE invites SET code_hash = ? WHERE display_name = 'I2 Known'`).bind(await hex('AB10CD10EF10')).run();
+    const r = await preview('abiocdloeflo');
+    expect(r.status).toBe(200);
+    expect(r.json.displayName).toBe('I2 Known');
+  });
+
+  it('I3 a used, an expired, a revoked and a made-up code → each 400 invalid_code, identical message', async () => {
+    const o = await owner();
+    const used = await o.post('/invites', { displayName: 'I3 Used' });
+    expect((await signup(used.json.code, 'i3-used@example.com', 'I3 Used')).status).toBe(201);
+    const expired = await o.post('/invites', { displayName: 'I3 Late' });
+    await env.DB.prepare(`UPDATE invites SET expires_at = '2000-01-01T00:00:00.000Z' WHERE display_name = 'I3 Late'`).run();
+    const revoked = await o.post('/invites', { displayName: 'I3 Revoked' });
+    const id = (await o.get('/invites')).json.find((i: any) => i.displayName === 'I3 Revoked').id;
+    expect((await o.del(`/invites/${id}`)).status).toBe(200);
+    const results = [];
+    for (const code of [used.json.code, expired.json.code, revoked.json.code, 'ZZZZ-ZZZZ-ZZZZ']) results.push(await preview(code));
+    for (const r of results) {
+      expect(r.status).toBe(400);
+      expect(r.json.error).toBe('invalid_code');
+    }
+    expect(new Set(results.map((r) => r.json.message)).size).toBe(1);
+    expect(results[0].json.message.length).toBeGreaterThan(0);
+    // …and it is the same message signup gives.
+    expect((await signup('ZZZZ-ZZZZ-ZZZZ', 'i3-nobody@example.com', 'Nobody')).json.message).toBe(results[0].json.message);
+  });
+
+  it('I4 signup after preview → 201; a second preview of that code → 400 invalid_code', async () => {
+    const o = await owner();
+    const inv = await o.post('/invites', { displayName: 'I4 Shelly' });
+    expect((await preview(inv.json.code)).status).toBe(200);
+    expect((await signup(inv.json.code, 'i4-shelly@example.com', 'Shelly B')).status).toBe(201);
+    const again = await preview(inv.json.code);
+    expect(again.status).toBe(400);
+    expect(again.json.error).toBe('invalid_code');
+  });
+
+  it('I5 preview without a session, and with a member session → both allowed', async () => {
+    const o = await owner();
+    const m = await member(o);
+    const inv = await o.post('/invites', { displayName: 'I5 Sam' });
+    expect((await preview(inv.json.code)).status).toBe(200);
+    expect((await preview(inv.json.code, m.client)).status).toBe(200);
+  });
+
+  it('I6 GET /invites after I4 → usedBy is the new member\'s name, usedAt set', async () => {
+    const o = await owner();
+    const inv = await o.post('/invites', { displayName: 'I6 Shelly' });
+    expect((await preview(inv.json.code)).status).toBe(200);
+    expect((await signup(inv.json.code, 'i6-shelly@example.com', 'Shelly B')).status).toBe(201);
+    const row = (await o.get('/invites')).json.find((i: any) => i.displayName === 'I6 Shelly');
+    expect(row.usedBy).toBe('Shelly B');
+    expect(typeof row.usedAt).toBe('string');
+  });
+});
+
 describe('session cookie (SPEC §2.1)', () => {
   const login = async (origin: string) => {
     await owner(); // make sure the owner exists

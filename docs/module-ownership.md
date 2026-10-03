@@ -27,6 +27,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/shared/chores.ts` | Chore rules: whose turn (assigneeFor), run planning, step advance/undo, a chore fire's config/person/step, input validation and limits (§7B) — pure |
 | `src/shared/engine.ts` | The alert engine: plan, step, act, timer commands (§5) — pure |
 | `src/shared/lists.ts` | Household list rules: itemKey, add/re-open decision, text/note limits, 30-day visible window (§7A.1) — pure |
+| `src/shared/invite-link.ts` | The invite link format (§6.2a): `JOIN_PATH`, build `{origin}/join#{code}`, take the code from a pasted link or a bare code — pure |
 
 ## Worker (flow stages: route → persist → deliver)
 
@@ -39,7 +40,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/session.ts` | Password hashing, session cookie, `requireMember` / owner guards |
 | `src/worker/tick.ts` | `tick()` orchestration: load rows, call the engine, write results, deliveries (§5.6–5.7), chore run planning (§7B.3) |
 | `src/worker/push.ts` | Web Push sending (§9.1) |
-| `src/worker/routes/auth.ts` | Setup, login/logout, signup, rate limit, `/me` |
+| `src/worker/routes/auth.ts` | Setup, login/logout, signup, invite preview, rate limit, `/me` |
 | `src/worker/routes/members.ts` | Members list/disable, invites |
 | `src/worker/routes/events.ts` | `/calendar` and event CRUD + exdates |
 | `src/worker/routes/alarms.ts` | `/alarms` — scheduled alarms as `is_alarm` events (§4.2a) |
@@ -71,7 +72,12 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/ChoresToday.tsx` | Lists → Today: today's chore runs, Mine \| Everyone, tick/undo a step (§8.8) |
 | `frontend/src/components/RingingBar.tsx` | Ringing bar (§8.2) |
 | `frontend/src/components/Settings.tsx` | Settings: Me, Household, Status (§8.6) |
-| `frontend/src/components/SignIn.tsx` | Setup, sign in, sign up |
+| `frontend/src/components/useAction.tsx` | Runs an async action, tracks busy, renders its failure in place (`role="alert"`) — the Settings sections' action hook |
+| `frontend/src/components/Invites.tsx` | Settings → Household → Invites: create, list with states, revoke (§8.9) |
+| `frontend/src/components/InviteCard.tsx` | The one-time invite card modal: lazy `uqr` QR, Share, Copy link, the code (§8.9) — the only importer of `uqr` |
+| `frontend/src/components/SignIn.tsx` | Setup, sign in, sign up with a typed or pasted invite code |
+| `frontend/src/components/JoinPage.tsx` | The join page at `/join#CODE`: read + clear the fragment, preview, signup form, dead-link state (§8.9) |
+| `frontend/src/components/Welcome.tsx` | The one-time welcome card and its per-member-per-device seen flag (§8.9) |
 | `frontend/src/components/Modal.tsx` | The one centred `<dialog>` modal primitive |
 | `frontend/src/*.module.css` | Styles for the same-named component |
 | `frontend/src/components/*.module.css` | Styles for the same-named component; `Lists.module.css` = shared single-line list tables and tick rows |

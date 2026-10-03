@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.6-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.7-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -141,6 +141,7 @@ from the Worker and speaks them through HA. This is the same pattern AskRoxy use
 | Styling | CSS Modules + CSS custom properties | Follow `C:\Users\Public\git\MOJOSOGO-PREFERENCES.md` and the `phone-ui` skill |
 | Push | Web Push (VAPID) from the Worker | Must use a WebCrypto-based implementation — the Node `web-push` package does not run on Workers. M5 begins with a spike to confirm the library. |
 | Relay | Node 20+ script run with `tsx` | No framework. Imports `src/shared/vocab.ts`. |
+| QR codes | `uqr` (MIT, zero dependencies, renders SVG) | **Loaded lazily** (dynamic `import()`) only when an invite card opens — never in the main bundle. |
 | Tests | **Vitest**; `@cloudflare/vitest-pool-workers` for API tests | API tests apply `migrations/` via `readD1Migrations` / `applyD1Migrations` |
 | Passwords | PBKDF2-SHA256 via WebCrypto, 100 000 iterations, 16-byte salt | 100k is the Workers cap. Not bcrypt. |
 | Sessions | Opaque random token in an `HttpOnly; SameSite=Lax` cookie, plus `Secure` whenever the request arrived over HTTPS (always, in production) | Stored hashed in D1. No JWT, no refresh tokens. Phones drop a `Secure` cookie sent over plain HTTP, so the LAN dev server (§2.3) gets it without. |
@@ -819,6 +820,36 @@ owner and logs them in. Once any member exists it returns 410 Gone.
 - **Errors:** wrong, expired, used and revoked codes all return the **same** 400
   `invalid_code`.
 
+### 6.2a The invite experience
+
+An invite is something you **hand over**, not a code someone has to type.
+
+- **The link:** `{origin}/join#{code}`, where `{origin}` is the address the owner is using
+  right now (`location.origin` — on the home network that is the LAN address, §2.3). The
+  code travels in the **fragment**, so it is never sent to the server, never logged, and
+  never in a query string. The join page reads it, then removes it from the address bar
+  (`history.replaceState`) so it does not linger in history.
+- **Preview before joining:** `POST /auth/invite-preview { code }` → `{ displayName,
+  householdName, invitedBy, expiresAt }` for a usable code; anything else is the same 400
+  `invalid_code` as signup (no hint which of wrong/expired/used/revoked). It never uses
+  the invite.
+- **Typing still works:** the manual "I have an invite code" field also accepts a whole
+  pasted link and takes the code from it.
+- **First arrival:** right after joining, a one-time **welcome** card (below) — then
+  never again for that member on that device.
+- **One way in by link:** the old `?invite=` query entry is removed; `/join#CODE` replaces it.
+
+**Acceptance (M4d — API tests):**
+
+| # | Call | Expected |
+|---|------|----------|
+| I1 | preview a fresh code | 200 `{ displayName, householdName, invitedBy, expiresAt }`; the invite is still unused |
+| I2 | preview the same code with dashes removed and lower-case, `I`/`L`/`O` swapped in | 200 (normalization as §6.2) |
+| I3 | preview a used, an expired, a revoked and a made-up code | each 400 `invalid_code`, identical message |
+| I4 | signup after preview | 201; a second preview of that code → 400 `invalid_code` |
+| I5 | preview without a session, and with a member session | both allowed (it is public, like signup) |
+| I6 | `GET /invites` after I4 | that invite shows `usedBy` = the new member's name and `usedAt` |
+
 ### 6.3 Roles
 
 | | owner | member |
@@ -1278,7 +1309,7 @@ Time      Chore            Days        This week
 
 - **Me:** name, color, enable phone alerts (subscribe), show/hide holiday types,
   show/hide 📈 options expiration (§7.4), log out.
-- **Household (owner):** name, timezone, days off (§7.3), members list (disable),
+- **Household (owner):** name, timezone, days off (§7.3), **invites (§8.9)**, members list (disable),
   invites (create, list, revoke), school holidays.
 - **Status:** relay last seen, the current member's push subscriptions with last
   success/error, and the last 20 deliveries with their status badge.
@@ -1352,6 +1383,90 @@ Fix the bike gears
   form, where **Not done** puts it back (a wish-list item is never re-opened by a stray
   tap). Delete in the form asks first.
 - No due dates and no reminders: a wish list that nags is not a wish list.
+
+### 8.9 Invites (owner) and the join page
+
+**In Settings → Household → Invites:**
+
+```
+Invite someone   [ Their name…        ][ Invite ]
+
+Kai        waiting · until Sat Oct 10        [Revoke]
+Shelly     joined Oct 4
+Sam        expired
+```
+
+- One line per invite, newest first: name · state — **waiting** (with its expiry,
+  amber), **joined** (with the date, green), **expired**, **revoked** (neutral). When the
+  member chose a different name it shows dimmed in the name column ("Kai → Kai B"), which
+  truncates, so the row stays one line at 320 px. Only waiting invites have **Revoke**
+  (asks first).
+- On the plain-HTTP home-network address the browser offers no clipboard and no share
+  sheet, so **Copy link** goes straight to the selected-link fallback and **Share…** is
+  hidden — expected, not a bug.
+
+**The invite card** opens as soon as an invite is created (modal, centred):
+
+```
+        Invite for Kai
+   ┌───────────────────┐
+   │   ▓▓ QR code ▓▓   │     ← scan with the phone's camera
+   └───────────────────┘
+ [ Share… ]  [ Copy link ]
+  or type on the sign-in page:
+       ABCD-EFGH-JKMN
+  Works once · until Sat Oct 10
+```
+
+- **QR** of the link, large enough to scan from across a table (≥ 220 px), dark
+  modules on a white quiet zone so phone cameras read it in dark mode too.
+- **Share…** uses the phone's share sheet (`navigator.share`, text "Join our household
+  on Ensō" + the link); hidden where the browser has no share sheet. **Copy link**
+  copies it and says "Copied" for a moment; if copying is blocked, the link is shown
+  selected so it can be copied by hand — never a silent failure.
+- **A link only this computer can open is flagged.** When the app itself is open at
+  `localhost` / `127.0.0.1`, the link and QR point there too and no phone can use
+  them. The card then says so above the QR, as a warning: "This link points to this
+  computer only — phones can't open it. Open Ensō at this computer's network address
+  (e.g. http://192.168.0.72:8787) and create the invite there." The code still works
+  typed on any device that can reach the app.
+- The code in large monospace, for typing.
+- **This card is the only time the link exists** (the server keeps only a hash). The
+  card says so: "Shown once — keep this open until they have it." Closing it asks first.
+
+**The join page** (`/join#CODE`, the screen the link opens — no account needed):
+
+```
+           Ensō
+  MojoSOGO invited you to join
+            Home
+
+  Your name   [ Kai              ]
+  Email       [                  ]
+  Password    [            ] 👁   (10+ characters)
+         [ Join Home ]
+  Already have an account? Sign in
+```
+
+- Fetches the preview first. The name is pre-filled from the invite (editable).
+  Password has a show/hide toggle (accessible name "Show password").
+- A link that no longer works says so plainly, in place of the form: "This invite link
+  doesn't work any more — it may have been used, expired or been cancelled. Ask
+  {invitedBy, when known, else "the person who invited you"} for a new one." plus
+  **Sign in** for people who already joined.
+- Errors (email taken, password too short) show inside the form with `role="alert"`.
+- If the preview cannot be fetched at all (network or server failure), the page says
+  "Could not check this invite: …" with **Try again** — it does not claim the link is dead.
+
+**Welcome card** (once, right after joining; remembered per member per device):
+
+```
+  Welcome, Kai 👋
+  📅 Calendar — what's happening
+  ⏰ Alarms — alarms, timers and chores
+  🛒 Lists → Today — your chores for today
+            [ Got it ]
+```
 
 ### 8.7 Theme
 
@@ -1471,6 +1586,7 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 |--------|------|-----|-----------------|
 | GET | `/health` | public | → `{ ok, db }` |
 | POST | `/setup` | public + `SETUP_TOKEN` | `{ setupToken, email, password, displayName }` → member; sets cookie |
+| POST | `/auth/invite-preview` | public | `{ code }` → `{ displayName, householdName, invitedBy, expiresAt }`; 400 `invalid_code` otherwise (§6.2a). Never uses the invite. |
 | POST | `/auth/signup` | public | `{ code, email, password, displayName }` → member; sets cookie |
 | POST | `/auth/login` | public | `{ email, password }` → member; sets cookie |
 | POST | `/auth/logout` | member | → 204; clears cookie |
@@ -1478,7 +1594,7 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showSchoolHolidays?, showOptionsExpiration? }` |
 | GET | `/members` | member | → members (no hashes, no emails for non-owners) |
 | PATCH | `/members/{id}` | owner | `{ disabled: boolean }` |
-| GET/POST | `/invites` | owner | POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once) |
+| GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
 | DELETE | `/invites/{id}` | owner | revoke |
 | GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], schoolHolidays[], marketDays[] }`; recurring events expanded server-side with `recurrence.ts`; alarms excluded; public holidays filtered to days off; max range 120 days |
 | POST | `/events` | member | event fields → event |
@@ -1609,6 +1725,14 @@ checks.
   without touching anything but the keyboard; tick one, find it under Recently bought,
   put it back.
 
+**M4d — Invites**
+- `/auth/invite-preview`, the invites list states, the invite card (QR, Share, Copy),
+  the join page at `/join`, the welcome card (§6.2a, §8.9).
+- ✅ API tests I1–I6.
+- ✅ Manual: on the PC create an invite; scan the QR with a phone on the home network;
+  the join page greets the invitee by name; join; the welcome card shows once; the
+  invite shows **joined** in Settings.
+
 **M4c — Chores**
 - Migration 0006 (incl. the `fires` rebuild), `CHORE_TIMING` + `chore` vocab,
   `src/shared/chores.ts`, tick planning, `/chores` + `/chore-runs` API, the Chores
@@ -1708,6 +1832,10 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q15 | Can anyone tick anyone's chore? | Yes — any member, like fires (Q9) |
 | Q16 | Chore alert channels by default | Phone on, House off — same as the alarm form |
 | Q17 | Which Lists view opens first when none is remembered? | Shopping (unchanged); Today once chosen is remembered |
+| Q18 | Invite expiry | 7 days (unchanged) |
+| Q19 | Welcome card content | The three-line tour above; shown once per member per device |
+| Q20 | A signed-in member opens a `/join` link | The app opens as normal and the address becomes `/` |
+| Q21 | Welcome card when an existing member signs in on a new device | No — only right after joining |
 
 ---
 
@@ -1725,7 +1853,9 @@ with its API tests (L1–L12) and its 320 px manual check passed on 2026-10-03. 
 Chores is built (C1–C14 green; migration 0006 applied to the local dev database with
 existing fires and deliveries intact; the Laundry loop exercised end to end through the
 live local API — ring, house message, Done → wait, Undo). **Its 320 px manual check is
-still to do** (the browser extension was unavailable).
+still to do** (the browser extension was unavailable). M4d Invites is built (I1–I6 and
+the link round-trip tests green; `uqr` builds into its own 10 kB lazy chunk, absent from
+the entry chunk). Its manual check — a real QR scanned by a phone at home — is still to do.
 
 Deviations from this spec, deliberately:
 

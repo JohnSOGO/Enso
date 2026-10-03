@@ -1,0 +1,18 @@
+.card { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+
+/* Dark modules on white with a 4-module quiet zone (drawn into the SVG), in dark mode too. */
+.qr { display: block; flex: none; background: #fff; border-radius: 8px; }
+.qrSlot {
+  width: 240px; height: 240px; max-width: 100%; display: grid; place-items: center; padding: 16px;
+  border: 1px dashed var(--border); border-radius: 8px;
+}
+
+.actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1.6rem; font-weight: 700; letter-spacing: 2px; user-select: all;
+  font-variant-numeric: tabular-nums;
+}
+
+.once { font-weight: 600; }

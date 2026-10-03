@@ -1,24 +1,14 @@
 // SPEC §8.6 — Me, Household (owner), School holidays (owner), Status.
 import { useEffect, useState, type ReactNode } from 'react';
-import { del, errorText, get, patch, post, put } from '../api';
+import { del, get, patch, post, put } from '../api';
 import { useApp } from '../state';
 import { MEMBER_PALETTE } from '../../../src/shared/vocab';
+import { useAction } from './useAction';
+import { Invites } from './Invites';
 import s from './Lists.module.css';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return <section className={s.section}><h2>{title}</h2>{children}</section>;
-}
-
-/** Runs an async action and renders its failure in place — never silently. */
-function useAction() {
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const run = async (fn: () => Promise<unknown>) => {
-    setBusy(true); setError(null);
-    try { await fn(); return true; } catch (e) { setError(errorText(e)); return false; } finally { setBusy(false); }
-  };
-  const errorEl = error ? <div role="alert" className="alert-error">{error}</div> : null;
-  return { run, busy, errorEl };
 }
 
 function MeSection({ onLogout }: { onLogout: () => void }) {
@@ -82,12 +72,7 @@ function HouseholdSection() {
   const { householdName, tz, members, refresh } = useApp();
   const [name, setName] = useState(householdName);
   const [zone, setZone] = useState(tz);
-  const [invites, setInvites] = useState<any[]>([]);
-  const [newCode, setNewCode] = useState<{ code: string; for: string; expiresAt: string } | null>(null);
-  const [inviteName, setInviteName] = useState('');
   const { run, busy, errorEl } = useAction();
-  const loadInvites = () => get('/invites').then(setInvites).catch(() => undefined);
-  useEffect(() => { loadInvites(); }, []);
 
   return (
     <Section title="Household">
@@ -120,37 +105,7 @@ function HouseholdSection() {
         </tbody>
       </table>
 
-      <h3 style={{ fontSize: '.9rem', margin: '16px 0 6px' }}>Invite someone</h3>
-      <div className="row">
-        <input aria-label="Name of person to invite" placeholder="e.g. Tostig" value={inviteName} maxLength={60} onChange={(e) => setInviteName(e.target.value)} />
-        <button className="primary" disabled={busy || !inviteName.trim()} onClick={() => run(async () => {
-          const r = await post('/invites', { displayName: inviteName });
-          setNewCode({ code: r.code, for: inviteName, expiresAt: r.expiresAt }); setInviteName(''); loadInvites();
-        })}>Create code</button>
-      </div>
-      {newCode && (
-        <div className="alert-error" style={{ background: 'rgba(99,102,241,.15)', borderColor: 'var(--accent)', color: 'var(--text)' }} role="status">
-          Code for {newCode.for}: <b style={{ fontSize: '1.2rem', letterSpacing: 1, userSelect: 'all' }}>{newCode.code}</b>
-          <br /><span className="muted">Shown only once. Expires {new Date(newCode.expiresAt).toLocaleDateString()}. They enter it on the sign-in page under “I have an invite code”.</span>
-        </div>
-      )}
-      {invites.length > 0 && (
-        <table className={s.table} style={{ marginTop: 8 }}>
-          <thead><tr><th scope="col">Invite</th><th scope="col">State</th><th scope="col"><span className="visually-hidden">Revoke</span></th></tr></thead>
-          <tbody>
-            {invites.map((i) => {
-              const state = i.usedAt ? `used by ${i.usedBy}` : i.revokedAt ? 'revoked' : Date.parse(i.expiresAt) < Date.now() ? 'expired' : 'open';
-              return (
-                <tr key={i.id}>
-                  <th scope="row" className={s.flexible}>{i.displayName}</th>
-                  <td className={s.rigid}><span className={`badge ${state === 'open' ? 'warn' : 'neutral'}`}>{state}</span></td>
-                  <td className={s.rigid}>{state === 'open' && <button disabled={busy} onClick={() => run(async () => { await del(`/invites/${i.id}`); loadInvites(); })}>Revoke</button>}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+      <Invites />
     </Section>
   );
 }
