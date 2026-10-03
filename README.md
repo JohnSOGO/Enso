@@ -25,6 +25,18 @@ npm run seed:dev              # (fresh DB only) test accounts from scripts/dev-s
 
 For frontend hot reload use `npm run dev` instead (Vite on :5173, proxying `/api`).
 
+### On your phone, at home
+
+`npm run build` then `npm run dev:lan` (instead of `dev:api`) and open
+`http://<this PC's LAN IP>:8787` on the phone, e.g. `http://192.168.0.72:8787`. Once, in
+an **administrator** PowerShell, let the home network reach it:
+
+```powershell
+New-NetFirewallRule -DisplayName "Enso dev server (home network)" -Direction Inbound -Protocol TCP -LocalPort 8787 -Profile Private -Action Allow
+```
+
+Everything works there except phone push, which needs HTTPS (SPEC §2.3).
+
 Secrets for dev live in `.dev.vars` (gitignored): `SETUP_TOKEN`, `RELAY_TOKEN`, `DEV_ENDPOINTS=1`.
 
 ### Simulate the clock

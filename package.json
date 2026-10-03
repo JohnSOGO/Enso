@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "concurrently -k -n api,web \"wrangler dev --port 8787\" \"vite --config frontend/vite.config.ts\"",
     "dev:api": "wrangler dev --port 8787",
+    "dev:lan": "wrangler dev --ip 0.0.0.0 --port 8787",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p frontend/tsconfig.json && tsc --noEmit -p relay/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
     "db:migrate:local": "wrangler d1 migrations apply enso --local",

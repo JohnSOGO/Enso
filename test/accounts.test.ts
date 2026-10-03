@@ -1,5 +1,5 @@
 // M2 acceptance — SPEC §11.
-import { env } from 'cloudflare:test';
+import { SELF, env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { Client, OWNER, member, owner } from './helpers';
 
@@ -81,5 +81,26 @@ describe('accounts', () => {
     const r = await new Client().get('/me');
     expect(r.status).toBe(401);
     expect(r.json.message.length).toBeGreaterThan(0);
+  });
+});
+
+describe('session cookie (SPEC §2.1)', () => {
+  const login = async (origin: string) => {
+    await owner(); // make sure the owner exists
+    const res = await SELF.fetch(`${origin}/api/v1/auth/login`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(OWNER),
+    });
+    expect(res.status).toBe(200);
+    return res.headers.get('set-cookie') ?? '';
+  };
+
+  it('is Secure over HTTPS', async () => {
+    expect(await login('https://hrc.test')).toMatch(/;\s*Secure/i);
+  });
+
+  it('is not Secure over plain HTTP (a phone on the LAN dev server would drop it)', async () => {
+    const cookie = await login('http://192.168.0.72:8787');
+    expect(cookie).toMatch(/HttpOnly/i);
+    expect(cookie).not.toMatch(/;\s*Secure/i);
   });
 });

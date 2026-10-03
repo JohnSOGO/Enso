@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.5-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.6-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -143,7 +143,7 @@ from the Worker and speaks them through HA. This is the same pattern AskRoxy use
 | Relay | Node 20+ script run with `tsx` | No framework. Imports `src/shared/vocab.ts`. |
 | Tests | **Vitest**; `@cloudflare/vitest-pool-workers` for API tests | API tests apply `migrations/` via `readD1Migrations` / `applyD1Migrations` |
 | Passwords | PBKDF2-SHA256 via WebCrypto, 100 000 iterations, 16-byte salt | 100k is the Workers cap. Not bcrypt. |
-| Sessions | Opaque random token in an `HttpOnly; Secure; SameSite=Lax` cookie | Stored hashed in D1. No JWT, no refresh tokens. |
+| Sessions | Opaque random token in an `HttpOnly; SameSite=Lax` cookie, plus `Secure` whenever the request arrived over HTTPS (always, in production) | Stored hashed in D1. No JWT, no refresh tokens. Phones drop a `Secure` cookie sent over plain HTTP, so the LAN dev server (§2.3) gets it without. |
 
 ### 2.2 Repository layout
 
@@ -210,10 +210,12 @@ Enso/
 | D1 | local, in `.wrangler/state` | remote D1 `enso` |
 | Frontend | `vite` dev server (proxies `/api` to 8787) | built into `frontend/dist`, served by the Worker |
 | Relay | points at `http://localhost:8787` | points at the production URL |
+| Phones at home | `npm run dev:lan` → `http://<PC's LAN IP>:8787` (listens on all interfaces; needs an inbound Windows Firewall rule for TCP 8787 on the **Private** profile) | the production URL |
 | Clock | `POST /api/v1/dev/tick?now=<ISO>` (only when `DEV_ENDPOINTS=1`) | cron `* * * * *` |
 
 **Web Push needs HTTPS.** It works on `localhost` in the PC's browser, but a phone
-on the LAN hitting `http://192.168.x.x` cannot subscribe. Test push on phones
+on the LAN hitting `http://192.168.x.x` cannot subscribe. Everything else works on the
+LAN dev server; the "Phone alerts off" badge is honest there. Test push on phones
 against the deployed Worker. On iPhone, push works only after
 **Add to Home Screen** (iOS 16.4+).
 
@@ -1521,6 +1523,7 @@ arrives. That is plenty for one household.
 |--------|------|
 | `dev` | `wrangler dev` (API + assets) and `vite` together |
 | `dev:api` | `wrangler dev` alone — serves the built PWA from `frontend/dist` |
+| `dev:lan` | `dev:api` listening on all interfaces, for phones on the home network (§2.3) |
 | `seed:dev` | fresh local DB only: test accounts from `scripts/dev-seed.json` + sample data |
 | `test` | `vitest run` (pure + Workers pool) |
 | `typecheck` | `tsc --noEmit` for worker + shared + tests, frontend, relay, scripts |

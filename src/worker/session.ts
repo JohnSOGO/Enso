@@ -46,7 +46,8 @@ export async function startSession(c: Context<AppEnv>, memberId: string): Promis
     'INSERT INTO sessions (id, member_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)',
     newId('ses'), memberId, await sha256hex(token), new Date().toISOString(), expiry());
   setCookie(c, COOKIE, token, {
-    httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: SESSION_DAYS * 86_400,
+    // §2.1: Secure whenever we were reached over HTTPS; a phone on the LAN dev server (plain HTTP) would drop it.
+    httpOnly: true, secure: new URL(c.req.url).protocol === 'https:', sameSite: 'Lax', path: '/', maxAge: SESSION_DAYS * 86_400,
   });
 }
 
