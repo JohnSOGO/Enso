@@ -38,6 +38,11 @@ New-NetFirewallRule -DisplayName "Enso dev server (home network)" -Direction Inb
 Everything works there except phone push, which needs HTTPS (SPEC §2.3).
 
 Secrets for dev live in `.dev.vars` (gitignored): `SETUP_TOKEN`, `RELAY_TOKEN`, `DEV_ENDPOINTS=1`.
+Reading photos locally (Things to do, SPEC §7C.4) also needs `ANTHROPIC_API_KEY` there; without it
+read-photo answers 503 "Reading photos isn't set up yet." (tests pin it empty, so they never call the API).
+
+Things to do, once per account (SPEC §11 M4g): `npx wrangler r2 bucket create enso-photos`, then
+`npx wrangler secret put ANTHROPIC_API_KEY`.
 
 ### Simulate the clock
 

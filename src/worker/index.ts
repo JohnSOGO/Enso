@@ -12,13 +12,16 @@ import { household } from './routes/household';
 import { relay } from './routes/relay';
 import { lists } from './routes/lists';
 import { chores } from './routes/chores';
+import { things } from './routes/things';
+import { thingPhotos } from './routes/thing-photos';
 
 const api = new Hono<AppEnv>();
 
-// The API is a system of record: never let a browser or iOS heuristically cache it.
+// The API is a system of record: never let a browser or iOS heuristically cache it. A route that
+// set its own Cache-Control (a thing's photo, §7C.3) keeps it.
 api.use('*', async (c, next) => {
   await next();
-  c.header('Cache-Control', 'no-store');
+  if (!c.res.headers.has('Cache-Control')) c.header('Cache-Control', 'no-store');
 });
 
 api.get('/health', async (c) => {
@@ -36,6 +39,8 @@ api.route('/', household);
 api.route('/', relay);
 api.route('/', lists);
 api.route('/', chores);
+api.route('/', thingPhotos); // before things: /things/read-photo must not match /things/:id
+api.route('/', things);
 
 api.post('/dev/tick', async (c) => {
   if (c.env.DEV_ENDPOINTS !== '1') return fail(c, 404, 'not_found', 'Not found.');

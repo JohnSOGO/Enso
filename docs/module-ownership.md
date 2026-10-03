@@ -39,7 +39,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/db.ts` | D1 helpers and id minting |
 | `src/worker/http.ts` | Error envelope (§10) and input checks |
 | `src/worker/session.ts` | Password hashing, session cookie, `requireMember` / owner guards |
-| `src/worker/tick.ts` | `tick()` orchestration: load rows, call the engine, write results, deliveries (§5.6–5.7), chore run planning (§7B.3) |
+| `src/worker/tick.ts` | `tick()` orchestration: load rows, call the engine, write results, deliveries (§5.6–5.7), chore run planning (§7B.3), thing reminder planning (§7C.2) |
 | `src/worker/push.ts` | Web Push sending (§9.1) |
 | `src/worker/routes/auth.ts` | Setup, login/logout, signup, invite preview, rate limit, `/me` |
 | `src/worker/routes/members.ts` | Members list/disable, invites |
@@ -50,6 +50,9 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/routes/relay.ts` | `/relay/claim`, `/relay/report` (§9.2) |
 | `src/worker/routes/lists.ts` | `/lists`, `/lists/{id}`, `/lists/{id}/items`, `/list-items/{id}` — list CRUD and list item CRUD (§7A, §10) |
 | `src/worker/routes/chores.ts` | `/chores`, `/chores/today`, `/chore-runs/{id}/done\|undo` — chore CRUD, today's runs, step done/undo and edit re-plan persistence (§7B, §10) |
+| `src/worker/routes/things.ts` | `/things`, `/things/{id}`, `/things/{id}/plan` — thing CRUD, Plan it (event + thing + fire closes in one batch), closing a thing's scheduled fires on edit/delete (§7C, §10) |
+| `src/worker/routes/thing-photos.ts` | `/things/{id}/photo` (R2 put/get/delete, private) and `/things/read-photo` (size/type check, daily cap via photo_reads, error mapping) (§7C.3–7C.4) |
+| `src/worker/photo-reader.ts` | Reads one photo with the Claude API — the only importer of `@anthropic-ai/sdk` (lazy import); returns raw fields or an honest failure (off / refused / failed + reason); never decides what is saved (§7C.4) |
 
 ## PWA (flow stage: render + capture intent)
 
