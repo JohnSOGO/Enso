@@ -7,12 +7,14 @@ interface Props {
   title: string;
   onClose: () => void;
   dirty?: boolean;
+  /** Asked instead of "Discard your changes?" when `dirty` is set. */
+  confirmCloseText?: string;
   error?: string | null;
   footer?: ReactNode;
   children: ReactNode;
 }
 
-export function Modal({ title, onClose, dirty = false, error, footer, children }: Props) {
+export function Modal({ title, onClose, dirty = false, confirmCloseText = 'Discard your changes?', error, footer, children }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const errRef = useRef<HTMLDivElement>(null);
   const dirtyRef = useRef(dirty);
@@ -29,7 +31,7 @@ export function Modal({ title, onClose, dirty = false, error, footer, children }
   }, [error]);
 
   const requestClose = () => {
-    if (dirtyRef.current && !confirm('Discard your changes?')) return;
+    if (dirtyRef.current && !confirm(confirmCloseText)) return;
     onClose();
   };
 

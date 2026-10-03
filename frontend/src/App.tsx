@@ -13,6 +13,9 @@ import { HouseholdLists } from './components/HouseholdLists';
 import { Settings } from './components/Settings';
 import { RingingBar } from './components/RingingBar';
 import { SignIn } from './components/SignIn';
+import { JoinPage } from './components/JoinPage';
+import { Welcome } from './components/Welcome';
+import { JOIN_PATH } from '../../src/shared/invite-link';
 import { Modal } from './components/Modal';
 import s from './App.module.css';
 
@@ -29,8 +32,8 @@ type Overlay =
   | { kind: 'explain'; title: string; text: string }
   | null;
 
-function Shell({ onLogout }: { onLogout: () => void }) {
-  const { status, today } = useApp();
+function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boolean }) {
+  const { me, status, today } = useApp();
   const [tab, setTab] = useState<Tab>(() => {
     try { const t = localStorage.getItem('enso.tab') as Tab; return TABS.includes(t) ? t : 'calendar'; } catch { return 'calendar'; }
   });
@@ -91,6 +94,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
           <p>{overlay.text}</p>
         </Modal>
       )}
+      {justJoined && <Welcome me={me} />}
     </div>
   );
 }
@@ -99,12 +103,22 @@ export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
   useEffect(() => { get<Me>('/me').then(setMe).catch(() => setMe(null)); }, []);
   const onMe = useCallback((m: Me | null) => setMe(m), []);
+  // §6.2a — the join page lives at /join#CODE; leaving it (joined, chose Sign in, or already signed in — Q20) means '/'.
+  const [joining, setJoining] = useState(() => location.pathname === JOIN_PATH);
+  const [justJoined, setJustJoined] = useState(false);
+  const leaveJoin = useCallback(() => { history.replaceState(null, '', '/'); setJoining(false); }, []);
+  useEffect(() => { if (me && joining) leaveJoin(); }, [me, joining, leaveJoin]);
+  const signedIn = (m: Me, how?: { joined: boolean }) => { setJustJoined(!!how?.joined); setMe(m); };
 
   if (me === undefined) return <p className="muted" style={{ padding: 16 }}>Loading…</p>;
-  if (me === null) return <SignIn onSignedIn={setMe} />;
+  if (me === null) {
+    return joining
+      ? <JoinPage onJoined={(m) => { leaveJoin(); signedIn(m, { joined: true }); }} onSignIn={leaveJoin} />
+      : <SignIn onSignedIn={signedIn} />;
+  }
   return (
     <AppProvider me={me} onMe={onMe}>
-      <Shell onLogout={() => setMe(null)} />
+      <Shell onLogout={() => { setJustJoined(false); setMe(null); }} justJoined={justJoined} />
     </AppProvider>
   );
 }

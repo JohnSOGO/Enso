@@ -1,11 +1,12 @@
-// SPEC §6 — first-run owner setup, login, and signup with an invite code.
+// SPEC §6, §6.2a — first-run owner setup, login, and signup with a typed or pasted invite code.
 import { useEffect, useState, type FormEvent } from 'react';
 import { errorText, get, post } from '../api';
+import { inviteCodeFrom } from '../../../src/shared/invite-link';
 import type { Me } from '../state';
 
 type Mode = 'login' | 'invite' | 'setup';
 
-export function SignIn({ onSignedIn }: { onSignedIn: (m: Me) => void }) {
+export function SignIn({ onSignedIn }: { onSignedIn: (m: Me, how?: { joined: boolean }) => void }) {
   const [mode, setMode] = useState<Mode>('login');
   const [f, setF] = useState({ email: '', password: '', displayName: '', code: '', setupToken: '' });
   const [error, setError] = useState<string | null>(null);
@@ -13,8 +14,6 @@ export function SignIn({ onSignedIn }: { onSignedIn: (m: Me) => void }) {
 
   useEffect(() => {
     get('/setup').then((r) => { if (r.needed) setMode('setup'); }).catch(() => undefined);
-    const code = new URLSearchParams(location.search).get('invite');
-    if (code) { setMode('invite'); setF((x) => ({ ...x, code })); }
   }, []);
 
   async function submit(e: FormEvent) {
@@ -22,8 +21,8 @@ export function SignIn({ onSignedIn }: { onSignedIn: (m: Me) => void }) {
     setBusy(true); setError(null);
     try {
       const path = mode === 'login' ? '/auth/login' : mode === 'invite' ? '/auth/signup' : '/setup';
-      await post(path, f);
-      onSignedIn(await get('/me'));
+      await post(path, mode === 'invite' ? { ...f, code: inviteCodeFrom(f.code) } : f); // a pasted whole link works too
+      onSignedIn(await get('/me'), { joined: mode === 'invite' });
     } catch (err) { setError(errorText(err)); } finally { setBusy(false); }
   }
 
@@ -42,7 +41,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: (m: Me) => void }) {
         </p>
         {error && <div role="alert" className="alert-error">{error}</div>}
         {mode === 'setup' && field('setupToken', 'Setup token (from the server secrets)', 'password', { autoComplete: 'off' })}
-        {mode === 'invite' && field('code', 'Invite code', 'text', { placeholder: 'XXXX-XXXX-XXXX', autoCapitalize: 'characters', autoComplete: 'off' })}
+        {mode === 'invite' && field('code', 'Invite code or link', 'text', { placeholder: 'XXXX-XXXX-XXXX', autoCapitalize: 'characters', autoComplete: 'off' })}
         {mode !== 'login' && field('displayName', 'Your name', 'text', { maxLength: 60, autoComplete: 'nickname' })}
         {field('email', 'Email', 'email', { autoComplete: 'email' })}
         {field('password', mode === 'login' ? 'Password' : 'Password (10+ characters)', 'password', { autoComplete: mode === 'login' ? 'current-password' : 'new-password', minLength: mode === 'login' ? undefined : 10 })}
