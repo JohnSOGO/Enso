@@ -1,5 +1,7 @@
 -- §7B — chores and their daily runs. fires gains kind 'chore' (+ chore_run_id); SQLite
--- cannot alter a CHECK, so fires is rebuilt and its rows copied.
+-- cannot alter a CHECK, so fires is rebuilt and its rows copied. DROP TABLE fires counts
+-- as deleting every fire, which leaves a deferred FK violation per delivery that the
+-- rename never clears — so deliveries are stashed and restored around the swap.
 PRAGMA defer_foreign_keys = true;
 
 CREATE TABLE chores (
@@ -57,8 +59,12 @@ INSERT INTO fires_new (id, kind, event_id, occurrence_date, timer_id, chore_run_
                        alert_count, last_alerted_at, close_reason, closed_by, closed_at)
   SELECT id, kind, event_id, occurrence_date, timer_id, NULL, due_at, state,
          alert_count, last_alerted_at, close_reason, closed_by, closed_at FROM fires;
+CREATE TABLE deliveries_stash AS SELECT * FROM deliveries;
+DELETE FROM deliveries;
 DROP TABLE fires;
 ALTER TABLE fires_new RENAME TO fires;
+INSERT INTO deliveries SELECT * FROM deliveries_stash;
+DROP TABLE deliveries_stash;
 CREATE UNIQUE INDEX uq_fire_occurrence ON fires(event_id, occurrence_date) WHERE kind = 'reminder' AND state != 'closed';
 CREATE UNIQUE INDEX uq_timer_open      ON fires(timer_id) WHERE kind = 'timer' AND state != 'closed';
 CREATE UNIQUE INDEX uq_chore_run_open  ON fires(chore_run_id) WHERE kind = 'chore' AND state != 'closed';

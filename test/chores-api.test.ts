@@ -103,6 +103,20 @@ describe('M4c chores — the Laundry loop (C3, C4, C5, C8)', () => {
     expect(none.status).toBe(409);
     expect(none.json.error).toBe('nothing_to_undo');
   });
+
+  it('C14 delete a chore while a step wait is pending → that fire closes removed; nothing rings', async () => {
+    const ch = await createChore(laundryBody(), '2026-09-06');
+    await tickAt(o, '2026-09-28T14:30:00.000Z');
+    const run = await runOn(ch.id, '2026-09-28');
+    await o.post(`/chore-runs/${run.id}/done`); // step 1 started: a wait fire is pending
+    const pending = (await firesOf(run.id)).find((f) => f.state === 'scheduled');
+    expect(pending).toBeDefined();
+
+    expect((await o.del(`/chores/${ch.id}`)).status).toBe(200);
+    expect((await env.DB.prepare('SELECT state, close_reason FROM fires WHERE id = ?').bind(pending.id).first<any>()))
+      .toEqual({ state: 'closed', close_reason: 'removed' });
+    expect((await firesOf(run.id)).filter((f) => f.state !== 'closed')).toEqual([]);
+  });
 });
 
 describe('M4c chores — by, today, edits', () => {

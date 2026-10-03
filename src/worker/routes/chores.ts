@@ -126,12 +126,12 @@ chores.delete('/chores/:id', requireMember, async (c) => {
   const row = await loadChore(c, true);
   if (row instanceof Response) return row;
   const db = c.env.DB, now = nowIso();
-  // Soft delete; the runs stay (history). Open fires of its unstarted runs close `removed` (§7B.3).
+  // Soft delete; the runs stay (history). Every open fire of its runs closes `removed` (§7B.3).
   await db.batch([
     db.prepare('UPDATE chores SET deleted_at = ?, updated_at = ? WHERE id = ?').bind(now, now, row.id),
     db.prepare(
       `UPDATE fires SET state = 'closed', close_reason = 'removed', closed_at = ?
-        WHERE state != 'closed' AND chore_run_id IN (SELECT id FROM chore_runs WHERE chore_id = ? AND step = 0)`,
+        WHERE state != 'closed' AND chore_run_id IN (SELECT id FROM chore_runs WHERE chore_id = ?)`,
     ).bind(now, row.id),
   ]);
   return c.json({ ok: true });

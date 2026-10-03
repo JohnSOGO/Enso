@@ -526,7 +526,9 @@ CREATE INDEX idx_list_items ON list_items(list, checked_at) WHERE deleted_at IS 
 
 ```sql
 -- §7B — chores and their daily runs. fires gains kind 'chore' (+ chore_run_id); SQLite
--- cannot alter a CHECK, so fires is rebuilt and its rows copied.
+-- cannot alter a CHECK, so fires is rebuilt and its rows copied. DROP TABLE fires counts
+-- as deleting every fire, which leaves a deferred FK violation per delivery that the
+-- rename never clears — so deliveries are stashed and restored around the swap.
 PRAGMA defer_foreign_keys = true;
 
 CREATE TABLE chores (
@@ -584,8 +586,12 @@ INSERT INTO fires_new (id, kind, event_id, occurrence_date, timer_id, chore_run_
                        alert_count, last_alerted_at, close_reason, closed_by, closed_at)
   SELECT id, kind, event_id, occurrence_date, timer_id, NULL, due_at, state,
          alert_count, last_alerted_at, close_reason, closed_by, closed_at FROM fires;
+CREATE TABLE deliveries_stash AS SELECT * FROM deliveries;
+DELETE FROM deliveries;
 DROP TABLE fires;
 ALTER TABLE fires_new RENAME TO fires;
+INSERT INTO deliveries SELECT * FROM deliveries_stash;
+DROP TABLE deliveries_stash;
 CREATE UNIQUE INDEX uq_fire_occurrence ON fires(event_id, occurrence_date) WHERE kind = 'reminder' AND state != 'closed';
 CREATE UNIQUE INDEX uq_timer_open      ON fires(timer_id) WHERE kind = 'timer' AND state != 'closed';
 CREATE UNIQUE INDEX uq_chore_run_open  ON fires(chore_run_id) WHERE kind = 'chore' AND state != 'closed';
@@ -1084,8 +1090,25 @@ Ringing bar until someone acts, like any fire.
 place**, in the same request and one batch: the assignee is recomputed, the open fire
 (if any) closes `removed`, and a new first fire is inserted by the planning rule (only
 if still ahead). Runs are never deleted — fires reference them. Started or finished
-runs are left alone. **Deleting a chore** is a soft delete; the open fires of its
-unstarted runs close `removed` and the runs stay (history).
+runs are left alone. **Deleting a chore** is a soft delete; **every** open fire of its
+runs closes `removed` (a pending step wait must not ring for a chore that no longer
+exists) and the runs stay (history).
+
+**Also settled while building (M4c):**
+- Creating or editing a chore plans its runs and first fires **in the same request**
+  (same rule as tick), so a new chore is on Today at once.
+- A run's first fire is inserted in the same batch as the run, only for a run inserted
+  just then.
+- Editing a chore's days: an unstarted run on a day no longer chosen gets no fire and
+  is hidden from Today.
+- `by` chores ring once on **every** fire, including a step wait's; `at` chores use
+  their repeat-alert setting. Repeat alert is 1–240 min (the timers' range).
+- A step person who is disabled counts as nobody: everyone active is alerted and the
+  message is `Chore: {title}`.
+- Editing a chore whose `people` include a since-disabled member is rejected with a
+  message until the people are fixed (§7B.4 "active members").
+- Two simultaneous Done taps on one run: the second fails visibly (one open fire per
+  run) rather than double-advancing.
 
 ### 7B.4 Limits and validation
 
@@ -1111,6 +1134,7 @@ rejection is 400 `invalid_input` with a message naming the field.
 | C11 | no days / no people / 7 steps / `waitMin` 0 | 400 `invalid_input`, message names the field |
 | C12 | `/calendar` and `/alarms` | no chore appears in either |
 | C13 | migration check (§4.2e) | old fires and deliveries intact after 0006 |
+| C14 | delete a chore while a step wait is pending | that fire closes `removed`; nothing rings |
 
 ---
 
@@ -1280,7 +1304,9 @@ every 30 s while visible (§10 Freshness).
   chip. **Done means** is the dim second line.
 - Tapping the row marks the **current step** done (≥ 44 px). A ↶ button (accessible
   name "Undo last step of Laundry") appears on runs that have a step done.
-- **Done today** is collapsed by default; ↶ there undoes the last step too.
+- **Done today** is collapsed by default; its rows show who finished (`doneBy`), are
+  not tappable (another Done would only be refused), and keep ↶ to undo the last step.
+- Nobody's turn shows as **anyone**.
 - Nothing from earlier days, nothing red except `ringing` (§1.0).
 
 **Shopping:**
@@ -1584,7 +1610,7 @@ checks.
 - Migration 0006 (incl. the `fires` rebuild), `CHORE_TIMING` + `chore` vocab,
   `src/shared/chores.ts`, tick planning, `/chores` + `/chore-runs` API, the Chores
   section + chore form (§8.5), Lists → Today (§8.8), chore rows in the Ringing bar.
-- ✅ Tests C1–C13 (§7B.5); M1-VOCAB passes with the rebuilt `fires`.
+- ✅ Tests C1–C14 (§7B.5); M1-VOCAB passes with the rebuilt `fires`.
 - ✅ Manual at 320 px: create the Laundry loop; on Today tick step 1, see "rings …";
   undo it; the four tabs still fit.
 
@@ -1678,6 +1704,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q14 | Unfinished chores from earlier days? | Drop off Today quietly; a still-ringing fire stays in the Ringing bar |
 | Q15 | Can anyone tick anyone's chore? | Yes — any member, like fires (Q9) |
 | Q16 | Chore alert channels by default | Phone on, House off — same as the alarm form |
+| Q17 | Which Lists view opens first when none is remembered? | Shopping (unchanged); Today once chosen is remembered |
 
 ---
 
@@ -1691,7 +1718,11 @@ recorded. M5 is server side only (subscriptions stored; **no sender** — every 
 delivery is recorded `failed` with `push_sender_not_built (M5)` or `no_subscription`,
 shown in Settings → Status). M7 not started: `wrangler.toml` still carries the
 placeholder `database_id`. The §2.5 architecture guard is in place (map, test, `arch:audit`). M4b Lists is built
-with its API tests (L1–L12) and its 320 px manual check passed on 2026-10-03.
+with its API tests (L1–L12) and its 320 px manual check passed on 2026-10-03. M4c
+Chores is built (C1–C14 green; migration 0006 applied to the local dev database with
+existing fires and deliveries intact; the Laundry loop exercised end to end through the
+live local API — ring, house message, Done → wait, Undo). **Its 320 px manual check is
+still to do** (the browser extension was unavailable).
 
 Deviations from this spec, deliberately:
 
