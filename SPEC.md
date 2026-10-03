@@ -1,6 +1,6 @@
 # Home Reminder Calendar — Specification v2
 
-**Version:** 2.1-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.2-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -34,6 +34,10 @@ exactly these points.
 8. **A fallback must be visible.** A failed push, an offline relay, an unknown value
    renders as an honest marker ("House announcements offline since 14:02"), never
    a plausible substitute or silence.
+9. **Placement before code.** Which file owns new code is looked up in
+   `docs/module-ownership.md`, not decided mid-task. A new file needs a new owner
+   row first. `test/architecture.test.ts` enforces the map, the layering bans, the
+   purity of `src/shared/`, and the line caps (§2.5).
 
 ---
 
@@ -145,8 +149,8 @@ HomeReminderCalendar/
 │       ├── http.ts         # error envelope (§10), input checks
 │       ├── routes/         # auth.ts (setup, login, signup, /me) · members.ts (members,
 │       │                   # invites) · events.ts (/calendar, events) · alarms.ts ·
-│       │                   # alerts.ts (timers, fires, push subscriptions, /status) ·
-│       │                   # household.ts (settings, days off, school holidays) · relay.ts
+│       │                   # alerts.ts (timers, fires + actions) · household.ts (settings,
+│       │                   # days off, school holidays, push subscriptions, /status) · relay.ts
 │       ├── tick.ts         # loads rows, calls engine, writes results
 │       ├── push.ts         # Web Push sending
 │       └── session.ts      # password hashing, session cookie
@@ -159,8 +163,16 @@ HomeReminderCalendar/
 │   ├── classify.ts         # classifyResult (§9.2), imported by the contract test
 │   ├── relay-task.vbs      # logon launcher (§9.2 "Running it")
 │   └── relay.config.example.json
-├── scripts/                # dev-seed.json + seed-dev.mjs (`npm run seed:dev`)
-└── test/
+├── scripts/
+│   ├── dev-seed.json, seed-dev.mjs   # `npm run seed:dev`
+│   ├── arch.ts             # §2.5 caps, layering bans, source scan — their ONE home
+│   ├── arch-types.ts       # the scan's shapes (Node-free, so the test can import them)
+│   └── arch-audit.ts       # `npm run arch:audit` headroom report
+├── docs/
+│   ├── module-ownership.md # the map: which file owns which concern (§2.5)
+│   ├── modularity.md       # the flow doctrine, ceilings, warning band, verdicts
+│   └── placement-receipts.md
+└── test/                   # incl. architecture.test.ts (§2.5)
 ```
 
 ### 2.3 Environments
@@ -188,6 +200,28 @@ against the deployed Worker. On iPhone, push works only after
 | HA token | relay only | Read from `C:\Users\Public\git\HomeAssistant\secrets\ha_token.txt` at startup. Never sent to the Worker, never logged. |
 
 Dev secrets go in `.dev.vars` (gitignored); production uses `wrangler secret put`.
+
+### 2.5 Architecture guard
+
+Source files are everything under `src/`, `frontend/src/`, `relay/` and `scripts/`
+ending in `.ts`, `.tsx`, `.mjs` or `.css`, found on disk (never listed by hand).
+`vitest.config.ts` scans them with `scripts/arch.ts` and hands the result to
+`test/architecture.test.ts`, which fails when:
+
+- a source file has no row (exact path or `*` pattern) in `docs/module-ownership.md`,
+  or a row names nothing on disk;
+- an import crosses a layering ban (`LAYERS` in `scripts/arch.ts`): `src/shared/`
+  imports only its own siblings (no packages, no I/O); the worker, the frontend and
+  the relay never import each other; nothing imports `scripts/`;
+- a `src/shared/` file uses `Date.now(`, `new Date()`, `fetch(` or `D1Database`
+  (§0.3 — `now` is always a parameter);
+- a file is over its line cap: its entry in `CEILINGS`, else `GLOBAL_FILE_CAP`;
+- a file has top-level `let`/`var` (cross-cutting state belongs in an owner module,
+  e.g. `frontend/src/state.tsx`'s context).
+
+`npm run arch:audit` prints every file's size against its cap and marks the **warning
+band** (≥ 90 %). The band is a report for the coordinating session, never a test
+failure. Its verdicts (extract vs bless-and-raise) are in `docs/modularity.md`.
 
 ---
 
@@ -1066,12 +1100,13 @@ arrives. That is plenty for one household.
 | `dev:api` | `wrangler dev` alone — serves the built PWA from `frontend/dist` |
 | `seed:dev` | fresh local DB only: test accounts from `scripts/dev-seed.json` + sample data |
 | `test` | `vitest run` (pure + Workers pool) |
-| `typecheck` | `tsc --noEmit` for worker, shared, relay; `tsc -p frontend` |
+| `typecheck` | `tsc --noEmit` for worker + shared + tests, frontend, relay, scripts |
 | `db:migrate:local` | `wrangler d1 migrations apply hrc --local` |
 | `db:migrate:remote` | `wrangler d1 migrations apply hrc --remote` |
 | `build` | `vite build` → `frontend/dist` |
 | `deploy` | `npm run build && wrangler deploy` |
 | `relay` | `tsx relay/relay.ts` |
+| `arch:audit` | `tsx scripts/arch-audit.ts` — size vs cap for every source file, warning band marked (§2.5) |
 
 `wrangler.toml` essentials:
 
@@ -1220,7 +1255,7 @@ contract test + logon launcher); its manual checks on real speakers are not yet
 recorded. M5 is server side only (subscriptions stored; **no sender** — every push
 delivery is recorded `failed` with `push_sender_not_built (M5)` or `no_subscription`,
 shown in Settings → Status). M7 not started: `wrangler.toml` still carries the
-placeholder `database_id`.
+placeholder `database_id`. The §2.5 architecture guard is in place (map, test, `arch:audit`).
 
 Deviations from this spec, deliberately:
 

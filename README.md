@@ -36,7 +36,8 @@ curl.exe -X POST "http://localhost:8787/api/v1/dev/tick?now=2026-10-06T13:00:00Z
 
 ```powershell
 npm test          # Vitest inside the Workers runtime; applies migrations/ for real
-npm run typecheck # worker + shared, frontend, relay
+npm run typecheck # worker + shared, frontend, relay, scripts
+npm run arch:audit # file sizes vs caps; warning band at 90 % (SPEC §2.5)
 ```
 
 ## House announcements — the LAN relay

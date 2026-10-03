@@ -7,12 +7,13 @@
     "dev": "concurrently -k -n api,web \"wrangler dev --port 8787\" \"vite --config frontend/vite.config.ts\"",
     "dev:api": "wrangler dev --port 8787",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p frontend/tsconfig.json && tsc --noEmit -p relay/tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p frontend/tsconfig.json && tsc --noEmit -p relay/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
     "db:migrate:local": "wrangler d1 migrations apply hrc --local",
     "db:migrate:remote": "wrangler d1 migrations apply hrc --remote",
     "build": "vite build --config frontend/vite.config.ts",
     "deploy": "npm run build && wrangler deploy",
     "relay": "tsx relay/relay.ts",
+    "arch:audit": "tsx scripts/arch-audit.ts",
     "seed:dev": "node scripts/seed-dev.mjs"
   },
   "dependencies": {
