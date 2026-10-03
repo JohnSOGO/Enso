@@ -6,13 +6,20 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "enso"
-database_id = "00000000-0000-0000-0000-000000000000" # replace after `wrangler d1 create enso` (M7)
+database_id = "85c0e2a9-95ef-4cf3-8cea-dceeb2b54773"
+# Local dev keeps its own database (its state is keyed by this id), never the production one.
+preview_database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
 
 [assets]
 directory = "frontend/dist"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
+
+# SPEC §11 M7 — the production address (Q6). The sogodojo.com zone is on this account.
+[[routes]]
+pattern = "enso.sogodojo.com"
+custom_domain = true
 
 [triggers]
 crons = ["* * * * *"]

@@ -2018,7 +2018,11 @@ live local API — ring, house message, Done → wait, Undo). **Its 320 px manua
 still to do** (the browser extension was unavailable). M4d Invites is built (I1–I6 and
 the link round-trip tests green; `uqr` builds into its own 10 kB lazy chunk, absent from
 the entry chunk). Its manual check — a real QR scanned by a phone at home — is still to do.
-M4e Lists of your own is built (L1–L20 green; 0007 verified against the
+**M7: live at https://enso.sogodojo.com (2026-10-03)** — production D1 `enso` (all 7
+migrations), carry-over of settings + 5 school holidays, secrets SETUP_TOKEN and
+RELAY_TOKEN only, the same build as the home-network server. Owner setup and the shared
+phone + house reminder check are still to do. Local dev keeps its own database through
+`preview_database_id` (local D1 state is keyed by that id). M4e Lists of your own is built (L1–L20 green; 0007 verified against the
 local dev data). Admins (§6.3, A1–A7) are built; `Settings.tsx` is at 89 % of its ceiling after the
 members-list controls — the next addition there is a placement decision.
 
