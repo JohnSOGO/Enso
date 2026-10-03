@@ -7,6 +7,8 @@ import { DaySheet } from './components/DaySheet';
 import { EventForm } from './components/EventForm';
 import { TimerForm, type Timer } from './components/Timers';
 import { Alarms, AlarmForm, type Alarm } from './components/Alarms';
+import { type Chore } from './components/Chores';
+import { ChoreForm } from './components/ChoreForm';
 import { HouseholdLists } from './components/HouseholdLists';
 import { Settings } from './components/Settings';
 import { RingingBar } from './components/RingingBar';
@@ -23,6 +25,7 @@ type Overlay =
   | { kind: 'event'; date: string; eventId?: string }
   | { kind: 'timer'; timer: Timer | null }
   | { kind: 'alarm'; alarm: Alarm | null }
+  | { kind: 'chore'; chore: Chore | null }
   | { kind: 'explain'; title: string; text: string }
   | null;
 
@@ -58,7 +61,8 @@ function Shell({ onLogout }: { onLogout: () => void }) {
       )}
       <main className={s.main}>
         {tab === 'calendar' && <Calendar onOpenDay={(date, data) => setOverlay({ kind: 'day', date, data })} />}
-        {tab === 'alarms' && <Alarms onEditAlarm={(alarm) => setOverlay({ kind: 'alarm', alarm })} onEditTimer={(timer) => setOverlay({ kind: 'timer', timer })} />}
+        {tab === 'alarms' && <Alarms onEditAlarm={(alarm) => setOverlay({ kind: 'alarm', alarm })} onEditTimer={(timer) => setOverlay({ kind: 'timer', timer })}
+          onEditChore={(chore) => setOverlay({ kind: 'chore', chore })} />}
         {tab === 'lists' && <HouseholdLists />}
         {tab === 'settings' && <Settings onLogout={onLogout} />}
       </main>
@@ -81,6 +85,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
       {overlay?.kind === 'event' && <EventForm date={overlay.date} eventId={overlay.eventId} onClose={() => setOverlay(null)} />}
       {overlay?.kind === 'timer' && <TimerForm timer={overlay.timer} onClose={() => setOverlay(null)} />}
       {overlay?.kind === 'alarm' && <AlarmForm alarm={overlay.alarm} onClose={() => setOverlay(null)} />}
+      {overlay?.kind === 'chore' && <ChoreForm chore={overlay.chore} onClose={() => setOverlay(null)} />}
       {overlay?.kind === 'explain' && (
         <Modal title={overlay.title} onClose={() => setOverlay(null)} footer={<button onClick={() => setOverlay(null)}>OK</button>}>
           <p>{overlay.text}</p>

@@ -1,7 +1,8 @@
-// SPEC §8.8 — the 🛒 Lists tab: Shopping | Wish list toggle, add box, item rows, item form modal.
+// SPEC §8.8 — the 🛒 Lists tab: Today | Shopping | Wish list toggle, add box, item rows, item form modal.
 // The server decides added / existing / reopened (§7A.1); this screen shows what it returns.
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Modal } from './Modal';
+import { ChoresToday } from './ChoresToday';
 import { del, errorText, get, patch, post } from '../api';
 import { useApp } from '../state';
 import { LIST, isOneOf, type List } from '../../../src/shared/vocab';
@@ -21,26 +22,31 @@ const LABELS: Record<List, { name: string; placeholder: string; checked: string 
   wishlist: { name: 'Wish list', placeholder: 'Add an idea…', checked: 'Done' },
 };
 const STORE_KEY = 'enso.list';
+/** The toggle's views (§8.8): Today (chores) then each list. */
+const VIEWS = ['today', ...LIST] as const;
+type View = (typeof VIEWS)[number];
+const viewName = (v: View) => (v === 'today' ? 'Today' : LABELS[v].name);
 
-function initialList(): List {
-  try { const v = localStorage.getItem(STORE_KEY); return isOneOf(LIST, v) ? v : LIST[0]; } catch { return LIST[0]; }
+// ⚑ The spec does not settle the default with nothing stored; it stays Shopping (LIST[0]).
+function initialView(): View {
+  try { const v = localStorage.getItem(STORE_KEY); return isOneOf(VIEWS, v) ? v : LIST[0]; } catch { return LIST[0]; }
 }
 
-/** The shell: Shopping | Wish list toggle and the remembered choice. */
+/** The shell: Today | Shopping | Wish list toggle and the remembered choice. */
 export function HouseholdLists() {
-  const [list, setList] = useState<List>(initialList);
+  const [view, setView] = useState<View>(initialView);
 
-  useEffect(() => { try { localStorage.setItem(STORE_KEY, list); } catch { /* storage may be blocked */ } }, [list]);
+  useEffect(() => { try { localStorage.setItem(STORE_KEY, view); } catch { /* storage may be blocked */ } }, [view]);
 
   return (
     <div className={s.screen}>
-      <div className={s.toggle} role="group" aria-label="Which list">
-        {LIST.map((l) => (
-          <button key={l} aria-pressed={l === list} className={l === list ? s.on : ''} onClick={() => setList(l)}>{LABELS[l].name}</button>
+      <div className={s.toggle} style={{ gridTemplateColumns: `repeat(${VIEWS.length}, 1fr)` }} role="group" aria-label="Which list">
+        {VIEWS.map((v) => (
+          <button key={v} aria-pressed={v === view} className={v === view ? s.on : ''} onClick={() => setView(v)}>{viewName(v)}</button>
         ))}
       </div>
       {/* Keyed by list: switching lists starts a fresh panel (empty add box, no note, reloads). */}
-      <ListPanel key={list} list={list} />
+      {view === 'today' ? <ChoresToday /> : <ListPanel key={view} list={view} />}
     </div>
   );
 }

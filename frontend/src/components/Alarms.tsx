@@ -1,7 +1,8 @@
-// SPEC §8.5 — Alarms tab: Scheduled alarms (days of week + time) and Rolling timers.
+// SPEC §8.5 — Alarms tab: Scheduled alarms (days of week + time), Rolling timers and Chores.
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
 import { TimersSection, type Timer } from './Timers';
+import { ChoresSection, type Chore } from './Chores';
 import { ChannelChecks, DayChips, RenotifySelect, SHORT, daysText } from './AlertFields';
 import { del, errorText, get, patch, post } from '../api';
 import { useApp } from '../state';
@@ -134,12 +135,15 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
   );
 }
 
-export function Alarms({ onEditAlarm, onEditTimer }: { onEditAlarm: (a: Alarm | null) => void; onEditTimer: (t: Timer | null) => void }) {
+export function Alarms({ onEditAlarm, onEditTimer, onEditChore }: {
+  onEditAlarm: (a: Alarm | null) => void; onEditTimer: (t: Timer | null) => void; onEditChore: (c: Chore | null) => void;
+}) {
   return (
     <div style={{ padding: 12, overflowY: 'auto', height: '100%' }}>
       <h1 style={{ fontSize: '1.15rem', marginBottom: 12 }}>Alarms</h1>
       <ScheduledSection onEdit={onEditAlarm} />
       <TimersSection onEdit={onEditTimer} />
+      <ChoresSection onEdit={onEditChore} />
     </div>
   );
 }

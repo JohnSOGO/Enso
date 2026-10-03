@@ -63,8 +63,11 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/EventForm.tsx` | Event form modal (§8.4) |
 | `frontend/src/components/Alarms.tsx` | Alarms tab: scheduled alarm list + alarm form (§8.5) |
 | `frontend/src/components/Timers.tsx` | Rolling timers list + timer form (§8.5) |
+| `frontend/src/components/Chores.tsx` | Chores section of the Alarms tab (§8.5) |
+| `frontend/src/components/ChoreForm.tsx` | Chore form modal: days, at/by, people turn order, steps (§8.5) |
 | `frontend/src/components/AlertFields.tsx` | Fields shared by the alarm, timer and chore forms: day chips + days text, channel checkboxes, repeat-alert options (§8.5) |
-| `frontend/src/components/HouseholdLists.tsx` | Lists tab (§8.8): `HouseholdLists` shell = Shopping / Wish list toggle + remembered choice; `ListPanel` = one list's add box, item rows, checked section, item form modal |
+| `frontend/src/components/HouseholdLists.tsx` | Lists tab: Today \| Shopping \| Wish list toggle (composes ChoresToday), item rows, item form modal (§8.8) |
+| `frontend/src/components/ChoresToday.tsx` | Lists → Today: today's chore runs, Mine \| Everyone, tick/undo a step (§8.8) |
 | `frontend/src/components/RingingBar.tsx` | Ringing bar (§8.2) |
 | `frontend/src/components/Settings.tsx` | Settings: Me, Household, Status (§8.6) |
 | `frontend/src/components/SignIn.tsx` | Setup, sign in, sign up |
