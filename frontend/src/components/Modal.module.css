@@ -16,7 +16,9 @@
 .panel {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  /* SPEC §8 iPhone rules: basis auto, never 0% — iOS Safari sized a 0% basis to zero here
+     (the dialog's height comes from its content), leaving only the grey backdrop. */
+  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -30,7 +32,7 @@
 .title { font-size: 1.05rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .body {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   padding: 12px 14px;
   overflow-y: auto;

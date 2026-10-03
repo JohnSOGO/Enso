@@ -1290,6 +1290,11 @@ only the grey backdrop):
 - **Every modal renders at the document root** (a portal to `document.body`), never
   inside a screen's scrolling container — no ancestor's overflow, scroll or stacking can
   hide or clip it.
+- **The cause, measured on the phone:** the dialog was 2 px tall and its panel 0 px.
+  iOS Safari 26.6 sizes a `flex: 1` child (basis 0%) of a column flexbox whose height is
+  not fixed as **zero**. Inside any box whose height comes from its content, flex
+  children grow from `auto` (`flex: 1 1 auto`), never from 0. Chrome and desktop
+  WebKit did not reproduce it — only the real phone did.
 
 ### 8.1 Frame
 
