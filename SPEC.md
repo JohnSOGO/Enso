@@ -1179,13 +1179,15 @@ a recycling day, a club's meetings. An event can be marked **optional** (decided
 MojoSOGO 2026-10-03); then **each member decides for themselves** whether it is on.
 
 - An optional event is **on** for a member when they have an `event_optins` row for it.
-  Its creator is turned on automatically when they create it. ⚑
+  Its creator is turned on automatically when they create it, and whoever **edits** an
+  event into optional is turned on the same way. ⚑
 - **Off** means absent for that member: not in their `/calendar` occurrences, not in their
   day sheet, no reminders to them, and its fires are hidden from their Ringing bar.
 - **On** means it behaves like any event for them.
 - **Reminders** of an optional event go only to the members who have it on (and, if the
   event is assigned, only those of them who are assigned). The **House** channel speaks only
-  when at least one member has it on. Nobody on → nothing is delivered. ⚑
+  when that same audience is not empty — the house never announces something nobody it is
+  for has turned on. Nobody in the audience → nothing is delivered. ⚑
 - Turning it on or off takes effect at once (the next fetch, the next alert).
 - Any member may turn any optional event on or off **for themselves**; only the creator or
   an admin may change whether an event is optional (like any edit, §6.3). Making an event
@@ -1583,7 +1585,9 @@ Fields:
   Yearly, plus an optional end date
 - Assigned to (member chips, none = everyone)
 - **☐ Optional — each person turns it on** (creator or admin, §7.5). On an optional event
-  the form also shows **☐ On for me** — every member's own switch.
+  the form also shows **☐ On for me** — every member's own switch. It takes effect the
+  moment it is ticked (like the Settings switch), needs no Save, and stays usable for
+  members who can't edit the event. ⚑
 - **Reminder:**
   - None / At start / 5 / 15 / 30 / 60 min before / 1 day before / for all-day events
     **The evening before (8 pm)** (= 780 min before the all-day start of 09:00) ⚑
