@@ -37,7 +37,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/db.ts` | D1 helpers and id minting |
 | `src/worker/http.ts` | Error envelope (§10) and input checks |
 | `src/worker/session.ts` | Password hashing, session cookie, `requireMember` / owner guards |
-| `src/worker/tick.ts` | `tick()` orchestration: load rows, call the engine, write results, deliveries (§5.6–5.7) |
+| `src/worker/tick.ts` | `tick()` orchestration: load rows, call the engine, write results, deliveries (§5.6–5.7), chore run planning (§7B.3) |
 | `src/worker/push.ts` | Web Push sending (§9.1) |
 | `src/worker/routes/auth.ts` | Setup, login/logout, signup, rate limit, `/me` |
 | `src/worker/routes/members.ts` | Members list/disable, invites |
@@ -47,6 +47,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/routes/household.ts` | Household settings, days off, school holidays, push subscriptions, `/status` |
 | `src/worker/routes/relay.ts` | `/relay/claim`, `/relay/report` (§9.2) |
 | `src/worker/routes/lists.ts` | `/lists/{list}` and `/list-items/{id}` — list item CRUD (§7A, §10) |
+| `src/worker/routes/chores.ts` | `/chores`, `/chores/today`, `/chore-runs/{id}/done\|undo` — chore CRUD, today's runs, step done/undo and edit re-plan persistence (§7B, §10) |
 
 ## PWA (flow stage: render + capture intent)
 
