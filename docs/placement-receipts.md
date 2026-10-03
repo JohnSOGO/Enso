@@ -7,6 +7,25 @@ carry its result.
 
 ---
 
+## 2026-10-03 — M4g Things to do (placement-advisor)
+
+- **Verdict:** NEW `src/shared/things.ts` (rules, pure; imports engine, never the reverse),
+  `src/worker/routes/things.ts` (CRUD + Plan it), `src/worker/routes/thing-photos.ts` (R2 +
+  read-photo), `src/worker/photo-reader.ts` (the only importer of `@anthropic-ai/sdk`, lazily),
+  `frontend/src/components/{ThingsToDo,ThingForm,ThingPlan,ThingPhoto}.tsx`,
+  `frontend/src/shrink-photo.ts`. EXISTING: engine, tick (thing reminder planning), alerts
+  (/fires join), events.ts (thingId + exported `insertEventStatement`, budget ≤ 210),
+  EventForm (≤ 250, `<FromThing>`), index.ts (stop clobbering Cache-Control), env, api.ts,
+  HouseholdLists, RingingBar. Reorganizer: none.
+- **Breakages found before building:** M1-VOCAB `status` collision (things vs deliveries →
+  keyed by table.column); C13 expected rows gain `thing_id`; RingingBar's exhaustive icon
+  map; the /api middleware overwriting the photo's Cache-Control; D13 needs the cap checked
+  before the key; vitest pins `ANTHROPIC_API_KEY: ''` so a local key can't reach the API.
+- **Next fire kind:** opens the pre-named seam tick.ts → `src/worker/fires.ts` first
+  (sourceOf now has three per-kind branches).
+
+---
+
 ## 2026-10-03 — M4e Lists of your own (placement-advisor)
 
 - **Rules:** `src/shared/lists.ts` (pure; imports only `./time`, `./vocab`) gains

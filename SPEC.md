@@ -1380,8 +1380,9 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
   reminder (Done / Snooze in the Ringing bar), may go `missed` like one, and alerts **the
   whole household** on the thing's channels (push by default; House optional). ⚑
   Message: `"To do: {title}"` plus `" — starts today"` for the start reminder.
-- Editing a thing's reminders or dates closes its scheduled future fires `removed`
-  (re-planned by the next tick), like an event edit.
+- **Every** edit of a thing (fields, status, delete) closes its scheduled future fires
+  `removed`; the next tick re-plans whatever still applies. Only `idea` things have
+  reminders — planned, done and let-go things never re-plan.
 - **Plan it** (decided by MojoSOGO): pick a date (inside the window when there is one ⚑ —
   outside it is refused with a message) and optionally a time → a normal **calendar event**
   is created (title; notes = the thing's note + place + link; `thing_id` set), the thing
@@ -1413,7 +1414,10 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
   dates, swaps start/end if reversed, and keeps only `http(s)` links — the model's answer
   is input, never trusted as-is.
 - **Cost guard:** at most **40 reads per household per day** ⚑ (`photo_reads`), then 429
-  with a message. Roughly a cent per photo.
+  with a message. Roughly a cent per photo. A read is counted when the model is called, so
+  failed reads count too.
+- **Check order:** signed in → size/type (400) → daily cap (429) → key present (503) →
+  count the read → call the model → refusal 422 / failure 502 / success → cleaned → 200.
 - **Honest failures:** no `ANTHROPIC_API_KEY` → 503 `photo_reading_off` "Reading photos
   isn't set up yet." Model or network failure → 502 with the reason. A refusal → 422 "Couldn't
   read that photo." The photo itself is still attached either way.
@@ -1491,6 +1495,7 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
 - Reminder row: `🔔 Take out trash · 19:00` with **[Snooze 10m] [Done]**
 - Timer row: `⏱ Check on the dog · ringing 45 min` with **[Ack]**
 - Chore row: `🧹 Laundry — Move to dryer · Sam` with **[Done]** (no snooze)
+- Thing row: `📌 Fall fair · to do` with **[Snooze 10m] [Done]** ⚑ glyph
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
   "3 more ringing ▾".
 
@@ -1978,7 +1983,7 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | DELETE | `/invites/{id}` | owner | revoke |
 | GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], schoolHolidays[], marketDays[] }`; recurring events expanded server-side with `recurrence.ts`; alarms excluded; public holidays filtered to days off; max range 120 days |
 | POST | `/events` | member | event fields → event |
-| GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes | PATCH/DELETE close future scheduled fires (§5.6) |
+| GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6) |
 | POST | `/events/{id}/exdates` | creator or owner | `{ date }` |
 | GET/POST | `/timers` | member | |
 | PATCH/DELETE | `/timers/{id}` | creator or owner | |
@@ -2005,7 +2010,7 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | POST | `/chore-runs/{id}/undo` | member | → run; 409 `nothing_to_undo` at step 0 |
 | GET | `/things` | member | → `{ open: Thing[], closed: Thing[] }` (closed = done/dropped, last 60 days); `Thing = { id, title, note, place, url, windowStart, windowEnd, remindStart, remindOn, channels, hasPhoto, status, plannedEventId, plannedDate, createdBy, updatedAt }` |
 | POST | `/things` | member | thing fields → thing (201) |
-| PATCH/DELETE | `/things/{id}` | member | fields, all optional, incl. `status` → thing; DELETE → 204 (and its photo) |
+| GET/PATCH/DELETE | `/things/{id}` | member | GET → thing; PATCH fields, all optional, incl. `status` → thing; DELETE → 204 (and its photo) |
 | POST | `/things/{id}/plan` | member | `{ date, time? }` → `{ thing, eventId }`; 400 outside the window |
 | PUT/GET/DELETE | `/things/{id}/photo` | member | PUT raw image body (≤ 4 MB) → 204; GET → the image; DELETE → 204 |
 | POST | `/things/read-photo` | member | raw image body → `{ title, startDate, endDate, place, url, note }` (each nullable); 503 / 502 / 422 / 429 per §7C.4 |

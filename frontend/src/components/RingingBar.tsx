@@ -6,7 +6,7 @@ import type { AlertKind } from '../../../src/shared/vocab';
 import s from './RingingBar.module.css';
 
 const COLLAPSE_AFTER = 3;
-const ICON: Record<AlertKind, string> = { reminder: '🔔', timer: '⏱', chore: '🧹' };
+const ICON: Record<AlertKind, string> = { reminder: '🔔', timer: '⏱', chore: '🧹', thing: '📌' }; // thing ⚑ (§8.2)
 
 export function RingingBar() {
   const { ringing, refresh, memberById } = useApp();
