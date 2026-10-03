@@ -11,6 +11,7 @@ import { alarms } from './routes/alarms';
 import { household } from './routes/household';
 import { relay } from './routes/relay';
 import { lists } from './routes/lists';
+import { chores } from './routes/chores';
 
 const api = new Hono<AppEnv>();
 
@@ -34,6 +35,7 @@ api.route('/', alarms);
 api.route('/', household);
 api.route('/', relay);
 api.route('/', lists);
+api.route('/', chores);
 
 api.post('/dev/tick', async (c) => {
   if (c.env.DEV_ENDPOINTS !== '1') return fail(c, 404, 'not_found', 'Not found.');

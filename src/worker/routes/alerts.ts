@@ -6,7 +6,9 @@ import { applyAction, applyTimerCmd, type FireRow } from '../../shared/engine';
 import { all, first, newId, nowIso, parseJson, run } from '../db';
 import { body, fail, intIn, str } from '../http';
 import { requireMember } from '../session';
-import { insertFire, sourceOf, updateFire } from '../tick';
+import { choreFireContext } from '../../shared/chores';
+import { insertFire, loadChoreRun, sourceOf, updateFire } from '../tick';
+import { completeStep } from './chores';
 
 interface TimerRow {
   id: string; title: string; interval_min: number; channels: string; renotify_min: number | null; max_alerts: number;
@@ -107,14 +109,25 @@ alerts.post('/timers/:id/commands', requireMember, async (c) => {
 alerts.get('/fires', requireMember, async (c) => {
   const state = c.req.query('state') ?? 'ringing';
   if (state !== 'ringing' && state !== 'open') return fail(c, 400, 'invalid_input', 'state must be ringing or open.');
-  const rows = await all(c.env.DB,
+  const rows = await all<Record<string, unknown> & { kind: string; choreRunId: string | null }>(c.env.DB,
     `SELECT f.id, f.kind, f.due_at AS dueAt, f.state, f.alert_count AS alertCount, f.occurrence_date AS occurrenceDate,
-            f.event_id AS eventId, f.timer_id AS timerId, COALESCE(e.title, t.title) AS title,
+            f.event_id AS eventId, f.timer_id AS timerId, f.chore_run_id AS choreRunId, COALESCE(e.title, t.title) AS title,
             e.start_time AS startTime
        FROM fires f LEFT JOIN events e ON e.id = f.event_id LEFT JOIN timers t ON t.id = f.timer_id
       WHERE ${state === 'ringing' ? "f.state = 'ringing'" : "f.state != 'closed'"}
       ORDER BY f.due_at DESC`);
-  return c.json(rows);
+  const out = [];
+  for (const { choreRunId, ...r } of rows) {
+    if (r.kind !== 'chore') { out.push(r); continue; }
+    // §10: chore fires carry their run, the current step's person, and the step title (multi-step only).
+    const cr = await loadChoreRun(c.env.DB, choreRunId);
+    const ctx = cr && choreFireContext(cr.chore, cr.run);
+    out.push({
+      ...r, title: cr?.chore.title ?? null, choreRunId, personId: ctx?.personId ?? null,
+      ...(ctx && ctx.stepCount > 1 ? { stepTitle: ctx.stepTitle } : {}),
+    });
+  }
+  return c.json(out);
 });
 
 alerts.post('/fires/:id/actions', requireMember, async (c) => {
@@ -124,8 +137,15 @@ alerts.post('/fires/:id/actions', requireMember, async (c) => {
   if (!fire) return fail(c, 404, 'not_found', 'That alert no longer exists.');
   const src = await sourceOf(c.env.DB, fire);
   if (!src) return fail(c, 404, 'not_found', 'That alert no longer has an event or timer.');
-  const r = applyAction(fire, b.action, src.cfg, c.get('member').id, nowIso());
+  const now = nowIso();
+  const r = applyAction(fire, b.action, src.cfg, c.get('member').id, now);
   if ('error' in r) return fail(c, 409, 'invalid_action', `Cannot ${b.action} this ${fire.kind} right now (it is ${fire.state}).`);
+  if (fire.kind === 'chore') {
+    // Done on a chore fire advances its run one step (§7B.3); that closes this fire and may plan the next.
+    const s = await completeStep(c.env.DB, fire.chore_run_id!, c.get('member').id, now);
+    if ('error' in s) return fail(c, 409, 'invalid_action', `Cannot ${b.action} this chore right now (${s.error}).`);
+    return c.json({ fire: s.change.closeFire ?? r.fire, next: s.change.newFire ?? null });
+  }
   const stmts = [updateFire(c.env.DB, r.fire)];
   if (r.next) stmts.push(insertFire(c.env.DB, r.next));
   await c.env.DB.batch(stmts);

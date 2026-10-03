@@ -1,6 +1,6 @@
 // SPEC §3 — the only place these strings are defined. Import; never retype.
 
-export const ALERT_KIND = ['reminder', 'timer'] as const;
+export const ALERT_KIND = ['reminder', 'timer', 'chore'] as const;
 export const CHANNEL = ['push', 'house'] as const;
 export const FIRE_STATE = ['scheduled', 'ringing', 'closed'] as const;
 export const CLOSE_REASON = ['done', 'acked', 'missed', 'superseded', 'stopped', 'removed'] as const;
@@ -11,6 +11,7 @@ export const ROLE = ['owner', 'member'] as const;
 export const FREQ = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'] as const;
 export const WEEKDAY = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;
 export const LIST = ['shopping', 'wishlist'] as const; // §7A
+export const CHORE_TIMING = ['at', 'by'] as const; // §7B
 
 export type AlertKind = (typeof ALERT_KIND)[number];
 export type Channel = (typeof CHANNEL)[number];
@@ -23,6 +24,7 @@ export type Role = (typeof ROLE)[number];
 export type Freq = (typeof FREQ)[number];
 export type Weekday = (typeof WEEKDAY)[number];
 export type List = (typeof LIST)[number];
+export type ChoreTiming = (typeof CHORE_TIMING)[number];
 
 /** Statuses the relay may report (§9.2). The server's /relay/report accepts exactly these. */
 export const RELAY_REPORT_STATUS = ['sent', 'partial', 'failed'] as const satisfies readonly DeliveryStatus[];

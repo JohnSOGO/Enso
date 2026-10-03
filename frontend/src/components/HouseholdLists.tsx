@@ -1,7 +1,8 @@
-// SPEC §8.8 — the 🛒 Lists tab: Shopping | Wish list toggle, add box, item rows, item form modal.
+// SPEC §8.8 — the 🛒 Lists tab: Today | Shopping | Wish list toggle, add box, item rows, item form modal.
 // The server decides added / existing / reopened (§7A.1); this screen shows what it returns.
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Modal } from './Modal';
+import { ChoresToday } from './ChoresToday';
 import { del, errorText, get, patch, post } from '../api';
 import { useApp } from '../state';
 import { LIST, isOneOf, type List } from '../../../src/shared/vocab';
@@ -21,14 +22,38 @@ const LABELS: Record<List, { name: string; placeholder: string; checked: string 
   wishlist: { name: 'Wish list', placeholder: 'Add an idea…', checked: 'Done' },
 };
 const STORE_KEY = 'enso.list';
+/** The toggle's views (§8.8): Today (chores) then each list. */
+const VIEWS = ['today', ...LIST] as const;
+type View = (typeof VIEWS)[number];
+const viewName = (v: View) => (v === 'today' ? 'Today' : LABELS[v].name);
 
-function initialList(): List {
-  try { const v = localStorage.getItem(STORE_KEY); return isOneOf(LIST, v) ? v : LIST[0]; } catch { return LIST[0]; }
+// ⚑ The spec does not settle the default with nothing stored; it stays Shopping (LIST[0]).
+function initialView(): View {
+  try { const v = localStorage.getItem(STORE_KEY); return isOneOf(VIEWS, v) ? v : LIST[0]; } catch { return LIST[0]; }
 }
 
+/** The shell: Today | Shopping | Wish list toggle and the remembered choice. */
 export function HouseholdLists() {
+  const [view, setView] = useState<View>(initialView);
+
+  useEffect(() => { try { localStorage.setItem(STORE_KEY, view); } catch { /* storage may be blocked */ } }, [view]);
+
+  return (
+    <div className={s.screen}>
+      <div className={s.toggle} style={{ gridTemplateColumns: `repeat(${VIEWS.length}, 1fr)` }} role="group" aria-label="Which list">
+        {VIEWS.map((v) => (
+          <button key={v} aria-pressed={v === view} className={v === view ? s.on : ''} onClick={() => setView(v)}>{viewName(v)}</button>
+        ))}
+      </div>
+      {/* Keyed by list: switching lists starts a fresh panel (empty add box, no note, reloads). */}
+      {view === 'today' ? <ChoresToday /> : <ListPanel key={view} list={view} />}
+    </div>
+  );
+}
+
+/** One list's body: add box, open rows, Recently bought / Done, and the item form. */
+function ListPanel({ list }: { list: List }) {
   const { me, version, tz, memberById } = useApp();
-  const [list, setList] = useState<List>(initialList);
   const [data, setData] = useState<ListData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState('');
@@ -37,14 +62,10 @@ export function HouseholdLists() {
   const [editing, setEditing] = useState<Item | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { try { localStorage.setItem(STORE_KEY, list); } catch { /* storage may be blocked */ } }, [list]);
-
   const load = useCallback(() => {
     get<ListData>(`/lists/${list}`).then((d) => { setData(d); setError(null); }).catch((e) => setError(errorText(e)));
   }, [list]);
   useEffect(() => { load(); }, [load, version]);
-
-  const switchTo = (l: List) => { if (l !== list) { setList(l); setData(null); setSaid(null); setText(''); } };
 
   async function add(e: FormEvent) {
     e.preventDefault();
@@ -97,11 +118,11 @@ export function HouseholdLists() {
   };
 
   const row = (i: Item, done: boolean) => (
-    <li key={i.id} className={`${s.row} ${done ? s.done : ''}`}>
-      <button className={`${ls.item} ${s.main}`}
+    <li key={i.id} className={`${ls.row} ${done ? ls.done : ''}`}>
+      <button className={`${ls.item} ${ls.main}`}
         aria-label={isWish ? `Open ${i.text}` : done ? `Put ${i.text} back on the list` : `Tick ${i.text}`}
         onClick={() => (isWish ? setEditing(i) : setChecked(i, !done))}>
-        {!isWish && <span aria-hidden className={s.box}>{done ? '☑' : '☐'}</span>}
+        {!isWish && <span aria-hidden className={ls.box}>{done ? '☑' : '☐'}</span>}
         <span className={`${ls.title} ${s.text}`}>{i.text}</span>
         {isWish && ownerChip(i)}
         {isWish && i.note && <span aria-label="Has a note" title="Has a note">📝</span>}
@@ -112,13 +133,7 @@ export function HouseholdLists() {
   );
 
   return (
-    <div className={s.screen}>
-      <div className={s.toggle} role="group" aria-label="Which list">
-        {LIST.map((l) => (
-          <button key={l} aria-pressed={l === list} className={l === list ? s.on : ''} onClick={() => switchTo(l)}>{LABELS[l].name}</button>
-        ))}
-      </div>
-
+    <>
       <form className="row" onSubmit={add}>
         <input ref={input} value={text} maxLength={TEXT_MAX} placeholder={LABELS[list].placeholder}
           aria-label={`Add to ${LABELS[list].name}`} enterKeyHint="enter" onChange={(e) => { setText(e.target.value); setSaid(null); }} />
@@ -133,7 +148,7 @@ export function HouseholdLists() {
           {data.open.length === 0 && <p className="muted">Nothing on the list.</p>}
           <ul className={ls.list}>{data.open.map((i) => row(i, false))}</ul>
           {data.checked.length > 0 && (
-            <details className={s.checked}>
+            <details className={ls.checked}>
               <summary>{LABELS[list].checked} ({data.checked.length})</summary>
               <ul className={ls.list}>{data.checked.map((i) => row(i, true))}</ul>
             </details>
@@ -142,7 +157,7 @@ export function HouseholdLists() {
       )}
 
       {editing && <ItemForm item={editing} onClose={() => setEditing(null)} onSaved={load} />}
-    </div>
+    </>
   );
 }
 

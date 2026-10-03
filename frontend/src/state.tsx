@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { get } from './api';
 import { utcToLocal } from '../../src/shared/time';
+import type { AlertKind } from '../../src/shared/vocab';
 
 export interface Me {
   id: string; email: string; displayName: string; color: string; role: 'owner' | 'member';
@@ -10,8 +11,10 @@ export interface Me {
 }
 export interface Member { id: string; displayName: string; color: string; role: string; email?: string; disabledAt: string | null }
 export interface Fire {
-  id: string; kind: 'reminder' | 'timer'; dueAt: string; state: string; alertCount: number;
+  id: string; kind: AlertKind; dueAt: string; state: string; alertCount: number;
   occurrenceDate: string | null; eventId: string | null; timerId: string | null; title: string; startTime: string | null;
+  /** Chore fires only (§10): the run, the current step's title (> 1 step only) and its person. */
+  choreRunId?: string | null; stepTitle?: string | null; personId?: string | null;
 }
 export interface Status {
   relayLastSeen: string | null; relayOnline: boolean;
