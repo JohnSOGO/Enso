@@ -2380,6 +2380,12 @@ home-screen tags, `AppRefresh` (reload on resume unless a dialog is open; pull t
 — verified with real touch events in an emulated phone; its on-iPhone check is still to do.
 The ensō mark (scripts/draw-enso.mjs) and the opening screen are built; the 7 iPhone launch
 images are rendered from it. Its on-iPhone check is still to do.
+**M4h optional events + certain weeks** is built (O1–O9 + §4.3 rows green, 225 tests; 0009
+applied locally with nothing lost; v1.1.0). Built as: reminders of optional events are planned
+for everyone and only deliveries and /fires are filtered; a non-optional event's House rule is
+unchanged; a single-week list stays "certain weeks" in the form. **Owed (warning band):**
+`EventForm.tsx` is at 91 % of its cap — the next addition there opens the named seam first
+(the reminder block onto AlertFields), a placement decision, not the next author's.
 **M4g Things to do** is built (D1–D13 green, 213 tests; 0008 applied to local data with
 every fire and delivery intact; create → photo → Plan it exercised on the live local API).
 Built as: a status set to `planned` directly is refused (use Plan it); Plan it on a non-idea
