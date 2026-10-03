@@ -1,4 +1,4 @@
-# HomeReminderCalendar — working agreement
+# Ensō — working agreement
 
 Adds to the global `~/.claude/CLAUDE.md` (its loop, worktrees, warning band and
 FunHouse notices all apply here); does not restate it. Run, test and relay setup are

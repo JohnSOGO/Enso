@@ -20,7 +20,7 @@ const LABELS: Record<List, { name: string; placeholder: string; checked: string 
   shopping: { name: 'Shopping', placeholder: 'Add item…', checked: 'Recently bought' },
   wishlist: { name: 'Wish list', placeholder: 'Add an idea…', checked: 'Done' },
 };
-const STORE_KEY = 'hrc.list';
+const STORE_KEY = 'enso.list';
 
 function initialList(): List {
   try { const v = localStorage.getItem(STORE_KEY); return isOneOf(LIST, v) ? v : LIST[0]; } catch { return LIST[0]; }

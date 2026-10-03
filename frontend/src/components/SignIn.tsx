@@ -36,7 +36,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: (m: Me) => void }) {
   return (
     <main style={{ height: '100%', overflowY: 'auto', display: 'grid', placeItems: 'center', padding: 16 }}>
       <form onSubmit={submit} style={{ width: 'min(380px, 100%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 }}>
-        <h1 style={{ fontSize: '1.2rem', marginBottom: 4 }}>🏠 Home Calendar</h1>
+        <h1 style={{ fontSize: '1.2rem', marginBottom: 4 }}>Ensō</h1>
         <p className="muted" style={{ marginBottom: 14 }}>
           {mode === 'setup' ? 'First run — create the owner account.' : mode === 'invite' ? 'Join the household with your invite code.' : 'Sign in'}
         </p>

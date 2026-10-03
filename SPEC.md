@@ -1,6 +1,6 @@
-# Home Reminder Calendar — Specification v2
+# Ensō — Specification v2
 
-**Version:** 2.3-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.4-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -42,6 +42,12 @@ exactly these points.
 ---
 
 ## 1. What it is
+
+**Ensō** (円相) — the Zen circle drawn in one unforced stroke. The household runs on
+loops: laundry (wear → wash → dry → put away → wear), shopping (need → buy → use up →
+need), timers that restart on Ack, chores that rotate. The name is the product's
+shape: loops kept turning without strain (wu wei). Written **Ensō** in the UI; `enso`
+wherever ASCII is required (Worker, database, package, storage keys).
 
 A calendar PWA for one household. It has three kinds of alert:
 
@@ -200,7 +206,7 @@ HomeReminderCalendar/
 | | Dev (Windows PC) | Production |
 |---|---|---|
 | Worker | `wrangler dev` → `http://localhost:8787` | `wrangler deploy` |
-| D1 | local, in `.wrangler/state` | remote D1 `hrc` |
+| D1 | local, in `.wrangler/state` | remote D1 `enso` |
 | Frontend | `vite` dev server (proxies `/api` to 8787) | built into `frontend/dist`, served by the Worker |
 | Relay | points at `http://localhost:8787` | points at the production URL |
 | Clock | `POST /api/v1/dev/tick?now=<ISO>` (only when `DEV_ENDPOINTS=1`) | cron `* * * * *` |
@@ -1252,8 +1258,8 @@ arrives. That is plenty for one household.
 | `seed:dev` | fresh local DB only: test accounts from `scripts/dev-seed.json` + sample data |
 | `test` | `vitest run` (pure + Workers pool) |
 | `typecheck` | `tsc --noEmit` for worker + shared + tests, frontend, relay, scripts |
-| `db:migrate:local` | `wrangler d1 migrations apply hrc --local` |
-| `db:migrate:remote` | `wrangler d1 migrations apply hrc --remote` |
+| `db:migrate:local` | `wrangler d1 migrations apply enso --local` |
+| `db:migrate:remote` | `wrangler d1 migrations apply enso --remote` |
 | `build` | `vite build` → `frontend/dist` |
 | `deploy` | `npm run build && wrangler deploy` |
 | `relay` | `tsx relay/relay.ts` |
@@ -1261,8 +1267,8 @@ arrives. That is plenty for one household.
 
 `wrangler.toml` essentials:
 
-- `main = "src/worker/index.ts"`
-- `[[d1_databases]] binding = "DB"`, `database_name = "hrc"`,
+- `name = "enso"`, `main = "src/worker/index.ts"`
+- `[[d1_databases]] binding = "DB"`, `database_name = "enso"`,
   `migrations_dir = "migrations"`
 - `[assets] directory = "frontend/dist"`,
   `not_found_handling = "single-page-application"`,
@@ -1356,7 +1362,7 @@ checks.
   2 min.
 
 **M7 — Production**
-- `wrangler d1 create hrc`, `db:migrate:remote`, secrets (§2.4), `deploy`, point
+- `wrangler d1 create enso`, `db:migrate:remote`, secrets (§2.4), `deploy`, point
   the relay at the prod URL.
 - ✅ The owner can set up, invite a second member, and both receive a shared
   reminder on phone and house.
@@ -1418,7 +1424,7 @@ machinery (§4.2a), not a second reminder system.
 | Q3 | While a timer rings unacknowledged, re-alert or ring once? | Re-alert every 15 min, 4 alerts max, then silent in the Ringing bar |
 | Q4 | Should normal reminders nag too? | Off by default; per-event "repeat alert every" option |
 | Q5 | House announcements go to **all four** Echos (incl. Toasty and Kid's Room) and the Voice PE — also at night? | Yes, all surfaces, always; per-alert speaker choice is Later |
-| Q6 | App URL (e.g. a `sogodojo.com` subdomain like AskRoxy)? | `*.workers.dev` until decided |
+| Q6 | App URL (e.g. a `sogodojo.com` subdomain like AskRoxy)? | `enso.<account>.workers.dev` until decided |
 | Q7 | Accent color: v1 used blue, which collides with school-holiday blue | Indigo `#6366F1` |
 | Q8 | Snooze length | 10 min, single option |
 | Q9 | Can any member Done/Ack a fire assigned to someone else? | Yes |

@@ -1,6 +1,9 @@
-# Home Reminder Calendar
+# Ensō
 
-Household calendar PWA with reminders and **rolling timers** (restart on Ack), alerts by
+The household's loops, kept turning without strain (円相, the Zen circle — see SPEC §1).
+
+Household calendar PWA with reminders, **rolling timers** (restart on Ack) and shared
+shopping / wish lists; alerts by
 phone push and spoken in the house through Home Assistant. **The spec is `SPEC.md`** —
 it is the source of truth; §14 records the prototype's status and deviations.
 Changes go into the spec first, then get built — see `CLAUDE.md`.

@@ -1,5 +1,5 @@
 {
-  "name": "home-reminder-calendar",
+  "name": "enso",
   "version": "0.2.0",
   "private": true,
   "type": "module",
@@ -8,8 +8,8 @@
     "dev:api": "wrangler dev --port 8787",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p frontend/tsconfig.json && tsc --noEmit -p relay/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
-    "db:migrate:local": "wrangler d1 migrations apply hrc --local",
-    "db:migrate:remote": "wrangler d1 migrations apply hrc --remote",
+    "db:migrate:local": "wrangler d1 migrations apply enso --local",
+    "db:migrate:remote": "wrangler d1 migrations apply enso --remote",
     "build": "vite build --config frontend/vite.config.ts",
     "deploy": "npm run build && wrangler deploy",
     "relay": "tsx relay/relay.ts",

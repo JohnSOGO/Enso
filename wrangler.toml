@@ -1,12 +1,12 @@
-name = "home-reminder-calendar"
+name = "enso"
 main = "src/worker/index.ts"
 compatibility_date = "2026-08-20"
 compatibility_flags = ["nodejs_compat"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "hrc"
-database_id = "00000000-0000-0000-0000-000000000000" # replace after `wrangler d1 create hrc` (M7)
+database_name = "enso"
+database_id = "00000000-0000-0000-0000-000000000000" # replace after `wrangler d1 create enso` (M7)
 migrations_dir = "migrations"
 
 [assets]

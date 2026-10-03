@@ -29,10 +29,10 @@ type Overlay =
 function Shell({ onLogout }: { onLogout: () => void }) {
   const { status, today } = useApp();
   const [tab, setTab] = useState<Tab>(() => {
-    try { const t = localStorage.getItem('hrc.tab') as Tab; return TABS.includes(t) ? t : 'calendar'; } catch { return 'calendar'; }
+    try { const t = localStorage.getItem('enso.tab') as Tab; return TABS.includes(t) ? t : 'calendar'; } catch { return 'calendar'; }
   });
   const [overlay, setOverlay] = useState<Overlay>(null);
-  useEffect(() => { try { localStorage.setItem('hrc.tab', tab); } catch { /* storage may be blocked */ } }, [tab]);
+  useEffect(() => { try { localStorage.setItem('enso.tab', tab); } catch { /* storage may be blocked */ } }, [tab]);
 
   const houseOffline = status !== null && !status.relayOnline;
   const phoneOff = status !== null && status.mySubscriptions.length === 0;
