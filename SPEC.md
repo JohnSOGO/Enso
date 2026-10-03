@@ -1443,8 +1443,12 @@ List [ Shopping (3)          ▾ ] [⋯]
 - **⋯** (accessible name "List options") next to the picker opens **Rename** / **Delete
   list** for the chosen list, shown only to those allowed (§7A.1) and never for Today.
   Delete asks first and says how many open items go with it.
-- The choice is remembered per device (by list id). If the remembered list no longer
-  exists, the picker shows **Shopping** (or the first list, if Shopping was deleted). The list refetches when the tab opens, on focus, and
+- The choice is remembered per device (by list id), written only when someone picks. If
+  the remembered list no longer exists — including the old toggle's `shopping`/`wishlist`
+  values — the picker shows **Shopping** (or the first list, if Shopping was deleted).
+- Errors: a missing list is 404 "That list no longer exists."; a refused rename/delete is
+  403 naming who may ("Only the person who made this list or an admin…", or "Only an
+  admin…" for a seeded list). A list's name is trimmed before its length is checked. The list refetches when the tab opens, on focus, and
 every 30 s while visible (§10 Freshness).
 
 **Today** (chores, §7B) — a switch **Mine | Everyone** (default Mine; remembered):
@@ -1493,8 +1497,10 @@ every 30 s while visible (§10 Freshness).
   note (multi-line), **Assigned to** (member chips, single choice, plus **Nobody**), Save /
   Cancel / **Delete** (asks first). The old ✕ quick-remove is gone: ticking is the quick
   action, and deleting lives in the form. ⚑
+- The item form has no Mark done / Not done: ticking is the row's tap, everywhere.
 - **Done** is collapsed by default and dim, newest first. Tapping a done row puts it back
-  on the list; its ✎ still opens the form. Each done row shows who ticked it and when:
+  on the list; its ✎ still opens the form. A done row shows who ticked it and when (in
+  place of the assignee chip, so it stays one line):
   weekday within the last 6 days (“Sat · Shelly”), else the date (“Sep 12 · Shelly”).
 - No due dates and no reminders on any list.
 
@@ -1986,7 +1992,8 @@ live local API — ring, house message, Done → wait, Undo). **Its 320 px manua
 still to do** (the browser extension was unavailable). M4d Invites is built (I1–I6 and
 the link round-trip tests green; `uqr` builds into its own 10 kB lazy chunk, absent from
 the entry chunk). Its manual check — a real QR scanned by a phone at home — is still to do.
-Admins (§6.3, A1–A7) are built; `Settings.tsx` is at 89 % of its ceiling after the
+M4e Lists of your own is built (L1–L20 green; 0007 verified against the
+local dev data). Admins (§6.3, A1–A7) are built; `Settings.tsx` is at 89 % of its ceiling after the
 members-list controls — the next addition there is a placement decision.
 
 Deviations from this spec, deliberately:
