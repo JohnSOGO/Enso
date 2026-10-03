@@ -1396,9 +1396,14 @@ Shelly     joined Oct 4
 Sam        expired
 ```
 
-- One line per invite, newest first: name · state — **waiting** (with its expiry),
-  **joined** (with the date, and the member's name when it differs), **expired**,
-  **revoked**. Only waiting invites have **Revoke** (asks first).
+- One line per invite, newest first: name · state — **waiting** (with its expiry,
+  amber), **joined** (with the date, green), **expired**, **revoked** (neutral). When the
+  member chose a different name it shows dimmed in the name column ("Kai → Kai B"), which
+  truncates, so the row stays one line at 320 px. Only waiting invites have **Revoke**
+  (asks first).
+- On the plain-HTTP home-network address the browser offers no clipboard and no share
+  sheet, so **Copy link** goes straight to the selected-link fallback and **Share…** is
+  hidden — expected, not a bug.
 
 **The invite card** opens as soon as an invite is created (modal, centred):
 
@@ -1419,6 +1424,12 @@ Sam        expired
   on Ensō" + the link); hidden where the browser has no share sheet. **Copy link**
   copies it and says "Copied" for a moment; if copying is blocked, the link is shown
   selected so it can be copied by hand — never a silent failure.
+- **A link only this computer can open is flagged.** When the app itself is open at
+  `localhost` / `127.0.0.1`, the link and QR point there too and no phone can use
+  them. The card then says so above the QR, as a warning: "This link points to this
+  computer only — phones can't open it. Open Ensō at this computer's network address
+  (e.g. http://192.168.0.72:8787) and create the invite there." The code still works
+  typed on any device that can reach the app.
 - The code in large monospace, for typing.
 - **This card is the only time the link exists** (the server keeps only a hash). The
   card says so: "Shown once — keep this open until they have it." Closing it asks first.
@@ -1444,6 +1455,8 @@ Sam        expired
   {invitedBy, when known, else "the person who invited you"} for a new one." plus
   **Sign in** for people who already joined.
 - Errors (email taken, password too short) show inside the form with `role="alert"`.
+- If the preview cannot be fetched at all (network or server failure), the page says
+  "Could not check this invite: …" with **Try again** — it does not claim the link is dead.
 
 **Welcome card** (once, right after joining; remembered per member per device):
 
@@ -1840,7 +1853,9 @@ with its API tests (L1–L12) and its 320 px manual check passed on 2026-10-03. 
 Chores is built (C1–C14 green; migration 0006 applied to the local dev database with
 existing fires and deliveries intact; the Laundry loop exercised end to end through the
 live local API — ring, house message, Done → wait, Undo). **Its 320 px manual check is
-still to do** (the browser extension was unavailable).
+still to do** (the browser extension was unavailable). M4d Invites is built (I1–I6 and
+the link round-trip tests green; `uqr` builds into its own 10 kB lazy chunk, absent from
+the entry chunk). Its manual check — a real QR scanned by a phone at home — is still to do.
 
 Deviations from this spec, deliberately:
 

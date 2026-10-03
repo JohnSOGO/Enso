@@ -11,11 +11,14 @@ export const untilDate = (iso: string) =>
 
 const CLOSE_TEXT = 'Close the invite card? The link and code are shown only once — they cannot be shown again.';
 const QR_PX = 240;
+/** Hosts only this computer can reach: a link built on them is useless to a phone (§8.9). */
+const THIS_COMPUTER_ONLY = ['localhost', '127.0.0.1', '[::1]'];
 
 type Qr = { size: number; path: string } | 'loading' | 'failed';
 
 export function InviteCard({ name, code, expiresAt, onClose }: { name: string; code: string; expiresAt: string; onClose: () => void }) {
   const link = inviteLink(location.origin, code);
+  const localOnly = THIS_COMPUTER_ONLY.includes(location.hostname);
   const [qr, setQr] = useState<Qr>('loading');
   const [copy, setCopy] = useState<'idle' | 'copied' | 'manual'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +67,12 @@ export function InviteCard({ name, code, expiresAt, onClose }: { name: string; c
     <Modal title={`Invite for ${name}`} onClose={onClose} dirty confirmCloseText={CLOSE_TEXT} error={error}
       footer={<button onClick={close}>Done</button>}>
       <div className={s.card}>
+        {localOnly && (
+          <div role="alert" className="alert-error">
+            This link points to this computer only — phones can't open it. Open Ensō at this computer's network
+            address (e.g. http://192.168.0.72:8787) and create the invite there. The code below still works if typed.
+          </div>
+        )}
         {qr === 'loading' && <div className={s.qrSlot} aria-busy="true"><span className="muted">Drawing QR code…</span></div>}
         {qr === 'failed' && (
           <div className={s.qrSlot} role="status"><span className="muted">QR unavailable — share or copy the link, or give them the code below.</span></div>
