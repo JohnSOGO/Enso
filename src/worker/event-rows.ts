@@ -1,0 +1,105 @@
+// SPEC §4.2 — the event row: its shape, its wire view, input validation, and the
+// insert / remove-future-fires statements shared by the events, alarms and things routes.
+import { CHANNEL, isOneOf, type Channel } from '../shared/vocab';
+import { isDate, isTime } from '../shared/time';
+import { recurrenceError, type Recurrence } from '../shared/recurrence';
+import { all, parseJson } from './db';
+import { intIn, optStr, str } from './http';
+
+export interface EventRow {
+  id: string; title: string; notes: string | null;
+  start_date: string; start_time: string | null; end_date: string; end_time: string | null;
+  recurrence: string | null; exdates: string; assigned_to: string;
+  remind_offset_min: number | null; remind_channels: string | null; renotify_min: number | null; max_alerts: number;
+  created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
+  is_alarm: number; thing_id: string | null;
+}
+
+export function eventView(e: EventRow) {
+  return {
+    id: e.id, title: e.title, notes: e.notes,
+    startDate: e.start_date, startTime: e.start_time, endDate: e.end_date, endTime: e.end_time,
+    allDay: e.start_time === null,
+    recurrence: parseJson<Recurrence | null>(e.recurrence, null),
+    exdates: parseJson<string[]>(e.exdates, []),
+    assignedTo: parseJson<string[]>(e.assigned_to, []),
+    reminder: e.remind_offset_min === null ? null : {
+      offsetMin: e.remind_offset_min,
+      channels: parseJson<Channel[]>(e.remind_channels, []),
+      renotifyMin: e.renotify_min,
+      maxAlerts: e.max_alerts,
+    },
+    createdBy: e.created_by, updatedAt: e.updated_at, thingId: e.thing_id,
+  };
+}
+
+export type EventInput = Omit<EventRow, 'id' | 'exdates' | 'created_by' | 'created_at' | 'updated_at' | 'deleted_at' | 'is_alarm' | 'thing_id'>;
+
+/** Validates untrusted event input → row fields, or an error message. */
+export async function parseEventInput(db: D1Database, b: Record<string, unknown>): Promise<EventInput | string> {
+  const title = str(b.title, 120);
+  if (!title) return 'Title is required (up to 120 characters).';
+  const notes = optStr(b.notes);
+  if (notes === undefined && b.notes !== undefined) return 'Notes must be text (up to 2000 characters).';
+  if (!isDate(b.startDate)) return 'Start date must be YYYY-MM-DD.';
+  const allDay = b.startTime === null || b.startTime === undefined;
+  let endDate = (b.endDate ?? b.startDate) as unknown;
+  let startTime: string | null = null, endTime: string | null = null;
+  if (allDay) {
+    if (!isDate(endDate) || endDate < b.startDate) return 'End date must be on or after the start date.';
+  } else {
+    if (!isTime(b.startTime)) return 'Start time must be HH:MM.';
+    startTime = b.startTime;
+    endDate = b.startDate; // timed events are single-day in v1
+    if (b.endTime !== null && b.endTime !== undefined) {
+      if (!isTime(b.endTime) || b.endTime <= startTime) return 'End time must be HH:MM and after the start time.';
+      endTime = b.endTime;
+    }
+  }
+  const recurrence = b.recurrence ?? null;
+  const recErr = recurrenceError(recurrence);
+  if (recErr) return recErr;
+  const assigned = b.assignedTo ?? [];
+  if (!Array.isArray(assigned) || !assigned.every((x) => typeof x === 'string')) return 'assignedTo must be a list of member ids.';
+  if (assigned.length) {
+    const known = new Set((await all<{ id: string }>(db, 'SELECT id FROM members WHERE disabled_at IS NULL')).map((r) => r.id));
+    if (!assigned.every((x) => known.has(x))) return 'assignedTo contains an unknown member.';
+  }
+  let remind: Pick<EventRow, 'remind_offset_min' | 'remind_channels' | 'renotify_min' | 'max_alerts'> =
+    { remind_offset_min: null, remind_channels: null, renotify_min: null, max_alerts: 4 };
+  if (b.reminder !== null && b.reminder !== undefined) {
+    const r = b.reminder as Record<string, unknown>;
+    const offset = intIn(r.offsetMin, 0, 1440);
+    if (offset === null) return 'Reminder offset must be 0–1440 minutes.';
+    const channels = r.channels;
+    if (!Array.isArray(channels) || channels.length === 0 || !channels.every((ch) => isOneOf(CHANNEL, ch))) {
+      return `Reminder channels must be a non-empty list of: ${CHANNEL.join(', ')}.`;
+    }
+    const renotify = r.renotifyMin === null || r.renotifyMin === undefined ? null : intIn(r.renotifyMin, 1, 240);
+    if (renotify === null && r.renotifyMin !== null && r.renotifyMin !== undefined) return 'Repeat-alert interval must be 1–240 minutes.';
+    const maxAlerts = r.maxAlerts === undefined ? 4 : intIn(r.maxAlerts, 1, 20);
+    if (maxAlerts === null) return 'maxAlerts must be 1–20.';
+    remind = { remind_offset_min: offset, remind_channels: JSON.stringify([...new Set(channels)]), renotify_min: renotify, max_alerts: maxAlerts };
+  }
+  return {
+    title, notes: notes ?? null, start_date: b.startDate, start_time: startTime, end_date: endDate as string, end_time: endTime,
+    recurrence: recurrence === null ? null : JSON.stringify(recurrence), assigned_to: JSON.stringify(assigned), ...remind,
+  };
+}
+
+/** §5.6 — an edit makes future scheduled fires obsolete; the next tick re-materializes. */
+export function removeFutureFires(db: D1Database, eventId: string, now: string): D1PreparedStatement {
+  return db.prepare(
+    `UPDATE fires SET state = 'closed', close_reason = 'removed', closed_at = ?
+      WHERE event_id = ? AND state = 'scheduled' AND due_at > ?`).bind(now, eventId, now);
+}
+
+/** One new event row — POST /events, and Plan it (§7C.2) with its `thingId`. */
+export function insertEventStatement(db: D1Database, id: string, input: EventInput, memberId: string, now: string, thingId: string | null = null): D1PreparedStatement {
+  return db.prepare(
+    `INSERT INTO events (id, title, notes, start_date, start_time, end_date, end_time, recurrence, assigned_to,
+       remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at, thing_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(id, input.title, input.notes, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
+    input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, memberId, now, now, thingId);
+}
