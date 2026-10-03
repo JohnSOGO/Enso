@@ -71,6 +71,8 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/ChoresToday.tsx` | Lists → Today: today's chore runs, Mine \| Everyone, tick/undo a step (§8.8) |
 | `frontend/src/components/RingingBar.tsx` | Ringing bar (§8.2) |
 | `frontend/src/components/Settings.tsx` | Settings: Me, Household, Status (§8.6) |
+| `frontend/src/components/useAction.tsx` | Runs an async action, tracks busy, renders its failure in place (`role="alert"`) — the Settings sections' action hook |
+| `frontend/src/components/Invites.tsx` | Settings → Household → Invites: create, list with states, revoke (§8.9) |
 | `frontend/src/components/SignIn.tsx` | Setup, sign in, sign up |
 | `frontend/src/components/Modal.tsx` | The one centred `<dialog>` modal primitive |
 | `frontend/src/*.module.css` | Styles for the same-named component |

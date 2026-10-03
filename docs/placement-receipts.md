@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-03 — R2 refactor: room in Settings for M4d Invites (reorganizer)
+
+- **Trigger:** M4d placement — `Settings.tsx` pinned at 264/304 would cross its
+  ceiling with the §8.9 invite experience (link + QR + share).
+- **Seam moved:** the invites block of `HouseholdSection` → `Invites.tsx` [NEW owner
+  row]; `useAction` → `useAction.tsx` [NEW owner row], imported by both.
+- **Room opened:** `Settings.tsx` 264 → 219 lines; ceiling `264 + WORKING_BUFFER` →
+  `219 + WORKING_BUFFER` (304 → 259).
+- **Behavior:** preserved (typecheck, tests, build green). Accepted difference: an
+  invite error renders above the invites block, not at the top of Household; invite
+  actions now have their own busy flag.
+- **Restraint:** Me, Days off, Members, School holidays, Status untouched; no feature
+  code added.
+
+---
+
 ## 2026-10-03 — M4c Chores (placement-advisor)
 
 - **Ask:** place chores (§7B): pure rules, engine changes, tick planning, API, Alarms →
