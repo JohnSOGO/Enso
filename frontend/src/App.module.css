@@ -21,13 +21,17 @@
 }
 
 .tabs {
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   border-top: 1px solid var(--border);
   background: var(--surface);
   padding-bottom: env(safe-area-inset-bottom);
 }
 .tabs button {
   border: 0; border-radius: 0; background: none;
-  height: var(--tabbar-h); color: var(--text-dim); font-size: .85rem;
+  height: var(--tabbar-h); color: var(--text-dim); font-size: .75rem;
+  /* Icon above label so four tabs fit one line at 320px without wrapping or truncating. */
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 0 2px; min-width: 0; white-space: nowrap;
 }
+.tabs .icon { font-size: 1.15rem; line-height: 1; }
 .tabs .active { color: var(--text); box-shadow: inset 0 3px 0 var(--accent); }

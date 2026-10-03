@@ -7,14 +7,17 @@ import { DaySheet } from './components/DaySheet';
 import { EventForm } from './components/EventForm';
 import { TimerForm, type Timer } from './components/Timers';
 import { Alarms, AlarmForm, type Alarm } from './components/Alarms';
+import { HouseholdLists } from './components/HouseholdLists';
 import { Settings } from './components/Settings';
 import { RingingBar } from './components/RingingBar';
 import { SignIn } from './components/SignIn';
 import { Modal } from './components/Modal';
 import s from './App.module.css';
 
-type Tab = 'calendar' | 'alarms' | 'settings';
-const TABS: Tab[] = ['calendar', 'alarms', 'settings'];
+/** The bottom tab bar (§8.1): the one list of tabs — id, icon, label. */
+const NAV = [['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alarms'], ['lists', '🛒', 'Lists'], ['settings', '⚙', 'Settings']] as const;
+type Tab = (typeof NAV)[number][0];
+const TABS: readonly Tab[] = NAV.map(([id]) => id);
 type Overlay =
   | { kind: 'day'; date: string; data: DayData | undefined }
   | { kind: 'event'; date: string; eventId?: string }
@@ -56,15 +59,16 @@ function Shell({ onLogout }: { onLogout: () => void }) {
       <main className={s.main}>
         {tab === 'calendar' && <Calendar onOpenDay={(date, data) => setOverlay({ kind: 'day', date, data })} />}
         {tab === 'alarms' && <Alarms onEditAlarm={(alarm) => setOverlay({ kind: 'alarm', alarm })} onEditTimer={(timer) => setOverlay({ kind: 'timer', timer })} />}
+        {tab === 'lists' && <HouseholdLists />}
         {tab === 'settings' && <Settings onLogout={onLogout} />}
       </main>
       {tab === 'calendar' && (
         <button className={s.fab} aria-label="Add event" title="Add event" onClick={() => setOverlay({ kind: 'event', date: today() })}>＋</button>
       )}
       <nav className={s.tabs} aria-label="Sections">
-        {([['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alarms'], ['settings', '⚙', 'Settings']] as const).map(([id, icon, label]) => (
+        {NAV.map(([id, icon, label]) => (
           <button key={id} className={tab === id ? s.active : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id)}>
-            <span aria-hidden>{icon}</span> {label}
+            <span aria-hidden className={s.icon}>{icon}</span>{label}
           </button>
         ))}
       </nav>

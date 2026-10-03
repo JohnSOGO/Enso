@@ -14,6 +14,7 @@ const EXPECTED: Record<string, readonly string[]> = {
   close_reason: vocab.CLOSE_REASON,
   channel: vocab.CHANNEL,
   status: vocab.DELIVERY_STATUS,
+  list: vocab.LIST,
 };
 
 it('every CHECK IN-list in the migrations matches vocab.ts', () => {

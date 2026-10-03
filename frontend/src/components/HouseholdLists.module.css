@@ -1,0 +1,29 @@
+/* SPEC §8.8 — Lists tab only. Row cards reuse Lists.module.css (.list, .item, .title). */
+.screen { padding: 12px; overflow-y: auto; overscroll-behavior: contain; height: 100%; }
+
+.toggle {
+  display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 12px;
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+.toggle button { border: 0; border-radius: 0; background: var(--surface); color: var(--text-dim); min-height: 44px; }
+.toggle .on { background: var(--accent); color: #fff; font-weight: 600; }
+
+.said { min-height: 1.4em; font-size: .85rem; margin: 4px 0 8px; }
+
+.row { display: flex; align-items: center; gap: 4px; }
+.main { align-items: center; min-height: 44px; min-width: 0; flex: 1; }
+.box { flex: none; font-size: 1.1rem; color: var(--text-dim); }
+.text { flex: 1; min-width: 0; }
+.whoWhen { flex: none; white-space: nowrap; font-size: .8rem; }
+.remove { flex: none; min-width: 44px; min-height: 44px; color: var(--text-dim); }
+
+.done .main { opacity: .6; }
+
+.checked { margin-top: 18px; }
+.checked > summary {
+  cursor: pointer; color: var(--text-dim); min-height: 44px; display: flex; align-items: center;
+  list-style: none;
+}
+.checked > summary::-webkit-details-marker { display: none; }
+.checked > summary::before { content: '▸'; margin-right: 6px; }
+.checked[open] > summary::before { content: '▾'; }

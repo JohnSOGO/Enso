@@ -25,6 +25,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/shared/holidays.ts` | The `HOLIDAYS` table, observed rule, default days off (§7.3) |
 | `src/shared/markets.ts` | Monthly options expiration dates, Easter computus (§7.4) |
 | `src/shared/engine.ts` | The alert engine: plan, step, act, timer commands (§5) — pure |
+| `src/shared/lists.ts` | Household list rules: itemKey, add/re-open decision, text/note limits, 30-day visible window (§7A.1) — pure |
 
 ## Worker (flow stages: route → persist → deliver)
 
@@ -44,6 +45,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/routes/alerts.ts` | Timers + commands, fires + actions |
 | `src/worker/routes/household.ts` | Household settings, days off, school holidays, push subscriptions, `/status` |
 | `src/worker/routes/relay.ts` | `/relay/claim`, `/relay/report` (§9.2) |
+| `src/worker/routes/lists.ts` | `/lists/{list}` and `/list-items/{id}` — list item CRUD (§7A, §10) |
 
 ## PWA (flow stage: render + capture intent)
 
@@ -60,6 +62,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/EventForm.tsx` | Event form modal (§8.4) |
 | `frontend/src/components/Alarms.tsx` | Alarms tab: scheduled alarm list + alarm form (§8.5) |
 | `frontend/src/components/Timers.tsx` | Rolling timers list + timer form (§8.5) |
+| `frontend/src/components/HouseholdLists.tsx` | Lists tab: Shopping / Wish list toggle, item rows, item form modal (§8.8) |
 | `frontend/src/components/RingingBar.tsx` | Ringing bar (§8.2) |
 | `frontend/src/components/Settings.tsx` | Settings: Me, Household, Status (§8.6) |
 | `frontend/src/components/SignIn.tsx` | Setup, sign in, sign up |
