@@ -1,14 +1,15 @@
-// SPEC §4.2 events, §7 calendar, §10 /calendar + /events.
+// SPEC §4.2 events, §7 calendar, §7.5 optional events, §10 /calendar + /events.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { addDays, diffDays, isDate } from '../../shared/time';
 import { occurrences, type Recurrence } from '../../shared/recurrence';
 import { publicHolidaysBetween } from '../../shared/holidays';
 import { marketDaysBetween } from '../../shared/markets';
+import { isOnFor } from '../../shared/optins';
 import { all, first, newId, nowIso, parseJson } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
-import { eventView, insertEventStatement, parseEventInput, removeFutureFires, type EventRow } from '../event-rows';
+import { eventView, insertEventStatement, onEventIds, optInStatement, parseEventInput, removeFutureFires, type EventRow } from '../event-rows';
 import { daysOff } from './household';
 
 const MAX_RANGE_DAYS = 120;
@@ -30,8 +31,10 @@ events.get('/calendar', requireMember, async (c) => {
   const rows = await all<EventRow & { color: string; creator_name: string }>(c.env.DB,
     `SELECT e.*, m.color, m.display_name AS creator_name FROM events e JOIN members m ON m.id = e.created_by
       WHERE e.deleted_at IS NULL AND e.is_alarm = 0 AND e.start_date <= ? AND (e.recurrence IS NOT NULL OR e.end_date >= ?)`, to, from);
+  const me = c.get('member').id, on = await onEventIds(c.env.DB, me);
   const occ = [];
   for (const e of rows) {
+    if (!isOnFor(e, me, on.has(e.id) ? [me] : [])) continue; // §7.5: an optional event exists only for who has it on
     const span = diffDays(e.end_date, e.start_date);
     const ev = { start_date: e.start_date, recurrence: parseJson<Recurrence | null>(e.recurrence, null), exdates: parseJson<string[]>(e.exdates, []) };
     for (const date of occurrences(ev, addDays(from, -span), to)) {
@@ -50,14 +53,16 @@ events.get('/calendar', requireMember, async (c) => {
 events.post('/events', requireMember, async (c) => {
   const input = await parseEventInput(c.env.DB, await body(c));
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
-  const id = newId('evt');
-  await insertEventStatement(c.env.DB, id, input, c.get('member').id, nowIso()).run();
+  const id = newId('evt'), me = c.get('member').id, now = nowIso();
+  // §7.5: the creator of an optional event has it on from the start.
+  await c.env.DB.batch([insertEventStatement(c.env.DB, id, input, me, now), ...(input.optional ? [optInStatement(c.env.DB, id, me, now)] : [])]);
   return c.json(eventView((await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ?', id))!), 201);
 });
 
 events.get('/events/:id', requireMember, async (c) => {
   const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND is_alarm = 0', c.req.param('id'));
-  return e ? c.json(eventView(e)) : fail(c, 404, 'not_found', 'That event no longer exists.');
+  if (!e) return fail(c, 404, 'not_found', 'That event no longer exists.');
+  return c.json({ ...eventView(e), on: (await onEventIds(c.env.DB, c.get('member').id)).has(e.id) });
 });
 
 events.patch('/events/:id', requireMember, async (c) => {
@@ -69,11 +74,13 @@ events.patch('/events/:id', requireMember, async (c) => {
   await c.env.DB.batch([
     c.env.DB.prepare(
       `UPDATE events SET title = ?, notes = ?, start_date = ?, start_time = ?, end_date = ?, end_time = ?, recurrence = ?,
-         assigned_to = ?, remind_offset_min = ?, remind_channels = ?, renotify_min = ?, max_alerts = ?, updated_at = ?
+         assigned_to = ?, remind_offset_min = ?, remind_channels = ?, renotify_min = ?, max_alerts = ?, optional = ?, updated_at = ?
        WHERE id = ?`).bind(
       input.title, input.notes, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
-      input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, now, e.id),
+      input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, input.optional, now, e.id),
     removeFutureFires(c.env.DB, e.id, now),
+    // §7.5 ⚑: whoever edits an event into optional has it on.
+    ...(input.optional && !e.optional ? [optInStatement(c.env.DB, e.id, c.get('member').id, now)] : []),
   ]);
   return c.json(eventView((await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ?', e.id))!));
 });

@@ -1,5 +1,6 @@
 // SPEC §4.2 — the event row: its shape, its wire view, input validation, and the
-// insert / remove-future-fires statements shared by the events, alarms and things routes.
+// insert / remove-future-fires statements shared by the events, alarms and things routes,
+// and every read/write of event_optins (§7.5 — who has an optional event on).
 import { CHANNEL, isOneOf, type Channel } from '../shared/vocab';
 import { isDate, isTime } from '../shared/time';
 import { recurrenceError, type Recurrence } from '../shared/recurrence';
@@ -12,7 +13,7 @@ export interface EventRow {
   recurrence: string | null; exdates: string; assigned_to: string;
   remind_offset_min: number | null; remind_channels: string | null; renotify_min: number | null; max_alerts: number;
   created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
-  is_alarm: number; thing_id: string | null;
+  is_alarm: number; thing_id: string | null; optional: number;
 }
 
 export function eventView(e: EventRow) {
@@ -29,7 +30,7 @@ export function eventView(e: EventRow) {
       renotifyMin: e.renotify_min,
       maxAlerts: e.max_alerts,
     },
-    createdBy: e.created_by, updatedAt: e.updated_at, thingId: e.thing_id,
+    createdBy: e.created_by, updatedAt: e.updated_at, thingId: e.thing_id, optional: e.optional === 1,
   };
 }
 
@@ -56,6 +57,7 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
       endTime = b.endTime;
     }
   }
+  if (b.optional !== undefined && typeof b.optional !== 'boolean') return 'optional must be true or false.';
   const recurrence = b.recurrence ?? null;
   const recErr = recurrenceError(recurrence);
   if (recErr) return recErr;
@@ -84,6 +86,7 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
   return {
     title, notes: notes ?? null, start_date: b.startDate, start_time: startTime, end_date: endDate as string, end_time: endTime,
     recurrence: recurrence === null ? null : JSON.stringify(recurrence), assigned_to: JSON.stringify(assigned), ...remind,
+    optional: b.optional ? 1 : 0,
   };
 }
 
@@ -98,8 +101,28 @@ export function removeFutureFires(db: D1Database, eventId: string, now: string):
 export function insertEventStatement(db: D1Database, id: string, input: EventInput, memberId: string, now: string, thingId: string | null = null): D1PreparedStatement {
   return db.prepare(
     `INSERT INTO events (id, title, notes, start_date, start_time, end_date, end_time, recurrence, assigned_to,
-       remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at, thing_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at, thing_id, optional)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(id, input.title, input.notes, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
-    input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, memberId, now, now, thingId);
+    input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, memberId, now, now, thingId, input.optional);
+}
+
+/** §7.5 — the ids of the events this member has turned on (their on-set). */
+export async function onEventIds(db: D1Database, memberId: string): Promise<Set<string>> {
+  return new Set((await all<{ event_id: string }>(db, 'SELECT event_id FROM event_optins WHERE member_id = ?', memberId)).map((r) => r.event_id));
+}
+
+/** §7.5 — the members who have this event on. */
+export async function onMemberIds(db: D1Database, eventId: string | null): Promise<string[]> {
+  return (await all<{ member_id: string }>(db, 'SELECT member_id FROM event_optins WHERE event_id = ? ORDER BY created_at', eventId)).map((r) => r.member_id);
+}
+
+/** Turns an event on for a member; turning it on twice is the same as once. */
+export function optInStatement(db: D1Database, eventId: string, memberId: string, now: string): D1PreparedStatement {
+  return db.prepare('INSERT OR IGNORE INTO event_optins (event_id, member_id, created_at) VALUES (?, ?, ?)').bind(eventId, memberId, now);
+}
+
+/** Turns an event off for a member. */
+export function optOutStatement(db: D1Database, eventId: string, memberId: string): D1PreparedStatement {
+  return db.prepare('DELETE FROM event_optins WHERE event_id = ? AND member_id = ?').bind(eventId, memberId);
 }
