@@ -54,6 +54,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 
 | Module | Owns (one concern) |
 |---|---|
+| `frontend/src/components/AppRefresh.tsx` | Always-fresh (§8.10): reload on resume unless a `dialog[open]` exists, pull-to-refresh gesture on the active scroll area + its pill — no app state, no data fetching |
 | `frontend/src/main.tsx` | React root mount |
 | `frontend/src/App.tsx` | The frame (§8.1): Ringing bar, badges, tabs, ＋ button |
 | `frontend/src/api.ts` | HTTP transport to the Worker; every failure an `ApiError` with a message |

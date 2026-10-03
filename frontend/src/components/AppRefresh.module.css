@@ -1,0 +1,16 @@
+/* SPEC §8.10 — the pull-to-refresh pill. Above the ＋ button (z 5), below any dialog (top layer). */
+.pill {
+  position: fixed;
+  left: 50%;
+  top: calc(env(safe-area-inset-top) + 8px);
+  z-index: 20;
+  padding: 6px 14px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: .85rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.armed { color: var(--text); border-color: var(--accent); }

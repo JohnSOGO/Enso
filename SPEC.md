@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.11-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.12-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1518,6 +1518,38 @@ every 30 s while visible (§10 Freshness).
   weekday within the last 6 days (“Sat · Shelly”), else the date (“Sep 12 · Shelly”).
 - No due dates and no reminders on any list.
 
+### 8.10 Installed app (PWA) and always-fresh
+
+**Installing** — Ensō is saved to the home screen (iPhone: Share → **Add to Home Screen**;
+Android: **Install app**) and opens full screen, like a native app. It looks exactly like
+the web page — same design, nothing reinvented.
+- `manifest.webmanifest`: `name` and `short_name` **Ensō**, `start_url` and `scope` `/`,
+  `display: standalone`, `background_color` and `theme_color` `#0F172A` (`--bg`), icons
+  `icon.svg` (any size) plus `icon-192.png` and `icon-512.png`.
+- iPhone: `apple-touch-icon` is a **180 px PNG** (iOS ignores SVG there); `apple-mobile-
+  web-app-capable` / `mobile-web-app-capable` `yes`; `apple-mobile-web-app-title` **Ensō**;
+  status bar `black-translucent` — the app already pads by the safe-area insets.
+- The PNG icons are rendered from `icon.svg` — the same artwork, never redrawn.
+
+**Always fresh** (decided by MojoSOGO 2026-10-03: "always force refresh on open and app pull
+down"). Fresh means the newest build *and* the newest data, i.e. a full page reload.
+- **Opening** from the home screen loads fresh by construction: there is no service worker
+  (§14) and the page is served `must-revalidate`, so nothing stale can be shown.
+- **Coming back** to the app (it was in the background — another app, the lock screen) →
+  the page reloads. **Except while a dialog is open**: a half-filled form, or an invite
+  card that can never be shown again (§8.9), is never thrown away. The reload then happens
+  the next time the app comes back with no dialog open. ⚑
+- **Pull down to refresh**, on every screen: when the screen's scroll area is at its very
+  top, dragging down shows a small pill at the top — "↓ Pull to refresh", then at 72 px
+  "↻ Release to refresh"; releasing past that reloads the page; releasing short of it does
+  nothing. Not inside dialogs. The pill uses the existing surface/text tokens.
+- Owner: `frontend/src/components/AppRefresh.tsx`, mounted once at the app root (signed in
+  or not).
+
+**Acceptance (M4f — manual on the iPhone):** Add to Home Screen shows the Ensō icon and
+name; it opens full screen; deploy a change, switch away and back → the change is there;
+pull down on Lists → it reloads; open ✎, switch away and back → the dialog is still there.
+
 ### 8.9 Invites (owner) and the join page
 
 **In Settings → Household → Invites:**
@@ -2018,6 +2050,9 @@ live local API — ring, house message, Done → wait, Undo). **Its 320 px manua
 still to do** (the browser extension was unavailable). M4d Invites is built (I1–I6 and
 the link round-trip tests green; `uqr` builds into its own 10 kB lazy chunk, absent from
 the entry chunk). Its manual check — a real QR scanned by a phone at home — is still to do.
+**M4f installed app + always fresh** is built: manifest named Ensō with PNG icons, iPhone
+home-screen tags, `AppRefresh` (reload on resume unless a dialog is open; pull to refresh)
+— verified with real touch events in an emulated phone; its on-iPhone check is still to do.
 **M7: live at https://enso.sogodojo.com (2026-10-03)** — production D1 `enso` (all 7
 migrations), carry-over of settings + 5 school holidays, secrets SETUP_TOKEN and
 RELAY_TOKEN only, the same build as the home-network server. Owner setup and the shared
@@ -2029,7 +2064,9 @@ members-list controls — the next addition there is a placement decision.
 Deviations from this spec, deliberately:
 
 - **No service worker / `vite-plugin-pwa` yet.** It arrives with M5, where the push
-  handlers need it; installing a caching SW earlier only adds stale-deploy bugs.
+  handlers need it; installing a caching SW earlier only adds stale-deploy bugs. The app
+  is still installable (§8.10) — iOS and current Chrome do not require one — and when M5
+  adds a service worker it must **not** cache the app shell, or §8.10's always-fresh breaks.
 - `compatibility_date` is `2026-08-20` — the bundled workerd rejects later dates.
 - §10 "Freshness" polls every 30 s. The `phone-ui` skill says *never poll*; polling
   was kept because a ringing timer must appear without a user action. Revisit when
