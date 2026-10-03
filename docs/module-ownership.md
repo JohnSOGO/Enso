@@ -43,6 +43,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/push.ts` | Web Push sending (§9.1) |
 | `src/worker/routes/auth.ts` | Setup, login/logout, signup, invite preview, rate limit, `/me` |
 | `src/worker/routes/members.ts` | Members list/disable, invites |
+| `src/worker/event-rows.ts` | The event row (§4.2): EventRow + eventView, EventInput + parseEventInput, insertEventStatement, removeFutureFires — no Hono, no routes |
 | `src/worker/routes/events.ts` | `/calendar` and event CRUD + exdates |
 | `src/worker/routes/alarms.ts` | `/alarms` — scheduled alarms as `is_alarm` events (§4.2a) |
 | `src/worker/routes/alerts.ts` | Timers + commands, fires + actions |

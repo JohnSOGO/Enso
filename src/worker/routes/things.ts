@@ -10,7 +10,7 @@ import { addMinutes } from '../../shared/time';
 import { all, first, newId, nowIso } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
-import { insertEventStatement, parseEventInput } from './events';
+import { insertEventStatement, parseEventInput } from '../event-rows';
 
 type Row = ThingRow & { planned_date: string | null };
 
