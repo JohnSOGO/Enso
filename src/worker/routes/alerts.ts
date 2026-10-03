@@ -111,9 +111,10 @@ alerts.get('/fires', requireMember, async (c) => {
   if (state !== 'ringing' && state !== 'open') return fail(c, 400, 'invalid_input', 'state must be ringing or open.');
   const rows = await all<Record<string, unknown> & { kind: string; choreRunId: string | null }>(c.env.DB,
     `SELECT f.id, f.kind, f.due_at AS dueAt, f.state, f.alert_count AS alertCount, f.occurrence_date AS occurrenceDate,
-            f.event_id AS eventId, f.timer_id AS timerId, f.chore_run_id AS choreRunId, COALESCE(e.title, t.title) AS title,
-            e.start_time AS startTime
+            f.event_id AS eventId, f.timer_id AS timerId, f.chore_run_id AS choreRunId, f.thing_id AS thingId,
+            COALESCE(e.title, t.title, th.title) AS title, e.start_time AS startTime
        FROM fires f LEFT JOIN events e ON e.id = f.event_id LEFT JOIN timers t ON t.id = f.timer_id
+       LEFT JOIN things th ON th.id = f.thing_id
       WHERE ${state === 'ringing' ? "f.state = 'ringing'" : "f.state != 'closed'"}
       ORDER BY f.due_at DESC`);
   const out = [];
