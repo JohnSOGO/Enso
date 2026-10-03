@@ -59,3 +59,7 @@ Go with the grain of what is already here.
 
 Non-trivial work goes on a topic branch (`feature/`, `fix/`, `docs/`, `refactor/`,
 `chore/`) and merges to `main` once complete and verified.
+
+## Sign-off
+
+FunHouse `sig` for this project: `⭕🔁🏠` (the loop, turning, at home).
