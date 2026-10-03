@@ -6,6 +6,7 @@ import { tick } from './tick';
 import { auth } from './routes/auth';
 import { members } from './routes/members';
 import { events } from './routes/events';
+import { optins } from './routes/optins';
 import { alerts } from './routes/alerts';
 import { alarms } from './routes/alarms';
 import { household } from './routes/household';
@@ -33,6 +34,7 @@ api.get('/health', async (c) => {
 api.route('/', auth);
 api.route('/', members);
 api.route('/', events);
+api.route('/', optins);
 api.route('/', alerts);
 api.route('/', alarms);
 api.route('/', household);

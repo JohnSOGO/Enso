@@ -6,8 +6,8 @@ export interface Recurrence {
   freq: Freq;
   interval?: number;
   byDay?: Weekday[];
-  /** MONTHLY only: the nth `byDay` of the month; -1 = last (RRULE "BYDAY=3FR"). */
-  setPos?: SetPos;
+  /** MONTHLY only: the nth `byDay` of the month, or several (RRULE "BYDAY=1TH,3TH"); -1 = last. */
+  setPos?: SetPos | SetPos[];
   until?: string;
   count?: number;
 }
@@ -36,7 +36,11 @@ export function recurrenceError(r: unknown): string | null {
   }
   if (x.freq === 'MONTHLY' && (x.byDay !== undefined || x.setPos !== undefined)) {
     if (!Array.isArray(x.byDay) || x.byDay.length !== 1) return 'MONTHLY by weekday needs exactly one byDay';
-    if (!(SET_POS as readonly unknown[]).includes(x.setPos)) return 'setPos must be 1, 2, 3, 4 or -1 (last)';
+    const list = Array.isArray(x.setPos) ? x.setPos : [x.setPos];
+    if (list.length === 0 || list.length > SET_POS.length || new Set(list).size !== list.length
+      || !list.every((p) => (SET_POS as readonly unknown[]).includes(p))) {
+      return 'setPos must be 1, 2, 3, 4 or -1 (last), or a list of distinct ones';
+    }
   }
   if (x.setPos !== undefined && x.freq !== 'MONTHLY') return 'setPos is only allowed with MONTHLY';
   if (x.until !== undefined && !isDate(x.until)) return 'until must be YYYY-MM-DD';
@@ -54,6 +58,9 @@ export function nthWeekdayOfMonth(year: number, month1: number, weekday: number,
   const first = ymd(year, month1, 1);
   return addDays(first, ((weekday - weekdayOf(first) + 7) % 7) + (n - 1) * 7);
 }
+
+/** A recurrence's setPos as a list — a single number is a list of one. */
+export const setPosList = (p: SetPos | SetPos[]): SetPos[] => (Array.isArray(p) ? p : [p]);
 
 /** How the form describes a date's position: 16 Oct 2026 (a Friday) → { weekday: 'FR', setPos: 3 }. */
 export function positionInMonth(date: string): { weekday: Weekday; setPos: SetPos } {
@@ -117,9 +124,12 @@ export function occurrences(ev: Recurring, from: string, to: string): string[] {
         const mm = (mi % 12) + 1;
         if (ymd(yy, mm, 1) > last) break;
         if (r.byDay && r.setPos) {
-          const d = nthWeekdayOfMonth(yy, mm, WEEKDAY.indexOf(r.byDay[0]), r.setPos);
-          if (d < ev.start_date) continue;
-          if (!emit(d)) break;
+          // Several weeks can land on one date (4th and last): de-duplicated and in order, so count counts dates.
+          const weekday = WEEKDAY.indexOf(r.byDay[0]);
+          const dates = [...new Set(setPosList(r.setPos).map((n) => nthWeekdayOfMonth(yy, mm, weekday, n)))].sort();
+          let more = true;
+          for (const d of dates) if (d >= ev.start_date && !(more = emit(d))) break;
+          if (!more) break;
         } else if (day <= daysInMonth(yy, mm) && !emit(ymd(yy, mm, day))) break;
       }
       break;

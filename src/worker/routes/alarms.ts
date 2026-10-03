@@ -7,7 +7,7 @@ import { occurrences, type Recurrence } from '../../shared/recurrence';
 import { all, first, newId, nowIso, parseJson, run } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
-import { parseEventInput, removeFutureFires, type EventRow } from './events';
+import { parseEventInput, removeFutureFires, type EventRow } from '../event-rows';
 
 interface AlarmRow extends EventRow {
   next_due_at: string | null;

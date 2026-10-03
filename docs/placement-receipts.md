@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-03 — M4h optional events + certain weeks (placement-advisor)
+
+- **Verdict:** NEW `src/shared/optins.ts` (the one opt-in rule: isOnFor + audience incl. House;
+  tick's private `recipients()` moves here and is deleted), `src/worker/event-rows.ts` (event
+  row/input/insert + all event_optins SQL; opened by R1), `src/worker/routes/optins.ts`,
+  `frontend/src/components/RepeatFields.tsx` (opened by R2), `OptionalItems.tsx`. EXISTING
+  recurrence.ts (setPos lists), events.ts, alerts.ts (/fires filter), tick.ts, EventForm,
+  Settings (+2 lines).
+- **Reorganizer R1/R2 (R4 refactor: room for M4h):** events.ts was both routes and a library
+  for alarms.ts/things.ts → `event-rows.ts`, cap re-pinned down; EventForm's Repeat section →
+  `RepeatFields.tsx`, cap re-pinned down.
+- **Next seams named:** Settings MeSection + PhoneAlerts → `MeSettings.tsx`; EventForm's reminder
+  block deduped onto AlertFields (changes visible labels — a MojoSOGO/code-steward item).
+
+---
+
 ## 2026-10-03 — M4g Things to do (placement-advisor)
 
 - **Verdict:** NEW `src/shared/things.ts` (rules, pure; imports engine, never the reverse),

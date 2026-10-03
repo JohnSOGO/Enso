@@ -1,19 +1,18 @@
 // SPEC §8.4 — event form (modal). Creates or edits an event and its reminder.
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
-import { del, errorText, get, patch, post } from '../api';
+import { del, errorText, get, patch, post, put } from '../api';
 import { useApp } from '../state';
-import { WEEKDAY, type Channel, type Weekday } from '../../../src/shared/vocab';
+import { WEEKDAY, type Channel } from '../../../src/shared/vocab';
 import { weekdayOf } from '../../../src/shared/time';
-import { positionInMonth, type Recurrence } from '../../../src/shared/recurrence';
+import { type Recurrence } from '../../../src/shared/recurrence';
 import { longDate } from './DaySheet';
 import { FromThing } from './ThingPhoto';
+import { RepeatFields, ownWeek, repeatOf, toRecurrence, weeksOf, type RepeatValue } from './RepeatFields';
 
-type Repeat = 'none' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'MONTHLY_POS' | 'YEARLY';
-
-interface Form {
+interface Form extends RepeatValue {
   title: string; notes: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string;
-  repeat: Repeat; byDay: Weekday[]; until: string; assignedTo: string[];
+  assignedTo: string[]; optional: boolean;
   remind: string; push: boolean; house: boolean; renotify: string;
 }
 
@@ -21,33 +20,24 @@ const REMIND_OPTIONS: [string, string][] = [
   ['none', 'None'], ['0', 'At start'], ['5', '5 min before'], ['15', '15 min before'],
   ['30', '30 min before'], ['60', '1 hour before'], ['1440', '1 day before'],
 ];
+/** §8.4 ⚑ — 780 min before the all-day start of 09:00. Offered for all-day events; a timed one keeping it says what it is. */
+const EVENING_BEFORE = '780';
 const RENOTIFY_OPTIONS: [string, string][] = [['off', 'Off'], ['5', 'Every 5 min'], ['10', 'Every 10 min'], ['15', 'Every 15 min'], ['30', 'Every 30 min']];
-const DAY_LABEL: Record<Weekday, string> = { SU: 'Sun', MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat' };
-
-const ORDINAL: Record<number, string> = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th', [-1]: 'last' };
-const WEEKDAY_NAME: Record<Weekday, string> = { SU: 'Sunday', MO: 'Monday', TU: 'Tuesday', WE: 'Wednesday', TH: 'Thursday', FR: 'Friday', SA: 'Saturday' };
-
-/** "3rd Friday" / "last Friday" — the nth weekday this date is in its month. */
-function positionText(date: string): string {
-  const p = positionInMonth(date);
-  return `${ORDINAL[p.setPos]} ${WEEKDAY_NAME[p.weekday]}`;
-}
-
 function blank(date: string): Form {
   return {
     title: '', notes: '', date, allDay: false, startTime: '09:00', endTime: '', endDate: date,
-    repeat: 'none', byDay: [WEEKDAY[weekdayOf(date)]], until: '', assignedTo: [],
+    repeat: 'none', byDay: [WEEKDAY[weekdayOf(date)]], weeks: ownWeek(date), until: '', assignedTo: [], optional: false,
     remind: 'none', push: true, house: false, renotify: 'off',
   };
 }
 
 function fromEvent(e: any): Form {
   const r: Recurrence | null = e.recurrence;
-  const repeat: Repeat = !r ? 'none' : r.freq === 'WEEKLY' && r.interval === 2 ? 'BIWEEKLY' : r.freq === 'MONTHLY' && r.setPos ? 'MONTHLY_POS' : r.freq;
+  const repeat = repeatOf(r);
   return {
     title: e.title, notes: e.notes ?? '', date: e.startDate, allDay: e.allDay, startTime: e.startTime ?? '09:00',
     endTime: e.endTime ?? '', endDate: e.endDate, repeat, byDay: r?.byDay ?? [WEEKDAY[weekdayOf(e.startDate)]],
-    until: r?.until ?? '', assignedTo: e.assignedTo,
+    weeks: weeksOf(r, e.startDate), until: r?.until ?? '', assignedTo: e.assignedTo, optional: !!e.optional,
     remind: e.reminder ? String(e.reminder.offsetMin) : 'none',
     push: e.reminder ? e.reminder.channels.includes('push') : true,
     house: e.reminder ? e.reminder.channels.includes('house') : false,
@@ -56,25 +46,13 @@ function fromEvent(e: any): Form {
 }
 
 function toPayload(f: Form) {
-  let recurrence: Recurrence | null = null;
-  if (f.repeat !== 'none') {
-    const freq = f.repeat === 'BIWEEKLY' ? 'WEEKLY' : f.repeat === 'MONTHLY_POS' ? 'MONTHLY' : f.repeat;
-    recurrence = { freq };
-    if (f.repeat === 'BIWEEKLY') recurrence.interval = 2;
-    if (f.repeat === 'MONTHLY_POS') {
-      const pos = positionInMonth(f.date);
-      recurrence.byDay = [pos.weekday];
-      recurrence.setPos = pos.setPos;
-    }
-    if (freq === 'WEEKLY') recurrence.byDay = WEEKDAY.filter((d) => f.byDay.includes(d));
-    if (f.until) recurrence.until = f.until;
-  }
+  const recurrence = toRecurrence(f, f.date);
   const channels: Channel[] = [...(f.push ? ['push' as const] : []), ...(f.house ? ['house' as const] : [])];
   return {
     title: f.title, notes: f.notes || null, startDate: f.date,
     startTime: f.allDay ? null : f.startTime, endTime: f.allDay || !f.endTime ? null : f.endTime,
     endDate: f.allDay ? f.endDate : f.date,
-    recurrence, assignedTo: f.assignedTo,
+    recurrence, assignedTo: f.assignedTo, optional: f.optional,
     reminder: f.remind === 'none' ? null : {
       offsetMin: Number(f.remind), channels, renotifyMin: f.renotify === 'off' ? null : Number(f.renotify),
     },
@@ -91,7 +69,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
   const { me, members, refresh } = useApp();
   const [form, setForm] = useState<Form | null>(eventId ? null : blank(date));
   const [initial, setInitial] = useState<string>(JSON.stringify(form));
-  const [meta, setMeta] = useState<{ createdBy: string; recurring: boolean; thingId: string | null } | null>(null);
+  const [meta, setMeta] = useState<{ createdBy: string; recurring: boolean; thingId: string | null; optional: boolean; on: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -100,7 +78,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
     get(`/events/${eventId}`).then((e) => {
       const f = fromEvent(e);
       setForm(f); setInitial(JSON.stringify(f));
-      setMeta({ createdBy: e.createdBy, recurring: !!e.recurrence, thingId: e.thingId ?? null });
+      setMeta({ createdBy: e.createdBy, recurring: !!e.recurrence, thingId: e.thingId ?? null, optional: !!e.optional, on: !!e.on });
     }).catch((e) => setError(errorText(e)));
   }, [eventId]);
 
@@ -117,10 +95,18 @@ export function EventForm({ eventId, date, onClose }: Props) {
     if (!form) return;
     if (form.remind !== 'none' && !form.push && !form.house) throw new Error('Pick at least one way to be reminded (Phone or House).');
     if (form.repeat === 'WEEKLY' && form.byDay.length === 0) throw new Error('Pick at least one day of the week.');
+    if (form.repeat === 'MONTHLY_WEEKS' && form.weeks.length === 0) throw new Error('Pick at least one week of the month.');
     const payload = toPayload(form);
     if (eventId) await patch(`/events/${eventId}`, payload);
     else await post('/events', payload);
   });
+
+  /** §7.5 ⚑ — this member's own switch: instant, no Save, usable even when the event can't be edited. */
+  const setOn = async (on: boolean) => {
+    setBusy(true); setError(null);
+    try { await (on ? put(`/events/${eventId}/optin`, {}) : del(`/events/${eventId}/optin`)); setMeta((m) => m && { ...m, on }); refresh(); }
+    catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+  };
 
   const deleteSeries = () => { if (confirm(meta?.recurring ? 'Delete every occurrence of this event?' : 'Delete this event?')) run(() => del(`/events/${eventId}`)); };
   const deleteOne = () => { if (confirm(`Delete only ${longDate(date)}?`)) run(() => post(`/events/${eventId}/exdates`, { date })); };
@@ -170,33 +156,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
             </div>
           )}
 
-          <label className="field"><span>Repeat</span>
-            <select value={form.repeat} onChange={(e) => set('repeat', e.target.value as Repeat)}>
-              <option value="none">Never</option>
-              <option value="DAILY">Daily</option>
-              <option value="WEEKLY">Weekly</option>
-              <option value="BIWEEKLY">Every 2 weeks</option>
-              <option value="MONTHLY">Monthly on day {Number(form.date.slice(8, 10))}</option>
-              <option value="MONTHLY_POS">Monthly on the {positionText(form.date)}</option>
-              <option value="YEARLY">Yearly</option>
-            </select>
-          </label>
-          {(form.repeat === 'WEEKLY' || form.repeat === 'BIWEEKLY') && (
-            <div className="row wrap" style={{ marginBottom: 12 }} role="group" aria-label="Days of the week">
-              {WEEKDAY.map((d) => (
-                <label key={d} className="chip" style={{ padding: '4px 8px' }}>
-                  <input type="checkbox" checked={form.byDay.includes(d)}
-                    onChange={(e) => set('byDay', e.target.checked ? [...form.byDay, d] : form.byDay.filter((x) => x !== d))} />
-                  {DAY_LABEL[d]}
-                </label>
-              ))}
-            </div>
-          )}
-          {form.repeat !== 'none' && (
-            <label className="field"><span>Repeat until (optional)</span>
-              <input type="date" min={form.date} value={form.until} onChange={(e) => set('until', e.target.value)} />
-            </label>
-          )}
+          <RepeatFields value={form} date={form.date} onChange={(c) => setForm((f) => (f ? { ...f, ...c } : f))} />
 
           <div className="field" role="group" aria-label="Assigned to">
             <span className="muted" style={{ fontSize: '.8rem' }}>Assigned to (none = everyone)</span>
@@ -214,6 +174,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
           <label className="field"><span>Reminder</span>
             <select value={form.remind} onChange={(e) => set('remind', e.target.value)}>
               {REMIND_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              {(form.allDay || form.remind === EVENING_BEFORE) && <option value={EVENING_BEFORE}>{form.allDay ? 'The evening before (8 pm)' : '13 hours before'}</option>}
             </select>
           </label>
           {form.remind !== 'none' && (
@@ -229,10 +190,18 @@ export function EventForm({ eventId, date, onClose }: Props) {
               </label>
             </>
           )}
+          <label className="row" style={{ marginBottom: 12, minHeight: 44 }}>
+            <input type="checkbox" checked={form.optional} onChange={(e) => set('optional', e.target.checked)} /> Optional — each person turns it on
+          </label>
           <label className="field"><span>Notes</span>
             <textarea rows={2} value={form.notes} maxLength={2000} onChange={(e) => set('notes', e.target.value)} />
           </label>
         </fieldset>
+      )}
+      {form && meta?.optional && (
+        <label className="row" style={{ marginBottom: 12, minHeight: 44 }}>
+          <input type="checkbox" checked={meta.on} disabled={busy} onChange={(e) => setOn(e.target.checked)} /> On for me
+        </label>
       )}
       {form && eventId && canEdit && (
         <div className="row wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>

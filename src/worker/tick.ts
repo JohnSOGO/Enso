@@ -5,18 +5,20 @@ import {
 } from '../shared/engine';
 import { DEFAULT_MAX_ALERTS, choreFireContext, choreFromRow, planChoreRuns, type Chore, type ChoreRow, type ChoreRun } from '../shared/chores';
 import { isStartReminder, planThingFires, type ThingRow } from '../shared/things';
+import { audience } from '../shared/optins';
 import type { Channel } from '../shared/vocab';
 import type { Recurrence } from '../shared/recurrence';
 import { addMinutes } from '../shared/time';
 import type { Env } from './env';
 import { all, first, newId, parseJson } from './db';
 import { sendPushDeliveries } from './push';
+import { onMemberIds } from './event-rows';
 
 export interface TickSummary { materialized: number; stepped: number; alerts: number; deliveries: number }
 
 interface SourceRow {
   title: string; assigned_to: string; channels: string | null; renotify_min: number | null; max_alerts: number;
-  interval_min: number | null;
+  interval_min: number | null; optional: number;
 }
 
 export function insertFire(db: D1Database, f: NewFire, ignoreConflict = false): D1PreparedStatement {
@@ -72,7 +74,11 @@ export function updateChoreRun(db: D1Database, r: ChoreRun, now: string): D1Prep
     .bind(r.assignee_id, r.step, r.done_at, r.done_by, now, r.id);
 }
 
-interface Source { title: string; assignedTo: string[]; cfg: AlertConfig; chore?: ChoreAlertText; startsToday?: boolean }
+interface Source {
+  title: string; assignedTo: string[]; cfg: AlertConfig; chore?: ChoreAlertText; startsToday?: boolean;
+  /** §7.5: a reminder of an optional event, and the members who have it on. */
+  optional?: boolean; onIds?: string[];
+}
 
 /** Loads the alert config + title for a fire from its event, timer, chore run or thing. */
 export async function sourceOf(
@@ -100,8 +106,8 @@ export async function sourceOf(
     };
   }
   const row = fire.kind === 'reminder'
-    ? await first<SourceRow>(db, `SELECT title, assigned_to, remind_channels AS channels, renotify_min, max_alerts, NULL AS interval_min FROM events WHERE id = ?`, fire.event_id)
-    : await first<SourceRow>(db, `SELECT title, assigned_to, channels, renotify_min, max_alerts, interval_min FROM timers WHERE id = ?`, fire.timer_id);
+    ? await first<SourceRow>(db, `SELECT title, assigned_to, remind_channels AS channels, renotify_min, max_alerts, NULL AS interval_min, optional FROM events WHERE id = ?`, fire.event_id)
+    : await first<SourceRow>(db, `SELECT title, assigned_to, channels, renotify_min, max_alerts, interval_min, 0 AS optional FROM timers WHERE id = ?`, fire.timer_id);
   if (!row) return null;
   return {
     title: row.title,
@@ -112,13 +118,8 @@ export async function sourceOf(
       maxAlerts: row.max_alerts,
       intervalMin: row.interval_min ?? undefined,
     },
+    ...(row.optional === 1 ? { optional: true, onIds: await onMemberIds(db, fire.event_id) } : {}),
   };
-}
-
-async function recipients(db: D1Database, assignedTo: string[]): Promise<string[]> {
-  const active = await activeMemberIds(db);
-  if (assignedTo.length === 0) return active;
-  return assignedTo.filter((id) => active.includes(id));
 }
 
 export async function tick(env: Env, now: string): Promise<TickSummary> {
@@ -168,8 +169,13 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
       summary.alerts++;
       const message = alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday);
       const base = [next.id, next.alert_count] as const;
+      // §5.7, §7.5: who it is for. Nobody → the fire still steps, nothing is delivered.
+      const aud = audience({
+        optional: src.optional ?? false, assignedTo: src.assignedTo, activeIds: await activeMemberIds(db),
+        onIds: src.onIds ?? [], channels: src.cfg.channels,
+      });
       if (src.cfg.channels.includes('push')) {
-        for (const memberId of await recipients(db, src.assignedTo)) {
+        for (const memberId of aud.push) {
           const id = newId('dlv');
           newDeliveryIds.push(id);
           stmts.push(db.prepare(
@@ -177,7 +183,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
              VALUES (?, ?, ?, 'push', ?, ?, 'queued', ?, ?)`).bind(id, ...base, memberId, message, now, now));
         }
       }
-      if (src.cfg.channels.includes('house')) {
+      if (src.cfg.channels.includes('house') && aud.house) {
         stmts.push(db.prepare(
           `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, status, created_at, updated_at)
            VALUES (?, ?, ?, 'house', NULL, ?, 'queued', ?, ?)`).bind(newId('dlv'), ...base, message, now, now));

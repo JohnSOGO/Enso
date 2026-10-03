@@ -9,6 +9,8 @@ import { requireMember } from '../session';
 import { choreFireContext } from '../../shared/chores';
 import { insertFire, loadChoreRun, sourceOf, updateFire } from '../tick';
 import { completeStep } from './chores';
+import { isOnFor } from '../../shared/optins';
+import { onEventIds } from '../event-rows';
 
 interface TimerRow {
   id: string; title: string; interval_min: number; channels: string; renotify_min: number | null; max_alerts: number;
@@ -109,16 +111,19 @@ alerts.post('/timers/:id/commands', requireMember, async (c) => {
 alerts.get('/fires', requireMember, async (c) => {
   const state = c.req.query('state') ?? 'ringing';
   if (state !== 'ringing' && state !== 'open') return fail(c, 400, 'invalid_input', 'state must be ringing or open.');
-  const rows = await all<Record<string, unknown> & { kind: string; choreRunId: string | null }>(c.env.DB,
+  const rows = await all<Record<string, unknown> & { kind: string; choreRunId: string | null; optional: number | null }>(c.env.DB,
     `SELECT f.id, f.kind, f.due_at AS dueAt, f.state, f.alert_count AS alertCount, f.occurrence_date AS occurrenceDate,
             f.event_id AS eventId, f.timer_id AS timerId, f.chore_run_id AS choreRunId, f.thing_id AS thingId,
-            COALESCE(e.title, t.title, th.title) AS title, e.start_time AS startTime
+            COALESCE(e.title, t.title, th.title) AS title, e.start_time AS startTime, e.optional
        FROM fires f LEFT JOIN events e ON e.id = f.event_id LEFT JOIN timers t ON t.id = f.timer_id
        LEFT JOIN things th ON th.id = f.thing_id
       WHERE ${state === 'ringing' ? "f.state = 'ringing'" : "f.state != 'closed'"}
       ORDER BY f.due_at DESC`);
+  const me = c.get('member').id, on = await onEventIds(c.env.DB, me);
   const out = [];
-  for (const { choreRunId, ...r } of rows) {
+  for (const { choreRunId, optional, ...r } of rows) {
+    // §7.5: a reminder of an optional event is hidden from whoever doesn't have it on.
+    if (r.kind === 'reminder' && !isOnFor({ optional: optional ?? 0 }, me, on.has(r.eventId as string) ? [me] : [])) continue;
     if (r.kind !== 'chore') { out.push(r); continue; }
     // §10: chore fires carry their run, the current step's person, and the step title (multi-step only).
     const cr = await loadChoreRun(c.env.DB, choreRunId);

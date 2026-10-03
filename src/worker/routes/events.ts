@@ -1,98 +1,18 @@
-// SPEC §4.2 events, §7 calendar, §10 /calendar + /events.
+// SPEC §4.2 events, §7 calendar, §7.5 optional events, §10 /calendar + /events.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
-import { CHANNEL, isOneOf, type Channel } from '../../shared/vocab';
-import { addDays, diffDays, isDate, isTime } from '../../shared/time';
-import { occurrences, recurrenceError, type Recurrence } from '../../shared/recurrence';
+import { addDays, diffDays, isDate } from '../../shared/time';
+import { occurrences, type Recurrence } from '../../shared/recurrence';
 import { publicHolidaysBetween } from '../../shared/holidays';
 import { marketDaysBetween } from '../../shared/markets';
+import { isOnFor } from '../../shared/optins';
 import { all, first, newId, nowIso, parseJson } from '../db';
-import { body, fail, intIn, optStr, str } from '../http';
+import { body, fail } from '../http';
 import { requireMember } from '../session';
+import { eventView, insertEventStatement, onEventIds, optInStatement, parseEventInput, removeFutureFires, type EventRow } from '../event-rows';
 import { daysOff } from './household';
 
 const MAX_RANGE_DAYS = 120;
-
-export interface EventRow {
-  id: string; title: string; notes: string | null;
-  start_date: string; start_time: string | null; end_date: string; end_time: string | null;
-  recurrence: string | null; exdates: string; assigned_to: string;
-  remind_offset_min: number | null; remind_channels: string | null; renotify_min: number | null; max_alerts: number;
-  created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
-  is_alarm: number; thing_id: string | null;
-}
-
-export function eventView(e: EventRow) {
-  return {
-    id: e.id, title: e.title, notes: e.notes,
-    startDate: e.start_date, startTime: e.start_time, endDate: e.end_date, endTime: e.end_time,
-    allDay: e.start_time === null,
-    recurrence: parseJson<Recurrence | null>(e.recurrence, null),
-    exdates: parseJson<string[]>(e.exdates, []),
-    assignedTo: parseJson<string[]>(e.assigned_to, []),
-    reminder: e.remind_offset_min === null ? null : {
-      offsetMin: e.remind_offset_min,
-      channels: parseJson<Channel[]>(e.remind_channels, []),
-      renotifyMin: e.renotify_min,
-      maxAlerts: e.max_alerts,
-    },
-    createdBy: e.created_by, updatedAt: e.updated_at, thingId: e.thing_id,
-  };
-}
-
-type EventInput = Omit<EventRow, 'id' | 'exdates' | 'created_by' | 'created_at' | 'updated_at' | 'deleted_at' | 'is_alarm' | 'thing_id'>;
-
-/** Validates untrusted event input → row fields, or an error message. */
-export async function parseEventInput(db: D1Database, b: Record<string, unknown>): Promise<EventInput | string> {
-  const title = str(b.title, 120);
-  if (!title) return 'Title is required (up to 120 characters).';
-  const notes = optStr(b.notes);
-  if (notes === undefined && b.notes !== undefined) return 'Notes must be text (up to 2000 characters).';
-  if (!isDate(b.startDate)) return 'Start date must be YYYY-MM-DD.';
-  const allDay = b.startTime === null || b.startTime === undefined;
-  let endDate = (b.endDate ?? b.startDate) as unknown;
-  let startTime: string | null = null, endTime: string | null = null;
-  if (allDay) {
-    if (!isDate(endDate) || endDate < b.startDate) return 'End date must be on or after the start date.';
-  } else {
-    if (!isTime(b.startTime)) return 'Start time must be HH:MM.';
-    startTime = b.startTime;
-    endDate = b.startDate; // timed events are single-day in v1
-    if (b.endTime !== null && b.endTime !== undefined) {
-      if (!isTime(b.endTime) || b.endTime <= startTime) return 'End time must be HH:MM and after the start time.';
-      endTime = b.endTime;
-    }
-  }
-  const recurrence = b.recurrence ?? null;
-  const recErr = recurrenceError(recurrence);
-  if (recErr) return recErr;
-  const assigned = b.assignedTo ?? [];
-  if (!Array.isArray(assigned) || !assigned.every((x) => typeof x === 'string')) return 'assignedTo must be a list of member ids.';
-  if (assigned.length) {
-    const known = new Set((await all<{ id: string }>(db, 'SELECT id FROM members WHERE disabled_at IS NULL')).map((r) => r.id));
-    if (!assigned.every((x) => known.has(x))) return 'assignedTo contains an unknown member.';
-  }
-  let remind: Pick<EventRow, 'remind_offset_min' | 'remind_channels' | 'renotify_min' | 'max_alerts'> =
-    { remind_offset_min: null, remind_channels: null, renotify_min: null, max_alerts: 4 };
-  if (b.reminder !== null && b.reminder !== undefined) {
-    const r = b.reminder as Record<string, unknown>;
-    const offset = intIn(r.offsetMin, 0, 1440);
-    if (offset === null) return 'Reminder offset must be 0–1440 minutes.';
-    const channels = r.channels;
-    if (!Array.isArray(channels) || channels.length === 0 || !channels.every((ch) => isOneOf(CHANNEL, ch))) {
-      return `Reminder channels must be a non-empty list of: ${CHANNEL.join(', ')}.`;
-    }
-    const renotify = r.renotifyMin === null || r.renotifyMin === undefined ? null : intIn(r.renotifyMin, 1, 240);
-    if (renotify === null && r.renotifyMin !== null && r.renotifyMin !== undefined) return 'Repeat-alert interval must be 1–240 minutes.';
-    const maxAlerts = r.maxAlerts === undefined ? 4 : intIn(r.maxAlerts, 1, 20);
-    if (maxAlerts === null) return 'maxAlerts must be 1–20.';
-    remind = { remind_offset_min: offset, remind_channels: JSON.stringify([...new Set(channels)]), renotify_min: renotify, max_alerts: maxAlerts };
-  }
-  return {
-    title, notes: notes ?? null, start_date: b.startDate, start_time: startTime, end_date: endDate as string, end_time: endTime,
-    recurrence: recurrence === null ? null : JSON.stringify(recurrence), assigned_to: JSON.stringify(assigned), ...remind,
-  };
-}
 
 async function loadEditable(c: Context<AppEnv>): Promise<EventRow | Response> {
   const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND is_alarm = 0', c.req.param('id'));
@@ -100,23 +20,6 @@ async function loadEditable(c: Context<AppEnv>): Promise<EventRow | Response> {
   const me = c.get('member');
   if (e.created_by !== me.id && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this event.');
   return e;
-}
-
-/** §5.6 — an edit makes future scheduled fires obsolete; the next tick re-materializes. */
-export function removeFutureFires(db: D1Database, eventId: string, now: string): D1PreparedStatement {
-  return db.prepare(
-    `UPDATE fires SET state = 'closed', close_reason = 'removed', closed_at = ?
-      WHERE event_id = ? AND state = 'scheduled' AND due_at > ?`).bind(now, eventId, now);
-}
-
-/** One new event row — POST /events, and Plan it (§7C.2) with its `thingId`. */
-export function insertEventStatement(db: D1Database, id: string, input: EventInput, memberId: string, now: string, thingId: string | null = null): D1PreparedStatement {
-  return db.prepare(
-    `INSERT INTO events (id, title, notes, start_date, start_time, end_date, end_time, recurrence, assigned_to,
-       remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at, thing_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(id, input.title, input.notes, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
-    input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, memberId, now, now, thingId);
 }
 
 export const events = new Hono<AppEnv>();
@@ -128,8 +31,10 @@ events.get('/calendar', requireMember, async (c) => {
   const rows = await all<EventRow & { color: string; creator_name: string }>(c.env.DB,
     `SELECT e.*, m.color, m.display_name AS creator_name FROM events e JOIN members m ON m.id = e.created_by
       WHERE e.deleted_at IS NULL AND e.is_alarm = 0 AND e.start_date <= ? AND (e.recurrence IS NOT NULL OR e.end_date >= ?)`, to, from);
+  const me = c.get('member').id, on = await onEventIds(c.env.DB, me);
   const occ = [];
   for (const e of rows) {
+    if (!isOnFor(e, me, on.has(e.id) ? [me] : [])) continue; // §7.5: an optional event exists only for who has it on
     const span = diffDays(e.end_date, e.start_date);
     const ev = { start_date: e.start_date, recurrence: parseJson<Recurrence | null>(e.recurrence, null), exdates: parseJson<string[]>(e.exdates, []) };
     for (const date of occurrences(ev, addDays(from, -span), to)) {
@@ -148,14 +53,16 @@ events.get('/calendar', requireMember, async (c) => {
 events.post('/events', requireMember, async (c) => {
   const input = await parseEventInput(c.env.DB, await body(c));
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
-  const id = newId('evt');
-  await insertEventStatement(c.env.DB, id, input, c.get('member').id, nowIso()).run();
+  const id = newId('evt'), me = c.get('member').id, now = nowIso();
+  // §7.5: the creator of an optional event has it on from the start.
+  await c.env.DB.batch([insertEventStatement(c.env.DB, id, input, me, now), ...(input.optional ? [optInStatement(c.env.DB, id, me, now)] : [])]);
   return c.json(eventView((await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ?', id))!), 201);
 });
 
 events.get('/events/:id', requireMember, async (c) => {
   const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND is_alarm = 0', c.req.param('id'));
-  return e ? c.json(eventView(e)) : fail(c, 404, 'not_found', 'That event no longer exists.');
+  if (!e) return fail(c, 404, 'not_found', 'That event no longer exists.');
+  return c.json({ ...eventView(e), on: (await onEventIds(c.env.DB, c.get('member').id)).has(e.id) });
 });
 
 events.patch('/events/:id', requireMember, async (c) => {
@@ -167,11 +74,13 @@ events.patch('/events/:id', requireMember, async (c) => {
   await c.env.DB.batch([
     c.env.DB.prepare(
       `UPDATE events SET title = ?, notes = ?, start_date = ?, start_time = ?, end_date = ?, end_time = ?, recurrence = ?,
-         assigned_to = ?, remind_offset_min = ?, remind_channels = ?, renotify_min = ?, max_alerts = ?, updated_at = ?
+         assigned_to = ?, remind_offset_min = ?, remind_channels = ?, renotify_min = ?, max_alerts = ?, optional = ?, updated_at = ?
        WHERE id = ?`).bind(
       input.title, input.notes, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
-      input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, now, e.id),
+      input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, input.optional, now, e.id),
     removeFutureFires(c.env.DB, e.id, now),
+    // §7.5 ⚑: whoever edits an event into optional has it on.
+    ...(input.optional && !e.optional ? [optInStatement(c.env.DB, e.id, c.get('member').id, now)] : []),
   ]);
   return c.json(eventView((await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ?', e.id))!));
 });
