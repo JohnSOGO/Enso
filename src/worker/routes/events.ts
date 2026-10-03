@@ -6,7 +6,7 @@ import { addDays, diffDays, isDate, isTime } from '../../shared/time';
 import { occurrences, recurrenceError, type Recurrence } from '../../shared/recurrence';
 import { publicHolidaysBetween } from '../../shared/holidays';
 import { marketDaysBetween } from '../../shared/markets';
-import { all, first, newId, nowIso, parseJson, run } from '../db';
+import { all, first, newId, nowIso, parseJson } from '../db';
 import { body, fail, intIn, optStr, str } from '../http';
 import { requireMember } from '../session';
 import { daysOff } from './household';
@@ -19,7 +19,7 @@ export interface EventRow {
   recurrence: string | null; exdates: string; assigned_to: string;
   remind_offset_min: number | null; remind_channels: string | null; renotify_min: number | null; max_alerts: number;
   created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
-  is_alarm: number;
+  is_alarm: number; thing_id: string | null;
 }
 
 export function eventView(e: EventRow) {
@@ -36,11 +36,11 @@ export function eventView(e: EventRow) {
       renotifyMin: e.renotify_min,
       maxAlerts: e.max_alerts,
     },
-    createdBy: e.created_by, updatedAt: e.updated_at,
+    createdBy: e.created_by, updatedAt: e.updated_at, thingId: e.thing_id,
   };
 }
 
-type EventInput = Omit<EventRow, 'id' | 'exdates' | 'created_by' | 'created_at' | 'updated_at' | 'deleted_at' | 'is_alarm'>;
+type EventInput = Omit<EventRow, 'id' | 'exdates' | 'created_by' | 'created_at' | 'updated_at' | 'deleted_at' | 'is_alarm' | 'thing_id'>;
 
 /** Validates untrusted event input → row fields, or an error message. */
 export async function parseEventInput(db: D1Database, b: Record<string, unknown>): Promise<EventInput | string> {
@@ -109,6 +109,16 @@ export function removeFutureFires(db: D1Database, eventId: string, now: string):
       WHERE event_id = ? AND state = 'scheduled' AND due_at > ?`).bind(now, eventId, now);
 }
 
+/** One new event row — POST /events, and Plan it (§7C.2) with its `thingId`. */
+export function insertEventStatement(db: D1Database, id: string, input: EventInput, memberId: string, now: string, thingId: string | null = null): D1PreparedStatement {
+  return db.prepare(
+    `INSERT INTO events (id, title, notes, start_date, start_time, end_date, end_time, recurrence, assigned_to,
+       remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at, thing_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(id, input.title, input.notes, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
+    input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, memberId, now, now, thingId);
+}
+
 export const events = new Hono<AppEnv>();
 
 events.get('/calendar', requireMember, async (c) => {
@@ -138,14 +148,8 @@ events.get('/calendar', requireMember, async (c) => {
 events.post('/events', requireMember, async (c) => {
   const input = await parseEventInput(c.env.DB, await body(c));
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
-  const id = newId('evt'), now = nowIso();
-  await run(c.env.DB,
-    `INSERT INTO events (id, title, notes, start_date, start_time, end_date, end_time, recurrence, assigned_to,
-       remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    id, input.title, input.notes, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
-    input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts,
-    c.get('member').id, now, now);
+  const id = newId('evt');
+  await insertEventStatement(c.env.DB, id, input, c.get('member').id, nowIso()).run();
   return c.json(eventView((await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ?', id))!), 201);
 });
 

@@ -1,11 +1,13 @@
 export interface Env {
   DB: D1Database;
+  PHOTOS: R2Bucket;
   SETUP_TOKEN?: string;
   RELAY_TOKEN?: string;
   DEV_ENDPOINTS?: string;
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
+  ANTHROPIC_API_KEY?: string;
 }
 
 export interface SessionMember {
@@ -22,6 +24,7 @@ declare global {
   namespace Cloudflare {
     interface Env {
       DB: D1Database;
+      PHOTOS: R2Bucket;
       SETUP_TOKEN: string;
       RELAY_TOKEN: string;
       TEST_MIGRATIONS: { name: string; queries: string[] }[];
