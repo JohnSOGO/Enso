@@ -103,6 +103,39 @@ describe('monthly by weekday (SPEC §4.3)', () => {
     expect(recurrenceError({ freq: 'MONTHLY', byDay: ['FR', 'MO'], setPos: 3 })).toMatch(/exactly one/);
     expect(recurrenceError({ freq: 'WEEKLY', setPos: 3 })).toMatch(/only allowed with MONTHLY/);
   });
+
+  // §4.3 — certain weeks: setPos as a list.
+  const weeks = (start: string, day: 'TH' | 'MO' | 'FR', setPos: (1 | 2 | 3 | 4 | -1)[], extra: object = {}) =>
+    ({ start_date: start, recurrence: { freq: 'MONTHLY' as const, byDay: [day], setPos, ...extra }, exdates: [] as string[] });
+  it('1st & 3rd Thursday', () => {
+    expect(occurrences(weeks('2026-10-01', 'TH', [1, 3]), '2026-10-01', '2026-12-31'))
+      .toEqual(['2026-10-01', '2026-10-15', '2026-11-05', '2026-11-19', '2026-12-03', '2026-12-17']);
+  });
+  it('2nd & last Monday', () => {
+    expect(occurrences(weeks('2026-10-12', 'MO', [2, -1]), '2026-10-01', '2026-11-30'))
+      .toEqual(['2026-10-12', '2026-10-26', '2026-11-09', '2026-11-30']);
+  });
+  it('a list given out of order still comes out in order; dates before the start are skipped', () => {
+    expect(occurrences(weeks('2026-10-10', 'TH', [3, 1]), '2026-10-01', '2026-11-30'))
+      .toEqual(['2026-10-15', '2026-11-05', '2026-11-19']);
+  });
+  it('4th and last on the same date count once (de-duplicated; count counts dates)', () => {
+    // October 2026 has five Thursdays; November has four, so its 4th is its last (11-26).
+    expect(occurrences(weeks('2026-10-01', 'TH', [4, -1]), '2026-10-01', '2026-11-30'))
+      .toEqual(['2026-10-22', '2026-10-29', '2026-11-26']);
+    expect(occurrences(weeks('2026-10-01', 'TH', [4, -1], { count: 4 }), '2026-10-01', '2027-12-31'))
+      .toEqual(['2026-10-22', '2026-10-29', '2026-11-26', '2026-12-24']);
+  });
+  it('validates setPos lists', () => {
+    expect(recurrenceError({ freq: 'MONTHLY', byDay: ['TH'], setPos: [1, 3] })).toBeNull();
+    expect(recurrenceError({ freq: 'MONTHLY', byDay: ['TH'], setPos: [1, 2, 3, 4, -1] })).toBeNull();
+    expect(recurrenceError({ freq: 'MONTHLY', byDay: ['TH'], setPos: 3 })).toBeNull(); // a single number stays valid
+    expect(recurrenceError({ freq: 'MONTHLY', byDay: ['TH'], setPos: [] })).toMatch(/setPos/);
+    expect(recurrenceError({ freq: 'MONTHLY', byDay: ['TH'], setPos: [1, 1] })).toMatch(/distinct/);
+    expect(recurrenceError({ freq: 'MONTHLY', byDay: ['TH'], setPos: [1, 5] })).toMatch(/setPos/);
+    expect(recurrenceError({ freq: 'MONTHLY', byDay: ['TH', 'FR'], setPos: [1, 3] })).toMatch(/exactly one/);
+    expect(recurrenceError({ freq: 'WEEKLY', byDay: ['TH'], setPos: [1, 3] })).toMatch(/only allowed with MONTHLY/);
+  });
 });
 
 describe('monthly options expiration (SPEC §7.4)', () => {
