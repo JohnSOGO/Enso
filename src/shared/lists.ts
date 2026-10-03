@@ -1,10 +1,30 @@
-// SPEC §7A.1 — household list item rules (pure). The route persists what these decide;
+// SPEC §7A.1 — household list and list item rules (pure). The route persists what these decide;
 // matching is done here with itemKey, never with SQLite lower()/NOCASE (ASCII-only).
 import { iso, ms } from './time';
+import type { Role } from './vocab';
 
 export const TEXT_MAX = 120;
 export const NOTE_MAX = 1000;
+export const LIST_NAME_MAX = 40;
+export const LISTS_MAX = 30;
 export const CHECKED_VISIBLE_DAYS = 30;
+
+/** The seeded Shopping list (migration 0007) — the one place its id is named outside the migration. */
+export const SHOPPING_LIST_ID = 'lst_shopping';
+
+/** Admins are members with role 'owner' (§6.3). Typed by Role, so a vocabulary change breaks the build. */
+const ADMIN: Role = 'owner';
+
+/** Who may rename or delete a list: its creator or an admin; a seeded list (no creator): admins only. */
+export function canManageList(createdBy: string | null, member: { id: string; role: Role }): boolean {
+  return member.role === ADMIN || (createdBy !== null && createdBy === member.id);
+}
+
+/** Naming list `id` (null when creating) `name`: the other non-deleted list already holding that key, if any (→ 409 duplicate). */
+export function listNameClash<T extends { id: string; name_key: string }>(id: string | null, name: string, lists: readonly T[]): T | null {
+  const key = itemKey(name);
+  return lists.find((l) => l.id !== id && l.name_key === key) ?? null;
+}
 
 const DAY_MS = 86_400_000;
 

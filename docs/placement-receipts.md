@@ -7,6 +7,42 @@ carry its result.
 
 ---
 
+## 2026-10-03 — M4e Lists of your own (placement-advisor)
+
+- **Rules:** `src/shared/lists.ts` (pure; imports only `./time`, `./vocab`) gains
+  `LIST_NAME_MAX`, `LISTS_MAX`, `listNameClash` (keyed by `itemKey`, mirrors
+  `renameClash`), `canManageList(createdBy, member)` (creator or admin via the `Role`
+  type; seeded lists, `createdBy` null, admins only) and `SHOPPING_LIST_ID` — the one
+  place the seeded id is named outside the migration.
+- **Schema:** `migrations/0007_custom_lists.sql`, §4.2f verbatim; 0001–0006 untouched.
+  `LIST`/`List` leave `vocab.ts`; M1-VOCAB reads the migrated `sqlite_master`.
+- **Route:** `src/worker/routes/lists.ts` (same file) owns list CRUD and item CRUD;
+  rename/delete permission only through `canManageList`; every item read/write joins
+  `lists.deleted_at IS NULL`.
+- **PWA:** `HouseholdLists.tsx` keeps the shell + list panel (picker replaces the
+  toggle); `HouseholdListItemForm.tsx` takes "Assigned to";
+  `HouseholdListOptions.tsx` [NEW owner row] holds the new-list and ⋯ options modals.
+  Styles stay in `HouseholdLists.module.css` (no new module CSS).
+- **Tests:** `test/lists.test.ts` L1–L19, `test/migration-0007.test.ts` [NEW] L20,
+  `test/vocab.test.ts` reads the migrated schema.
+
+---
+
+## 2026-10-03 — R3 refactor: room in HouseholdLists for M4e (reorganizer)
+
+- **Trigger:** M4e placement — `HouseholdLists.tsx` at 216/300 (global cap) estimated
+  ~320 with M4e (list picker, create/rename/delete lists, one assignee) in place.
+- **Seam moved:** `ItemForm` + the `Item` interface → `HouseholdListItemForm.tsx`
+  [NEW owner row], the seam pre-named in the Phase A receipt. `HouseholdLists.tsx`
+  imports both; the type moved with the form so the import runs one way (no cycle).
+- **Room opened:** `HouseholdLists.tsx` 216 → 158 lines; new file 67. No `CEILINGS`
+  change (neither file is pinned; both under the global cap).
+- **Behavior:** preserved (typecheck, tests, build green); code moved verbatim, no
+  logic, props or imports-at-runtime changed.
+- **Restraint:** shell, `ListPanel`, rows and add box untouched; no feature code added.
+
+---
+
 ## 2026-10-03 — R2 refactor: room in Settings for M4d Invites (reorganizer)
 
 - **Trigger:** M4d placement — `Settings.tsx` pinned at 264/304 would cross its

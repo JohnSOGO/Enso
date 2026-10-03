@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.8-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.9-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -72,8 +72,9 @@ completion*.)
 Alerts reach people two ways: **Web Push** to their phones, and **spoken in the
 house** through Home Assistant (four Echos + the Voice PE satellite).
 
-It also keeps the household's two shared **lists** (§7A): **Shopping** (what to buy)
-and **Wish list** (projects and ideas to keep without carrying them in your head).
+It also keeps the household's shared **lists** (§7A) — it starts with **Shopping** and
+**Wish list**, and anyone can make more ("Hardware store", "Camping trip"). An item can
+be assigned to one person.
 
 ### 1.0 Who it is for — design constraints
 
@@ -272,7 +273,6 @@ export const DELIVERY_STATUS = ['queued', 'claimed', 'sent', 'partial', 'failed'
 export const ROLE         = ['owner', 'member'] as const;
 export const FREQ         = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'] as const;
 export const WEEKDAY      = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;  // §4.3 byDay, alarm days
-export const LIST         = ['shopping', 'wishlist'] as const;                   // §7A
 export const CHORE_TIMING = ['at', 'by'] as const;                               // §7B
 export const RELAY_REPORT_STATUS = ['sent', 'partial', 'failed'] as const;    // what /relay/report accepts (§9.2)
 
@@ -296,8 +296,8 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `stopped` | The timer was stopped |
 | `removed` | The event or timer was edited or deleted, making this fire obsolete |
 | `partial` | House delivery reached some surfaces but not all |
-| `shopping` | The one shared shopping list (§7A) |
-| `wishlist` | The one shared wish list of projects and ideas (§7A) |
+
+Lists are **data, not vocabulary** (§7A): their names live in the `lists` table.
 
 `vocab.ts` also holds `MEMBER_PALETTE` (§6.5) and the `isOneOf(list, value)` guard
 used to validate input against any of these tuples.
@@ -472,8 +472,10 @@ CREATE TABLE member_prefs (
 );
 ```
 
-The `CHECK` lists above necessarily repeat §3 as SQL text. When a later migration rebuilds a table, the **last** `CHECK` for a column in
-migration order is the one in force, and that is the one compared. Test **M1-VOCAB** asserts
+The `CHECK` lists above necessarily repeat §3 as SQL text. Test **M1-VOCAB** reads the
+`CHECK`s **in force** from the migrated database's own schema (`sqlite_master`), not from
+migration text — so a table rebuilt or a column dropped by a later migration is judged by
+what actually exists. It asserts
 that each `CHECK` list matches the corresponding `vocab.ts` tuple exactly. That
 test is what keeps the two in step.
 
@@ -605,6 +607,53 @@ CREATE INDEX idx_fires_open ON fires(state, due_at) WHERE state != 'closed';
 **Migration check (M4c):** a test applies 0001–0005, inserts a reminder fire, a timer
 fire and a delivery, applies 0006, and finds all three intact with the delivery still
 pointing at its fire.
+
+### 4.2f Schema change — `migrations/0007_custom_lists.sql`
+
+```sql
+-- §7A — lists become household data: any number, named by members. list_items.list (a
+-- fixed vocabulary) becomes list_id, and owner_id becomes assignee_id for every list.
+-- list_items is rebuilt (SQLite cannot drop a CHECK); nothing references it.
+CREATE TABLE lists (
+  id         TEXT PRIMARY KEY,                 -- 'lst_' + 16 base32; the two seeded lists keep fixed ids
+  name       TEXT NOT NULL,                    -- 1–40 chars, as typed (trimmed)
+  name_key   TEXT NOT NULL,                    -- itemKey(name): one list per name
+  created_by TEXT REFERENCES members(id),      -- NULL for the two seeded lists
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+CREATE UNIQUE INDEX uq_list_name ON lists(name_key) WHERE deleted_at IS NULL;
+INSERT INTO lists (id, name, name_key, created_by, created_at, updated_at) VALUES
+  ('lst_shopping', 'Shopping',  'shopping',  NULL, '2026-10-03T00:00:00.000Z', '2026-10-03T00:00:00.000Z'),
+  ('lst_wishlist', 'Wish list', 'wish list', NULL, '2026-10-03T00:00:00.000Z', '2026-10-03T00:00:00.000Z');
+
+CREATE TABLE list_items_new (
+  id          TEXT PRIMARY KEY,
+  list_id     TEXT NOT NULL REFERENCES lists(id),
+  text        TEXT NOT NULL,
+  text_key    TEXT NOT NULL,
+  note        TEXT,
+  assignee_id TEXT REFERENCES members(id),     -- one person, or NULL = the household
+  created_by  TEXT NOT NULL REFERENCES members(id),
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  checked_at  TEXT,
+  checked_by  TEXT REFERENCES members(id),
+  deleted_at  TEXT
+);
+INSERT INTO list_items_new (id, list_id, text, text_key, note, assignee_id, created_by, created_at,
+                            updated_at, checked_at, checked_by, deleted_at)
+  SELECT id, CASE list WHEN 'shopping' THEN 'lst_shopping' ELSE 'lst_wishlist' END, text, text_key, note,
+         owner_id, created_by, created_at, updated_at, checked_at, checked_by, deleted_at
+    FROM list_items;
+DROP TABLE list_items;
+ALTER TABLE list_items_new RENAME TO list_items;
+CREATE UNIQUE INDEX uq_list_item_key ON list_items(list_id, text_key) WHERE deleted_at IS NULL;
+CREATE INDEX idx_list_items ON list_items(list_id, checked_at) WHERE deleted_at IS NULL;
+```
+
+The seed timestamps are fixed literals (never `datetime('now')`, §4.1).
 
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
@@ -1032,17 +1081,34 @@ options expiration"; `member_prefs.show_options_expiration`, §4.2c).
 
 ## 7A. Lists
 
-Two fixed lists, shared by the whole household: `shopping` and `wishlist` (`LIST` in
-§3). There are no user-created lists in v1 — one shopping list for every store.
+Lists are **household data**: any number, each with a name. The household starts with two,
+**Shopping** and **Wish list** (seeded by migration 0007 with fixed ids `lst_shopping` and
+`lst_wishlist`); they are ordinary lists from then on. **Every list behaves the same way**
+(decided by MojoSOGO, Q24).
 
-### 7A.1 Item rules — `src/shared/lists.ts` (pure)
+### 7A.1 Rules — `src/shared/lists.ts` (pure)
 
 Every decision below lives in `lists.ts` and is imported by the route and the PWA:
-`itemKey`, `TEXT_MAX`, `NOTE_MAX`, `CHECKED_VISIBLE_DAYS`, and `resolveAdd(text,
-items)` → existing / reopen / insert. Matching is done in JS with `itemKey` — never with
-SQLite `lower()`/`NOCASE`, which fold ASCII only. `text_key` is written by app code.
+`itemKey`, `TEXT_MAX`, `NOTE_MAX`, `LIST_NAME_MAX`, `LISTS_MAX`, `CHECKED_VISIBLE_DAYS`,
+`resolveAdd(text, items)` → existing / reopen / insert, the list-name checks,
+`canManageList(createdBy, member)` (who may rename/delete — the route and the PWA's ⋯ use
+the same function), and `SHOPPING_LIST_ID` (the one place the seeded id is named outside the
+migration; the PWA's fallback uses it and the migration test asserts it). Matching
+is done in JS with `itemKey` — never with SQLite `lower()`/`NOCASE`, which fold ASCII only.
+`text_key` and `name_key` are written by app code.
 
-- **Text** is trimmed, 1–120 characters. **Note** ≤ 1000 characters (wish list).
+**Lists:**
+- **Name** is trimmed, 1–`LIST_NAME_MAX` (40) characters. One list per name:
+  `itemKey(name)` must be unique among non-deleted lists → otherwise 409 `duplicate`,
+  "There is already a list called “Shopping”."
+- At most `LISTS_MAX` (30) lists — a 31st is refused with a message.
+- **Any member may create a list.** **Rename or delete:** its creator or an admin; the two
+  seeded lists (no creator): admins only. ⚑ DEFAULT
+- **Delete** is a soft delete. Its items go with it: they are no longer reachable
+  (`GET` → 404, item calls → 404). The name becomes free again.
+
+**Items** (on any list):
+- **Text** is trimmed, 1–120 characters. **Note** ≤ 1000 characters.
 - **One item per thing.** `itemKey(text)` = lower-case, trimmed, inner whitespace
   collapsed to one space. A list holds at most one non-deleted item per key (the
   unique index enforces it). Adding text whose key is already on the list never
@@ -1053,33 +1119,42 @@ SQLite `lower()`/`NOCASE`, which fold ASCII only. `text_key` is written by app c
   - otherwise a new open item, `result: "added"`.
 - **Check / uncheck.** Checking sets `checked_at = now`, `checked_by = me`. Unchecking
   clears both — that is how "buy it again" works.
-- **Rename** to a key another item already holds → 409 `duplicate`, message
-  "“Milk” is already on this list."
-- **Owner** (wish list) must be an existing, non-disabled member, or null. Shopping
-  items ignore it.
+- **Rename** to a key another item on the same list already holds → 409 `duplicate`,
+  message "“Milk” is already on this list."
+- **Assignee:** at most **one** member (decided by MojoSOGO, Q23), who must exist and not be
+  disabled; `null` = the household. Any list.
 - **Visible checked items** = checked within the last `CHECKED_VISIBLE_DAYS = 30`
   days, newest first. Older checked items stay in the table (so adding them again
   re-opens rather than duplicates) but are not returned.
 - **Delete** is a soft delete. Adding the same text later creates a new item.
-- Any member may add, edit, check or delete any item. ⚑ DEFAULT
-- Lists never ring, push or speak. They are things to look at, not alerts.
+- Any member may add, edit, check, assign or delete any item. ⚑ DEFAULT
+- Lists never ring, push or speak. They are things to look at, not alerts — being
+  assigned an item notifies nobody.
 
-### 7A.2 Acceptance (M4b — each row is an API test)
+### 7A.2 Acceptance (M4b + M4e — each row is an API test)
 
 | # | Call | Expected |
 |---|------|----------|
-| L1 | add "Milk" to shopping | 201, `result: "added"`, item open |
+| L1 | add "Milk" to Shopping | 201, `result: "added"`, item open |
 | L2 | add "  milk " | 200, `result: "existing"`, same id; still one open item |
 | L3 | check it | it moves from `open` to `checked`, `checkedBy` = me |
 | L4 | add "MILK" | 200, `result: "reopened"`, same id, open, text "MILK" |
 | L5 | check, then PATCH `checked: false` | open again |
 | L6 | add "" or 121 characters | 400 `invalid_input` with a message |
-| L7 | GET `/lists/groceries` | 404 `not_found` with a message |
-| L8 | wish list item with an unknown `ownerId` | 400 `invalid_input` |
+| L7 | GET `/lists/{an id that does not exist}` | 404 `not_found` with a message |
+| L8 | an item with an unknown or disabled `assigneeId` | 400 `invalid_input` |
 | L9 | an item checked 31 days ago | absent from `checked`; adding its text re-opens it |
 | L10 | delete, then add the same text | 201, a new id |
 | L11 | rename "Eggs" to "milk" while Milk exists | 409 `duplicate` |
 | L12 | any list call without a session | 401 |
+| L13 | POST `/lists { name: "Hardware store" }` | 201; it appears in `GET /lists` with `openCount` 0 |
+| L14 | POST `/lists { name: " hardware  STORE " }` | 409 `duplicate` |
+| L15 | rename it as a member who did not create it / as its creator / as an admin | 403 / 200 / 200 |
+| L16 | delete it | gone from `GET /lists`; `GET /lists/{id}` 404; PATCH of one of its items 404; the name can be used again |
+| L17 | assign an item to member M, then to `null` | `assigneeId` M, then null |
+| L18 | a member renames or deletes the seeded Shopping list | 403; an admin may |
+| L19 | name "" / 41 characters / a 31st list | 400 `invalid_input` with a message |
+| L20 | migration check (§4.2f) | items on the old `shopping`/`wishlist` lists, and wish-list owners, are on `lst_shopping`/`lst_wishlist` with the same assignee |
 
 ---
 
@@ -1350,8 +1425,30 @@ Time      Chore            Days        This week
 
 ### 8.8 Lists screen
 
-The **🛒 Lists** tab. A three-way toggle at the top, **Today | Shopping | Wish list**;
-the choice is remembered per device. The list refetches when the tab opens, on focus, and
+The **🛒 Lists** tab. At the top, a **list picker** — a native `<select>` labelled
+"List" (the phone's own picker, not a row of buttons):
+
+```
+List [ Shopping (3)          ▾ ] [⋯]
+      Today — chores
+      Shopping (3)
+      Wish list (5)
+      Hardware store (1)
+      ＋ New list…
+```
+
+- Options: **Today — chores** first, then every list by name with its open-item count,
+  then **＋ New list…**. Choosing **＋ New list…** opens the **new list** form (name,
+  Create; errors inside the dialog); after creating, the picker switches to it.
+- **⋯** (accessible name "List options") next to the picker opens **Rename** / **Delete
+  list** for the chosen list, shown only to those allowed (§7A.1) and never for Today.
+  Delete asks first and says how many open items go with it.
+- The choice is remembered per device (by list id), written only when someone picks. If
+  the remembered list no longer exists — including the old toggle's `shopping`/`wishlist`
+  values — the picker shows **Shopping** (or the first list, if Shopping was deleted).
+- Errors: a missing list is 404 "That list no longer exists."; a refused rename/delete is
+  403 naming who may ("Only the person who made this list or an admin…", or "Only an
+  admin…" for a seeded list). A list's name is trimmed before its length is checked. The list refetches when the tab opens, on focus, and
 every 30 s while visible (§10 Freshness).
 
 **Today** (chores, §7B) — a switch **Mine | Everyone** (default Mine; remembered):
@@ -1376,47 +1473,36 @@ every 30 s while visible (§10 Freshness).
 - Nobody's turn shows as **anyone**.
 - Nothing from earlier days, nothing red except `ringing` (§1.0).
 
-**Shopping:**
+**Any list** (all alike — Q24):
 
 ```
-[ Add item…                    ][ Add ]
-☐ Milk
-☐ Dish soap
-☐ Batteries AA
-▸ Recently bought (12)
+[ Add to Shopping…              ][ Add ]
+☐ Milk                       Kai      ✎
+☐ Dish soap                           ✎
+☐ Paint the fence     📝     Shelly   ✎
+▸ Done (12)
 ```
 
-- The add box is at the **top**, always visible. Enter or **Add** adds the item, clears
-  the box, and keeps focus, so several items go in one after another.
+- The add box is at the **top**, always visible, its placeholder naming the list. Enter or
+  **Add** adds the item, clears the box, and keeps focus, so several items go in one after
+  another.
 - Adding something already open says so under the box in plain text (“Milk is already
   on the list”) — a fact, not an error. Re-opening says “Milk is back on the list”.
+  The note clears on the next typing, tick or edit.
 - Open items: most recently added or changed first (so a re-added item comes back to
-  the top), one line each, the whole row is the tap target (≥ 44 px):
-  tapping ticks it. A ticked item leaves the open list straight away.
-- **Recently bought** is collapsed by default and dim. Tapping an item there puts it
-  back on the list. Each row shows who bought it and when: weekday within the last 6
-  days (“Sat · Shelly”), else the date (“Sep 12 · Shelly”).
-- A small ✕ on each row (with its own accessible name, “Remove Milk”) deletes it at
-  once, with no confirm: an item is cheap to add again.
-- The “already on / back on the list” note clears on the next typing, tick or remove.
-
-**Wish list:**
-
-```
-[ Add an idea…                 ][ Add ]
-Paint the fence            Dad      📝
-Build a bird box           Shelly
-Fix the bike gears
-▸ Done (3)
-```
-
-- Same add box. Rows show text, the owner chip (if any) and 📝 when there is a note.
-- Tapping a row opens the **item form** (modal): text, note (multi-line), owner (member
-  chips, none = household), **Mark done** / **Not done**, Save / Cancel / Delete.
-- **Done** is collapsed by default, newest first. Tapping a done item opens the item
-  form, where **Not done** puts it back (a wish-list item is never re-opened by a stray
-  tap). Delete in the form asks first.
-- No due dates and no reminders: a wish list that nags is not a wish list.
+  the top), one line each. **Tapping the row ticks it** (≥ 44 px); a ticked item leaves
+  the open list straight away. The row shows 📝 when there is a note and the
+  **assignee's chip** when there is one (the chip truncates; the row stays one line).
+- **✎** on each row (accessible name "Edit Milk") opens the **item form** (modal): text,
+  note (multi-line), **Assigned to** (member chips, single choice, plus **Nobody**), Save /
+  Cancel / **Delete** (asks first). The old ✕ quick-remove is gone: ticking is the quick
+  action, and deleting lives in the form. ⚑
+- The item form has no Mark done / Not done: ticking is the row's tap, everywhere.
+- **Done** is collapsed by default and dim, newest first. Tapping a done row puts it back
+  on the list; its ✎ still opens the form. A done row shows who ticked it and when (in
+  place of the assignee chip, so it stays one line):
+  weekday within the last 6 days (“Sat · Shelly”), else the date (“Sep 12 · Shelly”).
+- No due dates and no reminders on any list.
 
 ### 8.9 Invites (owner) and the join page
 
@@ -1657,9 +1743,12 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | GET | `/chores/today` | member | → `{ date, runs: Run[] }`; `Run = { id, choreId, title, doneMeans, timing, time, step, steps, assigneeId, personId, doneAt, doneBy, nextDueAt, ringing }` (`personId` = the current step's person) |
 | POST | `/chore-runs/{id}/done` | member | advances one step (§7B.3) → run; 409 `already_done` when finished |
 | POST | `/chore-runs/{id}/undo` | member | → run; 409 `nothing_to_undo` at step 0 |
-| GET | `/lists/{list}` | member | → `{ open: Item[], checked: Item[] }` (§7A.1); `Item = { id, list, text, note, ownerId, createdBy, createdAt, checkedAt, checkedBy }` |
-| POST | `/lists/{list}/items` | member | `{ text, note?, ownerId? }` → `{ item, result: "added" \| "existing" \| "reopened" }`, 201 when added, else 200 |
-| PATCH | `/list-items/{id}` | member | `{ text?, note?, ownerId?, checked?: boolean }` → item; 409 `duplicate` on a key clash |
+| GET | `/lists` | member | → `{ id, name, createdBy, openCount }[]`, by name (§7A) |
+| POST | `/lists` | member | `{ name }` → list (201); 409 `duplicate`; 400 at `LISTS_MAX` |
+| PATCH/DELETE | `/lists/{id}` | creator or admin (seeded lists: admin) | PATCH `{ name }` → list; DELETE → 204 |
+| GET | `/lists/{id}` | member | → `{ list: { id, name, createdBy }, open: Item[], checked: Item[] }` (§7A.1); `Item = { id, listId, text, note, assigneeId, createdBy, createdAt, checkedAt, checkedBy }` |
+| POST | `/lists/{id}/items` | member | `{ text, note?, assigneeId? }` → `{ item, result: "added" \| "existing" \| "reopened" }`, 201 when added, else 200 |
+| PATCH | `/list-items/{id}` | member | `{ text?, note?, assigneeId?, checked?: boolean }` → item; 409 `duplicate` on a key clash |
 | DELETE | `/list-items/{id}` | member | → 204 |
 | POST | `/dev/tick?now=ISO` | only if `DEV_ENDPOINTS=1` | runs `tick(db, now)` → summary |
 
@@ -1711,7 +1800,7 @@ checks.
 **M1 — Shared pure modules**
 - `vocab.ts`, `time.ts`, `recurrence.ts`, `holidays.ts`, `engine.ts`.
 - ✅ Every row of §5.8 (T1–T11, R1–R14, R9a) and §7.3 acceptance is a passing test.
-- ✅ **M1-VOCAB:** every SQL `CHECK (… IN (…))` list in `migrations/` matches its
+- ✅ **M1-VOCAB:** every SQL `CHECK (… IN (…))` list in the migrated schema matches its
   `vocab.ts` tuple. The test parses the migration files, and is the only place
   allowed to read SQL as text.
 
@@ -1754,10 +1843,18 @@ checks.
 
 **M4b — Lists**
 - Migration 0005, `LIST` vocab, `/lists` API, the Lists tab (§7A, §8.8).
-- ✅ API tests L1–L12 (§7A.2); M1-VOCAB covers `list_items.list`.
+- ✅ API tests L1–L12 (§7A.2). (Superseded in part by M4e: fixed lists → household lists.)
 - ✅ Manual at 320 px: four tabs fit on one line; add five shopping items in a row
   without touching anything but the keyboard; tick one, find it under Recently bought,
   put it back.
+
+**M4e — Lists of your own**
+- Migration 0007 (lists table, `list_items` rebuilt with `list_id` + `assignee_id`), the
+  list picker, new/rename/delete list, assignee on every item (§7A, §8.8). `LIST` leaves
+  `vocab.ts`; M1-VOCAB reads the migrated schema.
+- ✅ API tests L1–L20.
+- ✅ Manual at 320 px: create "Hardware store" from the picker, add two items, assign one,
+  tick it, rename the list, delete it.
 
 **M4d — Invites**
 - `/auth/invite-preview`, the invites list states, the invite card (QR, Share, Copy),
@@ -1829,7 +1926,7 @@ Captured from v1.0-draft so nothing is lost:
 - Adding list items by voice (Voice PE / Home Assistant intent → Worker). If built, it
   goes through Home Assistant's own Assist, never Alexa skills or lists.
 - Chore points, streaks or rewards
-- Shopping list grouped by store aisle; more than one shopping list
+- Shopping list grouped by store aisle; list sharing outside the household; list ordering by hand
 
 ### 12.1 Next — decided with MojoSOGO (2026-10-03), spec to be written before building
 
@@ -1870,6 +1967,10 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q19 | Welcome card content | The three-line tour above; shown once per member per device |
 | Q20 | A signed-in member opens a `/join` link | The app opens as normal and the address becomes `/` |
 | Q21 | Welcome card when an existing member signs in on a new device | No — only right after joining |
+| Q23 | How many people can a list item be assigned to? | **Decided by MojoSOGO 2026-10-03:** one (or nobody) |
+| Q24 | Do lists behave differently? | **Decided by MojoSOGO 2026-10-03:** all alike — tap ticks, ✎ edits |
+| Q25 | Who may create, rename, delete lists? | Anyone creates; creator or admin renames/deletes; seeded lists admin-only |
+| Q26 | The old ✕ quick-remove on rows | Removed — tick is the quick action, Delete is in the item form |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -1891,7 +1992,8 @@ live local API — ring, house message, Done → wait, Undo). **Its 320 px manua
 still to do** (the browser extension was unavailable). M4d Invites is built (I1–I6 and
 the link round-trip tests green; `uqr` builds into its own 10 kB lazy chunk, absent from
 the entry chunk). Its manual check — a real QR scanned by a phone at home — is still to do.
-Admins (§6.3, A1–A7) are built; `Settings.tsx` is at 89 % of its ceiling after the
+M4e Lists of your own is built (L1–L20 green; 0007 verified against the
+local dev data). Admins (§6.3, A1–A7) are built; `Settings.tsx` is at 89 % of its ceiling after the
 members-list controls — the next addition there is a placement decision.
 
 Deviations from this spec, deliberately:

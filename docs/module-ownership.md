@@ -26,7 +26,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/shared/markets.ts` | Monthly options expiration dates, Easter computus (§7.4) |
 | `src/shared/chores.ts` | Chore rules: whose turn (assigneeFor), run planning, step advance/undo, a chore fire's config/person/step, input validation and limits (§7B) — pure |
 | `src/shared/engine.ts` | The alert engine: plan, step, act, timer commands (§5) — pure |
-| `src/shared/lists.ts` | Household list rules: itemKey, add/re-open decision, text/note limits, 30-day visible window (§7A.1) — pure |
+| `src/shared/lists.ts` | Household list rules: itemKey, add/re-open decision, item clash, list-name clash, who may rename/delete a list (canManageList), text/note/name limits, LISTS_MAX, SHOPPING_LIST_ID, 30-day visible window (§7A.1) — pure |
 | `src/shared/invite-link.ts` | The invite link format (§6.2a): `JOIN_PATH`, build `{origin}/join#{code}`, take the code from a pasted link or a bare code — pure |
 
 ## Worker (flow stages: route → persist → deliver)
@@ -47,7 +47,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/routes/alerts.ts` | Timers + commands, fires + actions |
 | `src/worker/routes/household.ts` | Household settings, days off, school holidays, push subscriptions, `/status` |
 | `src/worker/routes/relay.ts` | `/relay/claim`, `/relay/report` (§9.2) |
-| `src/worker/routes/lists.ts` | `/lists/{list}` and `/list-items/{id}` — list item CRUD (§7A, §10) |
+| `src/worker/routes/lists.ts` | `/lists`, `/lists/{id}`, `/lists/{id}/items`, `/list-items/{id}` — list CRUD and list item CRUD (§7A, §10) |
 | `src/worker/routes/chores.ts` | `/chores`, `/chores/today`, `/chore-runs/{id}/done\|undo` — chore CRUD, today's runs, step done/undo and edit re-plan persistence (§7B, §10) |
 
 ## PWA (flow stage: render + capture intent)
@@ -68,7 +68,9 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/Chores.tsx` | Chores section of the Alarms tab (§8.5) |
 | `frontend/src/components/ChoreForm.tsx` | Chore form modal: days, at/by, people turn order, steps (§8.5) |
 | `frontend/src/components/AlertFields.tsx` | Fields shared by the alarm, timer and chore forms: day chips + days text, channel checkboxes, repeat-alert options (§8.5) |
-| `frontend/src/components/HouseholdLists.tsx` | Lists tab: Today \| Shopping \| Wish list toggle (composes ChoresToday), item rows, item form modal (§8.8) |
+| `frontend/src/components/HouseholdLists.tsx` | Lists tab: list picker (Today + lists + ＋ New list…, ⋯) composing ChoresToday / HouseholdListOptions, the list panel (add box, rows, Done) (§8.8) |
+| `frontend/src/components/HouseholdListItemForm.tsx` | The list item form modal: text, note, Assigned to (one member or Nobody), Save / Cancel / Delete (§8.8); owns the `Item` shape |
+| `frontend/src/components/HouseholdListOptions.tsx` | Lists tab list management: the new-list form and the ⋯ list options (rename, delete with its open-item count) modals (§8.8) |
 | `frontend/src/components/ChoresToday.tsx` | Lists → Today: today's chore runs, Mine \| Everyone, tick/undo a step (§8.8) |
 | `frontend/src/components/RingingBar.tsx` | Ringing bar (§8.2) |
 | `frontend/src/components/Settings.tsx` | Settings: Me, Household, Status (§8.6) |
