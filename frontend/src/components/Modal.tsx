@@ -1,6 +1,7 @@
 // MOJOSOGO-PREFERENCES "Modals": native <dialog> + showModal, explicitly centred, scrolls internally,
 // titled, dirty form asks before closing, focus returns to the opener, failures render inside.
 import { useEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import s from './Modal.module.css';
 
 interface Props {
@@ -35,7 +36,8 @@ export function Modal({ title, onClose, dirty = false, confirmCloseText = 'Disca
     onClose();
   };
 
-  return (
+  // SPEC §8 iPhone rules: rendered at the document root, never inside a screen's scroll container.
+  return createPortal(
     <dialog
       ref={ref}
       className={s.dialog}
@@ -54,6 +56,7 @@ export function Modal({ title, onClose, dirty = false, confirmCloseText = 'Disca
         </div>
         {footer && <footer className={s.foot}>{footer}</footer>}
       </div>
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }

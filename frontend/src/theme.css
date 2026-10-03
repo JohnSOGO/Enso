@@ -49,6 +49,8 @@ button.danger { border-color: var(--bad); color: #FCA5A5; background: transparen
 button.plain { background: none; border: 0; padding: 4px; min-height: 0; }
 
 input, select, textarea {
+  /* SPEC §8 iPhone rules: below 16px, iOS Safari zooms the page on focus and leaves it zoomed. */
+  font-size: 16px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
