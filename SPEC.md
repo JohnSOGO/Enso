@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.13-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.14-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -143,6 +143,8 @@ from the Worker and speaks them through HA. This is the same pattern AskRoxy use
 | Styling | CSS Modules + CSS custom properties | Follow `C:\Users\Public\git\MOJOSOGO-PREFERENCES.md` and the `phone-ui` skill |
 | Push | Web Push (VAPID) from the Worker | Must use a WebCrypto-based implementation — the Node `web-push` package does not run on Workers. M5 begins with a spike to confirm the library. |
 | Relay | Node 20+ script run with `tsx` | No framework. Imports `src/shared/vocab.ts`. |
+| Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Private: photos are served only through the API to signed-in members (§7C.3). |
+| Reading photos | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). |
 | QR codes | `uqr` (MIT, zero dependencies, renders SVG) | **Loaded lazily** (dynamic `import()`) only when an invite card opens — never in the main bundle. |
 | Tests | **Vitest**; `@cloudflare/vitest-pool-workers` for API tests | API tests apply `migrations/` via `readD1Migrations` / `applyD1Migrations` |
 | Passwords | PBKDF2-SHA256 via WebCrypto, 100 000 iterations, 16-byte salt | 100k is the Workers cap. Not bcrypt. |
@@ -263,7 +265,7 @@ These are the **only** definitions. Export each as a `const` tuple and derive th
 type from it:
 
 ```ts
-export const ALERT_KIND   = ['reminder', 'timer', 'chore'] as const;
+export const ALERT_KIND   = ['reminder', 'timer', 'chore', 'thing'] as const;
 export const CHANNEL      = ['push', 'house'] as const;
 export const FIRE_STATE   = ['scheduled', 'ringing', 'closed'] as const;
 export const CLOSE_REASON = ['done', 'acked', 'missed', 'superseded', 'stopped', 'removed'] as const;
@@ -274,6 +276,7 @@ export const ROLE         = ['owner', 'member'] as const;
 export const FREQ         = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'] as const;
 export const WEEKDAY      = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;  // §4.3 byDay, alarm days
 export const CHORE_TIMING = ['at', 'by'] as const;                               // §7B
+export const THING_STATUS = ['idea', 'planned', 'done', 'dropped'] as const;     // §7C
 export const RELAY_REPORT_STATUS = ['sent', 'partial', 'failed'] as const;    // what /relay/report accepts (§9.2)
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
@@ -654,6 +657,80 @@ CREATE INDEX idx_list_items ON list_items(list_id, checked_at) WHERE deleted_at 
 ```
 
 The seed timestamps are fixed literals (never `datetime('now')`, §4.1).
+
+### 4.2g Schema change — `migrations/0008_things_to_do.sql`
+
+```sql
+-- §7C — things to do: ideas with a time window, reminders, an optional photo.
+-- fires gains kind 'thing' (+ thing_id); rebuilt exactly like 0006, deliveries stashed.
+PRAGMA defer_foreign_keys = true;
+
+CREATE TABLE things (
+  id           TEXT PRIMARY KEY,                -- 'thg_' + 16 base32
+  title        TEXT NOT NULL,                   -- 1–120
+  note         TEXT,                            -- ≤ 2000
+  place        TEXT,                            -- ≤ 200
+  url          TEXT,                            -- ≤ 500, http(s) only
+  window_start TEXT,                            -- local YYYY-MM-DD; NULL = any time
+  window_end   TEXT,                            -- local YYYY-MM-DD ≥ window_start; NULL = open-ended
+  remind_start INTEGER NOT NULL DEFAULT 0 CHECK (remind_start IN (0, 1)),
+  remind_on    TEXT,                            -- local YYYY-MM-DD, a reminder on a picked date
+  channels     TEXT NOT NULL DEFAULT '["push"]',-- JSON CHANNEL[] for its reminders
+  photo_key    TEXT,                            -- R2 object key; NULL = no photo
+  status       TEXT NOT NULL DEFAULT 'idea' CHECK (status IN ('idea','planned','done','dropped')),
+  planned_event_id TEXT REFERENCES events(id),  -- set by Plan it
+  created_by   TEXT NOT NULL REFERENCES members(id),
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL,
+  deleted_at   TEXT
+);
+CREATE INDEX idx_things_open ON things(status, window_end) WHERE deleted_at IS NULL;
+
+-- Plan it (§7C.2) links the calendar event back to its thing.
+ALTER TABLE events ADD COLUMN thing_id TEXT REFERENCES things(id);
+
+-- Daily cap on photo reading (§7C.4).
+CREATE TABLE photo_reads (at TEXT NOT NULL, member_id TEXT NOT NULL REFERENCES members(id));
+
+CREATE TABLE fires_new (
+  id              TEXT PRIMARY KEY,
+  kind            TEXT NOT NULL CHECK (kind IN ('reminder','timer','chore','thing')),
+  event_id        TEXT REFERENCES events(id),
+  occurrence_date TEXT,                         -- reminder: the event occurrence; thing: the reminder's date
+  timer_id        TEXT REFERENCES timers(id),
+  chore_run_id    TEXT REFERENCES chore_runs(id),
+  thing_id        TEXT REFERENCES things(id),
+  due_at          TEXT NOT NULL,
+  state           TEXT NOT NULL CHECK (state IN ('scheduled','ringing','closed')),
+  alert_count     INTEGER NOT NULL DEFAULT 0,
+  last_alerted_at TEXT,
+  close_reason    TEXT CHECK (close_reason IN ('done','acked','missed','superseded','stopped','removed')),
+  closed_by       TEXT REFERENCES members(id),
+  closed_at       TEXT,
+  CHECK ((kind = 'reminder' AND event_id IS NOT NULL AND occurrence_date IS NOT NULL AND timer_id IS NULL AND chore_run_id IS NULL AND thing_id IS NULL)
+      OR (kind = 'timer'    AND timer_id IS NOT NULL AND event_id IS NULL AND chore_run_id IS NULL AND thing_id IS NULL)
+      OR (kind = 'chore'    AND chore_run_id IS NOT NULL AND event_id IS NULL AND timer_id IS NULL AND thing_id IS NULL)
+      OR (kind = 'thing'    AND thing_id IS NOT NULL AND occurrence_date IS NOT NULL AND event_id IS NULL AND timer_id IS NULL AND chore_run_id IS NULL))
+);
+INSERT INTO fires_new (id, kind, event_id, occurrence_date, timer_id, chore_run_id, thing_id, due_at, state,
+                       alert_count, last_alerted_at, close_reason, closed_by, closed_at)
+  SELECT id, kind, event_id, occurrence_date, timer_id, chore_run_id, NULL, due_at, state,
+         alert_count, last_alerted_at, close_reason, closed_by, closed_at FROM fires;
+CREATE TABLE deliveries_stash AS SELECT * FROM deliveries;
+DELETE FROM deliveries;
+DROP TABLE fires;
+ALTER TABLE fires_new RENAME TO fires;
+INSERT INTO deliveries SELECT * FROM deliveries_stash;
+DROP TABLE deliveries_stash;
+CREATE UNIQUE INDEX uq_fire_occurrence ON fires(event_id, occurrence_date) WHERE kind = 'reminder' AND state != 'closed';
+CREATE UNIQUE INDEX uq_timer_open      ON fires(timer_id) WHERE kind = 'timer' AND state != 'closed';
+CREATE UNIQUE INDEX uq_chore_run_open  ON fires(chore_run_id) WHERE kind = 'chore' AND state != 'closed';
+CREATE UNIQUE INDEX uq_thing_reminder  ON fires(thing_id, occurrence_date) WHERE kind = 'thing' AND state != 'closed';
+CREATE INDEX idx_fires_open ON fires(state, due_at) WHERE state != 'closed';
+```
+
+**Migration check (M4g):** like C13 — fires of every existing kind and their deliveries
+survive 0008; `PRAGMA foreign_key_check` is empty.
 
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
@@ -1276,6 +1353,93 @@ rejection is 400 `invalid_input` with a message naming the field.
 
 ---
 
+## 7C. Things to do — `src/shared/things.ts` (pure)
+
+The ideas the household wants to get to — "the fair is on Oct 10–20", "that exhibit closes
+Nov 5", "a concert on the 14th" — usually spotted by Shelly, usually from a flyer or a
+screenshot. Not calendar events yet: nobody has decided to go. Each thing has its own
+loop: **idea → reminder → Plan it (a real calendar event) → done** (or let go).
+
+### 7C.1 A thing
+
+- **Title** 1–120 (required). **Note** ≤ 2000, **place** ≤ 200, **link** ≤ 500 (`http(s)://`
+  only, else 400).
+- **When:** an optional window — `window_start` and/or `window_end` (local dates,
+  end ≥ start). No dates = **any time**. Only an end = **until** that date.
+- **Status:** `idea` → `planned` (Plan it) → `done`; or `dropped` ("let it go"). A done or
+  dropped thing can be put back to `idea`.
+- **Photo:** at most one (§7C.3). **Anyone** may add, edit, plan, finish or delete any thing. ⚑
+
+### 7C.2 Reminders and Plan it
+
+- Two reminders, each optional (decided by MojoSOGO 2026-10-03):
+  - **When it starts** (`remind_start`): on `window_start` (needs one) at **09:00 local** ⚑;
+  - **On a date I pick** (`remind_on`): that date at 09:00 local.
+- Each is a fire of kind **`thing`** (`thing_id`, `occurrence_date` = the reminder's date),
+  planned by `tick` like reminders (36 h ahead, `INSERT OR IGNORE`). It rings like an event
+  reminder (Done / Snooze in the Ringing bar), may go `missed` like one, and alerts **the
+  whole household** on the thing's channels (push by default; House optional). ⚑
+  Message: `"To do: {title}"` plus `" — starts today"` for the start reminder.
+- Editing a thing's reminders or dates closes its scheduled future fires `removed`
+  (re-planned by the next tick), like an event edit.
+- **Plan it** (decided by MojoSOGO): pick a date (inside the window when there is one ⚑ —
+  outside it is refused with a message) and optionally a time → a normal **calendar event**
+  is created (title; notes = the thing's note + place + link; `thing_id` set), the thing
+  becomes `planned` with `planned_event_id`, and its scheduled reminders close `removed`
+  (the event has its own). The event form shows **"From Things to do"** with the photo.
+- `things.ts` owns: limits, window validation, `remindersFor(thing, tz)` → the reminder
+  dates/instants, `canPlanOn(thing, date)`, and `cleanPhotoReading(raw, today)` (§7C.4).
+
+### 7C.3 Photos — R2, private
+
+- The phone shrinks the picture before upload: longest side **1600 px**, JPEG quality 0.85
+  (canvas). The server refuses anything over **4 MB** or not `image/jpeg|png|webp|heic`.
+- Stored in R2 at `things/{thingId}/{random}.jpg`. Served **only** through
+  `GET /things/{id}/photo` to signed-in members (`Cache-Control: private, max-age=3600`).
+  Never a public URL.
+- Replacing a photo deletes the old object; deleting a thing deletes its photo from R2.
+
+### 7C.4 Reading a photo (fills the fields)
+
+- `POST /things/read-photo` with the (already shrunk) image → `{ title, startDate,
+  endDate, place, url, note }` — each a string or `null`, dates `YYYY-MM-DD`. **Nothing is
+  saved**: the form fills only **empty** fields, marks each filled one "from photo — check
+  it", and the person reviews and taps Save.
+- Implementation: the official `@anthropic-ai/sdk` in the Worker, model `claude-opus-5-5`,
+  `messages.parse` with a structured-output schema, the image as a base64 block; the prompt
+  gives today's date and the household time zone so "Sat Oct 12" becomes a full date. Refusal
+  fallback on (`server-side-fallback-2026-07-01` beta, `fallbacks: "default"`).
+- `cleanPhotoReading` (pure) trims to the limits, drops dates that aren't real calendar
+  dates, swaps start/end if reversed, and keeps only `http(s)` links — the model's answer
+  is input, never trusted as-is.
+- **Cost guard:** at most **40 reads per household per day** ⚑ (`photo_reads`), then 429
+  with a message. Roughly a cent per photo.
+- **Honest failures:** no `ANTHROPIC_API_KEY` → 503 `photo_reading_off` "Reading photos
+  isn't set up yet." Model or network failure → 502 with the reason. A refusal → 422 "Couldn't
+  read that photo." The photo itself is still attached either way.
+- **Privacy:** the photo is sent to Anthropic to be read (MojoSOGO's choice, Q30); stored
+  photos stay in the household's own R2.
+
+### 7C.5 Acceptance (M4g — each row is a test)
+
+| # | Setup / call | Expected |
+|---|---|---|
+| D1 | create "Fall fair", window 2026-10-10…2026-10-20 | 201; listed under Things to do, status `idea` |
+| D2 | window end before start; link `ftp://x`; empty title | 400 `invalid_input`, message names the field |
+| D3 | remind_start on, remind_on 2026-10-15; tick 2026-10-10 09:00 local | a `thing` fire rings, push to every active member, message `To do: Fall fair — starts today` |
+| D4 | tick 2026-10-15 09:00 local | the picked-date reminder rings, `To do: Fall fair` |
+| D5 | edit the window to start 10-12 | the 10-10 fire (if still scheduled) closes `removed`; the next tick plans 10-12 |
+| D6 | Plan it on 2026-10-14 | an event on 10-14 with `thing_id`; thing `planned`; scheduled thing fires `removed` |
+| D7 | Plan it on 2026-10-25 (outside the window) | 400 with a message |
+| D8 | upload a 200 KB JPEG, GET it back, replace it, delete the thing | bytes round-trip; old and final objects gone from R2 |
+| D9 | GET a photo without a session | 401 |
+| D10 | read-photo with no API key | 503 `photo_reading_off` |
+| D11 | `cleanPhotoReading` on raw model output with `2026-02-30`, reversed dates, a `javascript:` link, a 300-char title | invalid date dropped, dates swapped, link dropped, title cut to 120 |
+| D12 | migration check (§4.2g) | every fire kind and delivery intact after 0008 |
+| D13 | a 41st read in one day | 429 with a message |
+
+---
+
 ## 8. Screens
 
 General rules come from `MOJOSOGO-PREFERENCES.md`: chips are entities, badges are
@@ -1445,13 +1609,14 @@ The **🛒 Lists** tab. At the top, a **list picker** — a native `<select>` la
 ```
 List [ Shopping (3)          ▾ ] [⋯]
       Today — chores
+      Things to do (4)
       Shopping (3)
       Wish list (5)
       Hardware store (1)
       ＋ New list…
 ```
 
-- Options: **Today — chores** first, then every list by name with its open-item count,
+- Options: **Today — chores** first, **Things to do** second (§8.11), then every list by name with its open-item count,
   then **＋ New list…**. Choosing **＋ New list…** opens the **new list** form (name,
   Create; errors inside the dialog); after creating, the picker switches to it.
 - **⋯** (accessible name "List options") next to the picker opens **Rename** / **Delete
@@ -1574,6 +1739,30 @@ down"). Fresh means the newest build *and* the newest data, i.e. a full page rel
 **Acceptance (M4f — manual on the iPhone):** Add to Home Screen shows the Ensō icon and
 name; it opens full screen; deploy a change, switch away and back → the change is there;
 pull down on Lists → it reloads; open ✎, switch away and back → the dialog is still there.
+
+### 8.11 Things to do (Lists → Things to do)
+
+```
+[ ＋ Add a thing to do ]
+Fall fair            Oct 10 – 20       📷 ⏰
+Science museum       until Nov 5       📷
+Kayaking             any time
+Pumpkin patch        📅 Sat Oct 12
+▸ Done & let go (3)
+```
+
+- Open things (ideas and planned) sorted by when they end — soonest first, any-time last.
+  A row: title, the window ("Oct 10 – 20", "until Nov 5", "from Oct 3", "any time") or for
+  a planned one 📅 its date, 📷 when there is a photo, ⏰ when a reminder is set. One line.
+- **＋ Add a thing to do** and tapping a row open the **thing form** (modal):
+  - **📷 Add photo** (camera or library) → a thumbnail; then "Reading the photo…" and the
+    empty fields fill in, each marked *from photo — check it*. Remove / replace photo.
+  - Title · From / To dates (both optional) · Place · Link · Note.
+  - **Reminders:** ☐ When it starts · ☐ On [date] · Phone / House.
+  - **Plan it** → a date (+ optional time) → creates the calendar event (§7C.2).
+  - **Done** / **Let it go** / **Put back** (by status) · Save / Cancel / Delete (asks).
+- Tapping the photo thumbnail shows it full size (inside the dialog).
+- A thing ending in the past stays listed until done or let go — no red, no nagging (§1.0).
 
 ### 8.9 Invites (owner) and the join page
 
@@ -1814,6 +2003,12 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | GET | `/chores/today` | member | → `{ date, runs: Run[] }`; `Run = { id, choreId, title, doneMeans, timing, time, step, steps, assigneeId, personId, doneAt, doneBy, nextDueAt, ringing }` (`personId` = the current step's person) |
 | POST | `/chore-runs/{id}/done` | member | advances one step (§7B.3) → run; 409 `already_done` when finished |
 | POST | `/chore-runs/{id}/undo` | member | → run; 409 `nothing_to_undo` at step 0 |
+| GET | `/things` | member | → `{ open: Thing[], closed: Thing[] }` (closed = done/dropped, last 60 days); `Thing = { id, title, note, place, url, windowStart, windowEnd, remindStart, remindOn, channels, hasPhoto, status, plannedEventId, plannedDate, createdBy, updatedAt }` |
+| POST | `/things` | member | thing fields → thing (201) |
+| PATCH/DELETE | `/things/{id}` | member | fields, all optional, incl. `status` → thing; DELETE → 204 (and its photo) |
+| POST | `/things/{id}/plan` | member | `{ date, time? }` → `{ thing, eventId }`; 400 outside the window |
+| PUT/GET/DELETE | `/things/{id}/photo` | member | PUT raw image body (≤ 4 MB) → 204; GET → the image; DELETE → 204 |
+| POST | `/things/read-photo` | member | raw image body → `{ title, startDate, endDate, place, url, note }` (each nullable); 503 / 502 / 422 / 429 per §7C.4 |
 | GET | `/lists` | member | → `{ id, name, createdBy, openCount }[]`, by name (§7A) |
 | POST | `/lists` | member | `{ name }` → list (201); 409 `duplicate`; 400 at `LISTS_MAX` |
 | PATCH/DELETE | `/lists/{id}` | creator or admin (seeded lists: admin) | PATCH `{ name }` → list; DELETE → 204 |
@@ -1927,6 +2122,14 @@ checks.
 - ✅ Manual at 320 px: create "Hardware store" from the picker, add two items, assign one,
   tick it, rename the list, delete it.
 
+**M4g — Things to do**
+- Migration 0008, `THING_STATUS` + `thing` kind, `src/shared/things.ts`, tick planning of
+  thing reminders, `/things` API, R2 photos, photo reading, Lists → Things to do (§7C, §8.11).
+- Setup: `wrangler r2 bucket create enso-photos`; `wrangler secret put ANTHROPIC_API_KEY`.
+- ✅ Tests D1–D13.
+- ✅ Manual on the iPhone: photograph a real flyer → the fields fill → save → a reminder
+  rings on its day → Plan it puts it on the calendar.
+
 **M4d — Invites**
 - `/auth/invite-preview`, the invites list states, the invite card (QR, Share, Copy),
   the join page at `/join`, the welcome card (§6.2a, §8.9).
@@ -1993,7 +2196,7 @@ Captured from v1.0-draft so nothing is lost:
 - Offline **editing** and conflict resolution. v1 offline = the cached app shell;
   actions need network, and buttons show disabled "offline".
 - Queued offline acks
-- R2 attachments
+- Photos anywhere other than Things to do (§7C.3 is the only attachment)
 - Data export
 - Audit-log screen
 - Event templates
@@ -2054,6 +2257,10 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q24 | Do lists behave differently? | **Decided by MojoSOGO 2026-10-03:** all alike — tap ticks, ✎ edits |
 | Q25 | Who may create, rename, delete lists? | Anyone creates; creator or admin renames/deletes; seeded lists admin-only |
 | Q26 | The old ✕ quick-remove on rows | Removed — tick is the quick action, Delete is in the item form |
+| Q27 | Where do things to do live? | **Decided by MojoSOGO 2026-10-03:** Lists picker, second entry |
+| Q28 | Plan it | **Decided:** creates a real calendar event; the idea becomes Planned |
+| Q29 | Reminders | **Decided:** when it starts, and on a picked date (09:00 local ⚑); whole household ⚑ |
+| Q30 | Reading photos | **Decided:** Claude reads them (`claude-opus-5-5`); ≤ 40 reads a day ⚑ |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
