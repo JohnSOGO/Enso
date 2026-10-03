@@ -7,6 +7,7 @@ import { WEEKDAY, type Channel, type Weekday } from '../../../src/shared/vocab';
 import { weekdayOf } from '../../../src/shared/time';
 import { positionInMonth, type Recurrence } from '../../../src/shared/recurrence';
 import { longDate } from './DaySheet';
+import { FromThing } from './ThingPhoto';
 
 type Repeat = 'none' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'MONTHLY_POS' | 'YEARLY';
 
@@ -90,7 +91,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
   const { me, members, refresh } = useApp();
   const [form, setForm] = useState<Form | null>(eventId ? null : blank(date));
   const [initial, setInitial] = useState<string>(JSON.stringify(form));
-  const [meta, setMeta] = useState<{ createdBy: string; recurring: boolean } | null>(null);
+  const [meta, setMeta] = useState<{ createdBy: string; recurring: boolean; thingId: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -99,7 +100,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
     get(`/events/${eventId}`).then((e) => {
       const f = fromEvent(e);
       setForm(f); setInitial(JSON.stringify(f));
-      setMeta({ createdBy: e.createdBy, recurring: !!e.recurrence });
+      setMeta({ createdBy: e.createdBy, recurring: !!e.recurrence, thingId: e.thingId ?? null });
     }).catch((e) => setError(errorText(e)));
   }, [eventId]);
 
@@ -139,6 +140,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
         </>
       )}
     >
+      {meta?.thingId && <FromThing thingId={meta.thingId} />}
       {form && (
         <fieldset disabled={!canEdit || busy} style={{ border: 0, padding: 0 }}>
           {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>Only the creator or an admin can change this event.</p>}

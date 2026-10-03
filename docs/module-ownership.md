@@ -70,10 +70,15 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/Chores.tsx` | Chores section of the Alarms tab (§8.5) |
 | `frontend/src/components/ChoreForm.tsx` | Chore form modal: days, at/by, people turn order, steps (§8.5) |
 | `frontend/src/components/AlertFields.tsx` | Fields shared by the alarm, timer and chore forms: day chips + days text, channel checkboxes, repeat-alert options (§8.5) |
-| `frontend/src/components/HouseholdLists.tsx` | Lists tab: list picker (Today + lists + ＋ New list…, ⋯) composing ChoresToday / HouseholdListOptions, the list panel (add box, rows, Done) (§8.8) |
+| `frontend/src/components/HouseholdLists.tsx` | Lists tab: list picker (Today + Things to do + lists + ＋ New list…, ⋯) composing ChoresToday / ThingsToDo / HouseholdListOptions, the list panel (add box, rows, Done) (§8.8) |
 | `frontend/src/components/HouseholdListItemForm.tsx` | The list item form modal: text, note, Assigned to (one member or Nobody), Save / Cancel / Delete (§8.8); owns the `Item` shape |
 | `frontend/src/components/HouseholdListOptions.tsx` | Lists tab list management: the new-list form and the ⋯ list options (rename, delete with its open-item count) modals (§8.8) |
 | `frontend/src/components/ChoresToday.tsx` | Lists → Today: today's chore runs, Mine \| Everyone, tick/undo a step (§8.8) |
+| `frontend/src/components/ThingsToDo.tsx` | Lists → Things to do: open rows (window text, 📅 planned date, 📷, ⏰), "Done & let go", ＋ Add, opens ThingForm (§8.11) |
+| `frontend/src/components/ThingForm.tsx` | The thing form modal: title, dates, place, link, note, reminders + channels, fill-empty-fields from a photo reading marked "from photo — check it", Done / Let it go / Put back, Save / Cancel / Delete (§8.11) |
+| `frontend/src/components/ThingPlan.tsx` | Plan it: a date (+ optional time) → `POST /things/{id}/plan`; the refusal shown inside (§7C.2) |
+| `frontend/src/components/ThingPhoto.tsx` | A thing's photo: pick (camera/library), shrink, thumbnail, full size inside the dialog, remove/replace, the read-photo request; and `FromThing`, the "From Things to do" block for the event form (§7C.3, §8.4, §8.11) |
+| `frontend/src/shrink-photo.ts` | Shrinks a picked image on the phone to PHOTO_LONG_SIDE px, JPEG PHOTO_QUALITY, via canvas (§7C.3) — no app state |
 | `frontend/src/components/RingingBar.tsx` | Ringing bar (§8.2) |
 | `frontend/src/components/Settings.tsx` | Settings: Me, Household, Status (§8.6) |
 | `frontend/src/components/useAction.tsx` | Runs an async action, tracks busy, renders its failure in place (`role="alert"`) — the Settings sections' action hook |

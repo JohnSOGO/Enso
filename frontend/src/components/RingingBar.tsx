@@ -28,6 +28,7 @@ export function RingingBar() {
   const sub = (f: Fire) => {
     if (f.kind === 'reminder') return f.startTime ? ` · ${f.startTime}` : ' · all day';
     if (f.kind === 'chore') return ` · ${person(f.personId)}`;
+    if (f.kind === 'thing') return ' · to do'; // ⚑ (§8.2)
     return ` · ringing ${minsAgo(f.dueAt)} min`;
   };
 
@@ -41,7 +42,7 @@ export function RingingBar() {
             {f.kind === 'chore' && f.stepTitle && <> — {f.stepTitle}</>}
             <span className={s.sub}>{sub(f)}</span>
           </span>
-          {f.kind === 'reminder' && <button disabled={busy === f.id} onClick={() => act(f, 'snooze')}>Snooze 10m</button>}
+          {(f.kind === 'reminder' || f.kind === 'thing') && <button disabled={busy === f.id} onClick={() => act(f, 'snooze')}>Snooze 10m</button>}
           {f.kind === 'timer'
             ? <button className="primary" disabled={busy === f.id} onClick={() => act(f, 'ack')}>Ack</button>
             : <button className="primary" disabled={busy === f.id} onClick={() => act(f, 'done')}>Done</button>}

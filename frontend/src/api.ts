@@ -6,15 +6,22 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+/** The Worker's URL for a path — also for `<img src>` of a private photo (the session cookie goes along). */
+export const apiUrl = (path: string) => `/api/v1${path}`;
+
+export function api<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+  return send<T>(method, path, body === undefined ? {} : { 'content-type': 'application/json' },
+    body === undefined ? undefined : JSON.stringify(body));
+}
+
+/** A raw body (e.g. a photo) sent with its own content type (§10 PUT /things/{id}/photo, POST /things/read-photo). */
+export const upload = <T = any>(method: string, path: string, blob: Blob) =>
+  send<T>(method, path, { 'content-type': blob.type || 'application/octet-stream' }, blob);
+
+async function send<T>(method: string, path: string, headers: Record<string, string>, body: BodyInit | undefined): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`/api/v1${path}`, {
-      method,
-      credentials: 'same-origin',
-      headers: body === undefined ? {} : { 'content-type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    res = await fetch(apiUrl(path), { method, credentials: 'same-origin', headers, body });
   } catch {
     throw new ApiError(null, 'network', 'Could not reach the server — check your connection.');
   }

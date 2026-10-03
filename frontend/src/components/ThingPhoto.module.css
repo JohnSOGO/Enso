@@ -1,0 +1,15 @@
+/* SPEC §8.11 — a thing's photo block and the event form's "From Things to do". Column boxes whose
+   height comes from content: children keep flex none / 1 1 auto, never basis 0 (§8 iPhone rules). */
+.photo { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 12px; }
+.photo > * { flex: none; max-width: 100%; }
+.thumbButton { display: block; min-height: 44px; min-width: 44px; padding: 0; }
+.thumb { display: block; max-width: 100%; max-height: 120px; border-radius: 8px; }
+.full { display: block; width: 100%; height: auto; border-radius: 8px; }
+
+.from {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  background: var(--surface-2); border-radius: 10px; padding: 8px 10px; margin-bottom: 12px;
+}
+.from > * { flex: none; max-width: 100%; }
+.from > span { font-size: .8rem; }
+.fromTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
