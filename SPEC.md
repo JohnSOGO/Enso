@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.9-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.10-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1281,6 +1281,20 @@ rejection is 400 `invalid_input` with a message naming the field.
 General rules come from `MOJOSOGO-PREFERENCES.md`: chips are entities, badges are
 statuses, modals are native `<dialog>` explicitly centred, failures render inside
 the dialog with `role="alert"`, and there are no wizards.
+
+**iPhone rules** (found 2026-10-03 on an iPhone 16 Pro Max — the ⋯ list options showed
+only the grey backdrop):
+- **Text fields are at least 16 px** (`input`, `select`, `textarea`). Below 16 px, iOS
+  Safari zooms the page on focus and leaves it zoomed, so a centred dialog can open
+  outside what the person is looking at.
+- **Every modal renders at the document root** (a portal to `document.body`), never
+  inside a screen's scrolling container — no ancestor's overflow, scroll or stacking can
+  hide or clip it.
+- **The cause, measured on the phone:** the dialog was 2 px tall and its panel 0 px.
+  iOS Safari 26.6 sizes a `flex: 1` child (basis 0%) of a column flexbox whose height is
+  not fixed as **zero**. Inside any box whose height comes from its content, flex
+  children grow from `auto` (`flex: 1 1 auto`), never from 0. Chrome and desktop
+  WebKit did not reproduce it — only the real phone did.
 
 ### 8.1 Frame
 
