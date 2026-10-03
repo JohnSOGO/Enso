@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.16-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.17-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -732,6 +732,19 @@ CREATE INDEX idx_fires_open ON fires(state, due_at) WHERE state != 'closed';
 **Migration check (M4g):** like C13 — fires of every existing kind and their deliveries
 survive 0008; `PRAGMA foreign_key_check` is empty.
 
+### 4.2h Schema change — `migrations/0009_optional_events.sql`
+
+```sql
+-- §7.5 — optional events: shown to, and reminding, only the members who turned them on.
+ALTER TABLE events ADD COLUMN optional INTEGER NOT NULL DEFAULT 0 CHECK (optional IN (0, 1));
+CREATE TABLE event_optins (
+  event_id   TEXT NOT NULL REFERENCES events(id),
+  member_id  TEXT NOT NULL REFERENCES members(id),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (event_id, member_id)
+);
+```
+
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
 
@@ -742,7 +755,7 @@ interface Recurrence {
   freq: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
   interval?: number;          // default 1; "every 2 weeks" = WEEKLY, interval 2
   byDay?: ('SU'|'MO'|'TU'|'WE'|'TH'|'FR'|'SA')[];   // WEEKLY: days; MONTHLY: exactly one day, with setPos
-  setPos?: 1 | 2 | 3 | 4 | -1;  // MONTHLY only: the nth byDay of the month (-1 = last) — RRULE "BYDAY=3FR"
+  setPos?: SetPos | SetPos[];  // MONTHLY only: which byDay(s) of the month (-1 = last) — RRULE "BYDAY=1TH,3TH"
   until?: string;             // local YYYY-MM-DD, inclusive
   count?: number;             // total occurrences; not together with until
 }
@@ -752,6 +765,9 @@ interface Recurrence {
   UTC with `localToUtc`.
 - `MONTHLY` with `byDay` + `setPos` repeats on the nth weekday of the month
   ("3rd Friday" = `{"freq":"MONTHLY","byDay":["FR"],"setPos":3}`; `-1` = last).
+  `setPos` may be a **list** for several weeks of the month: "1st and 3rd Thursday" =
+  `{"freq":"MONTHLY","byDay":["TH"],"setPos":[1,3]}` (`SetPos` = 1 | 2 | 3 | 4 | -1; a list
+  is 1–5 distinct values; a single number stays valid, so stored events need no change).
   The event form derives it from the start date: n = ceil(day ÷ 7); a 5th weekday
   is offered as "last".
 - `MONTHLY` without `byDay` repeats on the start date's day-of-month. Months without that day are
@@ -765,7 +781,9 @@ interface Recurrence {
 - The same module expands events for the calendar view **and** for the engine.
   There is one recurrence format in the whole app.
 - **Acceptance:** 3rd Friday from 2026-10-16 → 2026-10-16, 2026-11-20, 2026-12-18;
-  last Friday from 2026-10-30 → 2026-10-30, 2026-11-27, 2026-12-25.
+  last Friday from 2026-10-30 → 2026-10-30, 2026-11-27, 2026-12-25;
+  1st & 3rd Thursday from 2026-10-01 → 10-01, 10-15, 11-05, 11-19, 12-03, 12-17;
+  2nd & last Monday from 2026-10-12 → 10-12, 10-26, 11-09, 11-30.
 
 ---
 
@@ -1154,6 +1172,43 @@ options expiration"; `member_prefs.show_options_expiration`, §4.2c).
   2025-04-17 (Thu — Fri 04-18 is Good Friday); 2026-04-17 (Good Friday 2026 is 04-03,
   unaffected). Easter: 2025-04-20, 2026-04-05, 2027-03-28.
 
+### 7.5 Optional events — each person turns them on
+
+Some calendar items matter only to whoever wants them — street sweeping (move the car),
+a recycling day, a club's meetings. An event can be marked **optional** (decided by
+MojoSOGO 2026-10-03); then **each member decides for themselves** whether it is on.
+
+- An optional event is **on** for a member when they have an `event_optins` row for it.
+  Its creator is turned on automatically when they create it. ⚑
+- **Off** means absent for that member: not in their `/calendar` occurrences, not in their
+  day sheet, no reminders to them, and its fires are hidden from their Ringing bar.
+- **On** means it behaves like any event for them.
+- **Reminders** of an optional event go only to the members who have it on (and, if the
+  event is assigned, only those of them who are assigned). The **House** channel speaks only
+  when at least one member has it on. Nobody on → nothing is delivered. ⚑
+- Turning it on or off takes effect at once (the next fetch, the next alert).
+- Any member may turn any optional event on or off **for themselves**; only the creator or
+  an admin may change whether an event is optional (like any edit, §6.3). Making an event
+  not optional again shows it to everyone; the opt-in rows are kept but unused.
+- Alarms and chores are never optional (they have their own assignment).
+- Who has it on is **data**, read per request; the one rule — "an optional event exists for
+  member M only if M has it on" — is applied where `/calendar`, the day sheet, `/fires` and
+  tick's recipients are built (placement decides the owner, so it is written once).
+
+**Acceptance (M4h — API tests):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| O1 | A creates optional "Street sweeping", all-day, MONTHLY TH [1,3] from 2026-10-01 | A has it on; it is in A's `/calendar` for Oct: 10-01, 10-15 |
+| O2 | member B's `/calendar` for Oct | no Street sweeping |
+| O3 | B `PUT /events/{id}/optin` | B's `/calendar` now has 10-01 and 10-15 |
+| O4 | reminder "evening before" (offset 780 from 09:00); tick 2026-10-14 20:00 local with A and B on | one fire; push to A and B |
+| O5 | B `DELETE …/optin`; tick the next occurrence's evening | push to A only |
+| O6 | nobody on (A also off); tick the evening | the fire steps, no deliveries; hidden from every Ringing bar |
+| O7 | `GET /optional-events` as B | the event, `on: false` (after O5) |
+| O8 | B (not creator, not admin) PATCH `optional: false` | 403 |
+| O9 | a non-optional event | unchanged for everyone (regression) |
+
 ---
 
 ## 7A. Lists
@@ -1523,10 +1578,15 @@ Fields:
 - End date (all-day only)
 - Repeat: Never / Daily / Weekly (day checkboxes) / Every 2 weeks / Monthly on day N /
   Monthly on the nth weekday (e.g. "Monthly on the 3rd Friday", derived from the date) /
+  **Monthly on certain weeks** — the date's weekday, with week chips **1st 2nd 3rd 4th
+  Last** (at least one; the date's own week is pre-ticked), e.g. "Thursdays: 1st · 3rd" /
   Yearly, plus an optional end date
 - Assigned to (member chips, none = everyone)
+- **☐ Optional — each person turns it on** (creator or admin, §7.5). On an optional event
+  the form also shows **☐ On for me** — every member's own switch.
 - **Reminder:**
-  - None / At start / 5 / 15 / 30 / 60 min before / 1 day before
+  - None / At start / 5 / 15 / 30 / 60 min before / 1 day before / for all-day events
+    **The evening before (8 pm)** (= 780 min before the all-day start of 09:00) ⚑
   - Channels: ☐ Phone ☐ House
   - Repeat alert every: Off / 5 / 10 / 15 / 30 min
 
@@ -1595,7 +1655,8 @@ Time      Chore            Days        This week
 
 ### 8.6 Settings
 
-- **Me:** name, color, enable phone alerts (subscribe), show/hide holiday types,
+- **Me:** **Optional calendar items** — one line per optional event (title, how it repeats)
+  with an **On** switch (§7.5); name, color, enable phone alerts (subscribe), show/hide holiday types,
   show/hide 📈 options expiration (§7.4), log out.
 - **Household (admins):** name, timezone, days off (§7.3), **invites (§8.9)**, members list:
   one line per member — name · **Owner** / **Admin** chip (nothing for a regular member) ·
@@ -1992,7 +2053,9 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
 | DELETE | `/invites/{id}` | owner | revoke |
-| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], schoolHolidays[], marketDays[] }`; recurring events expanded server-side with `recurrence.ts`; alarms excluded; public holidays filtered to days off; max range 120 days |
+| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], schoolHolidays[], marketDays[] }`; recurring events expanded server-side with `recurrence.ts`; alarms excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
+| GET | `/optional-events` | member | → `{ id, title, recurrence, startDate, on }[]` — every optional event, with this member's switch |
+| PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |
 | GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6) |
 | POST | `/events/{id}/exdates` | creator or owner | `{ date }` |
@@ -2146,6 +2209,14 @@ checks.
 - ✅ Manual on the iPhone: photograph a real flyer → the fields fill → save → a reminder
   rings on its day → Plan it puts it on the calendar.
 
+**M4h — Optional events + "certain weeks"** (street sweeping)
+- Migration 0009, `setPos` lists in `recurrence.ts`, opt-in visibility in `/calendar`,
+  `/fires` and tick recipients, `/optional-events` + `/events/{id}/optin`, the event form
+  (certain weeks, evening before, Optional / On for me), Settings → Me list (§7.5, §8.4, §8.6).
+- ✅ §4.3 acceptance incl. 1st & 3rd Thursday; tests O1–O9.
+- ✅ Production: "Street sweeping" exists — 1st & 3rd Thursday, all-day, optional,
+  reminder the evening before at 8 pm by phone; on for MojoSOGO; everyone else can turn it on.
+
 **M4d — Invites**
 - `/auth/invite-preview`, the invites list states, the invite card (QR, Share, Copy),
   the join page at `/join`, the welcome card (§6.2a, §8.9).
@@ -2276,6 +2347,8 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q27 | Where do things to do live? | **Decided by MojoSOGO 2026-10-03:** Lists picker, second entry |
 | Q28 | Plan it | **Decided:** creates a real calendar event; the idea becomes Planned |
 | Q29 | Reminders | **Decided:** when it starts, and on a picked date (09:00 local ⚑); whole household ⚑ |
+| Q31 | Street sweeping / per-person items | **Decided by MojoSOGO 2026-10-03:** optional events any person turns on; reminder the evening before at 8 pm |
+| Q32 | Is the creator of an optional event turned on automatically? | Yes ⚑ |
 | Q30 | Reading photos | **Decided:** Claude reads them (`claude-opus-5-5`); ≤ 40 reads a day ⚑ |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
