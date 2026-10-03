@@ -15,6 +15,7 @@ export interface FireRow {
   occurrence_date: string | null;
   timer_id: string | null;
   chore_run_id: string | null;
+  thing_id: string | null;
   due_at: string;
   state: FireState;
   alert_count: number;
@@ -47,19 +48,27 @@ export interface TimerState {
   running: boolean;
 }
 
-const blankFire = (): Omit<NewFire, 'kind' | 'event_id' | 'occurrence_date' | 'timer_id' | 'chore_run_id' | 'due_at'> => ({
+const blankFire = (): Omit<NewFire, 'kind' | 'event_id' | 'occurrence_date' | 'timer_id' | 'chore_run_id' | 'thing_id' | 'due_at'> => ({
   state: 'scheduled', alert_count: 0, last_alerted_at: null,
   close_reason: null, closed_by: null, closed_at: null,
 });
 
 export function newTimerFire(timerId: string, dueAt: string): NewFire {
-  return { kind: 'timer', event_id: null, occurrence_date: null, timer_id: timerId, chore_run_id: null, due_at: dueAt, ...blankFire() };
+  return { kind: 'timer', event_id: null, occurrence_date: null, timer_id: timerId, chore_run_id: null, thing_id: null, due_at: dueAt, ...blankFire() };
 }
 
 /** A fire for one step of one chore run (§7B.3). */
 export function newChoreFire(runId: string, dueAt: string): NewFire {
-  return { kind: 'chore', event_id: null, occurrence_date: null, timer_id: null, chore_run_id: runId, due_at: dueAt, ...blankFire() };
+  return { kind: 'chore', event_id: null, occurrence_date: null, timer_id: null, chore_run_id: runId, thing_id: null, due_at: dueAt, ...blankFire() };
 }
+
+/** One reminder of a thing to do (§7C.2): `occurrence_date` is the reminder's local date. */
+export function newThingFire(thingId: string, date: string, dueAt: string): NewFire {
+  return { kind: 'thing', event_id: null, occurrence_date: date, timer_id: null, chore_run_id: null, thing_id: thingId, due_at: dueAt, ...blankFire() };
+}
+
+/** Reminders and thing reminders ring alike: they may go `missed`, and take Done / Snooze (§5.3, §5.4, §7C.2). */
+const remindsLike = (kind: AlertKind) => kind === 'reminder' || kind === 'thing';
 
 export function closeFire<T extends NewFire>(fire: T, reason: CloseReason, memberId: string | null, now: string): T {
   return { ...fire, state: 'closed', close_reason: reason, closed_by: memberId, closed_at: now };
@@ -75,7 +84,7 @@ export function planReminderFires(ev: ReminderEvent, tz: string, fromUtc: string
     const start = localToUtc(date, ev.start_time ?? ALL_DAY_REMIND_TIME, tz);
     const due = addMinutes(start, -ev.remind_offset_min);
     if (ms(due) >= ms(fromUtc) && ms(due) < ms(toUtc)) {
-      out.push({ kind: 'reminder', event_id: ev.id, occurrence_date: date, timer_id: null, chore_run_id: null, due_at: due, ...blankFire() });
+      out.push({ kind: 'reminder', event_id: ev.id, occurrence_date: date, timer_id: null, chore_run_id: null, thing_id: null, due_at: due, ...blankFire() });
     }
   }
   return out;
@@ -86,7 +95,7 @@ export function stepFire(fire: FireRow, cfg: AlertConfig, now: string): { fire: 
   const t = ms(now);
   if (fire.state === 'scheduled') {
     if (t < ms(fire.due_at)) return { fire, alert: false };
-    if (fire.kind === 'reminder' && t - ms(fire.due_at) > MISSED_AFTER_MIN * 60_000) {
+    if (remindsLike(fire.kind) && t - ms(fire.due_at) > MISSED_AFTER_MIN * 60_000) {
       return { fire: closeFire(fire, 'missed', null, now), alert: false };
     }
     return { fire: { ...fire, state: 'ringing', alert_count: 1, last_alerted_at: now }, alert: true };
@@ -111,7 +120,7 @@ export function applyAction(
     // The run's step advance is the route's job (advanceRun, §7B.3); the engine only closes this fire.
     return fire.state === 'ringing' && action === 'done' ? { fire: closeFire(fire, 'done', memberId, now) } : { error: 'invalid_action' };
   }
-  if (fire.kind === 'reminder' && fire.state === 'ringing') {
+  if (remindsLike(fire.kind) && fire.state === 'ringing') {
     if (action === 'done') return { fire: closeFire(fire, 'done', memberId, now) };
     if (action === 'snooze') {
       return { fire: { ...fire, state: 'scheduled', due_at: addMinutes(now, SNOOZE_MIN), alert_count: 0, last_alerted_at: null } };
@@ -142,10 +151,11 @@ export function applyTimerCmd(
 /** Who a chore alert names and which step it is on (§5.7). */
 export interface ChoreAlertText { personName: string | null; stepTitle: string; stepCount: number }
 
-/** §5.7 — alert message text. */
-export function alertMessage(kind: AlertKind, title: string, alertNumber: number, chore?: ChoreAlertText): string {
+/** §5.7 — alert message text. `startsToday`: a thing's start reminder (§7C.2). */
+export function alertMessage(kind: AlertKind, title: string, alertNumber: number, chore?: ChoreAlertText, startsToday = false): string {
   const base = kind === 'reminder' ? `Reminder: ${title}`
     : kind === 'timer' ? `Timer: ${title}`
+    : kind === 'thing' ? `To do: ${title}${startsToday ? ' — starts today' : ''}`
     : `${chore?.personName ? `Chore for ${chore.personName}` : 'Chore'}: ${title}${chore && chore.stepCount > 1 ? ` — ${chore.stepTitle}` : ''}`;
   return alertNumber >= 2 ? `${base} (alert ${alertNumber})` : base;
 }

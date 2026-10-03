@@ -1,0 +1,5 @@
+/* SPEC §8.11 — Lists → Things to do only. Rows reuse Lists.module.css (.list, .item, .title, .row, .main, .done, .checked). */
+.add { width: 100%; min-height: 44px; margin-bottom: 10px; }
+.text { flex: 1 1 auto; min-width: 0; }
+.when { flex: none; white-space: nowrap; font-size: .8rem; font-variant-numeric: tabular-nums; }
+.glyph { flex: none; }

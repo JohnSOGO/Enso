@@ -11,6 +11,11 @@ database_id = "85c0e2a9-95ef-4cf3-8cea-dceeb2b54773"
 preview_database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
 
+# SPEC §7C.3 — thing photos, private: served only through the API (`wrangler r2 bucket create enso-photos`).
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "enso-photos"
+
 [assets]
 directory = "frontend/dist"
 not_found_handling = "single-page-application"

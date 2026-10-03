@@ -35,7 +35,7 @@ it('C13 old fires and deliveries are intact after 0006', async () => {
   await applyD1Migrations(db, env.TEST_MIGRATIONS);
 
   const after = (await db.prepare('SELECT * FROM fires ORDER BY id').all<Record<string, unknown>>()).results;
-  expect(after).toEqual(before.map((f) => ({ ...f, chore_run_id: null })));
+  expect(after).toEqual(before.map((f) => ({ ...f, chore_run_id: null, thing_id: null }))); // later migrations add these columns
   const d = await db.prepare('SELECT d.id, d.message, f.id AS fire_id, f.kind FROM deliveries d JOIN fires f ON f.id = d.fire_id').all();
   expect(d.results).toEqual([{ id: 'dlv_1', message: 'Reminder: Meds', fire_id: 'fire_r', kind: 'reminder' }]);
   expect((await db.prepare('PRAGMA foreign_key_check').all()).results).toEqual([]);

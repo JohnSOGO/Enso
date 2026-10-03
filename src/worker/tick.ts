@@ -3,7 +3,8 @@ import {
   MATERIALIZE_AHEAD_H, alertMessage, newChoreFire, stepFire, planReminderFires,
   type AlertConfig, type ChoreAlertText, type FireRow, type NewFire,
 } from '../shared/engine';
-import { choreFireContext, choreFromRow, planChoreRuns, type Chore, type ChoreRow, type ChoreRun } from '../shared/chores';
+import { DEFAULT_MAX_ALERTS, choreFireContext, choreFromRow, planChoreRuns, type Chore, type ChoreRow, type ChoreRun } from '../shared/chores';
+import { isStartReminder, planThingFires, type ThingRow } from '../shared/things';
 import type { Channel } from '../shared/vocab';
 import type { Recurrence } from '../shared/recurrence';
 import { addMinutes } from '../shared/time';
@@ -20,10 +21,10 @@ interface SourceRow {
 
 export function insertFire(db: D1Database, f: NewFire, ignoreConflict = false): D1PreparedStatement {
   return db.prepare(
-    `INSERT ${ignoreConflict ? 'OR IGNORE ' : ''}INTO fires (id, kind, event_id, occurrence_date, timer_id, chore_run_id, due_at, state,
+    `INSERT ${ignoreConflict ? 'OR IGNORE ' : ''}INTO fires (id, kind, event_id, occurrence_date, timer_id, chore_run_id, thing_id, due_at, state,
        alert_count, last_alerted_at, close_reason, closed_by, closed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(newId('fire'), f.kind, f.event_id, f.occurrence_date, f.timer_id, f.chore_run_id, f.due_at, f.state,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(newId('fire'), f.kind, f.event_id, f.occurrence_date, f.timer_id, f.chore_run_id, f.thing_id, f.due_at, f.state,
     f.alert_count, f.last_alerted_at, f.close_reason, f.closed_by, f.closed_at);
 }
 
@@ -71,10 +72,21 @@ export function updateChoreRun(db: D1Database, r: ChoreRun, now: string): D1Prep
     .bind(r.assignee_id, r.step, r.done_at, r.done_by, now, r.id);
 }
 
-interface Source { title: string; assignedTo: string[]; cfg: AlertConfig; chore?: ChoreAlertText }
+interface Source { title: string; assignedTo: string[]; cfg: AlertConfig; chore?: ChoreAlertText; startsToday?: boolean }
 
-/** Loads the alert config + title for a fire from its event, timer or chore run. */
-export async function sourceOf(db: D1Database, fire: Pick<FireRow, 'kind' | 'event_id' | 'timer_id' | 'chore_run_id'>): Promise<Source | null> {
+/** Loads the alert config + title for a fire from its event, timer, chore run or thing. */
+export async function sourceOf(
+  db: D1Database, fire: Pick<FireRow, 'kind' | 'event_id' | 'timer_id' | 'chore_run_id' | 'thing_id' | 'occurrence_date'>,
+): Promise<Source | null> {
+  if (fire.kind === 'thing') {
+    // §7C.2: the whole household hears it, on the thing's channels; it rings once, like a reminder with no repeat.
+    const t = await first<ThingRow>(db, 'SELECT * FROM things WHERE id = ?', fire.thing_id);
+    if (!t) return null;
+    return {
+      title: t.title, assignedTo: [], startsToday: isStartReminder(t, fire.occurrence_date),
+      cfg: { channels: parseJson<Channel[]>(t.channels, []), renotifyMin: null, maxAlerts: DEFAULT_MAX_ALERTS },
+    };
+  }
   if (fire.kind === 'chore') {
     const cr = await loadChoreRun(db, fire.chore_run_id);
     if (!cr) return null;
@@ -133,6 +145,10 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
     const active = await activeMemberIds(db);
     for (const c of chores) inserts.push(...choreRunInserts(db, choreFromRow(c), tz, now, to, active));
   }
+  // 1c. Plan thing reminders (§7C.2): only ideas, same window, INSERT OR IGNORE.
+  const things = await all<ThingRow>(db,
+    `SELECT * FROM things WHERE deleted_at IS NULL AND status = 'idea' AND (remind_start = 1 OR remind_on IS NOT NULL)`);
+  for (const t of things) for (const f of planThingFires(t, tz, now, to)) inserts.push(insertFire(db, f, true));
   if (inserts.length) {
     const results = await db.batch(inserts);
     summary.materialized = results.reduce((n, r) => n + (r.meta.changes ?? 0), 0);
@@ -150,7 +166,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
     const stmts = [updateFire(db, next)];
     if (alert) {
       summary.alerts++;
-      const message = alertMessage(fire.kind, src.title, next.alert_count, src.chore);
+      const message = alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday);
       const base = [next.id, next.alert_count] as const;
       if (src.cfg.channels.includes('push')) {
         for (const memberId of await recipients(db, src.assignedTo)) {
