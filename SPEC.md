@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.14-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.15-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1715,16 +1715,23 @@ least 0.8 s so it never flickers:
             ◯   (the ensō, large)
            Ensō
    https://enso.sogodojo.com
+      v0.2.0 · a99e5db
 ```
 - Centred on `--bg`: the ensō, **Ensō** in a large, light-weight serif-free type, and the
   **full address the app is served from** (`location.origin`, so the home-network server
-  shows its own) in small dim text. Nothing else — no spinner, no tagline.
+  shows its own) in small dim text, and under it the **build stamp** — `v{version} ·
+  {commit}` (decided by MojoSOGO 2026-10-03): the app version from `package.json` and the
+  short git commit the page was built from, written into the page **at build time** (never
+  typed by hand). A build from a tree with uncommitted changes shows `{commit}-dirty`; a
+  build with no git at all shows `unknown build` — never a plausible-looking guess.
+  Nothing else — no spinner, no tagline.
 - One source: the screen is plain HTML in `index.html`, outside the React root, so it
   appears before any script loads; `App` removes it when ready (signed in or not).
 - iPhone shows its own launch image before the page exists: `apple-touch-startup-image`
   PNGs of this same screen are rendered for current iPhone sizes (portrait), with the
   production address. The PNGs are rendered from `index.html`'s screen, never drawn
-  separately.
+  separately — **without** the build stamp (a launch image is not rebuilt per commit, so a
+  stamp in it would soon be wrong).
 
 **Always fresh** (decided by MojoSOGO 2026-10-03: "always force refresh on open and app pull
 down"). Fresh means the newest build *and* the newest data, i.e. a full page reload.
