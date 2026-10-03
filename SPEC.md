@@ -2292,6 +2292,12 @@ home-screen tags, `AppRefresh` (reload on resume unless a dialog is open; pull t
 — verified with real touch events in an emulated phone; its on-iPhone check is still to do.
 The ensō mark (scripts/draw-enso.mjs) and the opening screen are built; the 7 iPhone launch
 images are rendered from it. Its on-iPhone check is still to do.
+**M4g Things to do** is built (D1–D13 green, 213 tests; 0008 applied to local data with
+every fire and delivery intact; create → photo → Plan it exercised on the live local API).
+Built as: a status set to `planned` directly is refused (use Plan it); Plan it on a non-idea
+is 409; the planned event carries no reminder and is all-day unless a time is given; a
+picked reminder date equal to the start date is one reminder (the start one). Photo
+reading uses `client.beta.messages.parse` (the beta path carries `fallbacks`).
 **M7: live at https://enso.sogodojo.com (2026-10-03)** — production D1 `enso` (all 7
 migrations), carry-over of settings + 5 school holidays, secrets SETUP_TOKEN and
 RELAY_TOKEN only, the same build as the home-network server. Owner setup and the shared
