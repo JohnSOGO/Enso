@@ -46,7 +46,7 @@ async function loadTimer(c: Context<AppEnv>, forWrite: boolean): Promise<TimerRo
   const t = await first<TimerRow>(c.env.DB, 'SELECT * FROM timers WHERE id = ? AND deleted_at IS NULL', c.req.param('id'));
   if (!t) return fail(c, 404, 'not_found', 'That timer no longer exists.');
   const me = c.get('member');
-  if (forWrite && t.created_by !== me.id && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the creator or the owner can change this timer.');
+  if (forWrite && t.created_by !== me.id && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this timer.');
   return t;
 }
 

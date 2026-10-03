@@ -1891,6 +1891,8 @@ live local API — ring, house message, Done → wait, Undo). **Its 320 px manua
 still to do** (the browser extension was unavailable). M4d Invites is built (I1–I6 and
 the link round-trip tests green; `uqr` builds into its own 10 kB lazy chunk, absent from
 the entry chunk). Its manual check — a real QR scanned by a phone at home — is still to do.
+Admins (§6.3, A1–A7) are built; `Settings.tsx` is at 89 % of its ceiling after the
+members-list controls — the next addition there is a placement decision.
 
 Deviations from this spec, deliberately:
 

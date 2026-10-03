@@ -98,7 +98,7 @@ async function loadEditable(c: Context<AppEnv>): Promise<EventRow | Response> {
   const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND is_alarm = 0', c.req.param('id'));
   if (!e) return fail(c, 404, 'not_found', 'That event no longer exists.');
   const me = c.get('member');
-  if (e.created_by !== me.id && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the creator or the owner can change this event.');
+  if (e.created_by !== me.id && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this event.');
   return e;
 }
 

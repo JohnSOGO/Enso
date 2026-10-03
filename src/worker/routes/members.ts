@@ -3,28 +3,43 @@ import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { all, first, newId, nowIso, randomBase32, run } from '../db';
 import { body, fail, str } from '../http';
+import { ROLE, isOneOf } from '../../shared/vocab';
 import { requireMember, requireOwner, sha256hex } from '../session';
 import { normalizeInviteCode } from './auth';
 
 const INVITE_DAYS = 7;
 
 export const members = new Hono<AppEnv>();
+/** §6.3 — the founder is the member setup created: the earliest created_at. Derived, never stored. */
+const FOUNDER_SQL = 'SELECT id FROM members ORDER BY created_at, id LIMIT 1';
+
 members.get('/members', requireMember, async (c) => {
   const isOwner = c.get('member').role === 'owner';
+  const founder = (await first<{ id: string }>(c.env.DB, FOUNDER_SQL))?.id;
   const rows = await all<Record<string, unknown>>(c.env.DB,
     `SELECT id, email, display_name AS displayName, color, role, disabled_at AS disabledAt FROM members ORDER BY created_at`);
-  return c.json(rows.map((r) => (isOwner ? r : { ...r, email: undefined })));
+  return c.json(rows.map((r) => ({ ...r, isFounder: r.id === founder, email: isOwner ? r.email : undefined })));
 });
 
 members.patch('/members/:id', requireMember, requireOwner, async (c) => {
   const b = await body(c);
-  if (typeof b.disabled !== 'boolean') return fail(c, 400, 'invalid_input', 'disabled must be true or false.');
-  const target = await first<{ role: string }>(c.env.DB, 'SELECT role FROM members WHERE id = ?', c.req.param('id'));
+  const id = c.req.param('id');
+  if (b.disabled !== undefined && typeof b.disabled !== 'boolean') return fail(c, 400, 'invalid_input', 'disabled must be true or false.');
+  if (b.role !== undefined && !isOneOf(ROLE, b.role)) return fail(c, 400, 'invalid_input', `role must be one of: ${ROLE.join(', ')}.`);
+  if (b.disabled === undefined && b.role === undefined) return fail(c, 400, 'invalid_input', 'Send disabled and/or role.');
+  const target = await first<{ id: string; disabled_at: string | null }>(c.env.DB, 'SELECT id, disabled_at FROM members WHERE id = ?', id);
   if (!target) return fail(c, 404, 'not_found', 'No such member.');
-  if (target.role === 'owner') return fail(c, 400, 'invalid_input', 'The owner cannot be disabled.');
+  // §6.3: the founder is protected — never demoted, never disabled.
+  if ((await first<{ id: string }>(c.env.DB, FOUNDER_SQL))?.id === id) {
+    if (b.disabled === true) return fail(c, 400, 'invalid_input', 'The owner cannot be disabled.');
+    if (b.role !== undefined && b.role !== 'owner') return fail(c, 400, 'invalid_input', "The owner can't be made a regular member.");
+  }
+  const disabledAfter = b.disabled === undefined ? target.disabled_at !== null : b.disabled;
+  if (b.role === 'owner' && disabledAfter) return fail(c, 400, 'invalid_input', 'Enable this member before making them an admin.');
   await c.env.DB.batch([
-    c.env.DB.prepare('UPDATE members SET disabled_at = ? WHERE id = ?').bind(b.disabled ? nowIso() : null, c.req.param('id')),
-    ...(b.disabled ? [c.env.DB.prepare('DELETE FROM sessions WHERE member_id = ?').bind(c.req.param('id'))] : []),
+    ...(b.role !== undefined ? [c.env.DB.prepare('UPDATE members SET role = ? WHERE id = ?').bind(b.role, id)] : []),
+    ...(b.disabled !== undefined ? [c.env.DB.prepare('UPDATE members SET disabled_at = ? WHERE id = ?').bind(b.disabled ? nowIso() : null, id)] : []),
+    ...(b.disabled ? [c.env.DB.prepare('DELETE FROM sessions WHERE member_id = ?').bind(id)] : []),
   ]);
   return c.json({ ok: true });
 });

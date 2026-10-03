@@ -16,7 +16,7 @@ export function normalizeInviteCode(code: string): string {
 }
 
 /** §6.2 — wrong, expired, used and revoked codes all get this ONE message (preview and signup alike). */
-const INVALID_CODE_MESSAGE = 'That invite code is not valid. Ask the household owner for a new one.';
+const INVALID_CODE_MESSAGE = 'That invite code is not valid. Ask an admin of the household for a new one.';
 
 interface UsableInvite { id: string; displayName: string; expiresAt: string; invitedBy: string | null }
 

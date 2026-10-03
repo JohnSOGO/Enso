@@ -73,6 +73,6 @@ export const requireMember: MiddlewareHandler<AppEnv> = async (c, next) => {
 };
 
 export const requireOwner: MiddlewareHandler<AppEnv> = async (c, next) => {
-  if (c.get('member').role !== 'owner') return fail(c, 403, 'forbidden', 'Only the household owner can do that.');
+  if (c.get('member').role !== 'owner') return fail(c, 403, 'forbidden', 'Only an admin can do that.');
   await next();
 };
