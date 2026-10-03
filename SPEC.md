@@ -837,6 +837,7 @@ An invite is something you **hand over**, not a code someone has to type.
   pasted link and takes the code from it.
 - **First arrival:** right after joining, a one-time **welcome** card (below) — then
   never again for that member on that device.
+- **One way in by link:** the old `?invite=` query entry is removed; `/join#CODE` replaces it.
 
 **Acceptance (M4d — API tests):**
 
@@ -1820,6 +1821,8 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q17 | Which Lists view opens first when none is remembered? | Shopping (unchanged); Today once chosen is remembered |
 | Q18 | Invite expiry | 7 days (unchanged) |
 | Q19 | Welcome card content | The three-line tour above; shown once per member per device |
+| Q20 | A signed-in member opens a `/join` link | The app opens as normal and the address becomes `/` |
+| Q21 | Welcome card when an existing member signs in on a new device | No — only right after joining |
 
 ---
 
