@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.15-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.16-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1724,6 +1724,10 @@ least 0.8 s so it never flickers:
   short git commit the page was built from, written into the page **at build time** (never
   typed by hand). A build from a tree with uncommitted changes shows `{commit}-dirty`; a
   build with no git at all shows `unknown build` — never a plausible-looking guess.
+  **App version policy** (decided by MojoSOGO 2026-10-03): `1.0.0` at go-live; each merged
+  feature bumps the minor (`1.1.0`, `1.2.0`, …), each fix-only merge bumps the patch. The
+  version lives only in `package.json` (the stamp reads it); the spec's own version line is
+  separate and counts spec revisions.
   Nothing else — no spinner, no tagline.
 - One source: the screen is plain HTML in `index.html`, outside the React root, so it
   appears before any script loads; `App` removes it when ready (signed in or not).
