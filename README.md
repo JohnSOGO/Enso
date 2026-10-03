@@ -3,6 +3,10 @@
 Household calendar PWA with reminders and **rolling timers** (restart on Ack), alerts by
 phone push and spoken in the house through Home Assistant. **The spec is `SPEC.md`** —
 it is the source of truth; §14 records the prototype's status and deviations.
+Changes go into the spec first, then get built — see `CLAUDE.md`.
+
+**Status:** prototype, local only. Calendar, alarms, timers and the relay work; phone
+push is not sent yet (M5), and nothing is deployed (M7). Details in SPEC §14.
 
 The previous local-model build is archived in `archive/v1-local-model/` (reference only).
 
@@ -43,5 +47,21 @@ npm run relay
 ```
 
 It polls the Worker every 10 s and speaks each "House" alert on the four Echos **and** the
-Voice PE (`relay/relay.ts`). Run it as a Scheduled Task at logon, like the HA watchdog.
-While it is not running, the app shows a red **House offline** badge.
+Voice PE (`relay/relay.ts`). While it is not running, the app shows a red **House offline**
+badge.
+
+### Start it at logon
+
+`relay/relay-task.vbs` runs the relay in a hidden window, does nothing if one is already
+running, and restarts it 30 s after it exits — the same pattern as the HA watchdog.
+Put a shortcut to it in your Startup folder:
+
+```powershell
+$lnk = (New-Object -ComObject WScript.Shell).CreateShortcut("$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\HRC relay.lnk")
+$lnk.TargetPath = "C:\Users\Public\git\HomeReminderCalendar\relay\relay-task.vbs"
+$lnk.Save()
+```
+
+Start it now without logging out: `wscript relay\relay-task.vbs`. Logs: `relay\relay.log`
+(normal output) and `relay\relay-crash.log` (a crash's stderr). To stop it, end the
+`node.exe` whose command line contains `relay.ts`.

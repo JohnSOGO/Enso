@@ -1,10 +1,13 @@
 # Home Reminder Calendar — Specification v2
 
-**Version:** 2.0-draft · **Date:** 2026-09-29 · **Owner:** MojoSOGO
+**Version:** 2.1-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
 them as written; they are isolated so changing one later is a small edit.
+
+**Spec first, always.** Every change to behavior, schema, API or screens is written
+here *before* it is built, and the code is then built to match. See `CLAUDE.md`.
 
 ---
 
@@ -119,21 +122,31 @@ from the Worker and speaks them through HA. This is the same pattern AskRoxy use
 ```
 HomeReminderCalendar/
 ├── SPEC.md
-├── package.json            # single package; scripts in §10
+├── CLAUDE.md               # working agreement: spec first, then build
+├── package.json            # single package; scripts in §10.1
 ├── wrangler.toml
 ├── migrations/             # wrangler d1 migrations — the ONLY schema source
-│   └── 0001_init.sql
+│   ├── 0001_init.sql       # §4.2
+│   ├── 0002_alarms.sql     # §4.2a
+│   ├── 0003_days_off.sql   # §4.2b
+│   └── 0004_options_expiration.sql   # §4.2c
 ├── src/
 │   ├── shared/             # pure TS, no I/O — imported by worker, frontend, relay
 │   │   ├── vocab.ts        # §3
 │   │   ├── time.ts         # local wall time <-> UTC, per IANA zone
 │   │   ├── recurrence.ts   # §4.3
 │   │   ├── holidays.ts     # §7.3
+│   │   ├── markets.ts      # §7.4
 │   │   └── engine.ts       # §5
 │   └── worker/
 │       ├── index.ts        # Hono app + scheduled() handler
-│       ├── routes/         # auth.ts, members.ts, events.ts, timers.ts, fires.ts,
-│       │                   # push.ts, relay.ts, settings.ts
+│       ├── env.ts          # bindings + secrets type
+│       ├── db.ts           # small D1 helpers
+│       ├── http.ts         # error envelope (§10), input checks
+│       ├── routes/         # auth.ts (setup, login, signup, /me) · members.ts (members,
+│       │                   # invites) · events.ts (/calendar, events) · alarms.ts ·
+│       │                   # alerts.ts (timers, fires, push subscriptions, /status) ·
+│       │                   # household.ts (settings, days off, school holidays) · relay.ts
 │       ├── tick.ts         # loads rows, calls engine, writes results
 │       ├── push.ts         # Web Push sending
 │       └── session.ts      # password hashing, session cookie
@@ -143,7 +156,10 @@ HomeReminderCalendar/
 │   └── src/
 ├── relay/
 │   ├── relay.ts
+│   ├── classify.ts         # classifyResult (§9.2), imported by the contract test
+│   ├── relay-task.vbs      # logon launcher (§9.2 "Running it")
 │   └── relay.config.example.json
+├── scripts/                # dev-seed.json + seed-dev.mjs (`npm run seed:dev`)
 └── test/
 ```
 
@@ -190,6 +206,8 @@ export const TIMER_CMD    = ['start', 'stop'] as const;             // commands 
 export const DELIVERY_STATUS = ['queued', 'claimed', 'sent', 'partial', 'failed'] as const;
 export const ROLE         = ['owner', 'member'] as const;
 export const FREQ         = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'] as const;
+export const WEEKDAY      = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;  // §4.3 byDay, alarm days
+export const RELAY_REPORT_STATUS = ['sent', 'partial', 'failed'] as const;    // what /relay/report accepts (§9.2)
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
 ```
@@ -208,6 +226,9 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `stopped` | The timer was stopped |
 | `removed` | The event or timer was edited or deleted, making this fire obsolete |
 | `partial` | House delivery reached some surfaces but not all |
+
+`vocab.ts` also holds `MEMBER_PALETTE` (§6.5) and the `isOneOf(list, value)` guard
+used to validate input against any of these tuples.
 
 ---
 
@@ -246,7 +267,7 @@ CREATE TABLE members (
   id            TEXT PRIMARY KEY,             -- 'mem_' + 16 random base32 chars
   email         TEXT NOT NULL UNIQUE COLLATE NOCASE,
   display_name  TEXT NOT NULL,
-  color         TEXT NOT NULL,                -- from §8.4 palette
+  color         TEXT NOT NULL,                -- from §6.5 palette
   role          TEXT NOT NULL CHECK (role IN ('owner','member')),
   password_hash TEXT NOT NULL,                -- 'pbkdf2$100000$<salt b64>$<hash b64>'
   created_at    TEXT NOT NULL,
@@ -376,7 +397,6 @@ CREATE TABLE member_prefs (
   member_id            TEXT PRIMARY KEY REFERENCES members(id),
   show_public_holidays INTEGER NOT NULL DEFAULT 1,
   show_school_holidays INTEGER NOT NULL DEFAULT 1
-  -- + show_options_expiration INTEGER NOT NULL DEFAULT 0   (migration 0004, §7.4)
 );
 ```
 
@@ -395,6 +415,23 @@ ALTER TABLE events ADD COLUMN is_alarm INTEGER NOT NULL DEFAULT 0 CHECK (is_alar
 An alarm row always has: `start_time` set (never all-day), `recurrence =
 {"freq":"WEEKLY","byDay":[...]}` with at least one day, `remind_offset_min = 0`,
 `start_date` = the local date it was created, `end_date = start_date`.
+
+### 4.2b Schema change — `migrations/0003_days_off.sql`
+
+```sql
+-- Household days off (§7.3): JSON array of HOLIDAYS keys; NULL = DEFAULT_DAYS_OFF.
+ALTER TABLE settings ADD COLUMN days_off TEXT;
+```
+
+### 4.2c Schema change — `migrations/0004_options_expiration.sql`
+
+```sql
+-- Per-member switch for the 📈 monthly options expiration marker (§7.4).
+ALTER TABLE member_prefs ADD COLUMN show_options_expiration INTEGER NOT NULL DEFAULT 0;
+```
+
+A schema change is always a **new** numbered migration plus a §4.2x section here.
+An applied migration is never edited.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -467,7 +504,7 @@ export const SNOOZE_MIN         = 10;    // ⚑ DEFAULT
 | # | Fire state | Condition | Result |
 |---|------------|-----------|--------|
 | 1 | `scheduled` | `now < due_at` | no change |
-| 2 | `scheduled`, kind `reminder` | `now − due_at > MISSED_AFTER_MIN` | `closed`, reason `missed`, **no alert** |
+| 2 | `scheduled`, kind `reminder` | `now − due_at > MISSED_AFTER_MIN` (strictly — exactly 60 min still rings) | `closed`, reason `missed`, **no alert** |
 | 3 | `scheduled` | `now ≥ due_at` | `ringing`, `alert_count = 1`, `last_alerted_at = now`, **alert** |
 | 4 | `ringing` | `renotifyMin` set, `alert_count < maxAlerts`, `now ≥ last_alerted_at + renotifyMin` | `alert_count + 1`, `last_alerted_at = now`, **alert** |
 | 5 | anything else | — | no change |
@@ -515,7 +552,13 @@ Runs from `scheduled()` every minute, and from `POST /api/v1/dev/tick` in dev.
 
 **Event edits:** when an event is updated or deleted, close its `scheduled` fires
 with `due_at > now` as `removed` in the same request. The next tick
-re-materializes them. `ringing` fires are left alone.
+re-materializes them. `ringing` fires are left alone. A `scheduled` fire with
+`due_at ≤ now` is also left alone, deliberately: it is already due, the next tick
+(≤ 60 s) rings it, and the edit arrived too late to stop it — exactly as if it had
+already rung.
+
+**Delete one occurrence** (`POST /events/{id}/exdates`) closes that occurrence's
+`scheduled` fire as `removed` whatever its `due_at`.
 
 ### 5.7 Deliveries
 
@@ -563,6 +606,7 @@ ack 13:45 → next due 14:45.
 | R7 | R6 with exdates [2026-10-20] | 10-06, 11-03, 11-17 |
 | R8 | `stepFire` on a scheduled reminder, now = due + 61 min | `closed`/`missed`, no alert |
 | R9 | `stepFire` now = due + 59 min | `ringing`, alert |
+| R9a | `stepFire` now = due + 60 min exactly | `ringing`, alert (the boundary is not missed) |
 | R10 | `snooze` at 19:03 local | `scheduled`, due 19:13 local, alert_count 0 |
 | R11 | `ack` on a reminder | `invalid_action` |
 | R12 | `planReminderFires` called twice for the same window | identical output (idempotent) |
@@ -589,7 +633,7 @@ owner and logs them in. Once any member exists it returns 410 Gone.
   `I` and `L` become `1` and `O` becomes `0`. The result is SHA-256 hashed.
 - **Expiry and use:** single use; expires after 7 days; the owner can revoke it.
 - **Signup:** `POST /api/v1/auth/signup` with code, email, password (≥ 10 chars),
-  display name. The new member gets the next unused palette color (§8.4).
+  display name. The new member gets the next unused palette color (§6.5).
 - **Errors:** wrong, expired, used and revoked codes all return the **same** 400
   `invalid_code`.
 
@@ -607,6 +651,16 @@ owner and logs them in. Once any member exists it returns 410 Gone.
 
 Five failed logins for one email within 15 minutes → further attempts for that
 email return 429 for 15 minutes.
+
+### 6.5 Member palette
+
+Assigned in order at signup (`MEMBER_PALETTE` in `vocab.ts`). Red and blue are
+excluded because they mean holidays:
+
+```
+#FF6B35 orange   #10B981 green   #8B5CF6 purple   #EC4899 pink
+#F59E0B amber    #06B6D4 cyan    #84CC16 lime     #A16207 brown
+```
 
 ---
 
@@ -664,7 +718,10 @@ Oct '26   4    5    6    7    8    9   10
 | Public (days off) | Computed in `src/shared/holidays.ts`, filtered to the household's **days off** (§7.3) — no hand-typed yearly dates | **Whole cell tinted faint yellow** (`--holiday-public-cell`) + the holiday's **emoji next to the date number**; name in the day sheet |
 | School | `school_holidays` table, edited by the owner in Settings → School holidays (add a single date or a date range + label) | Blue (`--holiday-school`) date number + circle + 🏫 next to it; label in the day sheet |
 
-- **Legend:** shown once, directly under the sticky month header.
+- **Legend:** shown once, directly under the sticky month header: a yellow square
+  (`--holiday-public-swatch`) "Public holiday", a blue dot "School holiday", and
+  "📈 Options expiration" (§7.4). Each entry shows only while that type is switched
+  on for the member.
 - **Toggles:** each member can hide either type (`member_prefs`).
 - **Both on one day:** the cell is yellow *and* the date has the blue circle; the day
   sheet lists both.
@@ -692,8 +749,7 @@ Oct '26   4    5    6    7    8    9   10
 
 - `publicHolidays(year, keys?)` returns the holidays (actual + observed dates) whose
   key is in `keys` (all when omitted).
-- **Household days off** = `settings.days_off` (JSON array of keys, migration
-  `0003_days_off.sql`); `NULL` means `DEFAULT_DAYS_OFF` from `holidays.ts` (the ✓
+- **Household days off** = `settings.days_off` (JSON array of keys, §4.2b); `NULL` means `DEFAULT_DAYS_OFF` from `holidays.ts` (the ✓
   column). The owner edits it in Settings → Household → **Days off** (a checklist of
   every key in `HOLIDAYS`). `/calendar` returns only days-off holidays.
 
@@ -715,8 +771,7 @@ is always marked too. New Year's Day on a Saturday is observed on Dec 31 of the
 ### 7.4 Monthly options expiration 📈 (`src/shared/markets.ts`)
 
 A per-member marker, off by default, switched on in Settings → Me ("📈 Show monthly
-options expiration"; `member_prefs.show_options_expiration`, migration
-`0004_options_expiration.sql`).
+options expiration"; `member_prefs.show_options_expiration`, §4.2c).
 
 - The date is the **3rd Friday** of each month; if that day is an exchange holiday
   (Good Friday, or Juneteenth — actual or observed), it is the **Thursday before**.
@@ -745,7 +800,7 @@ the dialog with `role="alert"`, and there are no wizards.
 | RINGING BAR (only when something is ringing)                 |
 +-------------------------------------+
 | Sep 2026               [Today]      |  <- sticky month header
-| ● Public holiday  ● School holiday  |  <- legend
+| ■ Public holiday  ● School holiday  |  <- legend
 |  S   M   T   W   T   F   S          |
 |  ...continuous weeks...             |
 +-------------------------------------+
@@ -809,32 +864,26 @@ Actions:
 - For a repeating event: **Delete this occurrence** (adds to `exdates`) and
   **Delete series**
 
-**Member palette** (assigned in order at signup). Red and blue are excluded because
-they mean holidays:
-
-```
-#FF6B35 orange   #10B981 green   #8B5CF6 purple   #EC4899 pink
-#F59E0B amber    #06B6D4 cyan    #84CC16 lime     #A16207 brown
-```
-
-### 8.5 Alarms screen (replaces the v2.0 "Timers screen")
+### 8.5 Alarms screen
 
 Two sections, each a single-line list (per the table rules), each with a **＋ Add**
 button in its header.
 
-**Scheduled** — one row per alarm, sorted by time of day:
+**Scheduled** — one row per alarm, sorted by time of day, then title:
 
 ```
 Time   Alarm                    Days            Next
+07:30  Wake kids               Weekdays        [ringing]
 08:00  💊 Morning meds          Every day       Wed 08:00
-19:00  🗑 Take out trash         Tue             Tue 19:00
-07:30  Wake kids               Weekdays        Wed 07:30   [ringing]
+19:00  🗑 Take out trash         Tue             later
 ```
 
 - **Days** text: all 7 → "Every day"; Mon–Fri → "Weekdays"; Sat+Sun → "Weekends";
   otherwise short names in week order ("Mon Wed Fri").
 - **Next** = the alarm's next due time in household local time (weekday + time), or a
-  red `ringing` badge while it rings.
+  red `ringing` badge **instead** while it rings. Fires are planned only 36 h ahead
+  (§5.2), so an alarm with nothing planned yet shows a dim **later** (tooltip
+  "Planned up to 36 hours ahead") — an honest gap, not a computed guess.
 - Tapping a row opens the **alarm form** (modal): title · time · day chips (Sun…Sat,
   plus "Every day" / "Weekdays" shortcuts) · channels (☐ Phone ☐ House) · repeat
   alert every (Off / 5 / 10 / 15 / 30 min) · assigned to · Save / Cancel / Delete.
@@ -850,10 +899,9 @@ assigned to, Delete).
 ### 8.6 Settings
 
 - **Me:** name, color, enable phone alerts (subscribe), show/hide holiday types,
-  show/hide 📈 options expiration (§7.4), log
-  out.
-- **Household (owner):** name, timezone, members list (disable), invites (create,
-  list, revoke), school holidays.
+  show/hide 📈 options expiration (§7.4), log out.
+- **Household (owner):** name, timezone, days off (§7.3), members list (disable),
+  invites (create, list, revoke), school holidays.
 - **Status:** relay last seen, the current member's push subscriptions with last
   success/error, and the last 20 deliveries with their status badge.
 
@@ -872,6 +920,7 @@ Dark by default. Colors are defined as tokens on `:root`:
 | `--month-a` | `#0F172A` |
 | `--month-b` | `#162033` |
 | `--holiday-public-cell` | `rgba(250, 204, 21, .16)` — a faint yellow tint over the dark cell, the same 16% strength as a multi-day event's tint; normal light text |
+| `--holiday-public-swatch` | `#FACC15` — the legend's public-holiday square |
 | `--holiday-school` | `#3B82F6` |
 
 ---
@@ -947,9 +996,12 @@ Dark by default. Colors are defined as tokens on `:root`:
 4. Sleep `pollSeconds` and repeat. On a network error, log it and keep going. The
    relay never exits on its own.
 
-**Running it:** run as a Windows Scheduled Task at logon, the same way as the HA
-watchdog (`C:\Users\Public\git\HomeAssistant\ha-watchdog-task.vbs`). Log to
-`relay/relay.log`, and never log the HA token.
+**Running it:** started at logon by `relay/relay-task.vbs`, the same pattern as the
+HA watchdog (`C:\Users\Public\git\HomeAssistant\ha-watchdog-task.vbs`): hidden
+window, exits if a relay is already running, restarts the relay 30 s after it dies.
+It is launched by a shortcut in the user's Startup folder (steps in README). The relay
+logs to `relay/relay.log`; a crash's stderr goes to `relay/relay-crash.log`. Never log
+the HA token.
 
 **Contract test (M6):** import `classifyResult` from the relay. Call it with all
 four boolean combinations. Assert that the server's `/relay/report` validator
@@ -974,12 +1026,12 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | POST | `/auth/login` | public | `{ email, password }` → member; sets cookie |
 | POST | `/auth/logout` | member | → 204; clears cookie |
 | GET | `/me` | member | → member + prefs |
-| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showSchoolHolidays? }` |
+| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showSchoolHolidays?, showOptionsExpiration? }` |
 | GET | `/members` | member | → members (no hashes, no emails for non-owners) |
 | PATCH | `/members/{id}` | owner | `{ disabled: boolean }` |
 | GET/POST | `/invites` | owner | POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once) |
 | DELETE | `/invites/{id}` | owner | revoke |
-| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], schoolHolidays[] }`; recurring events expanded server-side with `recurrence.ts`; max range 120 days |
+| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], schoolHolidays[], marketDays[] }`; recurring events expanded server-side with `recurrence.ts`; alarms excluded; public holidays filtered to days off; max range 120 days |
 | POST | `/events` | member | event fields → event |
 | GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes | PATCH/DELETE close future scheduled fires (§5.6) |
 | POST | `/events/{id}/exdates` | creator or owner | `{ date }` |
@@ -994,8 +1046,9 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | POST | `/push/subscriptions` | member | `PushSubscriptionJSON` + userAgent |
 | DELETE | `/push/subscriptions/{id}` | owner of the subscription | |
 | GET | `/push/vapid-key` | public | → `{ key }` |
-| GET/PUT/DELETE | `/school-holidays` | GET member / writes owner | PUT `{ from, to, label }` |
-| GET/PATCH | `/settings` | GET member / PATCH owner | `{ householdName?, timezone? }` |
+| GET/PUT | `/school-holidays` | GET member / PUT owner | PUT `{ from, to, label }` (a single date: `from = to`) |
+| DELETE | `/school-holidays/{date}` | owner | removes that one date |
+| GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff }`; PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
 | GET | `/status` | member | → `{ relayLastSeen, mySubscriptions[], recentDeliveries[] }` |
 | POST | `/relay/claim` | bearer `RELAY_TOKEN` | → deliveries |
 | POST | `/relay/report` | bearer `RELAY_TOKEN` | `{ id, status, detail }` |
@@ -1010,6 +1063,8 @@ arrives. That is plenty for one household.
 | Script | Does |
 |--------|------|
 | `dev` | `wrangler dev` (API + assets) and `vite` together |
+| `dev:api` | `wrangler dev` alone — serves the built PWA from `frontend/dist` |
+| `seed:dev` | fresh local DB only: test accounts from `scripts/dev-seed.json` + sample data |
 | `test` | `vitest run` (pure + Workers pool) |
 | `typecheck` | `tsc --noEmit` for worker, shared, relay; `tsc -p frontend` |
 | `db:migrate:local` | `wrangler d1 migrations apply hrc --local` |
@@ -1044,7 +1099,7 @@ checks.
 
 **M1 — Shared pure modules**
 - `vocab.ts`, `time.ts`, `recurrence.ts`, `holidays.ts`, `engine.ts`.
-- ✅ Every row of §5.8 (T1–T11, R1–R14) and §7.3 acceptance is a passing test.
+- ✅ Every row of §5.8 (T1–T11, R1–R14, R9a) and §7.3 acceptance is a passing test.
 - ✅ **M1-VOCAB:** every SQL `CHECK (… IN (…))` list in `migrations/` matches its
   `vocab.ts` tuple. The test parses the migration files, and is the only place
   allowed to read SQL as text.
@@ -1067,7 +1122,7 @@ checks.
 - ✅ Manual, in Chrome at **320px, 480px and 1024px** wide (DevTools device mode is
   fine):
   - no horizontal scroll
-  - Sep 7 2026 shows red
+  - Sep 7 2026 (Labor Day) shows the yellow cell + 🛠️
   - the tone changes at Oct 1
   - Today scrolls back
   - the form's Save is reachable on a short screen
@@ -1100,7 +1155,7 @@ checks.
 
 **M6 — LAN relay**
 - `/relay/claim`, `/relay/report`, `relay.ts`, the "House offline" badge,
-  Scheduled Task instructions in README.
+  `relay/relay-task.vbs` + logon setup steps in README.
 - ✅ Contract test (§9.2).
 - ✅ Manual: a 1-min timer with channel House is spoken on the Echos **and** the
   Voice PE.
@@ -1156,11 +1211,16 @@ Captured from v1.0-draft so nothing is lost:
 
 ---
 
-## 14. Prototype status (2026-09-29)
+## 14. Prototype status (2026-10-03)
 
-Built: M0–M4 fully, M6 code (relay + API + contract test), M5 server side only
-(subscriptions stored; **no sender** — every push delivery is recorded `failed` with
-`push_sender_not_built (M5)` or `no_subscription`, shown in Settings → Status).
+Built: M0–M4 and M4a fully (alarms, with their API tests), plus the later §7 work:
+household days off (§7.3), grouped multi-day bars (§7.1), monthly-by-weekday repeat
+(§4.3) and the 📈 options-expiration marker (§7.4). M6 code is built (relay + API +
+contract test + logon launcher); its manual checks on real speakers are not yet
+recorded. M5 is server side only (subscriptions stored; **no sender** — every push
+delivery is recorded `failed` with `push_sender_not_built (M5)` or `no_subscription`,
+shown in Settings → Status). M7 not started: `wrangler.toml` still carries the
+placeholder `database_id`.
 
 Deviations from this spec, deliberately:
 

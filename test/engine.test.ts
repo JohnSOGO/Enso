@@ -165,6 +165,13 @@ describe('reminders — household tz America/Los_Angeles', () => {
     expect(r.fire.state).toBe('ringing');
   });
 
+  it('R9a due + 60 min exactly → ringing, alert (boundary is not missed)', () => {
+    const f = withId(planReminderFires(weekly, TZ, ...window)[0]);
+    const r = stepFire(f, cfg, '2026-10-07T03:00:00.000Z');
+    expect(r.alert).toBe(true);
+    expect(r.fire.state).toBe('ringing');
+  });
+
   it('R10 snooze at 19:03 local → scheduled, due 19:13 local, alert_count 0', () => {
     const r = applyAction(ringing(), 'snooze', cfg, 'mem_a', '2026-10-07T02:03:00.000Z');
     if ('error' in r) throw new Error(r.error);
