@@ -1090,7 +1090,10 @@ Lists are **household data**: any number, each with a name. The household starts
 
 Every decision below lives in `lists.ts` and is imported by the route and the PWA:
 `itemKey`, `TEXT_MAX`, `NOTE_MAX`, `LIST_NAME_MAX`, `LISTS_MAX`, `CHECKED_VISIBLE_DAYS`,
-`resolveAdd(text, items)` → existing / reopen / insert, and the list-name checks. Matching
+`resolveAdd(text, items)` → existing / reopen / insert, the list-name checks,
+`canManageList(createdBy, member)` (who may rename/delete — the route and the PWA's ⋯ use
+the same function), and `SHOPPING_LIST_ID` (the one place the seeded id is named outside the
+migration; the PWA's fallback uses it and the migration test asserts it). Matching
 is done in JS with `itemKey` — never with SQLite `lower()`/`NOCASE`, which fold ASCII only.
 `text_key` and `name_key` are written by app code.
 
