@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.12-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.13-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1531,6 +1531,31 @@ the web page — same design, nothing reinvented.
   status bar `black-translucent` — the app already pads by the safe-area insets.
 - The PNG icons are rendered from `icon.svg` — the same artwork, never redrawn.
 
+**The mark** (decided by MojoSOGO 2026-10-03): an **ensō** — one brush stroke round, thick
+where the brush lands and tapering as it lifts, left **open at the top right** (the
+traditional unfinished circle). Off-white ink (`--text` #F8FAFC) on the app's navy
+(`--bg` #0F172A). It is **our own drawing** (`frontend/public/icon.svg`, generated once by
+`scripts/draw-enso.mjs`), not a stock image — a stock logo needs its licence bought first.
+It replaces the old calendar icon everywhere: home-screen icon, favicon, opening screen.
+
+**Opening screen** — shown from the very first frame until the app is ready, and for at
+least 0.8 s so it never flickers:
+
+```
+            ◯   (the ensō, large)
+           Ensō
+   https://enso.sogodojo.com
+```
+- Centred on `--bg`: the ensō, **Ensō** in a large, light-weight serif-free type, and the
+  **full address the app is served from** (`location.origin`, so the home-network server
+  shows its own) in small dim text. Nothing else — no spinner, no tagline.
+- One source: the screen is plain HTML in `index.html`, outside the React root, so it
+  appears before any script loads; `App` removes it when ready (signed in or not).
+- iPhone shows its own launch image before the page exists: `apple-touch-startup-image`
+  PNGs of this same screen are rendered for current iPhone sizes (portrait), with the
+  production address. The PNGs are rendered from `index.html`'s screen, never drawn
+  separately.
+
 **Always fresh** (decided by MojoSOGO 2026-10-03: "always force refresh on open and app pull
 down"). Fresh means the newest build *and* the newest data, i.e. a full page reload.
 - **Opening** from the home screen loads fresh by construction: there is no service worker
@@ -2053,6 +2078,8 @@ the entry chunk). Its manual check — a real QR scanned by a phone at home — 
 **M4f installed app + always fresh** is built: manifest named Ensō with PNG icons, iPhone
 home-screen tags, `AppRefresh` (reload on resume unless a dialog is open; pull to refresh)
 — verified with real touch events in an emulated phone; its on-iPhone check is still to do.
+The ensō mark (scripts/draw-enso.mjs) and the opening screen are built; the 7 iPhone launch
+images are rendered from it. Its on-iPhone check is still to do.
 **M7: live at https://enso.sogodojo.com (2026-10-03)** — production D1 `enso` (all 7
 migrations), carry-over of settings + 5 school holidays, secrets SETUP_TOKEN and
 RELAY_TOKEN only, the same build as the home-network server. Owner setup and the shared

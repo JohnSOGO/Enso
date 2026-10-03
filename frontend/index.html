@@ -12,9 +12,33 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Ensō" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- SPEC §8.10: iPhone launch images, rendered from the opening screen below (never drawn separately). -->
+    <link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/1320x2868.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/1290x2796.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/1206x2622.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/1179x2556.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/1170x2532.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/1125x2436.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="/splash/828x1792.png" />
     <title>Ensō</title>
+    <!-- SPEC §8.10 opening screen: plain HTML so it shows before any script; App removes it when ready. -->
+    <style>
+      #splash { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center;
+        justify-content: center; gap: 10px; background: #0F172A; color: #F8FAFC; transition: opacity .25s ease;
+        font: 15px/1.35 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 24px; }
+      #splash.gone { opacity: 0; pointer-events: none; }
+      #splash img { width: min(46vw, 220px); height: auto; margin-bottom: 8px; }
+      #splash h1 { margin: 0; font-size: 2.4rem; font-weight: 300; letter-spacing: .04em; }
+      #splash p { margin: 0; font-size: .9rem; color: #94A3B8; letter-spacing: .02em; }
+    </style>
   </head>
   <body>
+    <div id="splash" role="status" aria-label="Ensō is opening">
+      <img src="/icon.svg" alt="" />
+      <h1>Ensō</h1>
+      <p id="splash-url">https://enso.sogodojo.com</p>
+    </div>
+    <script>document.getElementById('splash-url').textContent = location.origin;</script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
