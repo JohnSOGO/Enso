@@ -1,6 +1,6 @@
 # Home Reminder Calendar — Specification v2
 
-**Version:** 2.2-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.3-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -64,6 +64,23 @@ completion*.)
 
 Alerts reach people two ways: **Web Push** to their phones, and **spoken in the
 house** through Home Assistant (four Echos + the Voice PE satellite).
+
+It also keeps the household's two shared **lists** (§7A): **Shopping** (what to buy)
+and **Wish list** (projects and ideas to keep without carrying them in your head).
+
+### 1.0 Who it is for — design constraints
+
+A household of five, everyone ADHD and/or Asperger's; two kids of about 11–12, each
+with their own phone and account. Shelly has a phone but often not on her; she is
+usually in the house and hears house announcements. Every feature is judged by:
+
+- **Capture in seconds.** Adding something must be faster than forgetting it.
+- **Visible without being asked for.** Out of sight is out of mind.
+- **Predictable and explicit.** Plain words, stable layout, a clear meaning of "done".
+- **Quiet by default.** Only time-critical things ring. Alert fatigue kills the app.
+- **No shaming.** Nothing overdue is shown in red to the household at large.
+- **Independent of vendor features.** The app owns its data; Alexa and Home Assistant
+  only speak. No dependence on Alexa's lists, routines or skills.
 
 ### 1.1 Users
 
@@ -133,7 +150,8 @@ HomeReminderCalendar/
 │   ├── 0001_init.sql       # §4.2
 │   ├── 0002_alarms.sql     # §4.2a
 │   ├── 0003_days_off.sql   # §4.2b
-│   └── 0004_options_expiration.sql   # §4.2c
+│   ├── 0004_options_expiration.sql   # §4.2c
+│   └── 0005_lists.sql      # §4.2d
 ├── src/
 │   ├── shared/             # pure TS, no I/O — imported by worker, frontend, relay
 │   │   ├── vocab.ts        # §3
@@ -141,6 +159,7 @@ HomeReminderCalendar/
 │   │   ├── recurrence.ts   # §4.3
 │   │   ├── holidays.ts     # §7.3
 │   │   ├── markets.ts      # §7.4
+│   │   ├── lists.ts        # §7A.1 item rules: itemKey, add/reopen decision, limits, 30-day window
 │   │   └── engine.ts       # §5
 │   └── worker/
 │       ├── index.ts        # Hono app + scheduled() handler
@@ -150,7 +169,8 @@ HomeReminderCalendar/
 │       ├── routes/         # auth.ts (setup, login, signup, /me) · members.ts (members,
 │       │                   # invites) · events.ts (/calendar, events) · alarms.ts ·
 │       │                   # alerts.ts (timers, fires + actions) · household.ts (settings,
-│       │                   # days off, school holidays, push subscriptions, /status) · relay.ts
+│       │                   # days off, school holidays, push subscriptions, /status) · relay.ts ·
+│       │                   # lists.ts (§7A)
 │       ├── tick.ts         # loads rows, calls engine, writes results
 │       ├── push.ts         # Web Push sending
 │       └── session.ts      # password hashing, session cookie
@@ -241,6 +261,7 @@ export const DELIVERY_STATUS = ['queued', 'claimed', 'sent', 'partial', 'failed'
 export const ROLE         = ['owner', 'member'] as const;
 export const FREQ         = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'] as const;
 export const WEEKDAY      = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;  // §4.3 byDay, alarm days
+export const LIST         = ['shopping', 'wishlist'] as const;                   // §7A
 export const RELAY_REPORT_STATUS = ['sent', 'partial', 'failed'] as const;    // what /relay/report accepts (§9.2)
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
@@ -260,6 +281,8 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `stopped` | The timer was stopped |
 | `removed` | The event or timer was edited or deleted, making this fire obsolete |
 | `partial` | House delivery reached some surfaces but not all |
+| `shopping` | The one shared shopping list (§7A) |
+| `wishlist` | The one shared wish list of projects and ideas (§7A) |
 
 `vocab.ts` also holds `MEMBER_PALETTE` (§6.5) and the `isOneOf(list, value)` guard
 used to validate input against any of these tuples.
@@ -462,6 +485,29 @@ ALTER TABLE settings ADD COLUMN days_off TEXT;
 ```sql
 -- Per-member switch for the 📈 monthly options expiration marker (§7.4).
 ALTER TABLE member_prefs ADD COLUMN show_options_expiration INTEGER NOT NULL DEFAULT 0;
+```
+
+### 4.2d Schema change — `migrations/0005_lists.sql`
+
+```sql
+-- §7A — items on the two household lists. One row per item; checking it off keeps the
+-- row (for "Recently bought" / "Done") until it ages out of view.
+CREATE TABLE list_items (
+  id          TEXT PRIMARY KEY,               -- 'itm_' + 16 base32
+  list        TEXT NOT NULL CHECK (list IN ('shopping','wishlist')),
+  text        TEXT NOT NULL,                  -- as typed, trimmed; 1–120 chars
+  text_key    TEXT NOT NULL,                  -- itemKey(text), §7A.1
+  note        TEXT,                           -- wish list detail; ≤ 1000 chars
+  owner_id    TEXT REFERENCES members(id),    -- wish list: whose it is; NULL = household
+  created_by  TEXT NOT NULL REFERENCES members(id),
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  checked_at  TEXT,                           -- NULL = open
+  checked_by  TEXT REFERENCES members(id),
+  deleted_at  TEXT
+);
+CREATE UNIQUE INDEX uq_list_item_key ON list_items(list, text_key) WHERE deleted_at IS NULL;
+CREATE INDEX idx_list_items ON list_items(list, checked_at) WHERE deleted_at IS NULL;
 ```
 
 A schema change is always a **new** numbered migration plus a §4.2x section here.
@@ -821,6 +867,59 @@ options expiration"; `member_prefs.show_options_expiration`, §4.2c).
 
 ---
 
+## 7A. Lists
+
+Two fixed lists, shared by the whole household: `shopping` and `wishlist` (`LIST` in
+§3). There are no user-created lists in v1 — one shopping list for every store.
+
+### 7A.1 Item rules — `src/shared/lists.ts` (pure)
+
+Every decision below lives in `lists.ts` and is imported by the route and the PWA:
+`itemKey`, `TEXT_MAX`, `NOTE_MAX`, `CHECKED_VISIBLE_DAYS`, and `resolveAdd(text,
+items)` → existing / reopen / insert. Matching is done in JS with `itemKey` — never with
+SQLite `lower()`/`NOCASE`, which fold ASCII only. `text_key` is written by app code.
+
+- **Text** is trimmed, 1–120 characters. **Note** ≤ 1000 characters (wish list).
+- **One item per thing.** `itemKey(text)` = lower-case, trimmed, inner whitespace
+  collapsed to one space. A list holds at most one non-deleted item per key (the
+  unique index enforces it). Adding text whose key is already on the list never
+  makes a duplicate:
+  - matches an **open** item → that item is returned unchanged, `result: "existing"`;
+  - matches a **checked** item → it is re-opened (`checked_at`/`checked_by` cleared,
+    text updated to the new spelling), `result: "reopened"`;
+  - otherwise a new open item, `result: "added"`.
+- **Check / uncheck.** Checking sets `checked_at = now`, `checked_by = me`. Unchecking
+  clears both — that is how "buy it again" works.
+- **Rename** to a key another item already holds → 409 `duplicate`, message
+  "“Milk” is already on this list."
+- **Owner** (wish list) must be an existing, non-disabled member, or null. Shopping
+  items ignore it.
+- **Visible checked items** = checked within the last `CHECKED_VISIBLE_DAYS = 30`
+  days, newest first. Older checked items stay in the table (so adding them again
+  re-opens rather than duplicates) but are not returned.
+- **Delete** is a soft delete. Adding the same text later creates a new item.
+- Any member may add, edit, check or delete any item. ⚑ DEFAULT
+- Lists never ring, push or speak. They are things to look at, not alerts.
+
+### 7A.2 Acceptance (M4b — each row is an API test)
+
+| # | Call | Expected |
+|---|------|----------|
+| L1 | add "Milk" to shopping | 201, `result: "added"`, item open |
+| L2 | add "  milk " | 200, `result: "existing"`, same id; still one open item |
+| L3 | check it | it moves from `open` to `checked`, `checkedBy` = me |
+| L4 | add "MILK" | 200, `result: "reopened"`, same id, open, text "MILK" |
+| L5 | check, then PATCH `checked: false` | open again |
+| L6 | add "" or 121 characters | 400 `invalid_input` with a message |
+| L7 | GET `/lists/groceries` | 404 `not_found` with a message |
+| L8 | wish list item with an unknown `ownerId` | 400 `invalid_input` |
+| L9 | an item checked 31 days ago | absent from `checked`; adding its text re-opens it |
+| L10 | delete, then add the same text | 201, a new id |
+| L11 | rename "Eggs" to "milk" while Milk exists | 409 `duplicate` |
+| L12 | any list call without a session | 401 |
+
+---
+
 ## 8. Screens
 
 General rules come from `MOJOSOGO-PREFERENCES.md`: chips are entities, badges are
@@ -838,7 +937,7 @@ the dialog with `role="alert"`, and there are no wizards.
 |  S   M   T   W   T   F   S          |
 |  ...continuous weeks...             |
 +-------------------------------------+
-|  📅 Calendar   ⏰ Alarms   ⚙ Settings |  <- bottom tab bar
+| 📅 Calendar ⏰ Alarms 🛒 Lists ⚙ Settings |  <- bottom tab bar
 +-------------------------------------+
 ```
 
@@ -938,6 +1037,48 @@ assigned to, Delete).
   invites (create, list, revoke), school holidays.
 - **Status:** relay last seen, the current member's push subscriptions with last
   success/error, and the last 20 deliveries with their status badge.
+
+### 8.8 Lists screen
+
+The **🛒 Lists** tab. A two-way toggle at the top, **Shopping | Wish list**; the
+choice is remembered per device. The list refetches when the tab opens, on focus, and
+every 30 s while visible (§10 Freshness).
+
+**Shopping:**
+
+```
+[ Add item…                    ][ Add ]
+☐ Milk
+☐ Dish soap
+☐ Batteries AA
+▸ Recently bought (12)
+```
+
+- The add box is at the **top**, always visible. Enter or **Add** adds the item, clears
+  the box, and keeps focus, so several items go in one after another.
+- Adding something already open says so under the box in plain text (“Milk is already
+  on the list”) — a fact, not an error. Re-opening says “Milk is back on the list”.
+- Open items: newest first, one line each, the whole row is the tap target (≥ 44 px):
+  tapping ticks it. A ticked item leaves the open list straight away.
+- **Recently bought** is collapsed by default and dim. Tapping an item there puts it
+  back on the list. Each row shows who bought it and when (“Sat · Shelly”).
+- A small ✕ on each row (with its own accessible name, “Remove Milk”) deletes it.
+
+**Wish list:**
+
+```
+[ Add an idea…                 ][ Add ]
+Paint the fence            Dad      📝
+Build a bird box           Shelly
+Fix the bike gears
+▸ Done (3)
+```
+
+- Same add box. Rows show text, the owner chip (if any) and 📝 when there is a note.
+- Tapping a row opens the **item form** (modal): text, note (multi-line), owner (member
+  chips, none = household), **Mark done** / **Not done**, Save / Cancel / Delete.
+- **Done** is collapsed by default, newest first.
+- No due dates and no reminders: a wish list that nags is not a wish list.
 
 ### 8.7 Theme
 
@@ -1086,6 +1227,10 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | GET | `/status` | member | → `{ relayLastSeen, mySubscriptions[], recentDeliveries[] }` |
 | POST | `/relay/claim` | bearer `RELAY_TOKEN` | → deliveries |
 | POST | `/relay/report` | bearer `RELAY_TOKEN` | `{ id, status, detail }` |
+| GET | `/lists/{list}` | member | → `{ open: Item[], checked: Item[] }` (§7A.1); `Item = { id, list, text, note, ownerId, createdBy, createdAt, checkedAt, checkedBy }` |
+| POST | `/lists/{list}/items` | member | `{ text, note?, ownerId? }` → `{ item, result: "added" \| "existing" \| "reopened" }`, 201 when added, else 200 |
+| PATCH | `/list-items/{id}` | member | `{ text?, note?, ownerId?, checked?: boolean }` → item; 409 `duplicate` on a key clash |
+| DELETE | `/list-items/{id}` | member | → 204 |
 | POST | `/dev/tick?now=ISO` | only if `DEV_ENDPOINTS=1` | runs `tick(db, now)` → summary |
 
 **Freshness:** there are no WebSockets. The app refetches the visible calendar range
@@ -1176,6 +1321,13 @@ checks.
   `/alarms` with its days, and rings via `/dev/tick` at 08:00 local on a Wednesday
   but not on a Tuesday; an alarm with no days is rejected with a message.
 
+**M4b — Lists**
+- Migration 0005, `LIST` vocab, `/lists` API, the Lists tab (§7A, §8.8).
+- ✅ API tests L1–L12 (§7A.2); M1-VOCAB covers `list_items.list`.
+- ✅ Manual at 320 px: four tabs fit on one line; add five shopping items in a row
+  without touching anything but the keyboard; tick one, find it under Recently bought,
+  put it back.
+
 **M5 — Web Push**
 - Spike first: send one push from a Worker to Chrome desktop and record which
   library works.
@@ -1227,6 +1379,27 @@ Captured from v1.0-draft so nothing is lost:
 - An `admin` role; guest role; multiple households
 - Holiday calendars for other countries
 - Turso / non-Cloudflare hosting
+- Adding list items by voice (Voice PE / Home Assistant intent → Worker). If built, it
+  goes through Home Assistant's own Assist, never Alexa skills or lists.
+- Chore points, streaks or rewards
+- Shopping list grouped by store aisle; more than one shopping list
+
+### 12.1 Next — decided with MojoSOGO (2026-10-03), spec to be written before building
+
+**Phase B — Chores.** Recurring jobs assigned to a person, built on the alarm/event
+machinery (§4.2a), not a second reminder system.
+- Timing is **chosen per chore**: either *at a time* (rings like an alarm) or *by a
+  time* (quiet; visible on the person's Today list; at most one optional nudge near
+  the deadline).
+- **Rotation** between chosen members, weekly, optional per chore.
+- A "done means…" line per chore (explicit expectations).
+- A per-person **Today** checklist; the kids have their own phones and accounts.
+
+**Phase C — Shared screen and house.**
+- A wall/kitchen tablet showing today's calendar, chores and the shopping list,
+  signed in as a **display** that can tick things off but cannot change settings
+  (a new role — §6.3 and §12's "guest role" entry are revisited then).
+- House announcements name who an alert is for ("Shelly: dentist at 14:30").
 
 ---
 
@@ -1243,6 +1416,8 @@ Captured from v1.0-draft so nothing is lost:
 | Q7 | Accent color: v1 used blue, which collides with school-holiday blue | Indigo `#6366F1` |
 | Q8 | Snooze length | 10 min, single option |
 | Q9 | Can any member Done/Ack a fire assigned to someone else? | Yes |
+| Q10 | Can any member edit or delete any list item (not only their own)? | Yes — they are household lists |
+| Q11 | How long do bought / done items stay visible? | 30 days |
 
 ---
 

@@ -7,6 +7,24 @@ carry its result.
 
 ---
 
+## 2026-10-03 — Phase A Lists (placement-advisor)
+
+- **Ask:** place household lists (shopping, wish list): item rules, routes, screen, styling.
+- **Verdict:** `src/shared/lists.ts` [NEW] (normalization, add/reopen decision, limits,
+  30-day window — pure); `src/worker/routes/lists.ts` [NEW] (CRUD; no match logic);
+  `frontend/src/components/HouseholdLists.tsx` [NEW] (tab, toggle, rows, item modal);
+  `Lists.module.css` reused unchanged — screen-only styles in
+  `HouseholdLists.module.css`. Small edits to existing owners: `vocab.ts` (`LIST`),
+  `worker/index.ts` (mount), `App.tsx` (tab), `test/vocab.test.ts` (EXPECTED).
+- **Why:** add-or-reopen is a decision → rules stage. The screen is not named
+  `Lists.tsx` because the existing shared `Lists.module.css` would read as its own.
+  Matching is in JS with one normalizer, never SQLite `lower()`/`NOCASE` (ASCII-only).
+- **Caps:** no pinned file touched; App.tsx 101/300. If `HouseholdLists.tsx` reaches the
+  band, the seam is the item modal → `HouseholdListItemForm.tsx`.
+- **Reorganizer:** none needed.
+
+---
+
 ## 2026-10-03 — Adopt the architecture guard (bootstrap)
 
 - **Decision:** created the ownership map with one row per existing file (no code
