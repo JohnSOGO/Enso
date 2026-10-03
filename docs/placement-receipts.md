@@ -7,6 +7,21 @@ carry its result.
 
 ---
 
+## 2026-10-03 — R3 refactor: room in HouseholdLists for M4e (reorganizer)
+
+- **Trigger:** M4e placement — `HouseholdLists.tsx` at 216/300 (global cap) estimated
+  ~320 with M4e (list picker, create/rename/delete lists, one assignee) in place.
+- **Seam moved:** `ItemForm` + the `Item` interface → `HouseholdListItemForm.tsx`
+  [NEW owner row], the seam pre-named in the Phase A receipt. `HouseholdLists.tsx`
+  imports both; the type moved with the form so the import runs one way (no cycle).
+- **Room opened:** `HouseholdLists.tsx` 216 → 158 lines; new file 67. No `CEILINGS`
+  change (neither file is pinned; both under the global cap).
+- **Behavior:** preserved (typecheck, tests, build green); code moved verbatim, no
+  logic, props or imports-at-runtime changed.
+- **Restraint:** shell, `ListPanel`, rows and add box untouched; no feature code added.
+
+---
+
 ## 2026-10-03 — R2 refactor: room in Settings for M4d Invites (reorganizer)
 
 - **Trigger:** M4d placement — `Settings.tsx` pinned at 264/304 would cross its

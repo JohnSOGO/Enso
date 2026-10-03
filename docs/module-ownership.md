@@ -68,7 +68,8 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/Chores.tsx` | Chores section of the Alarms tab (§8.5) |
 | `frontend/src/components/ChoreForm.tsx` | Chore form modal: days, at/by, people turn order, steps (§8.5) |
 | `frontend/src/components/AlertFields.tsx` | Fields shared by the alarm, timer and chore forms: day chips + days text, channel checkboxes, repeat-alert options (§8.5) |
-| `frontend/src/components/HouseholdLists.tsx` | Lists tab: Today \| Shopping \| Wish list toggle (composes ChoresToday), item rows, item form modal (§8.8) |
+| `frontend/src/components/HouseholdLists.tsx` | Lists tab: Today \| Shopping \| Wish list toggle (composes ChoresToday), add box, item rows (§8.8) |
+| `frontend/src/components/HouseholdListItemForm.tsx` | The list item form modal: text, note, owner, Mark done / Not done, Save / Cancel / Delete (§8.8); owns the `Item` shape |
 | `frontend/src/components/ChoresToday.tsx` | Lists → Today: today's chore runs, Mine \| Everyone, tick/undo a step (§8.8) |
 | `frontend/src/components/RingingBar.tsx` | Ringing bar (§8.2) |
 | `frontend/src/components/Settings.tsx` | Settings: Me, Household, Status (§8.6) |
