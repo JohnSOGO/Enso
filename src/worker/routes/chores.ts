@@ -63,7 +63,7 @@ async function loadChore(c: Context<AppEnv>, forWrite: boolean): Promise<ChoreRo
   const row = await first<ChoreRow>(c.env.DB, 'SELECT * FROM chores WHERE id = ? AND deleted_at IS NULL', c.req.param('id'));
   if (!row) return fail(c, 404, 'not_found', 'That chore no longer exists.');
   const me = c.get('member');
-  if (forWrite && row.created_by !== me.id && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the creator or the owner can change this chore.');
+  if (forWrite && row.created_by !== me.id && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this chore.');
   return row;
 }
 

@@ -182,3 +182,74 @@ describe('session cookie (SPEC §2.1)', () => {
     expect(cookie).not.toMatch(/;\s*Secure/i);
   });
 });
+
+describe('admins (SPEC §6.3)', () => {
+  const founderId = async (o: Client) => (await o.get('/members')).json.find((m: any) => m.isFounder).id;
+  const canInvite = async (c: Client) => (await c.post('/invites', { displayName: 'probe' })).status;
+
+  it('A1 founder makes member M an admin → M can create an invite', async () => {
+    const o = await owner();
+    const m = await member(o);
+    expect(await canInvite(m.client)).toBe(403);
+    expect((await o.patch(`/members/${m.id}`, { role: 'owner' })).status).toBe(200);
+    expect(await canInvite(m.client)).toBe(201);
+  });
+
+  it('A2 admin M makes member N an admin, then removes N', async () => {
+    const o = await owner();
+    const m = await member(o);
+    await o.patch(`/members/${m.id}`, { role: 'owner' });
+    const n = await member(o);
+    expect((await m.client.patch(`/members/${n.id}`, { role: 'owner' })).status).toBe(200);
+    expect(await canInvite(n.client)).toBe(201);
+    expect((await m.client.patch(`/members/${n.id}`, { role: 'member' })).status).toBe(200);
+    expect(await canInvite(n.client)).toBe(403);
+  });
+
+  it('A3 nobody can demote or disable the founder', async () => {
+    const o = await owner();
+    const m = await member(o);
+    await o.patch(`/members/${m.id}`, { role: 'owner' });
+    const f = await founderId(o);
+    for (const [who, b] of [[m.client, { role: 'member' }], [m.client, { disabled: true }], [o, { role: 'member' }], [o, { disabled: true }]] as const) {
+      const r = await who.patch(`/members/${f}`, b);
+      expect(r.status).toBe(400);
+      expect(r.json.error).toBe('invalid_input');
+      expect(r.json.message).toBeTruthy();
+    }
+  });
+
+  it('A4 a regular member cannot make themselves admin', async () => {
+    const o = await owner();
+    const m = await member(o);
+    const r = await m.client.patch(`/members/${m.id}`, { role: 'owner' });
+    expect(r.status).toBe(403);
+    expect(r.json.error).toBe('forbidden');
+  });
+
+  it('A5 a disabled member cannot be made an admin', async () => {
+    const o = await owner();
+    const m = await member(o);
+    await o.patch(`/members/${m.id}`, { disabled: true });
+    const r = await o.patch(`/members/${m.id}`, { role: 'owner' });
+    expect(r.status).toBe(400);
+    expect(r.json.message).toMatch(/Enable/);
+  });
+
+  it('A6 GET /members carries role and isFounder; exactly one founder', async () => {
+    const o = await owner();
+    await member(o);
+    const list = (await o.get('/members')).json;
+    expect(list.every((m: any) => typeof m.isFounder === 'boolean' && typeof m.role === 'string')).toBe(true);
+    expect(list.filter((m: any) => m.isFounder)).toHaveLength(1);
+    expect(list.find((m: any) => m.isFounder).email).toBe(OWNER.email);
+  });
+
+  it('A7 an admin removing their own admin role loses owner-only access on the next request', async () => {
+    const o = await owner();
+    const m = await member(o);
+    await o.patch(`/members/${m.id}`, { role: 'owner' });
+    expect((await m.client.patch(`/members/${m.id}`, { role: 'member' })).status).toBe(200);
+    expect(await canInvite(m.client)).toBe(403);
+  });
+});

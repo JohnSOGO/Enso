@@ -141,7 +141,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
     >
       {form && (
         <fieldset disabled={!canEdit || busy} style={{ border: 0, padding: 0 }}>
-          {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>Only the creator or the owner can change this event.</p>}
+          {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>Only the creator or an admin can change this event.</p>}
           <label className="field"><span>Title</span>
             <input value={form.title} maxLength={120} onChange={(e) => set('title', e.target.value)} autoFocus={!eventId} />
           </label>

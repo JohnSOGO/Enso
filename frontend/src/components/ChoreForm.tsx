@@ -76,7 +76,7 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
         <button onClick={onClose} disabled={busy}>Cancel</button>
       </>}>
       <fieldset disabled={!canEdit || busy}>
-        {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>Only the creator or the owner can change this chore.</p>}
+        {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>Only the creator or an admin can change this chore.</p>}
         <label className="field"><span>Title</span>
           <input value={f.title} maxLength={TITLE_MAX} onChange={(e) => setTitle(e.target.value)} autoFocus={!chore} />
         </label>

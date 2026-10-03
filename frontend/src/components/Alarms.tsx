@@ -103,7 +103,7 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
         <button onClick={onClose} disabled={busy}>Cancel</button>
       </>}>
       <fieldset disabled={!canEdit || busy}>
-        {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>Only the creator or the owner can change this alarm.</p>}
+        {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>Only the creator or an admin can change this alarm.</p>}
         <label className="field"><span>Title</span>
           <input value={f.title} maxLength={120} onChange={(e) => setF({ ...f, title: e.target.value })} autoFocus={!alarm} />
         </label>

@@ -3,13 +3,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { get } from './api';
 import { utcToLocal } from '../../src/shared/time';
-import type { AlertKind } from '../../src/shared/vocab';
+import type { AlertKind, Role } from '../../src/shared/vocab';
 
 export interface Me {
-  id: string; email: string; displayName: string; color: string; role: 'owner' | 'member';
+  id: string; email: string; displayName: string; color: string; role: Role;
   showPublicHolidays: number; showSchoolHolidays: number; showOptionsExpiration: number;
 }
-export interface Member { id: string; displayName: string; color: string; role: string; email?: string; disabledAt: string | null }
+/** §6.3: role 'owner' reads Admin; the founder (isFounder) reads Owner and is protected. */
+export interface Member { id: string; displayName: string; color: string; role: Role; isFounder: boolean; email?: string; disabledAt: string | null }
 export interface Fire {
   id: string; kind: AlertKind; dueAt: string; state: string; alertCount: number;
   occurrenceDate: string | null; eventId: string | null; timerId: string | null; title: string; startTime: string | null;

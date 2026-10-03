@@ -69,10 +69,16 @@ function PhoneAlerts() {
 }
 
 function HouseholdSection() {
-  const { householdName, tz, members, refresh } = useApp();
+  const { me, householdName, tz, members, refresh } = useApp();
   const [name, setName] = useState(householdName);
   const [zone, setZone] = useState(tz);
   const { run, busy, errorEl } = useAction();
+  /** §6.3 — make or remove an admin; asks first, and warns when you are removing yourself. */
+  const setAdmin = (id: string, name: string, make: boolean) => {
+    const ask = make ? `Make ${name} an admin? They will have the same powers as you, except over the owner.`
+      : id === me.id ? 'Remove your own admin role? You will lose these settings straight away.' : `Remove ${name}'s admin role?`;
+    if (confirm(ask)) run(async () => { await patch(`/members/${id}`, { role: make ? 'owner' : 'member' }); refresh(); });
+  };
 
   return (
     <Section title="Household">
@@ -92,12 +98,18 @@ function HouseholdSection() {
           {members.map((m) => (
             <tr key={m.id}>
               <th scope="row" className={s.flexible} title={m.email}><span style={{ color: m.color }}>●</span> {m.displayName}</th>
-              <td className={s.rigid}>{m.disabledAt ? <span className="badge bad">disabled</span> : <span className="chip">{m.role}</span>}</td>
               <td className={s.rigid}>
-                {m.role !== 'owner' && (
-                  <button disabled={busy} onClick={() => run(async () => { await patch(`/members/${m.id}`, { disabled: !m.disabledAt }); refresh(); })}>
-                    {m.disabledAt ? 'Enable' : 'Disable'}
-                  </button>
+                {m.disabledAt && <span className="badge bad">disabled</span>}{' '}
+                {m.role === 'owner' && <span className="chip">{m.isFounder ? 'Owner' : 'Admin'}</span>}
+              </td>
+              <td className={s.rigid}>
+                {!m.isFounder && (
+                  <span className="row" style={{ gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {!m.disabledAt && <button disabled={busy} onClick={() => setAdmin(m.id, m.displayName, m.role !== 'owner')}>{m.role === 'owner' ? 'Remove admin' : 'Make admin'}</button>}
+                    <button disabled={busy} onClick={() => run(async () => { await patch(`/members/${m.id}`, { disabled: !m.disabledAt }); refresh(); })}>
+                      {m.disabledAt ? 'Enable' : 'Disable'}
+                    </button>
+                  </span>
                 )}
               </td>
             </tr>
