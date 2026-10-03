@@ -1,7 +1,7 @@
 // SPEC §5.8 — every row is a test.
 import { describe, expect, it } from 'vitest';
 import {
-  applyAction, applyTimerCmd, planReminderFires, stepFire,
+  alertMessage, applyAction, applyTimerCmd, newChoreFire, planReminderFires, stepFire,
   type AlertConfig, type FireRow, type NewFire, type ReminderEvent,
 } from '../src/shared/engine';
 import { localToUtc } from '../src/shared/time';
@@ -202,6 +202,45 @@ describe('reminders — household tz America/Los_Angeles', () => {
     const allDay: ReminderEvent = { ...weekly, start_time: null, recurrence: null };
     const fires = planReminderFires(allDay, TZ, '2026-10-06T00:00:00.000Z', '2026-10-07T00:00:00.000Z');
     expect(fires[0].due_at).toBe(localToUtc('2026-10-06', '09:00', TZ));
+  });
+});
+
+describe('chore fires (§5.3, §5.4, §5.7)', () => {
+  const cfg: AlertConfig = { channels: ['push'], renotifyMin: 15, maxAlerts: 4 };
+  const due = '2026-10-05T14:30:00.000Z';
+  const fire = withId(newChoreFire('run_1', due));
+
+  it('a chore fire carries its run and no event or timer', () => {
+    expect(fire).toMatchObject({ kind: 'chore', chore_run_id: 'run_1', event_id: null, timer_id: null, state: 'scheduled' });
+  });
+
+  it('a chore is never missed: hours overdue (an outage) it still rings', () => {
+    const r = stepFire(fire, cfg, '2026-10-05T20:00:00.000Z');
+    expect(r.alert).toBe(true);
+    expect(r.fire.state).toBe('ringing');
+    expect(r.fire.close_reason).toBeNull();
+  });
+
+  it('done on a ringing chore fire closes it done, with no next fire', () => {
+    const ringing = stepFire(fire, cfg, due).fire;
+    const r = applyAction(ringing, 'done', cfg, 'mem_a', '2026-10-05T14:40:00.000Z');
+    if ('error' in r) throw new Error(r.error);
+    expect(r.fire).toMatchObject({ state: 'closed', close_reason: 'done', closed_by: 'mem_a' });
+    expect(r.next).toBeUndefined();
+  });
+
+  it('snooze/ack on a chore, or done while still scheduled → invalid_action', () => {
+    const ringing = stepFire(fire, cfg, due).fire;
+    expect(applyAction(ringing, 'snooze', cfg, 'mem_a', due)).toEqual({ error: 'invalid_action' });
+    expect(applyAction(ringing, 'ack', cfg, 'mem_a', due)).toEqual({ error: 'invalid_action' });
+    expect(applyAction(fire, 'done', cfg, 'mem_a', due)).toEqual({ error: 'invalid_action' });
+  });
+
+  it('message names the person and, for a multi-step chore, the step', () => {
+    expect(alertMessage('chore', 'Laundry', 1, { personName: 'Sam', stepTitle: 'Start washer', stepCount: 3 })).toBe('Chore for Sam: Laundry — Start washer');
+    expect(alertMessage('chore', 'Trash', 1, { personName: 'Kai', stepTitle: 'Trash', stepCount: 1 })).toBe('Chore for Kai: Trash');
+    expect(alertMessage('chore', 'Trash', 2, { personName: null, stepTitle: 'Trash', stepCount: 1 })).toBe('Chore: Trash (alert 2)');
+    expect(alertMessage('reminder', 'Meds', 1)).toBe('Reminder: Meds');
   });
 });
 
