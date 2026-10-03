@@ -1,15 +1,18 @@
 /* SPEC §8.8 — Lists tab only. Row cards and tick rows reuse Lists.module.css (.list, .item, .title, .row, .main, .box, .done, .checked). */
 .screen { padding: 12px; overflow-y: auto; overscroll-behavior: contain; height: 100%; }
 
-.toggle {
-  display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 12px;
-  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
-}
-.toggle button { border: 0; border-radius: 0; background: var(--surface); color: var(--text-dim); min-height: 44px; }
-.toggle .on { background: var(--accent); color: #fff; font-weight: 600; }
+/* List [ Shopping (3) ▾ ] [⋯] — the native picker takes the slack, ⋯ stays a 44 px target. */
+.picker { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.pickerLabel { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.pickerLabel > span { flex: none; color: var(--text-dim); font-size: .85rem; }
+.pickerLabel > select { flex: 1; min-width: 0; min-height: 44px; }
+.more { flex: none; min-width: 44px; min-height: 44px; padding: 0; font-size: 1.2rem; line-height: 1; }
 
 .said { min-height: 1.4em; font-size: .85rem; margin: 4px 0 8px; }
 
 .text { flex: 1; min-width: 0; }
+.glyph { flex: none; }
+/* The assignee's chip truncates so the row stays one line. */
+.assignee { display: block; flex: 0 1 auto; min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
 .whoWhen { flex: none; white-space: nowrap; font-size: .8rem; }
-.remove { flex: none; min-width: 44px; min-height: 44px; color: var(--text-dim); }
+.edit { flex: none; min-width: 44px; min-height: 44px; color: var(--text-dim); }

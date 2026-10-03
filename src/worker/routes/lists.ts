@@ -1,67 +1,144 @@
-// SPEC §7A, §10 — the two household lists: item CRUD. Every add/re-open/duplicate decision
-// is made by src/shared/lists.ts; this route validates, persists and shapes the response.
+// SPEC §7A, §10 — household lists: list CRUD and list item CRUD. Every add/re-open/duplicate
+// decision and who may rename/delete a list is made by src/shared/lists.ts; this route
+// validates, persists and shapes the response. Items of a deleted list are unreachable:
+// every item read and write joins lists.deleted_at IS NULL (L16).
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
-import { LIST, isOneOf, type List } from '../../shared/vocab';
-import { NOTE_MAX, TEXT_MAX, itemKey, renameClash, resolveAdd, visibleItems } from '../../shared/lists';
+import {
+  LISTS_MAX, LIST_NAME_MAX, NOTE_MAX, TEXT_MAX, canManageList, itemKey, listNameClash, renameClash, resolveAdd, visibleItems,
+} from '../../shared/lists';
 import { all, first, newId, nowIso, run } from '../db';
 import { body, fail, optStr, str } from '../http';
 import { requireMember } from '../session';
 
+interface ListRow {
+  id: string; name: string; name_key: string; created_by: string | null;
+  created_at: string; updated_at: string; deleted_at: string | null;
+}
+
 interface ItemRow {
-  id: string; list: List; text: string; text_key: string; note: string | null; owner_id: string | null;
+  id: string; list_id: string; text: string; text_key: string; note: string | null; assignee_id: string | null;
   created_by: string; created_at: string; updated_at: string;
   checked_at: string | null; checked_by: string | null; deleted_at: string | null;
 }
 
+const listView = (l: ListRow) => ({ id: l.id, name: l.name, createdBy: l.created_by });
+
 const itemView = (r: ItemRow) => ({
-  id: r.id, list: r.list, text: r.text, note: r.note, ownerId: r.owner_id, createdBy: r.created_by,
+  id: r.id, listId: r.list_id, text: r.text, note: r.note, assigneeId: r.assignee_id, createdBy: r.created_by,
   createdAt: r.created_at, checkedAt: r.checked_at, checkedBy: r.checked_by,
 });
 
-const loadList = (db: D1Database, list: List) =>
-  all<ItemRow>(db, 'SELECT * FROM list_items WHERE list = ? AND deleted_at IS NULL', list);
+const loadLists = (db: D1Database) => all<ListRow>(db, 'SELECT * FROM lists WHERE deleted_at IS NULL');
+const loadList = (db: D1Database, id: string) => first<ListRow>(db, 'SELECT * FROM lists WHERE id = ? AND deleted_at IS NULL', id);
+/** A list's non-deleted items. Callers have already found the list itself non-deleted. */
+const loadItems = (db: D1Database, listId: string) =>
+  all<ItemRow>(db, 'SELECT * FROM list_items WHERE list_id = ? AND deleted_at IS NULL', listId);
+/** One non-deleted item on a non-deleted list. */
 const loadItem = (db: D1Database, id: string) =>
-  first<ItemRow>(db, 'SELECT * FROM list_items WHERE id = ? AND deleted_at IS NULL', id);
+  first<ItemRow>(db,
+    `SELECT i.* FROM list_items i JOIN lists l ON l.id = i.list_id
+      WHERE i.id = ? AND i.deleted_at IS NULL AND l.deleted_at IS NULL`, id);
 
 const TEXT_MSG = `Item text must be 1–${TEXT_MAX} characters.`;
 const NOTE_MSG = `A note can be at most ${NOTE_MAX} characters.`;
+const NAME_MSG = `A list name must be 1–${LIST_NAME_MAX} characters.`;
+const LIST_GONE = 'That list no longer exists.';
+const ITEM_GONE = 'That item is no longer on the list.';
 
-/** :list must be one of LIST, else 404 with a message. */
-function listParam(c: Context<AppEnv>): List | Response {
-  const list = c.req.param('list');
-  return isOneOf(LIST, list) ? list : fail(c, 404, 'not_found', `There is no list called “${list}”. Lists: ${LIST.join(', ')}.`);
+/** A list name: trimmed, 1–LIST_NAME_MAX characters; null otherwise. */
+function listName(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  return t.length >= 1 && t.length <= LIST_NAME_MAX ? t : null;
 }
 
-/** ownerId: undefined = not given; null = household; else an existing, non-disabled member. Returns an error message on a bad id. */
-async function ownerParam(db: D1Database, v: unknown): Promise<string | null | undefined | { error: string }> {
+/** The :id list (non-deleted), else a 404 with a message. */
+async function listParam(c: Context<AppEnv>): Promise<ListRow | Response> {
+  return (await loadList(c.env.DB, c.req.param('id')!)) ?? fail(c, 404, 'not_found', LIST_GONE);
+}
+
+/** assigneeId: undefined = not given; null = the household; else an existing, non-disabled member. Returns an error message on a bad id. */
+async function assigneeParam(db: D1Database, v: unknown): Promise<string | null | undefined | { error: string }> {
   if (v === undefined || v === null) return v;
   const m = typeof v === 'string' ? await first<{ id: string }>(db, 'SELECT id FROM members WHERE id = ? AND disabled_at IS NULL', v) : null;
-  return m ? m.id : { error: 'ownerId must be an active member of the household, or null.' };
+  return m ? m.id : { error: 'assigneeId must be an active member of the household, or null.' };
 }
 
 export const lists = new Hono<AppEnv>();
 
-lists.get('/lists/:list', requireMember, async (c) => {
-  const list = listParam(c);
-  if (list instanceof Response) return list;
-  const { open, checked } = visibleItems(await loadList(c.env.DB, list), nowIso());
-  return c.json({ open: open.map(itemView), checked: checked.map(itemView) });
+// ── Lists ──────────────────────────────────────────────────────────────
+
+lists.get('/lists', requireMember, async (c) => {
+  const rows = await all<ListRow & { open_count: number }>(c.env.DB,
+    `SELECT l.*, (SELECT COUNT(*) FROM list_items i WHERE i.list_id = l.id AND i.deleted_at IS NULL AND i.checked_at IS NULL) AS open_count
+       FROM lists l WHERE l.deleted_at IS NULL`);
+  rows.sort((a, b) => a.name_key.localeCompare(b.name_key) || a.name.localeCompare(b.name));
+  return c.json(rows.map((l) => ({ ...listView(l), openCount: l.open_count })));
 });
 
-lists.post('/lists/:list/items', requireMember, async (c) => {
-  const list = listParam(c);
+lists.post('/lists', requireMember, async (c) => {
+  const name = listName((await body(c)).name);
+  if (!name) return fail(c, 400, 'invalid_input', NAME_MSG);
+  const existing = await loadLists(c.env.DB);
+  const clash = listNameClash(null, name, existing);
+  if (clash) return fail(c, 409, 'duplicate', `There is already a list called “${clash.name}”.`);
+  if (existing.length >= LISTS_MAX) return fail(c, 400, 'invalid_input', `The household can have at most ${LISTS_MAX} lists. Delete one first.`);
+
+  const id = newId('lst'), now = nowIso();
+  await run(c.env.DB,
+    'INSERT INTO lists (id, name, name_key, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    id, name, itemKey(name), c.get('member').id, now, now);
+  return c.json(listView((await loadList(c.env.DB, id))!), 201);
+});
+
+lists.patch('/lists/:id', requireMember, async (c) => {
+  const list = await listParam(c);
+  if (list instanceof Response) return list;
+  if (!canManageList(list.created_by, c.get('member'))) {
+    return fail(c, 403, 'forbidden', list.created_by ? 'Only the person who made this list or an admin can rename it.' : 'Only an admin can rename this list.');
+  }
+  const name = listName((await body(c)).name);
+  if (!name) return fail(c, 400, 'invalid_input', NAME_MSG);
+  const clash = listNameClash(list.id, name, await loadLists(c.env.DB));
+  if (clash) return fail(c, 409, 'duplicate', `There is already a list called “${clash.name}”.`);
+  await run(c.env.DB, 'UPDATE lists SET name = ?, name_key = ?, updated_at = ? WHERE id = ?', name, itemKey(name), nowIso(), list.id);
+  return c.json(listView((await loadList(c.env.DB, list.id))!));
+});
+
+lists.delete('/lists/:id', requireMember, async (c) => {
+  const list = await listParam(c);
+  if (list instanceof Response) return list;
+  if (!canManageList(list.created_by, c.get('member'))) {
+    return fail(c, 403, 'forbidden', list.created_by ? 'Only the person who made this list or an admin can delete it.' : 'Only an admin can delete this list.');
+  }
+  const now = nowIso();
+  await run(c.env.DB, 'UPDATE lists SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL', now, now, list.id);
+  return c.body(null, 204);
+});
+
+// ── Items ──────────────────────────────────────────────────────────────
+
+lists.get('/lists/:id', requireMember, async (c) => {
+  const list = await listParam(c);
+  if (list instanceof Response) return list;
+  const { open, checked } = visibleItems(await loadItems(c.env.DB, list.id), nowIso());
+  return c.json({ list: listView(list), open: open.map(itemView), checked: checked.map(itemView) });
+});
+
+lists.post('/lists/:id/items', requireMember, async (c) => {
+  const list = await listParam(c);
   if (list instanceof Response) return list;
   const b = await body(c);
   const text = str(b.text, TEXT_MAX);
   if (!text) return fail(c, 400, 'invalid_input', TEXT_MSG);
   const note = optStr(b.note, NOTE_MAX);
   if (b.note !== undefined && note === undefined) return fail(c, 400, 'invalid_input', NOTE_MSG);
-  const owner = list === 'wishlist' ? await ownerParam(c.env.DB, b.ownerId) : null;
-  if (owner && typeof owner === 'object') return fail(c, 400, 'invalid_input', owner.error);
+  const assignee = await assigneeParam(c.env.DB, b.assigneeId);
+  if (assignee && typeof assignee === 'object') return fail(c, 400, 'invalid_input', assignee.error);
 
   const me = c.get('member').id, now = nowIso();
-  const decision = resolveAdd(text, await loadList(c.env.DB, list));
+  const decision = resolveAdd(text, await loadItems(c.env.DB, list.id));
   if (decision.kind === 'existing') return c.json({ item: itemView(decision.item), result: 'existing' });
   if (decision.kind === 'reopen') {
     await run(c.env.DB,
@@ -71,45 +148,48 @@ lists.post('/lists/:list/items', requireMember, async (c) => {
   }
   const id = newId('itm');
   await run(c.env.DB,
-    `INSERT INTO list_items (id, list, text, text_key, note, owner_id, created_by, created_at, updated_at)
+    `INSERT INTO list_items (id, list_id, text, text_key, note, assignee_id, created_by, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    id, list, text, decision.key, note ?? null, owner ?? null, me, now, now);
+    id, list.id, text, decision.key, note ?? null, assignee ?? null, me, now, now);
   return c.json({ item: itemView((await loadItem(c.env.DB, id))!), result: 'added' }, 201);
 });
 
 lists.patch('/list-items/:id', requireMember, async (c) => {
   const row = await loadItem(c.env.DB, c.req.param('id'));
-  if (!row) return fail(c, 404, 'not_found', 'That item is no longer on the list.');
+  if (!row) return fail(c, 404, 'not_found', ITEM_GONE);
   const b = await body(c);
 
   let text = row.text;
   if (b.text !== undefined) {
     const t = str(b.text, TEXT_MAX);
     if (!t) return fail(c, 400, 'invalid_input', TEXT_MSG);
-    const clash = renameClash(row.id, t, await loadList(c.env.DB, row.list));
+    const clash = renameClash(row.id, t, await loadItems(c.env.DB, row.list_id));
     if (clash) return fail(c, 409, 'duplicate', `“${clash.text}” is already on this list.`);
     text = t;
   }
   const note = optStr(b.note, NOTE_MAX);
   if (b.note !== undefined && note === undefined) return fail(c, 400, 'invalid_input', NOTE_MSG);
-  const owner = row.list === 'wishlist' ? await ownerParam(c.env.DB, b.ownerId) : undefined;
-  if (owner && typeof owner === 'object') return fail(c, 400, 'invalid_input', owner.error);
+  const assignee = await assigneeParam(c.env.DB, b.assigneeId);
+  if (assignee && typeof assignee === 'object') return fail(c, 400, 'invalid_input', assignee.error);
   if (b.checked !== undefined && typeof b.checked !== 'boolean') return fail(c, 400, 'invalid_input', 'checked must be true or false.');
 
   const me = c.get('member').id, now = nowIso();
   const checkedAt = b.checked === undefined ? row.checked_at : b.checked ? now : null;
   const checkedBy = b.checked === undefined ? row.checked_by : b.checked ? me : null;
   await run(c.env.DB,
-    `UPDATE list_items SET text = ?, text_key = ?, note = ?, owner_id = ?, checked_at = ?, checked_by = ?, updated_at = ?
+    `UPDATE list_items SET text = ?, text_key = ?, note = ?, assignee_id = ?, checked_at = ?, checked_by = ?, updated_at = ?
       WHERE id = ?`,
-    text, itemKey(text), note === undefined ? row.note : note, owner === undefined ? row.owner_id : owner,
+    text, itemKey(text), note === undefined ? row.note : note, assignee === undefined ? row.assignee_id : assignee,
     checkedAt, checkedBy, now, row.id);
   return c.json(itemView((await loadItem(c.env.DB, row.id))!));
 });
 
 lists.delete('/list-items/:id', requireMember, async (c) => {
   const now = nowIso();
-  const r = await run(c.env.DB, 'UPDATE list_items SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL', now, now, c.req.param('id'));
-  if (r.meta.changes !== 1) return fail(c, 404, 'not_found', 'That item is no longer on the list.');
+  const r = await run(c.env.DB,
+    `UPDATE list_items SET deleted_at = ?, updated_at = ?
+      WHERE id = ? AND deleted_at IS NULL AND list_id IN (SELECT id FROM lists WHERE deleted_at IS NULL)`,
+    now, now, c.req.param('id'));
+  if (r.meta.changes !== 1) return fail(c, 404, 'not_found', ITEM_GONE);
   return c.body(null, 204);
 });
