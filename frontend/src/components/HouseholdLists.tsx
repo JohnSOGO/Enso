@@ -66,6 +66,7 @@ export function HouseholdLists() {
 
   /** Optimistic: the row moves at once; the server's answer then replaces the local copy. */
   async function setChecked(item: Item, checked: boolean) {
+    setSaid(null);
     setData((d) => d && (checked
       ? { open: d.open.filter((i) => i.id !== item.id), checked: [{ ...item, checkedAt: new Date().toISOString(), checkedBy: me.id }, ...d.checked] }
       : { open: [{ ...item, checkedAt: null }, ...d.open], checked: d.checked.filter((i) => i.id !== item.id) }));
@@ -74,6 +75,7 @@ export function HouseholdLists() {
   }
 
   async function remove(item: Item) {
+    setSaid(null);
     setData((d) => d && { open: d.open.filter((i) => i.id !== item.id), checked: d.checked.filter((i) => i.id !== item.id) });
     try { await del(`/list-items/${item.id}`); } catch (e) { setError(errorText(e)); }
     load();

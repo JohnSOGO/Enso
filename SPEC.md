@@ -1058,11 +1058,15 @@ every 30 s while visible (§10 Freshness).
   the box, and keeps focus, so several items go in one after another.
 - Adding something already open says so under the box in plain text (“Milk is already
   on the list”) — a fact, not an error. Re-opening says “Milk is back on the list”.
-- Open items: newest first, one line each, the whole row is the tap target (≥ 44 px):
+- Open items: most recently added or changed first (so a re-added item comes back to
+  the top), one line each, the whole row is the tap target (≥ 44 px):
   tapping ticks it. A ticked item leaves the open list straight away.
 - **Recently bought** is collapsed by default and dim. Tapping an item there puts it
-  back on the list. Each row shows who bought it and when (“Sat · Shelly”).
-- A small ✕ on each row (with its own accessible name, “Remove Milk”) deletes it.
+  back on the list. Each row shows who bought it and when: weekday within the last 6
+  days (“Sat · Shelly”), else the date (“Sep 12 · Shelly”).
+- A small ✕ on each row (with its own accessible name, “Remove Milk”) deletes it at
+  once, with no confirm: an item is cheap to add again.
+- The “already on / back on the list” note clears on the next typing, tick or remove.
 
 **Wish list:**
 
@@ -1077,7 +1081,9 @@ Fix the bike gears
 - Same add box. Rows show text, the owner chip (if any) and 📝 when there is a note.
 - Tapping a row opens the **item form** (modal): text, note (multi-line), owner (member
   chips, none = household), **Mark done** / **Not done**, Save / Cancel / Delete.
-- **Done** is collapsed by default, newest first.
+- **Done** is collapsed by default, newest first. Tapping a done item opens the item
+  form, where **Not done** puts it back (a wish-list item is never re-opened by a stray
+  tap). Delete in the form asks first.
 - No due dates and no reminders: a wish list that nags is not a wish list.
 
 ### 8.7 Theme
@@ -1430,7 +1436,8 @@ contract test + logon launcher); its manual checks on real speakers are not yet
 recorded. M5 is server side only (subscriptions stored; **no sender** — every push
 delivery is recorded `failed` with `push_sender_not_built (M5)` or `no_subscription`,
 shown in Settings → Status). M7 not started: `wrangler.toml` still carries the
-placeholder `database_id`. The §2.5 architecture guard is in place (map, test, `arch:audit`).
+placeholder `database_id`. The §2.5 architecture guard is in place (map, test, `arch:audit`). M4b Lists is built
+with its API tests (L1–L12) and its 320 px manual check passed on 2026-10-03.
 
 Deviations from this spec, deliberately:
 
