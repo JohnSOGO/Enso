@@ -2050,6 +2050,9 @@ live local API — ring, house message, Done → wait, Undo). **Its 320 px manua
 still to do** (the browser extension was unavailable). M4d Invites is built (I1–I6 and
 the link round-trip tests green; `uqr` builds into its own 10 kB lazy chunk, absent from
 the entry chunk). Its manual check — a real QR scanned by a phone at home — is still to do.
+**M4f installed app + always fresh** is built: manifest named Ensō with PNG icons, iPhone
+home-screen tags, `AppRefresh` (reload on resume unless a dialog is open; pull to refresh)
+— verified with real touch events in an emulated phone; its on-iPhone check is still to do.
 **M7: live at https://enso.sogodojo.com (2026-10-03)** — production D1 `enso` (all 7
 migrations), carry-over of settings + 5 school holidays, secrets SETUP_TOKEN and
 RELAY_TOKEN only, the same build as the home-network server. Owner setup and the shared
