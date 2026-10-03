@@ -5,6 +5,7 @@ import { useApp } from '../state';
 import { MEMBER_PALETTE } from '../../../src/shared/vocab';
 import { useAction } from './useAction';
 import { Invites } from './Invites';
+import { OptionalItems } from './OptionalItems';
 import s from './Lists.module.css';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -20,6 +21,7 @@ function MeSection({ onLogout }: { onLogout: () => void }) {
   return (
     <Section title="Me">
       {errorEl}
+      <OptionalItems />
       <label className="field"><span>Display name</span>
         <div className="row"><input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
           <button disabled={busy || name === me.displayName || !name.trim()} onClick={() => save({ displayName: name })}>Save</button></div>

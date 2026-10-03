@@ -71,7 +71,8 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/Calendar.tsx` | Continuous calendar view (§7.1–7.2) |
 | `frontend/src/components/DaySheet.tsx` | Day sheet modal (§8.3) |
 | `frontend/src/components/EventForm.tsx` | Event form modal (§8.4) |
-| `frontend/src/components/RepeatFields.tsx` | The event form's Repeat section (§8.4): repeat select, weekday chips, until; Recurrence ⇄ form mapping |
+| `frontend/src/components/RepeatFields.tsx` | The event form's Repeat section (§8.4): repeat select, weekday chips, until; Recurrence ⇄ form mapping, certain-weeks chips, repeatText |
+| `frontend/src/components/OptionalItems.tsx` | Settings → Me → Optional calendar items: GET /optional-events, one line per event (title, repeatText), On switch → PUT/DELETE /events/{id}/optin (§8.6) |
 | `frontend/src/components/Alarms.tsx` | Alarms tab: scheduled alarm list + alarm form (§8.5) |
 | `frontend/src/components/Timers.tsx` | Rolling timers list + timer form (§8.5) |
 | `frontend/src/components/Chores.tsx` | Chores section of the Alarms tab (§8.5) |

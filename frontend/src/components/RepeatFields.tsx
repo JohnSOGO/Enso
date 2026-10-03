@@ -1,11 +1,11 @@
-// SPEC §8.4 — the event form's Repeat section: repeat select, weekday chips, until;
-// and the Recurrence ⇄ form mapping.
+// SPEC §8.4 — the event form's Repeat section: repeat select, weekday chips, certain-weeks chips,
+// until; the Recurrence ⇄ form mapping; and repeatText, the one place repeat wording lives.
 import { WEEKDAY, type Weekday } from '../../../src/shared/vocab';
-import { positionInMonth, type Recurrence } from '../../../src/shared/recurrence';
+import { SET_POS, positionInMonth, setPosList, type Recurrence, type SetPos } from '../../../src/shared/recurrence';
 
-export type Repeat = 'none' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'MONTHLY_POS' | 'YEARLY';
+export type Repeat = 'none' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'MONTHLY_POS' | 'MONTHLY_WEEKS' | 'YEARLY';
 
-export interface RepeatValue { repeat: Repeat; byDay: Weekday[]; until: string }
+export interface RepeatValue { repeat: Repeat; byDay: Weekday[]; weeks: SetPos[]; until: string }
 
 const DAY_LABEL: Record<Weekday, string> = { SU: 'Sun', MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat' };
 
@@ -18,22 +18,57 @@ function positionText(date: string): string {
   return `${ORDINAL[p.setPos]} ${WEEKDAY_NAME[p.weekday]}`;
 }
 
+/** Weeks in month order (1st … 4th, last), however they were ticked. */
+const inOrder = (weeks: readonly SetPos[]) => SET_POS.filter((p) => weeks.includes(p));
+
+/** "1st", "1st & 3rd", "1st, 2nd & last". */
+function ordinals(weeks: readonly SetPos[]): string {
+  const words = inOrder(weeks).map((p) => ORDINAL[p]);
+  return words.length < 2 ? words.join('') : `${words.slice(0, -1).join(', ')} & ${words[words.length - 1]}`;
+}
+
+/** The weeks of the month the form starts with: the date's own week. */
+export const ownWeek = (date: string): SetPos[] => [positionInMonth(date).setPos];
+
+/** How an event repeats, in words — e.g. "1st & 3rd Thursday", "Weekly on Mon, Thu". */
+export function repeatText(r: Recurrence | null, startDate: string): string {
+  const date = new Date(`${startDate}T12:00:00`);
+  if (!r) return `Once, ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  const n = r.interval ?? 1;
+  const days = (r.byDay ?? [positionInMonth(startDate).weekday]).map((d) => DAY_LABEL[d]).join(', ');
+  let text = r.freq === 'DAILY' ? (n > 1 ? `Every ${n} days` : 'Daily')
+    : r.freq === 'WEEKLY' ? `${n > 1 ? `Every ${n} weeks` : 'Weekly'} on ${days}`
+    : r.freq === 'YEARLY' ? `Yearly on ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+    : r.byDay && r.setPos !== undefined ? (Array.isArray(r.setPos)
+      ? `${ordinals(r.setPos)} ${WEEKDAY_NAME[r.byDay[0]]}` : `Monthly on the ${ORDINAL[r.setPos]} ${WEEKDAY_NAME[r.byDay[0]]}`)
+    : `Monthly on day ${Number(startDate.slice(8, 10))}`;
+  if (r.freq === 'MONTHLY' && n > 1) text += `, every ${n} months`;
+  return r.until ? `${text} until ${r.until}` : text;
+}
+
 /** The Repeat choice a stored recurrence shows as. */
 export function repeatOf(r: Recurrence | null): Repeat {
-  return !r ? 'none' : r.freq === 'WEEKLY' && r.interval === 2 ? 'BIWEEKLY' : r.freq === 'MONTHLY' && r.setPos ? 'MONTHLY_POS' : r.freq;
+  if (!r) return 'none';
+  if (r.freq === 'WEEKLY' && r.interval === 2) return 'BIWEEKLY';
+  if (r.freq === 'MONTHLY' && r.setPos !== undefined) return Array.isArray(r.setPos) ? 'MONTHLY_WEEKS' : 'MONTHLY_POS';
+  return r.freq;
 }
+
+/** The ticked weeks a stored recurrence shows as (certain weeks only; else the date's own week). */
+export const weeksOf = (r: Recurrence | null, date: string): SetPos[] =>
+  r && Array.isArray(r.setPos) ? setPosList(r.setPos) : ownWeek(date);
 
 /** The recurrence to save for this Repeat section, starting on `date`. */
 export function toRecurrence(v: RepeatValue, date: string): Recurrence | null {
   let recurrence: Recurrence | null = null;
   if (v.repeat !== 'none') {
-    const freq = v.repeat === 'BIWEEKLY' ? 'WEEKLY' : v.repeat === 'MONTHLY_POS' ? 'MONTHLY' : v.repeat;
+    const freq = v.repeat === 'BIWEEKLY' ? 'WEEKLY' : v.repeat === 'MONTHLY_POS' || v.repeat === 'MONTHLY_WEEKS' ? 'MONTHLY' : v.repeat;
     recurrence = { freq };
     if (v.repeat === 'BIWEEKLY') recurrence.interval = 2;
-    if (v.repeat === 'MONTHLY_POS') {
+    if (v.repeat === 'MONTHLY_POS' || v.repeat === 'MONTHLY_WEEKS') {
       const pos = positionInMonth(date);
       recurrence.byDay = [pos.weekday];
-      recurrence.setPos = pos.setPos;
+      recurrence.setPos = v.repeat === 'MONTHLY_POS' ? pos.setPos : inOrder(v.weeks);
     }
     if (freq === 'WEEKLY') recurrence.byDay = WEEKDAY.filter((d) => v.byDay.includes(d));
     if (v.until) recurrence.until = v.until;
@@ -48,16 +83,21 @@ interface Props {
 }
 
 export function RepeatFields({ value, date, onChange }: Props) {
+  const weekday = WEEKDAY_NAME[positionInMonth(date).weekday];
   return (
     <>
       <label className="field"><span>Repeat</span>
-        <select value={value.repeat} onChange={(e) => onChange({ repeat: e.target.value as Repeat })}>
+        <select value={value.repeat} onChange={(e) => {
+          const repeat = e.target.value as Repeat;
+          onChange(repeat === 'MONTHLY_WEEKS' && value.weeks.length === 0 ? { repeat, weeks: ownWeek(date) } : { repeat });
+        }}>
           <option value="none">Never</option>
           <option value="DAILY">Daily</option>
           <option value="WEEKLY">Weekly</option>
           <option value="BIWEEKLY">Every 2 weeks</option>
           <option value="MONTHLY">Monthly on day {Number(date.slice(8, 10))}</option>
           <option value="MONTHLY_POS">Monthly on the {positionText(date)}</option>
+          <option value="MONTHLY_WEEKS">Monthly on certain weeks</option>
           <option value="YEARLY">Yearly</option>
         </select>
       </label>
@@ -68,6 +108,18 @@ export function RepeatFields({ value, date, onChange }: Props) {
               <input type="checkbox" checked={value.byDay.includes(d)}
                 onChange={(e) => onChange({ byDay: e.target.checked ? [...value.byDay, d] : value.byDay.filter((x) => x !== d) })} />
               {DAY_LABEL[d]}
+            </label>
+          ))}
+        </div>
+      )}
+      {value.repeat === 'MONTHLY_WEEKS' && (
+        <div className="row wrap" style={{ marginBottom: 12 }} role="group" aria-label={`Which ${weekday}s of the month`}>
+          <span className="muted">{weekday}s:</span>
+          {SET_POS.map((p) => (
+            <label key={p} className="chip" style={{ padding: '4px 12px', minHeight: 44 }}>
+              <input type="checkbox" checked={value.weeks.includes(p)}
+                onChange={(e) => onChange({ weeks: e.target.checked ? [...value.weeks, p] : value.weeks.filter((x) => x !== p) })} />
+              {p === -1 ? 'Last' : ORDINAL[p]}
             </label>
           ))}
         </div>
