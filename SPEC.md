@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.4-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.5-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -55,6 +55,7 @@ A calendar PWA for one household. It has three kinds of alert:
 |------|--------------|----------------|---------|
 | **Event reminder** | Fires before/at a calendar event. | On the calendar, inside the event | "Dentist" at 14:30, remind 30 min before |
 | **Scheduled alarm** | Fires at a set time on chosen **days of the week**, every week. Not a calendar entry. | **Alarms** tab, not drawn on the calendar | "Take out trash" Tue 19:00 · "Morning meds" every day 08:00 |
+| **Chore** | A job on chosen days, **rotating** weekly between people, either *at* a time (rings) or *by* a time (quiet). It can be a **loop** of steps that hand off. | **Alarms** tab (set up) · **Lists → Today** (tick off) | "Laundry": start the washer → move to dryer (60 min later) → fold & put away |
 | **Rolling timer** ⚑ name | A countdown that **restarts when acknowledged**, not on a fixed clock. | **Alarms** tab | "Check on the dog", 60 min |
 
 **Why scheduled alarms are not calendar events:** a daily alarm drawn on the
@@ -257,7 +258,7 @@ These are the **only** definitions. Export each as a `const` tuple and derive th
 type from it:
 
 ```ts
-export const ALERT_KIND   = ['reminder', 'timer'] as const;
+export const ALERT_KIND   = ['reminder', 'timer', 'chore'] as const;
 export const CHANNEL      = ['push', 'house'] as const;
 export const FIRE_STATE   = ['scheduled', 'ringing', 'closed'] as const;
 export const CLOSE_REASON = ['done', 'acked', 'missed', 'superseded', 'stopped', 'removed'] as const;
@@ -268,6 +269,7 @@ export const ROLE         = ['owner', 'member'] as const;
 export const FREQ         = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'] as const;
 export const WEEKDAY      = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;  // §4.3 byDay, alarm days
 export const LIST         = ['shopping', 'wishlist'] as const;                   // §7A
+export const CHORE_TIMING = ['at', 'by'] as const;                               // §7B
 export const RELAY_REPORT_STATUS = ['sent', 'partial', 'failed'] as const;    // what /relay/report accepts (§9.2)
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
@@ -283,6 +285,9 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `done` | Someone tapped Done on a reminder |
 | `acked` | Someone tapped Ack on a timer (the timer restarts) |
 | `missed` | A reminder was more than 60 min overdue when the engine first saw it (outage) — closed without alerting |
+| `chore` | A fire for one step of one chore run (§7B) |
+| `at` | Chore rings at its time, like an alarm |
+| `by` | Chore is quiet: due by its time, optionally one nudge then |
 | `superseded` | A newer occurrence of the same event started ringing while this one still was |
 | `stopped` | The timer was stopped |
 | `removed` | The event or timer was edited or deleted, making this fire obsolete |
@@ -463,7 +468,8 @@ CREATE TABLE member_prefs (
 );
 ```
 
-The `CHECK` lists above necessarily repeat §3 as SQL text. Test **M1-VOCAB** asserts
+The `CHECK` lists above necessarily repeat §3 as SQL text. When a later migration rebuilds a table, the **last** `CHECK` for a column in
+migration order is the one in force, and that is the one compared. Test **M1-VOCAB** asserts
 that each `CHECK` list matches the corresponding `vocab.ts` tuple exactly. That
 test is what keeps the two in step.
 
@@ -515,6 +521,80 @@ CREATE TABLE list_items (
 CREATE UNIQUE INDEX uq_list_item_key ON list_items(list, text_key) WHERE deleted_at IS NULL;
 CREATE INDEX idx_list_items ON list_items(list, checked_at) WHERE deleted_at IS NULL;
 ```
+
+### 4.2e Schema change — `migrations/0006_chores.sql`
+
+```sql
+-- §7B — chores and their daily runs. fires gains kind 'chore' (+ chore_run_id); SQLite
+-- cannot alter a CHECK, so fires is rebuilt and its rows copied.
+PRAGMA defer_foreign_keys = true;
+
+CREATE TABLE chores (
+  id           TEXT PRIMARY KEY,               -- 'chr_' + 16 base32
+  title        TEXT NOT NULL,                  -- 1–60 chars
+  done_means   TEXT,                           -- ≤ 200 chars: what "done" looks like
+  days         TEXT NOT NULL,                  -- JSON Weekday[], ≥ 1, week order
+  timing       TEXT NOT NULL CHECK (timing IN ('at','by')),
+  time         TEXT NOT NULL,                  -- local HH:MM
+  nudge        INTEGER NOT NULL DEFAULT 0 CHECK (nudge IN (0, 1)),   -- 'by' only
+  people       TEXT NOT NULL,                  -- JSON member ids in turn order, 1–8
+  steps        TEXT NOT NULL,                  -- JSON ChoreStep[], 1–6 (§7B.2)
+  channels     TEXT NOT NULL,                  -- JSON CHANNEL[] (for rings and nudges)
+  renotify_min INTEGER,                        -- NULL = ring once
+  max_alerts   INTEGER NOT NULL DEFAULT 4,
+  start_date   TEXT NOT NULL,                  -- local date created; rotation counts weeks from it
+  created_by   TEXT NOT NULL REFERENCES members(id),
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL,
+  deleted_at   TEXT
+);
+
+CREATE TABLE chore_runs (                      -- one per chore per day it is due
+  id           TEXT PRIMARY KEY,               -- 'run_' + 16 base32
+  chore_id     TEXT NOT NULL REFERENCES chores(id),
+  date         TEXT NOT NULL,                  -- local YYYY-MM-DD
+  assignee_id  TEXT REFERENCES members(id),    -- whose turn; NULL = nobody active
+  step         INTEGER NOT NULL DEFAULT 0,     -- index of the current step; = steps.length when done
+  done_at      TEXT,
+  done_by      TEXT REFERENCES members(id),
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL,
+  UNIQUE (chore_id, date)
+);
+
+CREATE TABLE fires_new (
+  id              TEXT PRIMARY KEY,
+  kind            TEXT NOT NULL CHECK (kind IN ('reminder','timer','chore')),
+  event_id        TEXT REFERENCES events(id),
+  occurrence_date TEXT,
+  timer_id        TEXT REFERENCES timers(id),
+  chore_run_id    TEXT REFERENCES chore_runs(id),
+  due_at          TEXT NOT NULL,
+  state           TEXT NOT NULL CHECK (state IN ('scheduled','ringing','closed')),
+  alert_count     INTEGER NOT NULL DEFAULT 0,
+  last_alerted_at TEXT,
+  close_reason    TEXT CHECK (close_reason IN ('done','acked','missed','superseded','stopped','removed')),
+  closed_by       TEXT REFERENCES members(id),
+  closed_at       TEXT,
+  CHECK ((kind = 'reminder' AND event_id IS NOT NULL AND occurrence_date IS NOT NULL AND timer_id IS NULL AND chore_run_id IS NULL)
+      OR (kind = 'timer'    AND timer_id IS NOT NULL AND event_id IS NULL AND chore_run_id IS NULL)
+      OR (kind = 'chore'    AND chore_run_id IS NOT NULL AND event_id IS NULL AND timer_id IS NULL))
+);
+INSERT INTO fires_new (id, kind, event_id, occurrence_date, timer_id, chore_run_id, due_at, state,
+                       alert_count, last_alerted_at, close_reason, closed_by, closed_at)
+  SELECT id, kind, event_id, occurrence_date, timer_id, NULL, due_at, state,
+         alert_count, last_alerted_at, close_reason, closed_by, closed_at FROM fires;
+DROP TABLE fires;
+ALTER TABLE fires_new RENAME TO fires;
+CREATE UNIQUE INDEX uq_fire_occurrence ON fires(event_id, occurrence_date) WHERE kind = 'reminder' AND state != 'closed';
+CREATE UNIQUE INDEX uq_timer_open      ON fires(timer_id) WHERE kind = 'timer' AND state != 'closed';
+CREATE UNIQUE INDEX uq_chore_run_open  ON fires(chore_run_id) WHERE kind = 'chore' AND state != 'closed';
+CREATE INDEX idx_fires_open ON fires(state, due_at) WHERE state != 'closed';
+```
+
+**Migration check (M4c):** a test applies 0001–0005, inserts a reminder fire, a timer
+fire and a delivery, applies 0006, and finds all three intact with the delivery still
+pointing at its fire.
 
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
@@ -595,7 +675,8 @@ export const SNOOZE_MIN         = 10;    // ⚑ DEFAULT
 | 4 | `ringing` | `renotifyMin` set, `alert_count < maxAlerts`, `now ≥ last_alerted_at + renotifyMin` | `alert_count + 1`, `last_alerted_at = now`, **alert** |
 | 5 | anything else | — | no change |
 
-Timers are never `missed`. An overdue timer still rings, even after an outage.
+Timers and chores are never `missed`. An overdue timer or chore still rings, even
+after an outage — a chore does not stop needing doing.
 
 After `maxAlerts` a fire stays `ringing` **silently**. It remains visible in the
 app's Ringing bar (§8.2) until someone acts.
@@ -606,6 +687,7 @@ app's Ringing bar (§8.2) until someone acts.
 |--------|----------|--------|
 | `done` | reminder, `ringing` | `closed`, reason `done`, `closed_by` |
 | `snooze` | reminder, `ringing` | `scheduled`, `due_at = now + SNOOZE_MIN`, `alert_count = 0` |
+| `done` | chore, `ringing` | advances the run one step (§7B.3) — the route calls `advanceRun`; the fire closes `done` |
 | `ack` | timer, `ringing` **or** `scheduled` | `closed`, reason `acked`; **next** = new timer fire `due_at = now + intervalMin` |
 | anything else | — | `{ error: 'invalid_action' }` → HTTP 409 |
 
@@ -650,12 +732,18 @@ already rung.
 
 For one alert of one fire:
 
-- **Recipients** = `assigned_to` members; if `[]`, all non-disabled members.
+- **Recipients** = `assigned_to` members; if `[]`, all non-disabled members. For a
+  **chore** fire: only the current step's person (§7B.2), or all active members if
+  there is none.
 - `push` in channels → one `deliveries` row **per recipient**, `member_id` set.
 - `house` in channels → **one** row, `member_id` NULL.
 - **Message text:**
   - reminder: `"Reminder: {title}"`
   - timer: `"Timer: {title}"`
+  - chore: `"Chore for {name}: {title}"`, plus `" — {step title}"` when the chore has
+    more than one step. `{name}` is the step person's display name; with nobody,
+    `"Chore: {title}"`. Naming the person is what lets Shelly (and everyone) hear whose
+    turn it is without a phone.
   - from the second alert on, append `" (alert {n})"`
 
 ### 5.8 Engine acceptance tables (M1 — each row is a test)
@@ -926,6 +1014,104 @@ SQLite `lower()`/`NOCASE`, which fold ASCII only. `text_key` is written by app c
 
 ---
 
+## 7B. Chores — `src/shared/chores.ts` (pure)
+
+A chore is a job on chosen days of the week, done by people **taking turns**. It may be
+a **loop of steps** that hand off — the household's real shape (laundry: start the
+washer → move to dryer → fold and put away). Chores are not calendar events and are
+never drawn on the calendar. Each day a chore is due it gets one **run**.
+
+### 7B.1 Turns (rotation)
+
+- `people` is the turn order (1–8 members). With one person it is simply theirs.
+- **Whose turn** on a date = `people[w mod n]`, where `w` = whole weeks (Sunday-start)
+  from the week containing `start_date` to the week containing the date. So the turn
+  changes every Sunday, and every day in a week belongs to the same person.
+- Disabled members are skipped: the turn passes to the next active person in order.
+  If nobody is active, the run has no assignee and shows as "anyone".
+- `assigneeFor(chore, date, activeIds)` is the one function that decides this.
+
+### 7B.2 Steps (the loop)
+
+```ts
+interface ChoreStep {
+  title: string;            // 1–60 chars, e.g. "Move to dryer"
+  waitMin: number | null;   // after THIS step is done, the next step rings in N min (1–720)
+  memberId: string | null;  // this step's person; null = whoever's turn it is
+}
+```
+
+- A chore has 1–6 steps. A one-step chore is an ordinary chore; its step title is
+  normally the chore title.
+- A run's **current step** is `steps[run.step]`; its **person** is the step's
+  `memberId` or else the run's assignee.
+- The last step's `waitMin` is ignored (nothing follows it).
+
+### 7B.3 Run rules — one open fire per run at most (`uq_chore_run_open`)
+
+**Planning** (`planChoreRuns(chore, tz, now, toUtc, activeIds)`, called by `tick`): one run
+per due date from today (household tz) to the local date of `toUtc` (36 h ahead), never
+before `start_date`. A run is planned once (`INSERT OR IGNORE` on `(chore_id, date)`);
+its first fire is planned only when the run row is newly inserted:
+
+| Timing | First fire |
+|---|---|
+| `at` | due at `date + time` — rings like an alarm (`renotify_min`, `max_alerts`) |
+| `by`, nudge on | due at `date + time` — one alert (renotify ignored), then stays in the Ringing bar |
+| `by`, nudge off | none — the run is only on the Today list |
+
+A first fire whose due time is already past when planned is **not** created (a chore
+added at 20:00 for 08:00 today appears on Today without ringing).
+
+**Done a step** (`advanceRun(chore, run, memberId, now, tz)` → `{ run, closeFire?, newFire? }`):
+1. The run's open fire, if any, closes `done` (`closed_by` = the member).
+2. `step + 1`. If that was the last step: `done_at = now`, `done_by` = member. Stop.
+3. Else, if the step just done has `waitMin` → new fire due `now + waitMin` (it rings
+   for the next step's person, with the chore's renotify).
+4. Else, if timing is `by`, nudge is on, and `date + time` is still ahead → new fire
+   at that deadline (the nudge is kept).
+5. Else no fire: the next step is simply current on the Today list.
+
+**Undo** (`undoRun(chore, run, now, tz)`): only when `step > 0`. `step − 1`, `done_at`/
+`done_by` cleared, the open fire (if any) closes `removed`, and a fire is re-planned
+by rule 4 alone (a `by` nudge still ahead). Waits are not re-armed.
+
+**Runs from earlier days** that were never finished simply drop off the Today list —
+no overdue pile, no red (§1.0 "no shaming"). Their open fire, if any, stays in the
+Ringing bar until someone acts, like any fire.
+
+**Editing a chore** closes `removed` the open fires of its **unstarted** runs (`step = 0`,
+date ≥ today) and deletes those runs; the next tick re-plans them with the new
+settings. Started or finished runs are left alone. Deleting a chore is a soft delete
+plus the same clean-up.
+
+### 7B.4 Limits and validation
+
+Title 1–60, `done_means` ≤ 200, `days` ≥ 1, `people` 1–8 active members, steps 1–6,
+step title 1–60, `waitMin` 1–720 or null, step `memberId` an active member or null,
+`time` `HH:MM`, at least one channel when timing is `at` or nudge is on. Every
+rejection is 400 `invalid_input` with a message naming the field.
+
+### 7B.5 Acceptance (M4c — each row is a test)
+
+| # | Setup / call | Expected |
+|---|---|---|
+| C1 | `assigneeFor` with people [A, B], start Sun 2026-10-04: dates 10-05, 10-10, 10-12, 10-19 | A, A, B, A |
+| C2 | C1 with B disabled | A every week |
+| C3 | Laundry, `at` 07:30 Mon, people [A], steps [Start washer (wait 60), Move to dryer (wait 50), Fold & put away]; tick Mon 07:30 local | fire ringing; push delivery to A only; house message `Chore for A: Laundry — Start washer` |
+| C4 | `done` on that fire at 07:40 | run step 1; new fire due 08:40; tick at 08:40 → ringing, message `… — Move to dryer` |
+| C5 | done at 08:45, then done again (step 2 → finished) | after the 2nd done: run `done_at` set, no open fire |
+| C6 | `by` 19:00 with nudge; done at 17:00 | the scheduled 19:00 fire closes `done`; tick at 19:00 sends nothing |
+| C7 | `by` 19:00, nudge off | no fire ever; the run is in `/chores/today` |
+| C8 | after C4's done, undo | step 0; the 08:40 fire closed `removed` |
+| C9 | create a chore at 20:00 for 08:00 today | today's run exists, no fire for it |
+| C10 | edit the chore's people from [A] to [B] | today's unstarted run is re-planned with assignee B on the next tick |
+| C11 | no days / no people / 7 steps / `waitMin` 0 | 400 `invalid_input`, message names the field |
+| C12 | `/calendar` and `/alarms` | no chore appears in either |
+| C13 | migration check (§4.2e) | old fires and deliveries intact after 0006 |
+
+---
+
 ## 8. Screens
 
 General rules come from `MOJOSOGO-PREFERENCES.md`: chips are entities, badges are
@@ -962,6 +1148,7 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
 
 - Reminder row: `🔔 Take out trash · 19:00` with **[Snooze 10m] [Done]**
 - Timer row: `⏱ Check on the dog · ringing 45 min` with **[Ack]**
+- Chore row: `🧹 Laundry — Move to dryer · Sam` with **[Done]** (no snooze)
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
   "3 more ringing ▾".
 
@@ -1035,6 +1222,30 @@ status badge (running / ringing / stopped) and **[Start]/[Stop]**; tapping a row
 opens the timer form (title, interval 1–1440 min, channels, repeat alert every,
 assigned to, Delete).
 
+**Chores** — the third section, with its own **＋ Add**. One line per chore, sorted
+by time:
+
+```
+Time      Chore            Days        This week
+07:30 at  🧺 Laundry ³     Mon Thu     Sam
+19:00 by  🗑 Trash          Tue         Kai → Sam
+```
+
+- `at`/`by` after the time; a superscript step count when there is more than one step.
+- **This week** = whose turn it is now; when people take turns, `→` the next person.
+- Tapping a row opens the **chore form** (modal):
+  - Title · **Done means…** (one line, e.g. "Bins at the curb, lids shut")
+  - Days (chips Sun…Sat, plus "Every day" / "Weekdays")
+  - **When:** ( ) **At** a time — it rings · ( ) **By** a time — quiet; ☐ nudge then
+  - Time
+  - **People:** member chips; the order you tap is the turn order. With two or more:
+    "Takes turns, changing every Sunday."
+  - **Steps:** one row per step — title · "then ring the next step after ___ min"
+    (optional) · who (whose turn / a member chip). **＋ Add step** (max 6). A new chore
+    starts with one step named after the title.
+  - Channels (☐ Phone ☐ House) · Repeat alert every (Off / 5 / 10 / 15 / 30 min) ·
+    Save / Cancel / Delete (creator or owner, like alarms).
+
 ### 8.6 Settings
 
 - **Me:** name, color, enable phone alerts (subscribe), show/hide holiday types,
@@ -1046,9 +1257,29 @@ assigned to, Delete).
 
 ### 8.8 Lists screen
 
-The **🛒 Lists** tab. A two-way toggle at the top, **Shopping | Wish list**; the
-choice is remembered per device. The list refetches when the tab opens, on focus, and
+The **🛒 Lists** tab. A three-way toggle at the top, **Today | Shopping | Wish list**;
+the choice is remembered per device. The list refetches when the tab opens, on focus, and
 every 30 s while visible (§10 Freshness).
+
+**Today** (chores, §7B) — a switch **Mine | Everyone** (default Mine; remembered):
+
+```
+☐ Laundry — 2/3 Move to dryer     rings 08:40   Sam
+   Lint filter cleaned, nothing left in the drum
+☐ Trash                           by 19:00      Kai
+   Bins at the curb, lids shut
+▸ Done today (2)
+```
+
+- One row per run of today; **Mine** = runs whose current step is mine (or whose turn
+  it is, when the step has no person of its own). Sorted by time.
+- Row: title, then `— n/m step title` for multi-step chores; when: `at 07:30`,
+  `by 19:00`, `rings 08:40` (a pending wait) or a red `ringing` badge; the person's
+  chip. **Done means** is the dim second line.
+- Tapping the row marks the **current step** done (≥ 44 px). A ↶ button (accessible
+  name "Undo last step of Laundry") appears on runs that have a step done.
+- **Done today** is collapsed by default; ↶ there undoes the last step too.
+- Nothing from earlier days, nothing red except `ringing` (§1.0).
 
 **Shopping:**
 
@@ -1239,6 +1470,12 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | GET | `/status` | member | → `{ relayLastSeen, mySubscriptions[], recentDeliveries[] }` |
 | POST | `/relay/claim` | bearer `RELAY_TOKEN` | → deliveries |
 | POST | `/relay/report` | bearer `RELAY_TOKEN` | `{ id, status, detail }` |
+| GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek }` (`thisWeek`/`nextWeek` = member id or null) |
+| POST | `/chores` | member | `{ title, doneMeans?, days, timing, time, nudge?, people, steps, channels, renotifyMin? }` → chore (201) |
+| PATCH/DELETE | `/chores/{id}` | creator or owner | same fields, all optional; re-plans unstarted runs (§7B.3) |
+| GET | `/chores/today` | member | → `{ date, runs: Run[] }`; `Run = { id, choreId, title, doneMeans, timing, time, step, steps, assigneeId, personId, doneAt, doneBy, nextDueAt, ringing }` (`personId` = the current step's person) |
+| POST | `/chore-runs/{id}/done` | member | advances one step (§7B.3) → run; 409 `already_done` when finished |
+| POST | `/chore-runs/{id}/undo` | member | → run; 409 `nothing_to_undo` at step 0 |
 | GET | `/lists/{list}` | member | → `{ open: Item[], checked: Item[] }` (§7A.1); `Item = { id, list, text, note, ownerId, createdBy, createdAt, checkedAt, checkedBy }` |
 | POST | `/lists/{list}/items` | member | `{ text, note?, ownerId? }` → `{ item, result: "added" \| "existing" \| "reopened" }`, 201 when added, else 200 |
 | PATCH | `/list-items/{id}` | member | `{ text?, note?, ownerId?, checked?: boolean }` → item; 409 `duplicate` on a key clash |
@@ -1340,6 +1577,14 @@ checks.
   without touching anything but the keyboard; tick one, find it under Recently bought,
   put it back.
 
+**M4c — Chores**
+- Migration 0006 (incl. the `fires` rebuild), `CHORE_TIMING` + `chore` vocab,
+  `src/shared/chores.ts`, tick planning, `/chores` + `/chore-runs` API, the Chores
+  section + chore form (§8.5), Lists → Today (§8.8), chore rows in the Ringing bar.
+- ✅ Tests C1–C13 (§7B.5); M1-VOCAB passes with the rebuilt `fires`.
+- ✅ Manual at 320 px: create the Laundry loop; on Today tick step 1, see "rings …";
+  undo it; the four tabs still fit.
+
 **M5 — Web Push**
 - Spike first: send one push from a Worker to Chrome desktop and record which
   library works.
@@ -1398,20 +1643,15 @@ Captured from v1.0-draft so nothing is lost:
 
 ### 12.1 Next — decided with MojoSOGO (2026-10-03), spec to be written before building
 
-**Phase B — Chores.** Recurring jobs assigned to a person, built on the alarm/event
-machinery (§4.2a), not a second reminder system.
-- Timing is **chosen per chore**: either *at a time* (rings like an alarm) or *by a
-  time* (quiet; visible on the person's Today list; at most one optional nudge near
-  the deadline).
-- **Rotation** between chosen members, weekly, optional per chore.
-- A "done means…" line per chore (explicit expectations).
-- A per-person **Today** checklist; the kids have their own phones and accounts.
+**Phase B — Chores.** Specified as §7B (v2.5). It shares the fire/delivery machinery
+with reminders and timers (a third fire kind), not a second reminder system.
 
 **Phase C — Shared screen and house.**
 - A wall/kitchen tablet showing today's calendar, chores and the shopping list,
   signed in as a **display** that can tick things off but cannot change settings
   (a new role — §6.3 and §12's "guest role" entry are revisited then).
-- House announcements name who an alert is for ("Shelly: dentist at 14:30").
+- House announcements name who an alert is for ("Shelly: dentist at 14:30"). Chores
+  already do (§5.7).
 
 ---
 
@@ -1430,6 +1670,11 @@ machinery (§4.2a), not a second reminder system.
 | Q9 | Can any member Done/Ack a fire assigned to someone else? | Yes |
 | Q10 | Can any member edit or delete any list item (not only their own)? | Yes — they are household lists |
 | Q11 | How long do bought / done items stay visible? | 30 days |
+| Q12 | Where do chores live? | Set up in **Alarms → Chores**; ticked off in **Lists → Today** (no fifth tab) |
+| Q13 | When do turns change? | Every Sunday (weekly), counted from the week the chore was made |
+| Q14 | Unfinished chores from earlier days? | Drop off Today quietly; a still-ringing fire stays in the Ringing bar |
+| Q15 | Can anyone tick anyone's chore? | Yes — any member, like fires (Q9) |
+| Q16 | Chore alert channels by default | Phone on, House off — same as the alarm form |
 
 ---
 
