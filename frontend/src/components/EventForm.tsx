@@ -3,17 +3,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
 import { del, errorText, get, patch, post } from '../api';
 import { useApp } from '../state';
-import { WEEKDAY, type Channel, type Weekday } from '../../../src/shared/vocab';
+import { WEEKDAY, type Channel } from '../../../src/shared/vocab';
 import { weekdayOf } from '../../../src/shared/time';
-import { positionInMonth, type Recurrence } from '../../../src/shared/recurrence';
+import { type Recurrence } from '../../../src/shared/recurrence';
 import { longDate } from './DaySheet';
 import { FromThing } from './ThingPhoto';
+import { RepeatFields, repeatOf, toRecurrence, type RepeatValue } from './RepeatFields';
 
-type Repeat = 'none' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'MONTHLY_POS' | 'YEARLY';
-
-interface Form {
+interface Form extends RepeatValue {
   title: string; notes: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string;
-  repeat: Repeat; byDay: Weekday[]; until: string; assignedTo: string[];
+  assignedTo: string[];
   remind: string; push: boolean; house: boolean; renotify: string;
 }
 
@@ -22,17 +21,6 @@ const REMIND_OPTIONS: [string, string][] = [
   ['30', '30 min before'], ['60', '1 hour before'], ['1440', '1 day before'],
 ];
 const RENOTIFY_OPTIONS: [string, string][] = [['off', 'Off'], ['5', 'Every 5 min'], ['10', 'Every 10 min'], ['15', 'Every 15 min'], ['30', 'Every 30 min']];
-const DAY_LABEL: Record<Weekday, string> = { SU: 'Sun', MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat' };
-
-const ORDINAL: Record<number, string> = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th', [-1]: 'last' };
-const WEEKDAY_NAME: Record<Weekday, string> = { SU: 'Sunday', MO: 'Monday', TU: 'Tuesday', WE: 'Wednesday', TH: 'Thursday', FR: 'Friday', SA: 'Saturday' };
-
-/** "3rd Friday" / "last Friday" — the nth weekday this date is in its month. */
-function positionText(date: string): string {
-  const p = positionInMonth(date);
-  return `${ORDINAL[p.setPos]} ${WEEKDAY_NAME[p.weekday]}`;
-}
-
 function blank(date: string): Form {
   return {
     title: '', notes: '', date, allDay: false, startTime: '09:00', endTime: '', endDate: date,
@@ -43,7 +31,7 @@ function blank(date: string): Form {
 
 function fromEvent(e: any): Form {
   const r: Recurrence | null = e.recurrence;
-  const repeat: Repeat = !r ? 'none' : r.freq === 'WEEKLY' && r.interval === 2 ? 'BIWEEKLY' : r.freq === 'MONTHLY' && r.setPos ? 'MONTHLY_POS' : r.freq;
+  const repeat = repeatOf(r);
   return {
     title: e.title, notes: e.notes ?? '', date: e.startDate, allDay: e.allDay, startTime: e.startTime ?? '09:00',
     endTime: e.endTime ?? '', endDate: e.endDate, repeat, byDay: r?.byDay ?? [WEEKDAY[weekdayOf(e.startDate)]],
@@ -56,19 +44,7 @@ function fromEvent(e: any): Form {
 }
 
 function toPayload(f: Form) {
-  let recurrence: Recurrence | null = null;
-  if (f.repeat !== 'none') {
-    const freq = f.repeat === 'BIWEEKLY' ? 'WEEKLY' : f.repeat === 'MONTHLY_POS' ? 'MONTHLY' : f.repeat;
-    recurrence = { freq };
-    if (f.repeat === 'BIWEEKLY') recurrence.interval = 2;
-    if (f.repeat === 'MONTHLY_POS') {
-      const pos = positionInMonth(f.date);
-      recurrence.byDay = [pos.weekday];
-      recurrence.setPos = pos.setPos;
-    }
-    if (freq === 'WEEKLY') recurrence.byDay = WEEKDAY.filter((d) => f.byDay.includes(d));
-    if (f.until) recurrence.until = f.until;
-  }
+  const recurrence = toRecurrence(f, f.date);
   const channels: Channel[] = [...(f.push ? ['push' as const] : []), ...(f.house ? ['house' as const] : [])];
   return {
     title: f.title, notes: f.notes || null, startDate: f.date,
@@ -170,33 +146,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
             </div>
           )}
 
-          <label className="field"><span>Repeat</span>
-            <select value={form.repeat} onChange={(e) => set('repeat', e.target.value as Repeat)}>
-              <option value="none">Never</option>
-              <option value="DAILY">Daily</option>
-              <option value="WEEKLY">Weekly</option>
-              <option value="BIWEEKLY">Every 2 weeks</option>
-              <option value="MONTHLY">Monthly on day {Number(form.date.slice(8, 10))}</option>
-              <option value="MONTHLY_POS">Monthly on the {positionText(form.date)}</option>
-              <option value="YEARLY">Yearly</option>
-            </select>
-          </label>
-          {(form.repeat === 'WEEKLY' || form.repeat === 'BIWEEKLY') && (
-            <div className="row wrap" style={{ marginBottom: 12 }} role="group" aria-label="Days of the week">
-              {WEEKDAY.map((d) => (
-                <label key={d} className="chip" style={{ padding: '4px 8px' }}>
-                  <input type="checkbox" checked={form.byDay.includes(d)}
-                    onChange={(e) => set('byDay', e.target.checked ? [...form.byDay, d] : form.byDay.filter((x) => x !== d))} />
-                  {DAY_LABEL[d]}
-                </label>
-              ))}
-            </div>
-          )}
-          {form.repeat !== 'none' && (
-            <label className="field"><span>Repeat until (optional)</span>
-              <input type="date" min={form.date} value={form.until} onChange={(e) => set('until', e.target.value)} />
-            </label>
-          )}
+          <RepeatFields value={form} date={form.date} onChange={(c) => setForm((f) => (f ? { ...f, ...c } : f))} />
 
           <div className="field" role="group" aria-label="Assigned to">
             <span className="muted" style={{ fontSize: '.8rem' }}>Assigned to (none = everyone)</span>

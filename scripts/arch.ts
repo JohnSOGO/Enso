@@ -18,7 +18,7 @@ export const WARN_AT = 0.9;
 export const CEILINGS: Record<string, number> = {
   'frontend/src/components/Settings.tsx': 219 + WORKING_BUFFER,
   'frontend/src/components/Calendar.tsx': 262 + WORKING_BUFFER,
-  'frontend/src/components/EventForm.tsx': 243 + WORKING_BUFFER,
+  'frontend/src/components/EventForm.tsx': 195 + WORKING_BUFFER,
   'src/worker/routes/events.ts': 201 + WORKING_BUFFER,
 };
 
