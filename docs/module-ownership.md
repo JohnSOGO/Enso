@@ -99,4 +99,5 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `scripts/arch.ts` | Architecture caps, layering bans, source scan (§2.5) |
 | `scripts/arch-types.ts` | Shapes of the scan, Node-free so the workerd test can import them |
 | `scripts/arch-audit.ts` | `npm run arch:audit` headroom report |
+| `scripts/draw-enso.mjs` | Draws the Ensō mark into `frontend/public/icon.svg` (§8.10) — our own drawing, regenerated, never hand-edited |
 | `scripts/seed-dev.mjs` | Local dev seed data (`npm run seed:dev`) |

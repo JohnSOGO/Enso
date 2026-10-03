@@ -1535,7 +1535,7 @@ the web page — same design, nothing reinvented.
 where the brush lands and tapering as it lifts, left **open at the top right** (the
 traditional unfinished circle). Off-white ink (`--text` #F8FAFC) on the app's navy
 (`--bg` #0F172A). It is **our own drawing** (`frontend/public/icon.svg`, generated once by
-`scripts/draw-enso.py`), not a stock image — a stock logo needs its licence bought first.
+`scripts/draw-enso.mjs`), not a stock image — a stock logo needs its licence bought first.
 It replaces the old calendar icon everywhere: home-screen icon, favicon, opening screen.
 
 **Opening screen** — shown from the very first frame until the app is ready, and for at
@@ -2078,6 +2078,8 @@ the entry chunk). Its manual check — a real QR scanned by a phone at home — 
 **M4f installed app + always fresh** is built: manifest named Ensō with PNG icons, iPhone
 home-screen tags, `AppRefresh` (reload on resume unless a dialog is open; pull to refresh)
 — verified with real touch events in an emulated phone; its on-iPhone check is still to do.
+The ensō mark (scripts/draw-enso.mjs) and the opening screen are built; the 7 iPhone launch
+images are rendered from it. Its on-iPhone check is still to do.
 **M7: live at https://enso.sogodojo.com (2026-10-03)** — production D1 `enso` (all 7
 migrations), carry-over of settings + 5 school holidays, secrets SETUP_TOKEN and
 RELAY_TOKEN only, the same build as the home-network server. Owner setup and the shared

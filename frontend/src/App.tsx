@@ -99,6 +99,9 @@ function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boo
   );
 }
 
+/** The opening screen stays at least this long from page start (§8.10). */
+const SPLASH_MIN_MS = 800;
+
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
   useEffect(() => { get<Me>('/me').then(setMe).catch(() => setMe(null)); }, []);
@@ -110,7 +113,20 @@ export function App() {
   useEffect(() => { if (me && joining) leaveJoin(); }, [me, joining, leaveJoin]);
   const signedIn = (m: Me, how?: { joined: boolean }) => { setJustJoined(!!how?.joined); setMe(m); };
 
-  if (me === undefined) return <p className="muted" style={{ padding: 16 }}>Loading…</p>;
+  // SPEC §8.10: the opening screen (index.html) covers loading; it leaves once we know who this is,
+  // after at least 0.8 s from page start so it never flickers.
+  useEffect(() => {
+    if (me === undefined) return;
+    const splash = document.getElementById('splash');
+    if (!splash) return;
+    const t = setTimeout(() => {
+      splash.classList.add('gone');
+      setTimeout(() => splash.remove(), 300);
+    }, Math.max(0, SPLASH_MIN_MS - performance.now()));
+    return () => clearTimeout(t);
+  }, [me]);
+
+  if (me === undefined) return null;
   if (me === null) {
     return joining
       ? <JoinPage onJoined={(m) => { leaveJoin(); signedIn(m, { joined: true }); }} onSignIn={leaveJoin} />
