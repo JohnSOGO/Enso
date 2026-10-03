@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
 import { TimersSection, type Timer } from './Timers';
+import { ChannelChecks, DayChips, RenotifySelect, SHORT, daysText } from './AlertFields';
 import { del, errorText, get, patch, post } from '../api';
 import { useApp } from '../state';
 import { WEEKDAY, type Channel, type Weekday } from '../../../src/shared/vocab';
@@ -11,18 +12,6 @@ import s from './Lists.module.css';
 export interface Alarm {
   id: string; title: string; time: string; days: Weekday[]; channels: Channel[];
   renotifyMin: number | null; assignedTo: string[]; createdBy: string; nextDueAt: string | null; ringing: boolean;
-}
-
-const SHORT: Record<Weekday, string> = { SU: 'Sun', MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat' };
-const WEEKDAYS: Weekday[] = ['MO', 'TU', 'WE', 'TH', 'FR'];
-const WEEKENDS: Weekday[] = ['SU', 'SA'];
-const same = (a: Weekday[], b: Weekday[]) => a.length === b.length && b.every((d) => a.includes(d));
-
-export function daysText(days: Weekday[]): string {
-  if (days.length === 7) return 'Every day';
-  if (same(days, WEEKDAYS)) return 'Weekdays';
-  if (same(days, WEEKENDS)) return 'Weekends';
-  return WEEKDAY.filter((d) => days.includes(d)).map((d) => SHORT[d]).join(' ');
 }
 
 function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
@@ -81,8 +70,6 @@ function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
   );
 }
 
-const RENOTIFY: [string, string][] = [['off', 'Off (ring once)'], ['5', 'Every 5 min'], ['10', 'Every 10 min'], ['15', 'Every 15 min'], ['30', 'Every 30 min']];
-
 export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: () => void }) {
   const { me, members, refresh } = useApp();
   const init = useMemo(() => ({
@@ -95,7 +82,6 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(f) !== JSON.stringify(init);
   const canEdit = !alarm || me.role === 'owner' || alarm.createdBy === me.id;
-  const toggleDay = (d: Weekday) => setF({ ...f, days: f.days.includes(d) ? f.days.filter((x) => x !== d) : [...f.days, d] });
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true); setError(null);
@@ -123,29 +109,9 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
         <label className="field"><span>Time</span>
           <input type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} />
         </label>
-        <div className="field" role="group" aria-label="Days of the week">
-          <span className="muted" style={{ fontSize: '.8rem' }}>Days</span>
-          <div className="row wrap" style={{ marginTop: 4 }}>
-            {WEEKDAY.map((d) => (
-              <label key={d} className="chip" style={{ padding: '4px 8px' }}>
-                <input type="checkbox" checked={f.days.includes(d)} onChange={() => toggleDay(d)} /> {SHORT[d]}
-              </label>
-            ))}
-          </div>
-          <div className="row wrap" style={{ marginTop: 6 }}>
-            <button type="button" onClick={() => setF({ ...f, days: [...WEEKDAY] })}>Every day</button>
-            <button type="button" onClick={() => setF({ ...f, days: [...WEEKDAYS] })}>Weekdays</button>
-          </div>
-        </div>
-        <div className="row wrap" style={{ marginBottom: 12 }} role="group" aria-label="Alert via">
-          <label className="chip" style={{ padding: '4px 8px' }}><input type="checkbox" checked={f.push} onChange={(e) => setF({ ...f, push: e.target.checked })} /> 📱 Phone</label>
-          <label className="chip" style={{ padding: '4px 8px' }}><input type="checkbox" checked={f.house} onChange={(e) => setF({ ...f, house: e.target.checked })} /> 🔊 House</label>
-        </div>
-        <label className="field"><span>Repeat the alert until handled</span>
-          <select value={f.renotify} onChange={(e) => setF({ ...f, renotify: e.target.value })}>
-            {RENOTIFY.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-        </label>
+        <DayChips days={f.days} onChange={(days) => setF({ ...f, days })} />
+        <ChannelChecks push={f.push} house={f.house} onChange={(c) => setF({ ...f, ...c })} />
+        <RenotifySelect label="Repeat the alert until handled" value={f.renotify} onChange={(renotify) => setF({ ...f, renotify })} />
         <div className="field" role="group" aria-label="Assigned to">
           <span className="muted" style={{ fontSize: '.8rem' }}>Assigned to (none = everyone)</span>
           <div className="row wrap" style={{ marginTop: 4 }}>

@@ -1,6 +1,7 @@
 // SPEC §8.5 — Timers screen (single-line list) and timer form.
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
+import { ChannelChecks, RenotifySelect } from './AlertFields';
 import { del, errorText, get, patch, post } from '../api';
 import { useApp } from '../state';
 import type { Channel } from '../../../src/shared/vocab';
@@ -94,8 +95,6 @@ export function TimersSection({ onEdit }: { onEdit: (t: Timer | null) => void })
   );
 }
 
-const RENOTIFY: [string, string][] = [['off', 'Off (ring once)'], ['5', 'Every 5 min'], ['10', 'Every 10 min'], ['15', 'Every 15 min'], ['30', 'Every 30 min']];
-
 export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: () => void }) {
   const { me, members, refresh } = useApp();
   const init = useMemo(() => ({
@@ -136,15 +135,8 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
         <label className="field"><span>Interval (minutes, 1–1440)</span>
           <input type="number" inputMode="numeric" min={1} max={1440} value={f.interval} onChange={(e) => setF({ ...f, interval: e.target.value })} />
         </label>
-        <div className="row wrap" style={{ marginBottom: 12 }} role="group" aria-label="Alert via">
-          <label className="chip" style={{ padding: '4px 8px' }}><input type="checkbox" checked={f.push} onChange={(e) => setF({ ...f, push: e.target.checked })} /> 📱 Phone</label>
-          <label className="chip" style={{ padding: '4px 8px' }}><input type="checkbox" checked={f.house} onChange={(e) => setF({ ...f, house: e.target.checked })} /> 🔊 House</label>
-        </div>
-        <label className="field"><span>While ringing, repeat the alert</span>
-          <select value={f.renotify} onChange={(e) => setF({ ...f, renotify: e.target.value })}>
-            {RENOTIFY.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-        </label>
+        <ChannelChecks push={f.push} house={f.house} onChange={(c) => setF({ ...f, ...c })} />
+        <RenotifySelect label="While ringing, repeat the alert" value={f.renotify} onChange={(renotify) => setF({ ...f, renotify })} />
         <div className="field" role="group" aria-label="Assigned to">
           <span className="muted" style={{ fontSize: '.8rem' }}>Assigned to (none = everyone)</span>
           <div className="row wrap" style={{ marginTop: 4 }}>
