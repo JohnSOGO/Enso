@@ -7,6 +7,33 @@ carry its result.
 
 ---
 
+## 2026-10-03 — M4c Chores (placement-advisor)
+
+- **Ask:** place chores (§7B): pure rules, engine changes, tick planning, API, Alarms →
+  Chores section + form, Lists → Today, Ringing-bar chore rows; split into a server
+  slice and a UI slice with disjoint files.
+- **Verdict:** NEW `src/shared/chores.ts` (whose turn, planning, advance/undo, fire
+  context, input validation — pure; imports engine, never the reverse),
+  `src/worker/routes/chores.ts` (CRUD, today, done/undo, in-place re-plan; exports
+  `completeStep`), `frontend/src/components/{Chores,ChoreForm,ChoresToday,AlertFields}.tsx`.
+  EXISTING: `engine.ts` (fire shape + `chore_run_id`, `applyAction` chore/done gate,
+  chore message text in `alertMessage`), `tick.ts` (planning, `sourceOf` chore branch,
+  recipients fallback), `routes/alerts.ts` (fires-action chore branch → `completeStep`;
+  `/fires` chore fields), `index.ts`, `Alarms.tsx`, `App.tsx`, `HouseholdLists.tsx`,
+  `RingingBar.tsx`, `state.tsx`, `test/vocab.test.ts`.
+- **Reorganizer (UI only, before the UI build):** extract day chips / days text /
+  channels / repeat options from `Alarms.tsx` + `Timers.tsx` into `AlertFields.tsx`;
+  split `HouseholdLists.tsx` into shell + `ListPanel`; move shared tick-row CSS into
+  `Lists.module.css`.
+- **Spec gaps found and fixed before dispatch:** `/fires` chore fields; edit re-plans
+  runs in place (deleting runs would break `fires.chore_run_id`); `advanceRun`/`undoRun`
+  take the open fire; push `done` action for chores.
+- **Caps:** nothing near a cap; largest projected `HouseholdLists.tsx` ~215/300.
+  Pre-named seams: `tick.ts` → `src/worker/fires.ts`; `chores.ts` → `chore-input.ts`;
+  `routes/chores.ts` → `chore-runs.ts`.
+
+---
+
 ## 2026-10-03 — Phase A Lists (placement-advisor)
 
 - **Ask:** place household lists (shopping, wish list): item rules, routes, screen, styling.

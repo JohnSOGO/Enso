@@ -1063,7 +1063,7 @@ its first fire is planned only when the run row is newly inserted:
 A first fire whose due time is already past when planned is **not** created (a chore
 added at 20:00 for 08:00 today appears on Today without ringing).
 
-**Done a step** (`advanceRun(chore, run, memberId, now, tz)` → `{ run, closeFire?, newFire? }`):
+**Done a step** (`advanceRun(chore, run, openFire, memberId, now, tz)` → `{ run, closeFire?, newFire? }`):
 1. The run's open fire, if any, closes `done` (`closed_by` = the member).
 2. `step + 1`. If that was the last step: `done_at = now`, `done_by` = member. Stop.
 3. Else, if the step just done has `waitMin` → new fire due `now + waitMin` (it rings
@@ -1072,7 +1072,7 @@ added at 20:00 for 08:00 today appears on Today without ringing).
    at that deadline (the nudge is kept).
 5. Else no fire: the next step is simply current on the Today list.
 
-**Undo** (`undoRun(chore, run, now, tz)`): only when `step > 0`. `step − 1`, `done_at`/
+**Undo** (`undoRun(chore, run, openFire, now, tz)`): only when `step > 0`. `step − 1`, `done_at`/
 `done_by` cleared, the open fire (if any) closes `removed`, and a fire is re-planned
 by rule 4 alone (a `by` nudge still ahead). Waits are not re-armed.
 
@@ -1080,10 +1080,12 @@ by rule 4 alone (a `by` nudge still ahead). Waits are not re-armed.
 no overdue pile, no red (§1.0 "no shaming"). Their open fire, if any, stays in the
 Ringing bar until someone acts, like any fire.
 
-**Editing a chore** closes `removed` the open fires of its **unstarted** runs (`step = 0`,
-date ≥ today) and deletes those runs; the next tick re-plans them with the new
-settings. Started or finished runs are left alone. Deleting a chore is a soft delete
-plus the same clean-up.
+**Editing a chore** re-plans its **unstarted** runs (`step = 0`, date ≥ today) **in
+place**, in the same request and one batch: the assignee is recomputed, the open fire
+(if any) closes `removed`, and a new first fire is inserted by the planning rule (only
+if still ahead). Runs are never deleted — fires reference them. Started or finished
+runs are left alone. **Deleting a chore** is a soft delete; the open fires of its
+unstarted runs close `removed` and the runs stay (history).
 
 ### 7B.4 Limits and validation
 
@@ -1105,7 +1107,7 @@ rejection is 400 `invalid_input` with a message naming the field.
 | C7 | `by` 19:00, nudge off | no fire ever; the run is in `/chores/today` |
 | C8 | after C4's done, undo | step 0; the 08:40 fire closed `removed` |
 | C9 | create a chore at 20:00 for 08:00 today | today's run exists, no fire for it |
-| C10 | edit the chore's people from [A] to [B] | today's unstarted run is re-planned with assignee B on the next tick |
+| C10 | edit the chore's people from [A] to [B] | today's unstarted run has assignee B straight away; its old fire closed `removed`, a new one planned if still ahead |
 | C11 | no days / no people / 7 steps / `waitMin` 0 | 400 `invalid_input`, message names the field |
 | C12 | `/calendar` and `/alarms` | no chore appears in either |
 | C13 | migration check (§4.2e) | old fires and deliveries intact after 0006 |
@@ -1357,6 +1359,7 @@ Dark by default. Colors are defined as tokens on `:root`:
   and `requireInteraction: true`. Actions:
   - reminder: `[{action:'done'}, {action:'snooze'}]`
   - timer: `[{action:'ack'}]`
+  - chore: `[{action:'done'}]`
 - **`notificationclick`:**
   - With an action, the handler `POST`s `/api/v1/fires/{id}/actions` with the
     session cookie (same origin) and closes the notification.
@@ -1459,7 +1462,7 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | GET | `/alarms` | member | → alarms: `{ id, title, time, days: Weekday[], channels, renotifyMin, assignedTo, createdBy, nextDueAt, ringing }` |
 | POST | `/alarms` | member | `{ title, time: "HH:MM", days: Weekday[], channels, renotifyMin?, assignedTo? }` → alarm |
 | PATCH/DELETE | `/alarms/{id}` | creator or owner | same fields as POST, all optional; closes future scheduled fires like an event edit |
-| GET | `/fires?state=ringing` | member | → open fires with titles |
+| GET | `/fires?state=ringing` | member | → open fires with titles; chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person) |
 | POST | `/fires/{id}/actions` | member | `{ action: Action }` → fire (+ next); 409 on `invalid_action` |
 | POST | `/push/subscriptions` | member | `PushSubscriptionJSON` + userAgent |
 | DELETE | `/push/subscriptions/{id}` | owner of the subscription | |

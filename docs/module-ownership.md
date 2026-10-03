@@ -24,6 +24,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/shared/recurrence.ts` | Recurrence expansion to local dates (§4.3) — the one recurrence format |
 | `src/shared/holidays.ts` | The `HOLIDAYS` table, observed rule, default days off (§7.3) |
 | `src/shared/markets.ts` | Monthly options expiration dates, Easter computus (§7.4) |
+| `src/shared/chores.ts` | Chore rules: whose turn (assigneeFor), run planning, step advance/undo, a chore fire's config/person/step, input validation and limits (§7B) — pure |
 | `src/shared/engine.ts` | The alert engine: plan, step, act, timer commands (§5) — pure |
 | `src/shared/lists.ts` | Household list rules: itemKey, add/re-open decision, text/note limits, 30-day visible window (§7A.1) — pure |
 
