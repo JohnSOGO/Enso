@@ -1,7 +1,7 @@
 // SPEC §5.8 — every row is a test.
 import { describe, expect, it } from 'vitest';
 import {
-  alertMessage, applyAction, applyTimerCmd, newChoreFire, planReminderFires, stepFire,
+  alertMessage, applyAction, applyTimerCmd, newChoreFire, newThingFire, planReminderFires, stepFire,
   type AlertConfig, type FireRow, type NewFire, type ReminderEvent,
 } from '../src/shared/engine';
 import { localToUtc } from '../src/shared/time';
@@ -241,6 +241,36 @@ describe('chore fires (§5.3, §5.4, §5.7)', () => {
     expect(alertMessage('chore', 'Trash', 1, { personName: 'Kai', stepTitle: 'Trash', stepCount: 1 })).toBe('Chore for Kai: Trash');
     expect(alertMessage('chore', 'Trash', 2, { personName: null, stepTitle: 'Trash', stepCount: 1 })).toBe('Chore: Trash (alert 2)');
     expect(alertMessage('reminder', 'Meds', 1)).toBe('Reminder: Meds');
+  });
+});
+
+describe('thing fires (§5.3, §5.4, §7C.2)', () => {
+  const cfg: AlertConfig = { channels: ['push'], renotifyMin: null, maxAlerts: 4 };
+  const due = '2026-10-10T16:00:00.000Z';
+  const fire = withId(newThingFire('thg_1', '2026-10-10', due));
+
+  it('a thing fire carries its thing and reminder date, and nothing else', () => {
+    expect(fire).toMatchObject({ kind: 'thing', thing_id: 'thg_1', occurrence_date: '2026-10-10', event_id: null, timer_id: null, chore_run_id: null, state: 'scheduled' });
+  });
+
+  it('like a reminder it goes missed after an outage (> 60 min), and rings at exactly 60', () => {
+    expect(stepFire(fire, cfg, '2026-10-10T17:01:00.000Z')).toMatchObject({ alert: false, fire: { close_reason: 'missed' } });
+    expect(stepFire(fire, cfg, '2026-10-10T17:00:00.000Z')).toMatchObject({ alert: true, fire: { state: 'ringing' } });
+  });
+
+  it('done and snooze work on a ringing thing fire; ack does not', () => {
+    const ringing = stepFire(fire, cfg, due).fire;
+    const done = applyAction(ringing, 'done', cfg, 'mem_a', '2026-10-10T16:05:00.000Z');
+    expect(done).toMatchObject({ fire: { state: 'closed', close_reason: 'done', closed_by: 'mem_a' } });
+    const snooze = applyAction(ringing, 'snooze', cfg, 'mem_a', '2026-10-10T16:05:00.000Z');
+    expect(snooze).toMatchObject({ fire: { state: 'scheduled', due_at: '2026-10-10T16:15:00.000Z', alert_count: 0 } });
+    expect(applyAction(ringing, 'ack', cfg, 'mem_a', due)).toEqual({ error: 'invalid_action' });
+    expect(applyAction(fire, 'done', cfg, 'mem_a', due)).toEqual({ error: 'invalid_action' });
+  });
+
+  it('message: "To do: {title}", plus " — starts today" for the start reminder', () => {
+    expect(alertMessage('thing', 'Fall fair', 1, undefined, true)).toBe('To do: Fall fair — starts today');
+    expect(alertMessage('thing', 'Fall fair', 1)).toBe('To do: Fall fair');
   });
 });
 
