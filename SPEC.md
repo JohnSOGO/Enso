@@ -3387,7 +3387,9 @@ for someone who is never in that room.
   Message: "Speakers must be a list of Home Assistant speaker ids, or null."
 - `speakersFor(choices)` — the speakers of one house delivery, from the choices (`string[] | null`) of
   everyone it is for: **any `null` → `null`** (someone has not chosen, so the default speakers) ⚑ Q125;
-  otherwise the **union**, in first-seen order ⚑ Q126; no choices at all → `[]`.
+  otherwise the **union**, in first-seen order ⚑ Q126. **No one at all** (an alert whose assigned members
+  are all disabled, which today is still spoken) → `null`, the default speakers, as before. A stored
+  choice that `speakersError` refuses is read as `null` (writes are validated, so it can only be hand-made).
 - `splitSpeakers(ids)` → `{ echo: string[], satellite: string[] }` by kind.
 - `speakerList(text)` → `Speaker[]` (`{ id, name, kind }`) or `null`: parses Home Assistant's answer
   (below), keeps the entries whose `id` has a kind and whose `name` is a non-empty string (else the id),
@@ -3441,7 +3443,7 @@ no longer lists is shown as such and fails visibly when spoken. `GET /me` carrie
 | # | Check | Expected |
 |---|---|---|
 | HS1 | `speakerKind`, `speakersError` | `media_player.game_room` echo; `assist_satellite.voice_pe` satellite; `light.x`, `media_player.Game Room`, `""` null; null ok, `[]` ok, 21 ids / a duplicate / a light / a non-array → message |
-| HS2 | `speakersFor` | `[null]` and `[['a'], null]` → null; `[['a','b'], ['b','c']]` → `['a','b','c']`; `[[], []]` → `[]`; `[]` → `[]` |
+| HS2 | `speakersFor` | `[null]` and `[['a'], null]` → null; `[['a','b'], ['b','c']]` → `['a','b','c']`; `[[], []]` → `[]`; `[]` → null |
 | HS3 | `speakerList` on an HA answer with two Echos, the Voice PE, a `light.*`, a duplicate, a blank name; on `"oops"` | Echos first by name, then the satellite; the light and duplicate gone; the blank name → the id; `null` |
 | HS4 | `GET /house/speakers` against a fake HA | one POST to `/api/template` carrying the template and the three auth headers; 200 with the list, `mine` null, `defaults`; not configured → 503 and zero fetches; HA 500 / 302 / not JSON → 502 `house_unreachable` |
 | HS5 | `PATCH /me { houseSpeakers }` | a list saved and back on `GET /me`; `null` clears it; a bad list → 400 and nothing saved |
