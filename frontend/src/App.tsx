@@ -10,6 +10,7 @@ import { Alarms, AlarmForm, type Alarm } from './components/Alarms';
 import { type Chore } from './components/Chores';
 import { ChoreForm } from './components/ChoreForm';
 import { HouseholdLists } from './components/HouseholdLists';
+import { Recipes } from './components/Recipes';
 import { Settings } from './components/Settings';
 import { RingingBar } from './components/RingingBar';
 import { SignIn } from './components/SignIn';
@@ -21,7 +22,7 @@ import { Modal } from './components/Modal';
 import s from './App.module.css';
 
 /** The bottom tab bar (§8.1): the one list of tabs — id, icon, label. */
-const NAV = [['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alarms'], ['lists', '🛒', 'Lists'], ['settings', '⚙', 'Settings']] as const;
+const NAV = [['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alarms'], ['lists', '🛒', 'Lists'], ['recipes', '🍳', 'Recipes'], ['settings', '⚙', 'Settings']] as const;
 type Tab = (typeof NAV)[number][0];
 const TABS: readonly Tab[] = NAV.map(([id]) => id);
 /** §8.1 ⚑ Q38 — the House badge per server-reported state; `ok` and `untried` show none. */
@@ -74,6 +75,7 @@ function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boo
         {tab === 'alarms' && <Alarms onEditAlarm={(alarm) => setOverlay({ kind: 'alarm', alarm })} onEditTimer={(timer) => setOverlay({ kind: 'timer', timer })}
           onEditChore={(chore) => setOverlay({ kind: 'chore', chore })} />}
         {tab === 'lists' && <HouseholdLists />}
+        {tab === 'recipes' && <Recipes />}
         {tab === 'settings' && <Settings onLogout={onLogout} />}
       </main>
       {tab === 'calendar' && (

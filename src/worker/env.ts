@@ -7,6 +7,7 @@ export interface Env {
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
   ANTHROPIC_API_KEY?: string;
+  YOUTUBE_API_KEY?: string; // §7E recipes from videos
   // §9.2 House delivery — vars in wrangler.toml, the three secrets via `wrangler secret put`.
   HA_URL?: string;
   ECHO_TARGETS?: string[];

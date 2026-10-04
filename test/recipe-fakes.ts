@@ -1,0 +1,79 @@
+// SPEC §7E — canned YouTube and Anthropic answers for the recipe tests. Nothing here ever leaves the
+// isolate: `fakeWorld` replaces fetch, answers only the four fake endpoints, and fails the test on any
+// other host. The keys the route sees are fake too (`keyedEnv`).
+import { env } from 'cloudflare:test';
+import { vi } from 'vitest';
+import type { Env } from '../src/worker/env';
+
+export const VIDEO_ID = 'dQw4w9WgXcQ';
+export const YT_KEY = 'fake-youtube-key';
+
+/** The pinned env with FAKE recipe keys — reading is "set up", and still reaches only the fakes. */
+export const keyedEnv = (): Env => ({ ...(env as unknown as Env), YOUTUBE_API_KEY: YT_KEY, ANTHROPIC_API_KEY: 'fake-anthropic-key' });
+
+/** A watch page whose player response lists `tracks` (none → a page with a player but no captions). */
+export function watchPage(tracks?: object[]): string {
+  const player = tracks ? { captions: { playerCaptionsTracklistRenderer: { captionTracks: tracks } } } : { videoDetails: {} };
+  return `<!doctype html><html><head><title>x</title></head><body><script>var ytInitialPlayerResponse = ${JSON.stringify(player)};</script></body></html>`;
+}
+
+export const TRACKS = [
+  { baseUrl: `https://www.youtube.com/api/timedtext?v=${VIDEO_ID}&lang=de`, languageCode: 'de' },
+  { baseUrl: `https://www.youtube.com/api/timedtext?v=${VIDEO_ID}&lang=en&kind=asr`, languageCode: 'en', kind: 'asr' },
+  { baseUrl: `https://www.youtube.com/api/timedtext?v=${VIDEO_ID}&lang=en`, languageCode: 'en' },
+];
+
+export const json3 = (...lines: string[]) =>
+  JSON.stringify({ events: lines.map((l) => ({ tStartMs: 0, segs: l.split(' ').map((w, i) => ({ utf8: i ? ` ${w}` : w })) })) });
+
+export const videoAnswer = (snippet: object | null) => ({ kind: 'youtube#videoListResponse', items: snippet ? [{ id: VIDEO_ID, snippet }] : [] });
+
+/** An Anthropic Messages answer carrying `value` as its structured output. */
+export const claudeMessage = (value: object | null, over: object = {}) => ({
+  id: 'msg_1', type: 'message', role: 'assistant', model: 'claude-opus-5-5', stop_sequence: null, stop_details: null,
+  usage: { input_tokens: 1, output_tokens: 1 }, stop_reason: 'end_turn',
+  content: value ? [{ type: 'text', text: JSON.stringify(value) }] : [], ...over,
+});
+
+type Reply = { status?: number; body: string | object } | 'throw';
+export interface World {
+  video?: Reply;
+  watch?: Reply;
+  captions?: Reply;
+  claude?: Reply;
+}
+export interface Heard { host: string; path: string; url: string; body: any }
+
+const respond = (r: Reply | undefined, what: string) => {
+  if (!r) throw new Error(`no fake answer for ${what}`);
+  if (r === 'throw') throw new Error('connection refused');
+  const json = typeof r.body !== 'string';
+  return new Response(json ? JSON.stringify(r.body) : (r.body as string), {
+    status: r.status ?? 200, headers: { 'content-type': json ? 'application/json' : 'text/html; charset=utf-8' },
+  });
+};
+
+/** Replaces fetch with the fakes (call vi.restoreAllMocks() in afterEach). Every request is recorded in `heard`. */
+export function fakeWorld(world: World) {
+  const heard: Heard[] = [];
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const req = new Request(input, init);
+    const url = new URL(req.url);
+    const text = req.method === 'POST' ? await req.text() : '';
+    heard.push({ host: url.host, path: url.pathname, url: req.url, body: text ? JSON.parse(text) : null });
+    if (url.host === 'www.googleapis.com' && url.pathname === '/youtube/v3/videos') return respond(world.video, 'videos.list');
+    if (url.host === 'www.youtube.com' && url.pathname === '/watch') return respond(world.watch, 'the watch page');
+    if (url.host === 'www.youtube.com' && url.pathname === '/api/timedtext') return respond(world.captions, 'timedtext');
+    if (url.host === 'api.anthropic.com' && url.pathname === '/v1/messages') return respond(world.claude, 'Claude');
+    throw new Error(`a test tried to reach ${url.host} — only the recipe fakes are allowed`);
+  });
+  return heard;
+}
+
+/**
+ * Loads what claude.ts imports lazily (the SDK and zod), so the first Claude call in a test does not pay
+ * for it under a busy parallel run. Call from beforeAll with a long hook timeout.
+ */
+export const warmClaude = () => Promise.all([
+  import('@anthropic-ai/sdk'), import('@anthropic-ai/sdk/helpers/beta/zod'), import('zod'),
+]);

@@ -2502,8 +2502,9 @@ Pumpkin patch        📅 Sat Oct 12
   place (`role="alert"`) with the server's message.
 - **A link already read** (409 `duplicate`) opens the existing recipe instead ⚑ Q63.
 - **Rows**, newest first ⚑ Q62: a small thumbnail (64×36, hotlinked, `loading="lazy"`,
-  `referrerPolicy="no-referrer"`; a typed recipe has none), the dish's name on one line, and a
-  **watch it** badge when `found` is false. Tapping a row opens the **recipe view**.
+  `referrerPolicy="no-referrer"`; a typed recipe keeps the slot empty), the dish's name on one line,
+  and a **watch it** badge when a video's recipe has `found` false (a typed recipe has no video to
+  watch, so never shows it). Tapping a row opens the **recipe view**.
 - **＋ Type a recipe** opens the **recipe form** empty.
 - **Recipe view** (modal, `RecipeView.tsx`), titled with the dish:
   - the thumbnail, full width, and **▶ Watch on YouTube** (opens the video, a new tab);
@@ -3347,6 +3348,22 @@ modal; Clear asks once; a disabled owner's load alerts everyone with "The laundr
 done". Migration 0014 is applied only in tests so far. **Still owed (manual):** the cards and
 the chooser at 320 px, a two-tap start on the iPhone, and a real done reminder spoken in the
 house.
+**M4o Recipes** (v1.11.0; 394 tests incl. R1–R12 and RC-M): migration 0017 (`recipes`,
+`recipe_reads`, `uq_recipe_video`), `RECIPE_SOURCE` / `CAPTIONS_FAILURE`, `src/shared/recipes.ts`,
+`youtube.ts` (Data API v3), `youtube-captions.ts` (the unofficial attempt), `recipe-reader.ts` (via
+`claude.ts`, untouched), the `/recipes` routes, and the 🍳 Recipes tab with `RecipeView` and `RecipeForm`;
+the tab bar is now one equal grid column per tab. Tests reach only fakes: the pinned config has both
+keys empty (R2 asserts zero fetches), and the pipeline tests run the real Worker with fake keys and a
+fetch spy that refuses every host but the four fakes. Built as: `source` is a JSON list of
+`RECIPE_SOURCE` (so no CHECK); `captions_error` keeps the reason text; found is recomputed on every
+save as "has ingredients or steps"; the read is counted at step 8 even when Claude is then skipped
+(§7E.2); a cut never ends inside an emoji's surrogate pair (found by R11's producer-vs-consumer
+check). The recipe tests warm the lazily imported SDK in `beforeAll` — under the full parallel run
+the first Claude call's import alone took over 5 s. Migration 0017 is applied only in tests so far.
+**Still owed:** apply 0017 in production; set `YOUTUBE_API_KEY` in a real PowerShell window (§2.4);
+the five tabs, the paste box, the view and the form checked at 320 px and on the iPhone; a real video
+read on the deployed URL (does YouTube let the Worker read captions, or is `captions_error` always
+set from Cloudflare's addresses?), and its ingredients added to Shopping.
 **M4n Sun-timed alerts — the goat alert** (v1.10.0; 330 tests incl. S1–S3, G1–G7, SA-M and
 M1-VOCAB with `events.start_sun`): migration 0016 (`settings.latitude` / `longitude` set to
 33.20 / −117.29, `events.start_sun`), `SUN_EVENT`, `src/shared/sun.ts` (NOAA general solar position
