@@ -2916,6 +2916,8 @@ nullable (applied only in tests so far); the push payload gains `tag`. Built as:
 nobody else to push to → 409 `no_recipients` rather than a quiet success. **Still to check:**
 the box at 320 px and on the iPhone, an announcement spoken on the Echos + Voice PE, and one
 arriving on another member's phone.
+**Machine card fix** (v1.8.1): whose load and "done ~20:35" sit on the button line, wrapping —
+at 320 px the old one-line layout cut the time off. Two-tap start checked at 320 px.
 **M4l The laundry loop** (v1.8.0; 290 tests incl. L1–L13): migration 0014 (`machines`, seeded
 free; `fires` rebuilt with kind `machine` + `machine_id`, `uq_machine_open`), `machines.ts`, the
 `/machines` routes, the Machines cards + chooser on the Alarms tab, machine rows in the Ringing
