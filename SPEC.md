@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.38-draft · **Date:** 2026-10-04 · **Owner:** MojoSOGO
+**Version:** 2.38 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4109,6 +4109,21 @@ VALUES ('evt_<16 base32>', 'Put the goats away', NULL, '2026-10-03', NULL, '2026
 
 No `event_optins` row is inserted: it is off for everyone until each person turns it on in
 Optional calendar items (Shelly and John will).
+**M4u Snap an item** (v1.18.0, §7A.3; 540 tests incl. SN1–SN15 and SN-M): decided by MojoSOGO 2026-10-04. 📷 beside
+Add on every list (`ItemPhoto.tsx`) → `POST /list-items/read-photo` (`routes/item-photos.ts`): SogoAI first —
+`identifyFromHome` POSTs the image through Access to the helper's new `POST /identify`, which asks LM Studio's
+`IDENTIFY_MODEL` (`home/identify.ts`) — and the Claude API (`readItemPhoto`) only when SogoAI gives no name, counted
+against the shared 40-a-day `photo_reads`. The rules are `src/shared/item-reading.ts`; `IDENTIFY_FAILURE` and
+`ITEM_READ_VIA` join vocab. The name fills the box with "Read from your photo — check it."; after Add the waiting
+photo is PUT to the item. Migration 0023 (`list_items.photo_key`, §4.2v); `/list-items/{id}/photo` PUT / GET / DELETE;
+deleting an item or a list deletes its photos from R2; items carry `hasPhoto` and `updatedAt`; 📷 row marker; the
+photo in the ✎ form (PhotoField, saved on Save). `build:home` is still one file importing only `node:http` (6.2 →
+9.8 kB). **Deviations:** `src/worker/access.ts`'s `AccessRequest.body` type widened to `string | ArrayBuffer` (type
+only) — a string body can't carry the image's bytes. The helper's `main()` reads every request's body (keeping
+nothing past 4 MB) before `handle()` checks the path, method and bearer, so the 413 can come after them as specified.
+**Still owed (coordinator):** deploy, then apply 0023 in production; update the helper on SogoAI (the new `.mjs`,
+`IDENTIFY_MODEL=qwen-uncensored` in its env file, restart; README); a real item snapped on the iPhone and named by
+SogoAI; the add row, thumbnail and ✎ form photo checked at 320 px (not checked in a browser in this build).
 **M4t Ping the founder's phone** (v1.17.0, §9.4): decided by MojoSOGO 2026-10-04. `POST /ops/notify` (`routes/ops.ts`,
 rules in `src/shared/ops.ts`) — Bearer `OPS_NOTIFY_TOKEN` in constant time (unset → 503 `ops_notify_off`), one
 fire-less `push` delivery to the founder (`FOUNDER_SQL`, now exported from `routes/members.ts`) carrying its own
