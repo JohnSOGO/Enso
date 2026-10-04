@@ -4345,8 +4345,25 @@ nothing past 4 MB) before `handle()` checks the path, method and bearer, so the 
 **Still owed (coordinator):** deploy, then apply 0023 in production; update the helper on SogoAI (the new `.mjs`,
 `IDENTIFY_MODEL=qwen-uncensored` in its env file, restart; README); a real item snapped on the iPhone and named by
 SogoAI; the add row, thumbnail and ✎ form photo checked at 320 px (not checked in a browser in this build).
-**M4v Sign in with my phone** (§6.6, §8.13; decided by MojoSOGO 2026-10-04): in progress on `feature/phone-login`
-— this entry is completed when it is built.
+**M4v Sign in with my phone** (§6.6, §8.13; decided by MojoSOGO 2026-10-04; built on `feature/phone-login`, 557
+tests incl. PL1–PL15 and PL-M): **Sign in with my phone** on the sign-in page (`PhoneSignIn.tsx`, hosted by
+`SignIn.tsx`) → `POST /auth/phone-login` → the identical 202 + waiting cookie for every well-formed email (a
+decoy row with `member_id` NULL for an unknown, disabled or rate-limited one) and, inside `waitUntil`, a push with
+`notice 'login'` and `url` `/approve-login#{id}`; the push opens `ApproveLogin.tsx` (sw.js navigates or opens the
+`url`); the right number approves and the waiting browser's next poll claims the row once and gets its session.
+Rules in `src/shared/phone-login.ts`, routes in `src/worker/routes/phone-login.ts`; `LOGIN_REQUEST_STATUS`,
+`LOGIN_VIEW`, `NOTICE_KIND` join vocab; migration 0025 (§4.2x); the push payload gains `url`; `/ops/notify`'s hourly
+count ignores notices; a password sign-in sends "New sign-in on …" to a member with a phone. Built as (not in the
+brief): `LOGIN_VIEW` is a vocab tuple (the wire's four statuses, derived, never stored); the column is
+`match_number` (`MATCH` is an SQLite operator); a used request polls `expired` but shows `approved` on the phone
+(`approveView`); the new-sign-in notice is sent before the login answers rather than in `waitUntil` (a test logging
+in must see a settled state — and a member without a phone gets no row); the waiting cookie is `Path`-scoped to
+`/api/v1/auth/phone-login`. sw.js's new `notificationclick` branch has no automated test (no test covers sw.js).
+**Still owed (coordinator):** merge (0024 / §4.2w and the app version belong to `feature/house-speakers` — bump the
+app version at merge), deploy, then apply 0025 in production; on the real iPhone: a PC asks, the push arrives,
+tapping it opens the approve page (also from a signed-out phone and with the app already open), the right number
+signs the PC in, a wrong one refuses; the sign-in page's new button and both screens checked at 320 px (not checked
+in a browser in this build).
 **M4t Ping the founder's phone** (v1.17.0, §9.4): decided by MojoSOGO 2026-10-04. `POST /ops/notify` (`routes/ops.ts`,
 rules in `src/shared/ops.ts`) — Bearer `OPS_NOTIFY_TOKEN` in constant time (unset → 503 `ops_notify_off`), one
 fire-less `push` delivery to the founder (`FOUNDER_SQL`, now exported from `routes/members.ts`) carrying its own
