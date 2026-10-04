@@ -2,10 +2,11 @@
 // parseRecipeInput, hasRecipeText / sourcesOf, the clash, recipeFromRow; M4p (§7E.5) RE8 byMyEmoji, RE9 usedEmojis.
 import { describe, expect, it } from 'vitest';
 import {
-  INGREDIENTS_MAX, INGREDIENT_MAX, RECIPE_TITLE_MAX, STEPS_MAX, UNTITLED_VIDEO, USED_EMOJIS_MAX, byMyEmoji, cleanRecipeReading,
-  hasRecipeText, myEmoji, parseRecipeInput, recipeFromRow, recipeVideoClash, sourcesOf, thumbnailUrl, usedEmojis, watchUrl,
+  INGREDIENTS_MAX, INGREDIENT_MAX, RECIPE_TITLE_MAX, STEPS_MAX, UNTITLED_VIDEO, cleanRecipeReading,
+  hasRecipeText, parseRecipeInput, recipeFromRow, recipeVideoClash, sourcesOf, thumbnailUrl, watchUrl,
   youtubeVideoId, type Recipe, type RecipeRow,
 } from '../src/shared/recipes';
+import { USED_EMOJIS_MAX, byMyEmoji, myEmoji, usedEmojis } from '../src/shared/recipe-emoji';
 import { TEXT_MAX } from '../src/shared/lists';
 
 const ID = 'dQw4w9WgXcQ';

@@ -4,7 +4,8 @@
 import { useState, type FormEvent } from 'react';
 import { del, errorText, put } from '../api';
 import { useApp } from '../state';
-import { myEmoji, usedEmojis, type Recipe } from '../../../src/shared/recipes';
+import { myEmoji, usedEmojis } from '../../../src/shared/recipe-emoji';
+import type { Recipe } from '../../../src/shared/recipes';
 import s from './Recipes.module.css';
 
 export function RecipeEmoji({ recipe, recipes, onChange }: { recipe: Recipe; recipes: Recipe[]; onChange: (r: Recipe) => void }) {
