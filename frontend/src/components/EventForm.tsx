@@ -3,31 +3,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
 import { del, errorText, get, patch, post, put } from '../api';
 import { useApp } from '../state';
-import { WEEKDAY, type Channel } from '../../../src/shared/vocab';
+import { WEEKDAY } from '../../../src/shared/vocab';
 import { weekdayOf } from '../../../src/shared/time';
 import { type Recurrence } from '../../../src/shared/recurrence';
 import { longDate } from './DaySheet';
 import { FromThing } from './ThingPhoto';
 import { RepeatFields, ownWeek, repeatOf, toRecurrence, weeksOf, type RepeatValue } from './RepeatFields';
+import { ReminderFields, reminderOf, toReminder, type ReminderValue } from './ReminderFields';
 
-interface Form extends RepeatValue {
+interface Form extends RepeatValue, ReminderValue {
   title: string; notes: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string;
   assignedTo: string[]; optional: boolean;
-  remind: string; push: boolean; house: boolean; renotify: string;
 }
 
-const REMIND_OPTIONS: [string, string][] = [
-  ['none', 'None'], ['0', 'At start'], ['5', '5 min before'], ['15', '15 min before'],
-  ['30', '30 min before'], ['60', '1 hour before'], ['1440', '1 day before'],
-];
-/** §8.4 ⚑ — 780 min before the all-day start of 09:00. Offered for all-day events; a timed one keeping it says what it is. */
-const EVENING_BEFORE = '780';
-const RENOTIFY_OPTIONS: [string, string][] = [['off', 'Off'], ['5', 'Every 5 min'], ['10', 'Every 10 min'], ['15', 'Every 15 min'], ['30', 'Every 30 min']];
 function blank(date: string): Form {
   return {
     title: '', notes: '', date, allDay: false, startTime: '09:00', endTime: '', endDate: date,
     repeat: 'none', byDay: [WEEKDAY[weekdayOf(date)]], weeks: ownWeek(date), until: '', assignedTo: [], optional: false,
-    remind: 'none', push: true, house: false, renotify: 'off',
+    ...reminderOf(null),
   };
 }
 
@@ -38,24 +31,18 @@ function fromEvent(e: any): Form {
     title: e.title, notes: e.notes ?? '', date: e.startDate, allDay: e.allDay, startTime: e.startTime ?? '09:00',
     endTime: e.endTime ?? '', endDate: e.endDate, repeat, byDay: r?.byDay ?? [WEEKDAY[weekdayOf(e.startDate)]],
     weeks: weeksOf(r, e.startDate), until: r?.until ?? '', assignedTo: e.assignedTo, optional: !!e.optional,
-    remind: e.reminder ? String(e.reminder.offsetMin) : 'none',
-    push: e.reminder ? e.reminder.channels.includes('push') : true,
-    house: e.reminder ? e.reminder.channels.includes('house') : false,
-    renotify: e.reminder?.renotifyMin ? String(e.reminder.renotifyMin) : 'off',
+    ...reminderOf(e.reminder),
   };
 }
 
 function toPayload(f: Form) {
   const recurrence = toRecurrence(f, f.date);
-  const channels: Channel[] = [...(f.push ? ['push' as const] : []), ...(f.house ? ['house' as const] : [])];
   return {
     title: f.title, notes: f.notes || null, startDate: f.date,
     startTime: f.allDay ? null : f.startTime, endTime: f.allDay || !f.endTime ? null : f.endTime,
     endDate: f.allDay ? f.endDate : f.date,
     recurrence, assignedTo: f.assignedTo, optional: f.optional,
-    reminder: f.remind === 'none' ? null : {
-      offsetMin: Number(f.remind), channels, renotifyMin: f.renotify === 'off' ? null : Number(f.renotify),
-    },
+    reminder: toReminder(f),
   };
 }
 
@@ -171,25 +158,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
             </div>
           </div>
 
-          <label className="field"><span>Reminder</span>
-            <select value={form.remind} onChange={(e) => set('remind', e.target.value)}>
-              {REMIND_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              {(form.allDay || form.remind === EVENING_BEFORE) && <option value={EVENING_BEFORE}>{form.allDay ? 'The evening before (8 pm)' : '13 hours before'}</option>}
-            </select>
-          </label>
-          {form.remind !== 'none' && (
-            <>
-              <div className="row wrap" style={{ marginBottom: 12 }} role="group" aria-label="Remind via">
-                <label className="chip" style={{ padding: '4px 8px' }}><input type="checkbox" checked={form.push} onChange={(e) => set('push', e.target.checked)} /> 📱 Phone</label>
-                <label className="chip" style={{ padding: '4px 8px' }}><input type="checkbox" checked={form.house} onChange={(e) => set('house', e.target.checked)} /> 🔊 House</label>
-              </div>
-              <label className="field"><span>Repeat the alert until handled</span>
-                <select value={form.renotify} onChange={(e) => set('renotify', e.target.value)}>
-                  {RENOTIFY_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-              </label>
-            </>
-          )}
+          <ReminderFields value={form} allDay={form.allDay} onChange={(c) => setForm((f) => (f ? { ...f, ...c } : f))} />
           <label className="row" style={{ marginBottom: 12, minHeight: 44 }}>
             <input type="checkbox" checked={form.optional} onChange={(e) => set('optional', e.target.checked)} /> Optional — each person turns it on
           </label>
