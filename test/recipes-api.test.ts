@@ -11,7 +11,7 @@ import {
 import { SHOPPING_LIST_ID } from '../src/shared/lists';
 import { BASE, Client, owner } from './helpers';
 import {
-  TRACKS, VIDEO_ID, claudeMessage, fakeWorld, json3, keyedEnv, videoAnswer, warmClaude, watchPage, type World,
+  TRACKS, VIDEO_ID, claudeMessage, fakeWorld, json3, keyedEnv, videoAnswer, warmClaude, playerAnswer, type World,
 } from './recipe-fakes';
 
 let o: Client;
@@ -35,7 +35,7 @@ async function readVideo(url: string, c: Client = o) {
 const PANCAKES = { title: 'Fluffy Pancakes!!', channelTitle: 'Chef Kai', description: 'Ingredients: 2 eggs, 1 cup milk, 1 cup flour.' };
 const READING = { found: true, title: 'Pancakes', ingredients: ['2 eggs', '1 cup milk', '1 cup flour'], steps: ['Whisk', 'Fry'], servings: '4', time: '15 min' };
 const happy = (over: World = {}): World => ({
-  video: { body: videoAnswer(PANCAKES) }, watch: { body: watchPage(TRACKS) }, captions: { body: json3('whisk the eggs then fry') },
+  video: { body: videoAnswer(PANCAKES) }, player: { body: playerAnswer(TRACKS) }, captions: { body: json3('whisk the eggs then fry') },
   claude: { body: claudeMessage(READING) }, ...over,
 });
 
@@ -88,7 +88,7 @@ describe('M4o from-video — reading', () => {
   });
 
   it('R7 captions blocked → still saved from the description, captionsError visible', async () => {
-    fakeWorld(happy({ watch: { status: 429, body: 'Too many requests' } }));
+    fakeWorld(happy({ player: { status: 429, body: 'Too many requests' } }));
     const r = await readVideo(LINK);
     expect(r.status).toBe(201);
     expect(r.json.source).toEqual(['description']);
@@ -97,7 +97,7 @@ describe('M4o from-video — reading', () => {
   });
 
   it('R8 no description and no captions → Claude is not asked; found:false with the video title', async () => {
-    const heard = fakeWorld(happy({ video: { body: videoAnswer({ title: 'Cooking vlog', channelTitle: 'Kai', description: '' }) }, watch: { body: watchPage() } }));
+    const heard = fakeWorld(happy({ video: { body: videoAnswer({ title: 'Cooking vlog', channelTitle: 'Kai', description: '' }) }, player: { body: playerAnswer() } }));
     const r = await readVideo(LINK);
     expect(r.status).toBe(201);
     expect(r.json).toMatchObject({ title: 'Cooking vlog', ingredients: [], steps: [], found: false, source: [], captionsError: 'This video has no captions.' });
