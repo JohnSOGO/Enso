@@ -6,7 +6,7 @@ import { readCaptions } from '../src/worker/youtube-captions';
 import { readRecipe } from '../src/worker/recipe-reader';
 import { TRANSCRIPT_MAX } from '../src/shared/recipes';
 import { CAPTIONS_FAILURE } from '../src/shared/vocab';
-import { TRACKS, VIDEO_ID, YT_KEY, claudeMessage, json3, videoAnswer, warmClaude, watchPage } from './recipe-fakes';
+import { TRACKS, VIDEO_ID, YT_KEY, claudeMessage, json3, videoAnswer, warmClaude, playerAnswer } from './recipe-fakes';
 
 type Answer = { status?: number; body: string | object } | 'throw';
 /** A fetch answering in order, recording each URL (and JSON body). */
@@ -58,9 +58,10 @@ describe('youtube.ts — videos.list?part=snippet', () => {
 
 describe('youtube-captions.ts — the unofficial attempt', () => {
   it('reads the English track written by a person, as json3, into one line of text', async () => {
-    const { f, seen } = scripted({ body: watchPage(TRACKS) }, { body: json3('Add 2 cups of flour.', 'Then  whisk the eggs.') });
+    const { f, seen } = scripted({ body: playerAnswer(TRACKS) }, { body: json3('Add 2 cups of flour.', 'Then  whisk the eggs.') });
     expect(await readCaptions(VIDEO_ID, { fetch: f })).toEqual({ ok: true, text: 'Add 2 cups of flour. Then whisk the eggs.', language: 'en' });
-    expect(new URL(seen[0].url).searchParams.get('v')).toBe(VIDEO_ID);
+    expect(new URL(seen[0].url).pathname).toBe('/youtubei/v1/player');
+    expect(seen[0].body).toMatchObject({ videoId: VIDEO_ID, context: { client: { clientName: 'ANDROID' } } });
     const track = new URL(seen[1].url);
     expect(track.searchParams.get('lang')).toBe('en');
     expect(track.searchParams.get('kind')).toBeNull();
@@ -69,24 +70,25 @@ describe('youtube-captions.ts — the unofficial attempt', () => {
 
   it('falls back to auto-captions, and reads timedtext XML with entities', async () => {
     const xml = '<?xml version="1.0"?><transcript><text start="0" dur="2">Mix &amp;amp; stir</text><text start="2">it&#39;s &lt;done&gt;</text></transcript>';
-    const { f } = scripted({ body: watchPage([TRACKS[0], TRACKS[1]]) }, { body: xml });
+    const { f } = scripted({ body: playerAnswer([TRACKS[0], TRACKS[1]]) }, { body: xml });
     expect(await readCaptions(VIDEO_ID, { fetch: f })).toEqual({ ok: true, text: "Mix & stir it's <done>", language: 'en' });
   });
 
   it('honest failures, each a CAPTIONS_FAILURE with a reason — and it never throws', async () => {
     const cases: [Answer[], string][] = [
       [[{ status: 429, body: 'Too many' }], 'blocked'],
-      [[{ body: '<html>Before you continue to YouTube</html>' }], 'blocked'],
-      [[{ body: watchPage(TRACKS) }, { body: '' }], 'blocked'],
-      [[{ body: watchPage(TRACKS) }, { status: 403, body: '' }], 'blocked'],
-      [[{ body: watchPage() }], 'none'],
-      [[{ body: watchPage([]) }], 'none'],
+      [[{ body: playerAnswer(undefined, 'LOGIN_REQUIRED') }], 'blocked'], // a bot check
+      [[{ body: playerAnswer(TRACKS, 'UNPLAYABLE') }], 'blocked'],
+      [[{ body: playerAnswer(TRACKS) }, { body: '' }], 'blocked'],
+      [[{ body: playerAnswer(TRACKS) }, { status: 403, body: '' }], 'blocked'],
+      [[{ body: playerAnswer() }], 'none'],
+      [[{ body: playerAnswer([]) }], 'none'],
       [[{ status: 500, body: 'oops' }], 'failed'],
       [['throw'], 'failed'],
-      [[{ body: watchPage(TRACKS) }, { body: '{"events": []}' }], 'failed'],
-      [[{ body: watchPage(TRACKS) }, { body: '{not json' }], 'failed'],
-      [[{ body: watchPage([{ baseUrl: 'https://evil.example/x', languageCode: 'en' }]) }], 'failed'],
-      [[{ body: watchPage(TRACKS).replace('"captionTracks":[', '"captionTracks":[{') }], 'failed'], // a broken page
+      [[{ body: playerAnswer(TRACKS) }, { body: '{"events": []}' }], 'failed'],
+      [[{ body: playerAnswer(TRACKS) }, { body: '{not json' }], 'failed'],
+      [[{ body: playerAnswer([{ baseUrl: 'https://evil.example/x', languageCode: 'en' }]) }], 'failed'],
+      [[{ body: '{not json' }], 'failed'], // a broken player answer
     ];
     for (const [answers, kind] of cases) {
       const r = await readCaptions(VIDEO_ID, { fetch: scripted(...answers).f });

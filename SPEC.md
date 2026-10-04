@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.31 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.32 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -151,7 +151,7 @@ Cloudflare Tunnel + Access**.
 | House delivery | The Worker calls Home Assistant's REST API through **Cloudflare Tunnel + Access** (§9.2) | `src/worker/house.ts`; no process at home besides HA itself. |
 | Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Private: photos are served only through the API to signed-in members (§7C.3). |
 | Reading photos and recipes | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4, §7E) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). One caller of the SDK: `src/worker/claude.ts`. |
-| Recipes from videos | **YouTube Data API v3** `videos.list?part=snippet&id=…` (§7E) | Secret `YOUTUBE_API_KEY`; 1 quota unit per lookup. Plus an **unofficial, keyless** captions attempt (the watch page's caption track), which may be blocked — a failure is recorded and shown, never faked. |
+| Recipes from videos | **YouTube Data API v3** `videos.list?part=snippet&id=…` (§7E) | Secret `YOUTUBE_API_KEY`; 1 quota unit per lookup. Plus an **unofficial, keyless** captions attempt (YouTube's player endpoint asked as its Android app), which may be blocked — a failure is recorded and shown, never faked. |
 | QR codes | `uqr` (MIT, zero dependencies, renders SVG) | **Loaded lazily** (dynamic `import()`) only when an invite card opens — never in the main bundle. |
 | Tests | **Vitest**; `@cloudflare/vitest-pool-workers` for API tests | API tests apply `migrations/` via `readD1Migrations` / `applyD1Migrations` |
 | Passwords | PBKDF2-SHA256 via WebCrypto, 100 000 iterations, 16-byte salt | 100k is the Workers cap. Not bcrypt. |
@@ -2036,8 +2036,11 @@ may add, edit or delete any recipe ⚑ Q66. Their own tab, 🍳 Recipes (§8.12)
   the video's title (cut to the limit; "Recipe from YouTube" when YouTube gave none).
 - **source** = `description` when the description was non-empty, plus `captions` when a transcript
   was read — what Claude was given, whatever it found there.
-- **Captions** are unofficial: no key, the public watch page's caption track (English preferred),
-  parsed to plain text. YouTube may refuse it (`blocked`), the video may have none (`none`), or it
+- **Captions** are unofficial: no key; YouTube's player endpoint (`/youtubei/v1/player`) asked as
+  its Android app lists the caption tracks (English preferred), and that track is parsed to plain
+  text. (The website's own caption files come back empty without a proof-of-origin token — found
+  2026-10-04: every recipe said "YouTube sent an empty caption file".) A player answer other than
+  `OK` (a bot check) is `blocked`. YouTube may refuse it (`blocked`), the video may have none (`none`), or it
   may fail otherwise (`failed`); the recipe is still read from the description and its
   `captions_error` keeps the reason, shown as "captions couldn't be read: {reason}" (§8.12). The
   captions module never throws and can be deleted alone.
@@ -3487,6 +3490,9 @@ VALUES ('evt_<16 base32>', 'Put the goats away', NULL, '2026-10-03', NULL, '2026
 
 No `event_optins` row is inserted: it is off for everyone until each person turns it on in
 Optional calendar items (Shelly and John will).
+**Captions fix** (v1.12.1): captions are read through YouTube's player endpoint as its Android app;
+the website route returned empty caption files for every video. Four real videos read from the home
+PC; still to see from Cloudflare's servers (a re-read in production).
 **Verified by MojoSOGO 2026-10-03:** 📢 announcements spoken through the tunnel (Echos + Voice PE
 `ok`); John opted in to 🐐 Put the goats away (first real alert 2026-10-04 18:00, sunset 18:30).
 **Push fix** (v1.7.1): no `Topic` header — Apple refused pushes carrying one (BadWebPushTopic)

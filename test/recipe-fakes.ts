@@ -11,11 +11,9 @@ export const YT_KEY = 'fake-youtube-key';
 /** The pinned env with FAKE recipe keys — reading is "set up", and still reaches only the fakes. */
 export const keyedEnv = (): Env => ({ ...(env as unknown as Env), YOUTUBE_API_KEY: YT_KEY, ANTHROPIC_API_KEY: 'fake-anthropic-key' });
 
-/** A watch page whose player response lists `tracks` (none → a page with a player but no captions). */
-export function watchPage(tracks?: object[]): string {
-  const player = tracks ? { captions: { playerCaptionsTracklistRenderer: { captionTracks: tracks } } } : { videoDetails: {} };
-  return `<!doctype html><html><head><title>x</title></head><body><script>var ytInitialPlayerResponse = ${JSON.stringify(player)};</script></body></html>`;
-}
+/** The player endpoint's answer listing `tracks` (none → playable, but no captions). */
+export const playerAnswer = (tracks?: object[], status = 'OK') =>
+  ({ playabilityStatus: { status }, ...(tracks ? { captions: { playerCaptionsTracklistRenderer: { captionTracks: tracks } } } : {}) });
 
 export const TRACKS = [
   { baseUrl: `https://www.youtube.com/api/timedtext?v=${VIDEO_ID}&lang=de`, languageCode: 'de' },
@@ -38,7 +36,7 @@ export const claudeMessage = (value: object | null, over: object = {}) => ({
 type Reply = { status?: number; body: string | object } | 'throw';
 export interface World {
   video?: Reply;
-  watch?: Reply;
+  player?: Reply;
   captions?: Reply;
   claude?: Reply;
 }
@@ -62,7 +60,7 @@ export function fakeWorld(world: World) {
     const text = req.method === 'POST' ? await req.text() : '';
     heard.push({ host: url.host, path: url.pathname, url: req.url, body: text ? JSON.parse(text) : null });
     if (url.host === 'www.googleapis.com' && url.pathname === '/youtube/v3/videos') return respond(world.video, 'videos.list');
-    if (url.host === 'www.youtube.com' && url.pathname === '/watch') return respond(world.watch, 'the watch page');
+    if (url.host === 'www.youtube.com' && url.pathname === '/youtubei/v1/player') return respond(world.player, 'the player');
     if (url.host === 'www.youtube.com' && url.pathname === '/api/timedtext') return respond(world.captions, 'timedtext');
     if (url.host === 'api.anthropic.com' && url.pathname === '/v1/messages') return respond(world.claude, 'Claude');
     throw new Error(`a test tried to reach ${url.host} — only the recipe fakes are allowed`);

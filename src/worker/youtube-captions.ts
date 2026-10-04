@@ -1,7 +1,9 @@
-// SPEC §7E.2 step 7 — the UNOFFICIAL captions attempt for one video: no key; the public watch page's
-// caption track list (English preferred), then that track as json3 (or timedtext XML) → plain text.
-// YouTube may refuse it at any time, so every problem is an honest failure + reason (blocked / none /
-// failed) and nothing here ever throws. Self-contained: deleting this file removes only the captions.
+// SPEC §7E.2 step 7 — the UNOFFICIAL captions attempt for one video: no key; YouTube's player endpoint
+// asked as its Android app (the website's caption files come back empty without a proof-of-origin
+// token, found 2026-10-04), its caption track list (English preferred), then that track as json3 (or
+// timedtext XML) → plain text. YouTube may refuse it at any time, so every problem is an honest
+// failure + reason (blocked / none / failed) and nothing here ever throws. Self-contained: deleting
+// this file removes only the captions.
 import type { CaptionsFailure } from '../shared/vocab';
 
 export type CaptionsResult =
@@ -10,10 +12,9 @@ export type CaptionsResult =
 
 interface Track { baseUrl: string; languageCode: string; kind?: string }
 
-const HEADERS = {
-  'accept-language': 'en-US,en;q=0.9',
-  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36',
-};
+const PLAYER = 'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';
+const CLIENT = { clientName: 'ANDROID', clientVersion: '20.10.38', androidSdkVersion: 34, hl: 'en', gl: 'US' };
+const HEADERS = { 'content-type': 'application/json', 'user-agent': 'com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip' };
 const fail = (kind: CaptionsFailure, reason: string): CaptionsResult => ({ ok: false, kind, reason });
 const refused = (status: number) => status === 403 || status === 429;
 
@@ -26,50 +27,26 @@ export async function readCaptions(videoId: string, opts: { fetch?: typeof fetch
 }
 
 async function attempt(videoId: string, get: typeof fetch): Promise<CaptionsResult> {
-  const page = await get(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&hl=en`, { headers: HEADERS });
-  if (refused(page.status)) return fail('blocked', `YouTube refused the video page (HTTP ${page.status}).`);
-  if (!page.ok) return fail('failed', `The video page answered HTTP ${page.status}.`);
-  const html = await page.text();
-  if (!html.includes('ytInitialPlayerResponse')) return fail('blocked', 'YouTube sent a page without the player (a consent or bot check).');
-  const tracks = captionTracks(html);
-  if (!tracks?.length) return fail('none', 'This video has no captions.');
+  const res0 = await get(PLAYER, { method: 'POST', headers: HEADERS, body: JSON.stringify({ context: { client: CLIENT }, videoId }) });
+  if (refused(res0.status)) return fail('blocked', `YouTube refused the player request (HTTP ${res0.status}).`);
+  if (!res0.ok) return fail('failed', `The player answered HTTP ${res0.status}.`);
+  const player: any = await res0.json();
+  const playable = player?.playabilityStatus?.status;
+  if (playable !== 'OK') return fail('blocked', `YouTube's player said ${playable ?? 'nothing'}${player?.playabilityStatus?.reason ? `: ${player.playabilityStatus.reason}` : ''}.`);
+  const list: unknown = player?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+  const tracks = Array.isArray(list) ? list.filter((t): t is Track => typeof t?.baseUrl === 'string' && typeof t?.languageCode === 'string') : [];
+  if (!tracks.length) return fail('none', 'This video has no captions.');
   const track = pick(tracks);
   const url = new URL(track.baseUrl, 'https://www.youtube.com');
   if (!/(^|\.)youtube\.com$/.test(url.hostname)) return fail('failed', `The caption track points at ${url.hostname}.`);
   url.searchParams.set('fmt', 'json3');
-  const res = await get(url.toString(), { headers: HEADERS });
+  const res = await get(url.toString(), { headers: { 'user-agent': HEADERS['user-agent'] } });
   if (refused(res.status)) return fail('blocked', `YouTube refused the captions (HTTP ${res.status}).`);
   if (!res.ok) return fail('failed', `The captions answered HTTP ${res.status}.`);
   const body = await res.text();
   if (!body.trim()) return fail('blocked', 'YouTube sent an empty caption file.');
   const text = toText(body);
   return text ? { ok: true, text, language: track.languageCode } : fail('failed', 'The caption file had no text in it.');
-}
-
-/** The `"captionTracks":[…]` array embedded in the watch page, or null when there is none. */
-function captionTracks(html: string): Track[] | null {
-  const at = html.indexOf('"captionTracks":');
-  if (at < 0) return null;
-  const start = html.indexOf('[', at);
-  if (start < 0) return null;
-  let depth = 0, inString = false;
-  for (let i = start; i < html.length; i++) {
-    const ch = html[i];
-    if (inString) {
-      if (ch === '\\') i++;
-      else if (ch === '"') inString = false;
-    } else if (ch === '"') inString = true;
-    else if (ch === '[' || ch === '{') depth++;
-    else if (ch === ']' || ch === '}') {
-      if (--depth === 0) {
-        const list: unknown = JSON.parse(html.slice(start, i + 1));
-        return Array.isArray(list)
-          ? list.filter((t): t is Track => typeof t?.baseUrl === 'string' && typeof t?.languageCode === 'string')
-          : null;
-      }
-    }
-  }
-  return null;
 }
 
 /** English written by a person, then English auto-captions, then whatever comes first. */
