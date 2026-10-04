@@ -206,3 +206,48 @@ Coming from the polling helper (v1.15.0): stop it as above, copy the new `.mjs`,
 
 A new token is `npx wrangler secret put CAPTIONS_TOKEN` plus the same value in `captions-helper.env`, then
 the restart above.
+
+## Ping MojoSOGO's phone from a Claude session (ops/notify)
+
+A Claude Code session on MojoSOGO's machines can push a message to **his own phone** (the founder's)
+with `POST /api/v1/ops/notify` (SPEC §9.4) — "it's live", a question, a blocker. It sits beside the
+FunHouse desk device and the house voice. The recipient is always the founder; at most 30 pings an hour
+(then 429). There is no session: the call carries `Authorization: Bearer <OPS_NOTIFY_TOKEN>`. With the
+secret unset the route answers 503 `ops_notify_off` — never open.
+
+### The token (once)
+
+In a **real PowerShell window** (never a `!` command, which saves an empty secret and still says
+Success), make a long random value, keep it in the token file, and give the Worker the same one:
+
+```powershell
+$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+$token = -join ($b | ForEach-Object { $_.ToString('x2') })
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.enso" | Out-Null
+[IO.File]::WriteAllText("$env:USERPROFILE\.enso\ops-notify-token", $token)   # no BOM, no newline
+npx wrangler secret put OPS_NOTIFY_TOKEN                                     # paste the same value
+```
+
+The token file is `%USERPROFILE%\.enso\ops-notify-token` on each machine that pings; it is never in a
+repo. A new token is the same steps again.
+
+### Sending one
+
+PowerShell (Windows PowerShell 5.1 too — the body is sent as UTF-8 bytes so the emoji survive):
+
+```powershell
+$t = (Get-Content "$env:USERPROFILE\.enso\ops-notify-token" -Raw).Trim(); $r = Invoke-RestMethod -Method Post -Uri https://enso.sogodojo.com/api/v1/ops/notify -Headers @{ Authorization = "Bearer $t" } -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes((@{ text = 'Ensō v1.17.0 is live'; title = '🤖 Claude ⭕🔁🏠' } | ConvertTo-Json -Compress))); $r.deliveries[0]
+```
+
+curl (Git Bash, where `~` is `%USERPROFILE%`):
+
+```bash
+curl -s -X POST https://enso.sogodojo.com/api/v1/ops/notify -H "Authorization: Bearer $(cat ~/.enso/ops-notify-token)" -H 'Content-Type: application/json; charset=utf-8' --data '{"text":"Ensō v1.17.0 is live","title":"🤖 Claude ⭕🔁🏠"}'
+```
+
+`text` is 1–200 characters; `title` is optional (at most 60; default "🤖 Claude"). The answer is
+`201 { deliveries: [{ id, status, detail }] }`. **The ping was delivered only when
+`deliveries[0].status == 'sent'`; otherwise report the `detail`** (`no_subscription` — his phone has
+no alerts turned on; `push_not_configured` — the push keys are missing; or the push service's error).
+Errors: 503 `ops_notify_off`, 401 `unauthorized`, 400 `invalid_input`, 429 `rate_limited`. Never print
+the token or the Authorization header.

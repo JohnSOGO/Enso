@@ -3258,7 +3258,8 @@ announcement, §9.3) that carries its own title (§4.2u). No session, no house r
    written inside `routes/ops.ts`) → a mismatch or no header is **401 `unauthorized`**. The token and
    the header are never logged, and never put in a message or a detail.
 3. `opsNotifyError` → **400 `invalid_input`** with its message.
-4. The recipient is the founder. A `member` (or any other) field in the body is ignored.
+4. The recipient is the founder. A `member` (or any other) field in the body is ignored. Before setup
+   there is no founder → **409 `no_recipients`**, nothing written (never a row with no member).
 5. **Hourly limit:** the push deliveries with no fire and a non-NULL `title` created at or after
    `opsWindowStart(now)` are counted; at `OPS_NOTIFY_PER_HOUR` or more → **429 `rate_limited`**, and no
    row is written. Announcements (title NULL) never count.
@@ -3281,6 +3282,7 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | ON2 | `OPS_NOTIFY_TOKEN` empty, with and without a Bearer header | 503 `ops_notify_off`; no row |
 | ON3 | a wrong token; no header | 401 `unauthorized`; no row; the response never contains the token |
 | ON4 | blank text, 201 chars, a 61-char title | 400 `invalid_input` ×3; no row |
+| ON4b | before setup (no members) | 409 `no_recipients`; no row |
 | ON5 | the founder with a phone; a `member` naming another member in the body | 201, one `push` row for the founder (`fire_id` NULL, `alert_number` 1, `title` set), `sent`; the other member gets nothing; the push decrypts to `{ fireId: null, kind: null, tag: <delivery id>, title, body: text, actions: [] }`; no `topic` header |
 | ON6 | the founder without a phone | 201, `failed`, `no_subscription` |
 | ON7 | 30 pings in the last hour, then a 31st | 429 `rate_limited`, no row written; announcements in the same hour do not count; a ping older than an hour does not count |
@@ -3336,7 +3338,7 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff }`; PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
 | GET | `/status` | member | → `{ house: { state: HouseState, lastOkAt, lastFailedAt, lastError } (§9.2, derived, never stored), mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[] }` |
 | POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `no_recipients` (§9.3); spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
-| POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 429 `rate_limited`, in that order |
+| POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 409 `no_recipients` (no founder yet) / 429 `rate_limited`, in that order |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek }` (`thisWeek`/`nextWeek` = member id or null) |
 | POST | `/chores` | member | `{ title, doneMeans?, days, timing, time, nudge?, people, steps, channels, renotifyMin? }` → chore (201) |
 | PATCH/DELETE | `/chores/{id}` | creator or owner | same fields, all optional; re-plans unstarted runs (§7B.3) |
@@ -3918,6 +3920,14 @@ VALUES ('evt_<16 base32>', 'Put the goats away', NULL, '2026-10-03', NULL, '2026
 
 No `event_optins` row is inserted: it is off for everyone until each person turns it on in
 Optional calendar items (Shelly and John will).
+**M4t Ping the founder's phone** (v1.17.0, §9.4): decided by MojoSOGO 2026-10-04. `POST /ops/notify` (`routes/ops.ts`,
+rules in `src/shared/ops.ts`) — Bearer `OPS_NOTIFY_TOKEN` in constant time (unset → 503 `ops_notify_off`), one
+fire-less `push` delivery to the founder (`FOUNDER_SQL`, now exported from `routes/members.ts`) carrying its own
+`title` (migration 0022, §4.2u), sent at once; 30 an hour, counted from deliveries rows. `push.ts` shows a fire-less
+delivery as `title ?? "📢 Announcement"`. README: the token file and the PowerShell / curl one-liners. Tests
+ON1–ON9 and ON-M reach only a fake push service. Built as (a guard the brief did not name): before setup there is no
+founder → 409 `no_recipients`, nothing written. **Still owed (coordinator):** deploy, apply 0022 in production,
+`wrangler secret put OPS_NOTIFY_TOKEN` and the token file, then a real ping arriving on his iPhone with its title.
 **Captions from home, in-line** (v1.16.0, §7E.2c): decided by MojoSOGO 2026-10-04 — no polling. When
 YouTube blocks the Worker's captions request, from-video asks SogoAI in-line (`home-captions.ts`: one GET
 through Cloudflare Access and the `sogoai` tunnel to `HOME_CAPTIONS_URL`, the `enso-worker` service

@@ -15,7 +15,7 @@ export const TEST_TAG = 'enso-test';
 const DETAIL_MAX = 500;
 
 /**
- * The notification the service worker shows (sw.js). A test push and an announcement (§9.3) have no
+ * The notification the service worker shows (sw.js). A test push, an announcement (§9.3) and a ping (§9.4) have no
  * fire, no kind, no actions. `tag` is what the phone collapses by (never sent as a Topic — Apple refuses it): a fire's push →
  * its fireId; a delivery with no fire → its delivery id; the test push → TEST_TAG.
  */
@@ -60,14 +60,15 @@ async function sendToAll(db: D1Database, vapid: VapidKeys, subs: Sub[], payload:
 }
 
 /**
- * Tick step 3 (and POST /announce): send each queued push delivery to every subscription of its member,
- * and record the outcome. A delivery with no fire is an announcement (§9.3).
+ * Tick step 3 (and POST /announce, POST /ops/notify): send each queued push delivery to every subscription
+ * of its member, and record the outcome. A delivery with no fire is an announcement (§9.3), or a ping with
+ * its own title (§9.4).
  */
 export async function sendPushDeliveries(env: Env, deliveryIds: string[], now: string): Promise<void> {
   const db = env.DB;
   const vapid = vapidOf(env);
-  const rows = await all<{ id: string; member_id: string; message: string; fire_id: string | null; kind: AlertKind | null }>(db,
-    `SELECT d.id, d.member_id, d.message, d.fire_id, f.kind FROM deliveries d LEFT JOIN fires f ON f.id = d.fire_id
+  const rows = await all<{ id: string; member_id: string; message: string; title: string | null; fire_id: string | null; kind: AlertKind | null }>(db,
+    `SELECT d.id, d.member_id, d.message, d.title, d.fire_id, f.kind FROM deliveries d LEFT JOIN fires f ON f.id = d.fire_id
       WHERE d.id IN (${deliveryIds.map(() => '?').join(',')})`, ...deliveryIds);
   for (const d of rows) {
     let status: 'sent' | 'failed' = 'failed';
@@ -78,7 +79,7 @@ export async function sendPushDeliveries(env: Env, deliveryIds: string[], now: s
       if (subs.length === 0) detail = NO_SUBSCRIPTION;
       else {
         const payload: PushPayload = d.fire_id === null || d.kind === null
-          ? { fireId: null, kind: null, tag: d.id, title: ANNOUNCE_TITLE, body: d.message, actions: [] }
+          ? { fireId: null, kind: null, tag: d.id, title: d.title ?? ANNOUNCE_TITLE, body: d.message, actions: [] }
           : { fireId: d.fire_id, kind: d.kind, tag: d.fire_id, title: PUSH_TITLE, body: d.message, actions: pushActions(d.kind) };
         const r = await sendToAll(db, vapid, subs, payload, now);
         if (r.sent > 0) status = 'sent';

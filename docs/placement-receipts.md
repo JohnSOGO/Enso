@@ -7,6 +7,26 @@ carry its result.
 
 ---
 
+## 2026-10-04 — Ping the founder's phone from a Claude session (placement-advisor; feature/ops-notify, v1.17.0)
+
+PLACEMENT RECEIPT
+- Feature:      §9.4, decided by MojoSOGO 2026-10-04: a Claude Code session on his machines pushes a message to
+  the founder's phone from the command line (beside the FunHouse device and the house voice).
+- Rules:        NEW owner `src/shared/ops.ts` (pure, imports nothing) — OPS_TEXT_MAX, OPS_TITLE_MAX,
+  OPS_TITLE_DEFAULT, OPS_NOTIFY_PER_HOUR, opsNotifyError, opsTitle, opsWindowStart.
+- Route:        NEW owner `src/worker/routes/ops.ts` — `POST /ops/notify`: OPS_NOTIFY_TOKEN unset/empty → 503
+  `ops_notify_off`, then a file-local constant-time SHA-256 compare (the same approach as home/captions-helper.ts's
+  sameSecret, deliberately not imported from home/) → 401; validate → 400; the founder via FOUNDER_SQL; the hourly
+  limit counted from deliveries rows → 429 with no row; one fire-less `push` delivery with `title`;
+  sendPushDeliveries; 201 `{ deliveries: [{ id, status, detail }] }`. No session, no house row.
+- Founder:      `routes/members.ts` FOUNDER_SQL `const` → `export const`; nothing else changed there.
+- Push:         `src/worker/push.ts` title passthrough only — the SELECT reads `d.title`; a fire-less delivery's
+  title is `d.title ?? ANNOUNCE_TITLE`; tag, Topic and actions unchanged.
+- Storage:      migration 0022 `deliveries.title TEXT` (§4.2u).
+- Config:       `env.ts` OPS_NOTIFY_TOKEN; vitest pins `test-ops-token`; index.ts mounts ops.
+- Untouched:    announce.ts, shared/announce.ts, vocab.ts, house.ts, tick.ts, web-push.ts, the frontend, sw.js.
+- Caps:         two new small files under the global cap; no CEILINGS entry added.
+
 ## 2026-10-04 — Captions from home, asked in-line (placement-advisor; feature/inline-home-captions, v1.16.0)
 
 PLACEMENT RECEIPT
