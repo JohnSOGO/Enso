@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.35 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
+**Version:** 2.36-draft · **Date:** 2026-10-04 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -117,30 +117,36 @@ calendars, anything in §12.
   |   - cron: every 1 min -> tick() (§5)         |
   |   - Web Push sender  (VAPID)                 |
   |   - House delivery   (house.ts, §9.2)        |
+  |   - Captions from home (§7E.2c)              |
   |            |                                 |
   |           D1 (SQLite)                        |
   +---------------------------------------------+
             |
-            |  HTTPS https://ha.sogodojo.com
-            |  CF-Access-Client-Id/-Secret + Bearer HA_TOKEN
+            |  HTTPS + CF-Access-Client-Id/-Secret (the enso-worker service token):
+            |    https://ha.sogodojo.com              + Bearer HA_TOKEN        (House, §9.2)
+            |    https://sogoai.sogodojo.com/captions + Bearer CAPTIONS_TOKEN  (in-line, §7E.2c)
             v
-  +---------------------------+                    +-------------------------+
-  |  Cloudflare Access         |  Cloudflare Tunnel |  Home Assistant          |
-  |  (Service Auth policy)     | -----------------> |  cloudflared add-on      |
+  +---------------------------+  Cloudflare Tunnel +-------------------------+
+  |  Cloudflare Access         | -----------------> |  Home Assistant          |
+  |  (Service Auth policy)     |                    |  cloudflared add-on      |
   +---------------------------+                    |  -> 4 Echos, Voice PE    |
-                                                   +-------------------------+
-
+            |                                       +-------------------------+
+            |  Cloudflare Tunnel `sogoai` (cloudflared, a Windows service on SogoAI)
+            v
   +-----------------------------------------+
-  |  SogoAI (home PC, Windows 11, Node 24)   |   polls the Worker every 10 s, outbound only:
-  |  home/dist/captions-helper.mjs           |   POST /api/v1/captions/claim -> readCaptions
-  |  (Task Scheduler, at startup)            |   from the home IP -> POST /api/v1/captions/report
-  +-----------------------------------------+   (Bearer CAPTIONS_TOKEN, §7E.2c)
+  |  SogoAI (home PC, Windows 11, Node 24)   |   http://127.0.0.1:8790 — GET /captions?v=…
+  |  home/dist/captions-helper.mjs           |   -> readCaptions from the home IP -> the
+  |  (Task Scheduler, at startup)            |   CaptionsResult as JSON (§7E.2c)
+  +-----------------------------------------+
 ```
 
 **Why SogoAI:** YouTube's player endpoint refuses Cloudflare's addresses (LOGIN_REQUIRED) but
-answers a home one (§7E.2c). The always-on home PC runs a small helper that **polls** the Worker
-for blocked captions, reads them from home with the same `youtube-captions.ts`, and posts them
-back. It only calls out: nothing on the home network is exposed, no port is opened.
+answers a home one (§7E.2c). Decided by MojoSOGO 2026-10-04: no polling. When YouTube blocks the
+Worker's captions request, the Worker asks the always-on home PC **in-line** — Worker → Cloudflare
+Access → Cloudflare Tunnel → SogoAI — and gets the captions back in the same request. The helper
+listens on `127.0.0.1:8790` only; `cloudflared` (a Windows service on SogoAI) carries the tunnel
+outbound, so no port is opened at home, and Access lets through only the `enso-worker` service token
+(the same one House delivery uses).
 
 **Why a tunnel:** Home Assistant is only on the LAN (`external_url` is null, no
 Nabu Casa), and no port is opened to it. Until v1.7.0 a relay process on the home PC
@@ -191,7 +197,8 @@ Enso/
 │   ├── 0017_recipes.sql         # §4.2p
 │   ├── 0018_recipe_emojis.sql   # §4.2q
 │   ├── 0019_recipe_comments.sql # §4.2r
-│   └── 0020_recipe_captions_job.sql # §4.2s
+│   ├── 0020_recipe_captions_job.sql # §4.2s
+│   └── 0021_drop_captions_job.sql   # §4.2t
 ├── src/
 │   ├── shared/             # pure TS, no I/O — imported by worker and frontend
 │   │   ├── vocab.ts        # §3
@@ -203,7 +210,7 @@ Enso/
 │   │   ├── machines.ts     # §7D the laundry loop: state, transitions, done message
 │   │   ├── sun.ts          # §7.7 sunset per local date and place (NOAA)
 │   │   ├── recipes.ts      # §7E recipe rules: limits, YouTube link → video id, typed input, the wire
-│   │   ├── recipe-reading.ts # §7E.2, §7E.2b reading a video: sources, creator's comments, transcript, cleaning a reading
+│   │   ├── recipe-reading.ts # §7E.2, §7E.2b, §7E.2c reading a video: sources, creator's comments, transcript, cleaning a reading, captions from home
 │   │   └── engine.ts       # §5
 │   └── worker/
 │       ├── index.ts        # Hono app + scheduled() handler
@@ -214,10 +221,8 @@ Enso/
 │       │                   # invites) · events.ts (/calendar, events) · alarms.ts ·
 │       │                   # alerts.ts (timers, fires + actions) · household.ts (settings,
 │       │                   # days off, /push/*, /status) · announce.ts ·
-│       │                   # lists.ts (§7A) · machines.ts (§7D) · recipes.ts (§7E) ·
-│       │                   # captions.ts (§7E.2c, the home helper's door)
-│       ├── recipe-reread.ts # §7E.2b, §7E.2c re-reading a recipe in place
-│       ├── captions-jobs.ts # §7E.2c every write of the captions-from-home job columns
+│       │                   # lists.ts (§7A) · machines.ts (§7D) · recipes.ts (§7E)
+│       ├── recipe-reread.ts # §7E.2b re-reading a recipe in place
 │       ├── claude.ts       # the one Claude API call (§7C.4, §7E)
 │       ├── recipe-reader.ts # §7E the recipe prompt + schema
 │       ├── youtube.ts      # §7E YouTube Data API videos.list + commentThreads.list
@@ -225,13 +230,14 @@ Enso/
 │       ├── tick.ts         # loads rows, calls engine, writes results
 │       ├── push.ts         # Web Push sending
 │       ├── house.ts        # House delivery via HA through Cloudflare Tunnel + Access (§9.2)
+│       ├── home-captions.ts # §7E.2c asking SogoAI for captions, through Access + the tunnel
 │       └── session.ts      # password hashing, session cookie
 ├── frontend/               # Vite root
 │   ├── index.html
 │   ├── vite.config.ts
 │   └── src/
 ├── home/                   # runs on SogoAI, not in the Worker (§7E.2c)
-│   ├── captions-helper.ts  # polls claim, readCaptions from the home IP, reports
+│   ├── captions-helper.ts  # 127.0.0.1:8790 GET /captions?v=… → readCaptions from the home IP
 │   ├── captions-helper.cmd # the Task Scheduler launcher (node --env-file, appends to a log)
 │   ├── tsconfig.json       # Node types; part of `npm run typecheck`
 │   └── dist/               # `npm run build:home` output (gitignored)
@@ -271,10 +277,11 @@ against the deployed Worker. On iPhone, push works only after
 | `SETUP_TOKEN` | Worker | One-time owner creation (§6.1) |
 | `VAPID_PUBLIC_KEY` (var, 65-byte raw P-256 key, base64url), `VAPID_PRIVATE_KEY` (secret, the JWK `d`), `VAPID_SUBJECT` (var, `https://enso.sogodojo.com`) | Worker | Web Push (§9.1). Generated once with WebCrypto; never rotated casually — rotating invalidates every phone's subscription. |
 | `HA_TOKEN` (secret) | Worker | Home Assistant long-lived access token, sent as `Authorization: Bearer …` to HA (§9.2). Never logged, never stored in a delivery's detail. |
-| `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` (secrets) | Worker | The Cloudflare Access **service token** for `ha.sogodojo.com`, sent as `CF-Access-Client-Id` / `CF-Access-Client-Secret` (§9.2). Never logged. |
+| `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` (secrets) | Worker | The Cloudflare Access **service token** (`enso-worker`) for `ha.sogodojo.com` **and** `sogoai.sogodojo.com`, sent as `CF-Access-Client-Id` / `CF-Access-Client-Secret` (§9.2, §7E.2c). One token, two Access applications. Never logged. Tests pin them empty (House and captions from home are then not configured). |
 | `HA_URL`, `ECHO_TARGETS` (JSON array), `ECHO_TYPE`, `SATELLITE_ENTITY` (vars, `wrangler.toml`) | Worker | Where and on what House speaks (§9.2). |
 | `YOUTUBE_API_KEY` (secret) | Worker | A Google Cloud API key with the YouTube Data API v3 enabled, for reading a recipe video's title and description (§7E). Set it with `npx wrangler secret put YOUTUBE_API_KEY` **in a real PowerShell window**. Never logged, never in an error message. Reading recipes also needs `ANTHROPIC_API_KEY`; without either, `POST /recipes/from-video` is 503 `recipe_reading_off` and typed recipes still work. Tests pin it empty. |
-| `CAPTIONS_TOKEN` (secret) | Worker **and** SogoAI's `C:\Enso\captions-helper.env` | The bearer the home captions helper sends to `/captions/claim` and `/captions/report` (§7E.2c). A long random string, set with `npx wrangler secret put CAPTIONS_TOKEN` in a real PowerShell window and the same value in the helper's env file (never in the repo). Unset or empty → both routes 503 `captions_helper_off` (never open) and no job is ever queued. Never logged, by the Worker or the helper. Tests pin a test-only value. |
+| `CAPTIONS_TOKEN` (secret) | Worker **and** SogoAI's `C:\Enso\captions-helper.env` | The bearer the Worker sends to the SogoAI helper (`Authorization: Bearer …`, §7E.2c), checked by the helper in constant time — a second lock behind Access. A long random string, set with `npx wrangler secret put CAPTIONS_TOKEN` in a real PowerShell window and the same value in the helper's env file (never in the repo). Unset or empty on the Worker → captions from home are not set up (§7E.2c); unset on SogoAI → the helper does not start. Never logged, by the Worker or the helper. Tests pin a test-only value. |
+| `HOME_CAPTIONS_URL` (var, `wrangler.toml`) | Worker | Where the SogoAI helper is reached: `https://sogoai.sogodojo.com` (§7E.2c). Tests pin `https://sogoai.test`, which only a fetch spy answers. |
 
 Dev secrets go in `.dev.vars` (gitignored); production uses `wrangler secret put`, typed
 in a real PowerShell window (never through a `!` shell, which saves an empty value).
@@ -294,7 +301,8 @@ Source files are everything under `src/`, `frontend/src/`, `scripts/` and `home/
   imports only its own siblings (no packages, no I/O); the worker and the frontend
   never import each other; nothing imports `scripts/` or `home/`; `home/` (the SogoAI
   helper, §7E.2c) imports nothing from the repo **except** `src/worker/youtube-captions.ts`,
-  and no package — a layer may name exact repo paths in `allowed`, which the ban then skips;
+  and no package **except** `node:http` (the helper's one server) — a layer may name exact repo
+  paths, or `package:<name>`, in `allowed`, which the ban then skips;
 - a `src/shared/` file uses `Date.now(`, `new Date()`, `fetch(` or `D1Database`
   (§0.3 — `now` is always a parameter);
 - a file is over its line cap: its entry in `CEILINGS`, else `GLOBAL_FILE_CAP`;
@@ -331,7 +339,6 @@ export const MACHINE_STATE = ['free', 'running', 'done'] as const;              
 export const SUN_EVENT    = ['sunset'] as const;                                 // §7.7 events.start_sun
 export const RECIPE_SOURCE = ['description', 'captions', 'transcript', 'comments', 'typed'] as const; // §7E what a recipe was read from ('transcript': pasted, §7E.2b)
 export const CAPTIONS_FAILURE = ['blocked', 'none', 'failed'] as const;         // §7E why captions couldn't be read
-export const CAPTIONS_JOB = ['queued', 'claimed'] as const;                      // §7E.2c recipes.captions_job (NULL = no job)
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
 ```
@@ -354,7 +361,6 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `description` / `captions` | A recipe was read from the video's description / its captions (§7E); a recipe can carry both |
 | `typed` | A recipe typed by hand, with no video (§7E) |
 | `blocked` / `none` / `failed` | Why a video's captions couldn't be read (§7E): YouTube refused the keyless request / the video has no captions / anything else (network, an unreadable answer) |
-| `queued` / `claimed` | A captions-from-home job (§7E.2c): waiting for the home helper / taken by it. Done and failed are not stored (the job column goes back to NULL) |
 | `at` | Chore rings at its time, like an alarm |
 | `by` | Chore is quiet: due by its time, optionally one nudge then |
 | `superseded` | A newer occurrence of the same event started ringing while this one still was |
@@ -1021,6 +1027,29 @@ PATCH never touches them. The partial index keeps the claim's lookup to the few 
 **Migration check (CJ-M):** rows written under 0001–0019 survive 0020 unchanged, every existing recipe
 has `captions_job`, `captions_queued_at`, `captions_claimed_at` NULL and `captions_attempts` 0; the CHECK
 refuses any other value; the index exists.
+
+Dropped by 0021 (§4.2t).
+
+### 4.2t Schema change — `migrations/0021_drop_captions_job.sql`
+
+Decided by MojoSOGO 2026-10-04: no polling, no job queue — the Worker asks SogoAI in-line (§7E.2c). The
+job columns and their index (§4.2s) go.
+
+```sql
+-- §7E.2c — the captions-from-home job is gone: the Worker asks SogoAI in-line.
+DROP INDEX idx_recipes_captions_job;
+ALTER TABLE recipes DROP COLUMN captions_job;
+ALTER TABLE recipes DROP COLUMN captions_queued_at;
+ALTER TABLE recipes DROP COLUMN captions_claimed_at;
+ALTER TABLE recipes DROP COLUMN captions_attempts;
+```
+
+The index goes first (SQLite refuses to drop an indexed column). 0020's CHECK is column-level, so
+`DROP COLUMN` needs no table rebuild. A recipe whose job was pending when 0021 ran keeps its
+`captions_error` (the blocked reason) and simply shows the transcript box (§8.12).
+**Migration check (CJ-D):** rows written under 0001–0020 survive 0021; the four columns are gone from
+`PRAGMA table_info(recipes)`; `idx_recipes_captions_job` is gone; `PRAGMA foreign_key_check` is empty;
+`recipe_emojis` is intact.
 
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
@@ -2083,7 +2112,8 @@ transcript given by hand, cleaning Claude's reading) live in `src/shared/recipe-
    such video (or private) → 404 `video_unavailable`; quota used up or any other failure → 502
    `youtube_failed` with the reason (never the key);
 7. the captions attempt (`src/worker/youtube-captions.ts`) → transcript text, or a failure
-   `{ kind: CAPTIONS_FAILURE, reason }` that is **kept**, never fatal;
+   `{ kind: CAPTIONS_FAILURE, reason }` that is **kept**, never fatal; a `blocked` failure asks
+   SogoAI in-line, in the same step (§7E.2c), whose captions or failure take its place;
 8. **the creator's comments** (`lookUpComments` in `youtube.ts`,
    `commentThreads.list?part=snippet&videoId={id}&order=relevance&maxResults=20&textFormat=plainText`,
    1 quota unit) → each thread's top-level comment `{ authorChannelId, text }`, or a failure
@@ -2204,113 +2234,86 @@ transcript for **any** video recipe; the PWA only offers it on "watch it" or fai
      line break;
   6. cut to `TRANSCRIPT_MAX` (never inside a surrogate pair). Nothing left → null.
 
-### 7E.2c Captions from home — SogoAI, `POST /captions/claim`, `POST /captions/report`
+### 7E.2c Captions from home — SogoAI, asked in-line
 
 Decided by MojoSOGO 2026-10-04. YouTube's player endpoint refuses Cloudflare's addresses
 (LOGIN_REQUIRED) but answers a home one. **SogoAI** — the always-on Windows 11 PC at home (Node 24, no
-public address) — runs a small helper, `home/captions-helper.ts`, that **polls** the Worker for a video
-whose captions were blocked, reads them from home with the **same** `src/worker/youtube-captions.ts`,
-and posts the result back. The Worker then re-reads the recipe with those captions (`rereadRecipe`,
-§7E.2b). The PC only calls out; nothing at home is exposed and no port is opened (§2).
+public address) — runs a small helper, `home/captions-helper.ts`, that reads a video's captions from
+home with the **same** `src/worker/youtube-captions.ts`. Decided by MojoSOGO 2026-10-04 (second
+pass): **no polling** and no job queue. When YouTube blocks the Worker's own captions request, the
+Worker asks SogoAI **in-line**, inside `POST /recipes/from-video`, through Cloudflare Access and the
+`sogoai` Cloudflare Tunnel (§2), gets the captions back in the same request, reads the recipe once and
+saves it complete. Nothing is pending, and nothing is re-read later.
 
-The rules (pure) are `src/shared/recipe-reading.ts`; every write of the job columns is
-`src/worker/captions-jobs.ts`; the door is `src/worker/routes/captions.ts`.
+The rules (pure) are `src/shared/recipe-reading.ts`; the call is `src/worker/home-captions.ts`; the
+decision to ask is the from-video route.
 
-**The job** — four columns on the recipe row (§4.2s): `captions_job` (`CAPTIONS_JOB`: `queued` |
-`claimed`; NULL = no job), `captions_queued_at`, `captions_claimed_at`, `captions_attempts`. **Ending**
-a job puts them back to NULL / 0 and, when given, sets `captions_error`; done and failed are not stored.
-On the wire, `captionsPending` = `captions_job IS NOT NULL` (`recipeFromRow`).
+**When** — in §7E.2 step 7, `wantsHomeCaptions(failure)` is true **only** for kind `blocked` ⚑ Q95;
+`none` and `failed` never ask (they would fail at home too), nor does the transcript route; there is no
+backfill of older recipes and no "try from home" button ⚑ Q102. The route's file-local
+`captionsFor(videoId, env)`:
 
-**Queueing** — one place only: `POST /recipes/from-video`, right after the INSERT, when
-`wantsHomeCaptions(failure)` (true **only** for kind `blocked` ⚑ Q95) and `CAPTIONS_TOKEN` is set. The
-recipe is saved and answered exactly as §7E.2 says (read from the description and comments,
-`captions_error` = the blocked reason), with `captionsPending: true`. `none` and `failed` never queue,
-nor does the transcript route; there is no backfill of older recipes and no "try from home" button
-⚑ Q102.
+1. `readCaptions(videoId)` — read → its text; a failure that is not `blocked` → that failure, kept;
+2. `blocked` and `homeCaptionsConfigOf(env)` is null → the failure
+   `homeCaptionsError(HOME_CAPTIONS_OFF)` = "from home: captions from home aren't set up." ⚑ Q106;
+3. `blocked` and configured → `readCaptionsFromHome(cfg, videoId)`: ok → its text is the transcript
+   (so `source` gets **`captions`** and `captions_error` is NULL); a failure → `captions_error` =
+   `homeCaptionsError(reason)` = "from home: {reason}" ⚑ Q97.
 
-**Claim** — `POST /captions/claim` → **200 `{ recipeId, videoId }`**, or **204** when there is nothing.
-First the give-up rule runs (below). Then the oldest (`captions_queued_at`, then id) live video recipe
-whose job is `queued`, or `claimed` with a claim older than **`CAPTIONS_CLAIM_STALE_MIN` = 2** min and
-attempts below **`CAPTIONS_JOB_ATTEMPTS` = 3** (a helper that died mid-job). The claim is a conditional
-per-row UPDATE (the job and claim time as read) checked with `meta.changes === 1`, so two claims never
-get the same job; it sets `claimed`, `captions_claimed_at` = now and attempts + 1.
+It runs beside the creator's comments (`Promise.all`, steps 7 and 8), before the read is counted:
+**one read, counted once**, and one INSERT — never an UPDATE after it. The rest of §7E.2 is unchanged.
 
-**Give up** — `giveUpCaptionsJobs(db, now)`, run on every cron (in `scheduled()` beside `tick()`, never
-inside it) and before every claim ⚑ Q96: a job `queued` for longer than **`CAPTIONS_JOB_GIVE_UP_MIN` =
-30** min, or a stale claim whose attempts reached 3 or whose job was queued more than 30 min ago → ended,
-`captions_error` = "Couldn't get captions from home: the home PC didn't answer in 30 minutes." (the 30
-is the constant).
+**The configuration** — `homeCaptionsConfigOf(env)` needs `HOME_CAPTIONS_URL`, `CF_ACCESS_CLIENT_ID`,
+`CF_ACCESS_CLIENT_SECRET` and `CAPTIONS_TOKEN` (§2.4), each non-empty → `{ url (no trailing slash),
+accessId, accessSecret, token }`; any missing or empty → null.
 
-**Report** — `POST /captions/report { recipeId, result }`, `result` the `CaptionsResult` exactly as
-`readCaptions` returned it. Check order:
-
-1. the bearer token (Auth, below);
-2. `recipeId` a string, and `parseCaptionsReport(result)` (pure) → `{ ok: true, text }` — `text` a
-   non-empty string cut to `TRANSCRIPT_MAX` (never inside a surrogate pair; **not** `cleanTranscript` —
-   captions carry no timestamps) — or `{ ok: false, kind, reason }` — `kind` one of `CAPTIONS_FAILURE`,
-   `reason` non-empty, cut to **`CAPTIONS_REPORT_REASON_MAX` = 300** ⚑ Q104 — else **400
-   `invalid_input`** with its message;
-3. a live recipe with that id whose job is `claimed` → else **409 `not_claimed`** (a report after the
-   job was given up or ended, a deleted recipe, a job never queued);
-4. `ok: false` → the job ends with `captions_error` = `homeCaptionsError(reason)` = "from home:
-   {reason}" ⚑ Q97 → outcome `captions_failed`;
-5. `ok: true` but the recipe was edited by hand since it was queued — `homeRereadMayReplace(row)` is
-   `updated_at <= captions_queued_at` — → **not replaced**: the job ends with `captions_error` =
-   "captions came from home, but the recipe was edited by hand since — not replaced" ⚑ Q99 → outcome
-   `edited`; nothing is fetched;
-6. `YOUTUBE_API_KEY` or `ANTHROPIC_API_KEY` missing → the job ends with "from home: Reading recipes from
-   videos isn't set up yet." → outcome `reread_failed`;
-7. `rereadRecipe(db, keys, row, { transcript: text }, null, now)` — §7E.2b steps 7 and 9–12 with the home
-   captions in the captions slot, so `source` gets **`captions`** (never `transcript`); the read is
-   **neither checked against nor counted in** the daily cap ⚑ Q100:
-   - ok → its one UPDATE also ends the job (`captions_error` NULL) → outcome `reread`;
-   - `no_recipe` → the content is untouched, the job ends with `captions_error` = "read from home, but
-     they hold no recipe" ⚑ Q98 → outcome `no_recipe`;
-   - any other failure → the job ends with `homeCaptionsError(reason)` → outcome `reread_failed`;
-8. → **200 `{ outcome }`**.
-
-A successful §7E.2b transcript re-read ends a pending job too — its UPDATE clears the columns ⚑ Q101 —
-so a later report for it is 409.
-
-**Auth** — this door has no session. `Authorization: Bearer <CAPTIONS_TOKEN>`, compared in constant
-time (the SHA-256 of each, every byte compared). `CAPTIONS_TOKEN` unset or empty → **503
-`captions_helper_off`** on both routes — never open; a missing or wrong bearer → **401 `unauthorized`**.
+**The call** — `readCaptionsFromHome(cfg, videoId, { fetch? })`: one `GET {url}/captions?v={videoId}`
+with `CF-Access-Client-Id`, `CF-Access-Client-Secret` and `Authorization: Bearer {CAPTIONS_TOKEN}`,
+`redirect: 'manual'` (Access answers a bad service token with a 302 to its login page — a failure),
+and `AbortSignal.timeout(HOME_CAPTIONS_TIMEOUT_MS)` = **20 s** ⚑ Q96. Only a **2xx** is read; its body
+(JSON, a `CaptionsResult`) goes through `parseCaptionsReport` (pure): `{ ok: true, text }` — `text` a
+non-empty string cut to `TRANSCRIPT_MAX` (never inside a surrogate pair; **not** `cleanTranscript` —
+captions carry no timestamps) — or `{ ok: false, kind, reason }` — `kind` one of `CAPTIONS_FAILURE`,
+`reason` non-empty, cut to **`CAPTIONS_REPORT_REASON_MAX` = 300** ⚑ Q104. It answers `{ ok: true, text }`
+or `{ ok: false, reason }`, the reason honest: "HTTP {status}: {body, at most 200 characters}" for
+anything but a 2xx, "error: {message}" for a network failure or the timeout, the parse message for a
+body that isn't a captions result, else the home's own reason. It **never throws**, never names a
+secret, and never decides whether to ask or what is saved. No D1, no Hono.
 
 **The helper** — `home/captions-helper.ts`, bundled by `npm run build:home` (esbuild, Node 24, ESM) into
 one file, `home/dist/captions-helper.mjs`, copied to `C:\Enso\` on SogoAI with
-`home/captions-helper.cmd` and a `captions-helper.env` holding `ENSO_URL` and `CAPTIONS_TOKEN` (never in
-the repo; README). It imports only `src/worker/youtube-captions.ts` and Node's globals (`fetch`,
-`setTimeout`, `console`) — no `node:` module, no package (§2.5). Loop: claim → `readCaptions(videoId)`
-→ report the result unchanged → claim again until 204 → wait **10 s** ⚑ Q105. A network error, or a
-claim answering anything but 200 / 204, doubles the wait up to **60 s** and tries again; it never exits.
-A report answered with an error is logged and the loop goes on (the job's claim goes stale and is
-retried). One log line per job (the video id, what came back, the outcome) and one per error; the token
-is never logged. `runOnce({ fetch, url, token })` (exported for tests) runs one claim-until-204 pass. The
-helper never decides what is saved.
+`home/captions-helper.cmd` and a `captions-helper.env` holding **`CAPTIONS_TOKEN` only** (never in the
+repo; README). It imports only `src/worker/youtube-captions.ts`, `node:http` and Node's globals (§2.5).
 
-**PWA** (§8.12) — while `captionsPending`: "⏳ Getting captions from home…" under the source note, the
-transcript box hidden, and the open view re-fetches `GET /recipes/{id}` every 10 s ⚑ Q103.
+- `handle(req: { method, url, authorization? }, deps: { token, fetch })` → `{ status, body }` (no
+  `node:http` in it): a path other than `/captions` → **404**; a method other than GET → **405**; the
+  bearer compared in constant time (the SHA-256 of each, every byte compared, via `crypto.subtle`) →
+  else **401**; `v` matching `^[A-Za-z0-9_-]{1,64}$` → else **400**; then `readCaptions(v, { fetch })`
+  → **200** with the `CaptionsResult` as JSON, whatever its `ok`. Errors are JSON `{ error }`.
+- `main()` is the only `node:http` user: one server on **`127.0.0.1:8790`** ⚑ Q105 — loopback only,
+  never `0.0.0.0`; the `sogoai` tunnel (`cloudflared`, a Windows service on SogoAI) is its only way in.
+  Port and host are constants. `CAPTIONS_TOKEN` unset → it logs that and exits with code 1.
+- One log line per request (the video id, the outcome); the token is never logged. The helper never
+  decides what is saved.
+
+**PWA** (§8.12) — nothing is pending: the recipe comes back complete. The transcript box shows on a
+video recipe that is "watch it" or whose `captionsError` is set, as before.
 
 **Acceptance (M4s — each row is a test; fakes only, never a real network):**
 
 | # | Setup / call | Expected |
 |---|---|---|
-| H-C1 | claim and report with `CAPTIONS_TOKEN` empty; with no bearer, a wrong one | 503 `captions_helper_off`; 401 `unauthorized` |
-| H-C2 | claim with no job | 204 |
-| H-C3 | one queued job; two claims side by side | exactly one 200 `{ recipeId, videoId }`, the other 204; the row `claimed`, attempts 1 |
-| H-C4 | a claim older than 2 min | claimed again; attempts 2 |
-| H-C5 | a stale claim with attempts 3 | the next claim gives it up first: job NULL, `captions_error` the give-up text; 204 |
-| H-C6 | report ok (fake YouTube, comments and Anthropic) | 200 `reread`; re-read; `source` includes `captions`; `captionsError` null; job cleared (`captionsPending` false); no read counted |
-| H-C7 | report ok:false `blocked` | 200 `captions_failed`; `captions_error` "from home: …"; job cleared |
-| H-C8 | report ok, Claude answers found:false | 200 `no_recipe`; content untouched; `captions_error` the no-recipe text |
-| H-C9 | a PATCH after queueing, then report ok | 200 `edited`; the hand edit kept; nothing fetched; `captions_error` the edited text |
-| H-C10 | report for a recipe that is not claimed, or unknown; a bad body | 409 `not_claimed`; 400 `invalid_input` |
-| H-C11 | `giveUpCaptionsJobs` 31 min after queueing; 29 min after | given up with the text; untouched |
-| H-C12 | from-video with captions `blocked`; `none`; `blocked` with `CAPTIONS_TOKEN` empty | a job queued (`captionsPending` true); none; none |
-| H-C13 | a §7E.2b transcript re-read on a recipe with a pending job | the job ended; `captionsPending` false |
-| H-C14 | every result `readCaptions` produces (ok / blocked / none / failed — found by **calling** it over fake fetches), JSON round-tripped | each accepted by `parseCaptionsReport` |
-| H-C15 | `runOnce` over one fake fetch | claim → player → track → report whose `result` equals the `CaptionsResult`; a 204 claim → idle; the bearer on every Worker request and in no log line |
-| CJ-M | migration check (§4.2s) | earlier rows intact; the new columns NULL / 0; the CHECK refuses another value; the partial index exists |
+| H-C1 | `homeCaptionsConfigOf` with each of the four settings missing or empty; with all four | null for each; the config, the URL's trailing slash trimmed |
+| H-C2 | `readCaptionsFromHome` over a fake fetch answering 200 with a read `CaptionsResult` | one GET to `{url}/captions?v=…` with both Access headers, `Authorization: Bearer {CAPTIONS_TOKEN}`, `redirect: 'manual'` and a signal; `{ ok: true, text }` |
+| H-C3 | the fake answers a 302, a 403, a 502; throws; aborts; answers a body that isn't JSON or isn't a captions result; an `ok: false` result | `{ ok: false, reason }` each: "HTTP 302: …", "HTTP 403: …", "HTTP 502: …", "error: …", the parse message, the home's reason — never a throw, never a secret in the reason |
+| H-C4 | from-video, captions `blocked`, home answers read captions | 201; `source` includes `captions`; `captionsError` null; one GET to the home URL; one `recipe_reads` row |
+| H-C5 | from-video, captions `blocked`, home answers a failure (a 502; an `ok: false`) | 201; `captionsError` "from home: …"; one read |
+| H-C6 | from-video, captions `blocked`, home not configured (the pinned test env) | 201; `captionsError` "from home: captions from home aren't set up."; no request to the home URL |
+| H-C7 | from-video, captions `none`; `failed` | home is never asked |
+| H-C8 | the helper's `handle`: no / wrong bearer; a bad or missing `v`; another path; POST; a good request | 401; 400; 404; 405; 200 with the `CaptionsResult` exactly as `readCaptions` returned it; the token in no log line |
+| H-C9 | every result `readCaptions` produces (ok / blocked / none / failed — found by **calling** it over fake fetches) through `handle()` and then `readCaptionsFromHome` over a fake fetch serving `handle`'s answer | each accepted: `{ ok: true, text }` for a read, the result's reason for a failure |
+| CJ-M | migration check (§4.2s) | as §4.2s (0020's own test, untouched) |
+| CJ-D | migration check (§4.2t) | earlier rows survive; the four columns and the index are gone; `foreign_key_check` empty; `recipe_emojis` intact |
 
 ### 7E.3 Typing and editing
 
@@ -2875,10 +2878,6 @@ Pumpkin patch        📅 Sat Oct 12
     /recipes/{id}/transcript`. While it works: "Reading…". When the recipe already has ingredients or
     steps it says "This replaces the ingredients and steps shown." A refusal shows in place
     (`role="alert"`) with the server's message; the re-read recipe goes back to the view and the row;
-  - **Captions from home** (§7E.2c) ⚑ Q103: while the recipe's `captionsPending` is true, "⏳ Getting
-    captions from home…" sits under the source note and the transcript box is **hidden**; while the
-    view is open it re-fetches `GET /recipes/{id}` every 10 s and hands each answer back to the view and
-    the row, so the re-read recipe (or the failure in the source note) appears by itself;
   - **Ingredients**, each with a pick box; a **Pick all** chip; **Add to Shopping (n)**. Nothing
     is picked at first ⚑ Q69. Adding calls `POST /lists/{SHOPPING_LIST_ID}/items` once per picked
     ingredient, in order; the summary shows inside the view: "Added 4 · Milk already on the list"
@@ -3278,14 +3277,12 @@ acked, nothing is scheduled — **now only**.
 | POST | `/things/{id}/plan` | member | `{ date, time? }` → `{ thing, eventId }`; 400 outside the window |
 | PUT/GET/DELETE | `/things/{id}/photo` | member | PUT raw image body (≤ 4 MB) → 204; GET → the image; DELETE → 204 |
 | POST | `/things/read-photo` | member | raw image body → `{ title, startDate, endDate, place, address, phone, cost, url, note }` (each nullable); 503 / 502 / 422 / 429 per §7C.4 |
-| GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, commentsError, captionsPending, createdBy, createdAt, updatedAt, emojis: RecipeEmoji[] }` (`captionsPending`: a captions-from-home job is queued or claimed, §7E.2c; `watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed; `RecipeEmoji = { memberId, emoji }`, §7E.5) (§7E) |
+| GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, commentsError, createdBy, createdAt, updatedAt, emojis: RecipeEmoji[] }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed; `RecipeEmoji = { memberId, emoji }`, §7E.5) (§7E) |
 | POST | `/recipes` | member | `{ title, ingredients, steps, servings?, time? }` → recipe (201), typed by hand; 400 `invalid_input` |
 | GET/PATCH/DELETE | `/recipes/{id}` | member | GET → recipe; PATCH the POST fields, all optional, merged → recipe (found recomputed); DELETE → 204 (soft); 404 when gone |
 | PUT/DELETE | `/recipes/{id}/emoji` | member (their own) | PUT `{ emoji }` → recipe (200), my emoji set (upsert); DELETE → recipe (200), mine cleared; 400 `invalid_input` (`emojiError`); 404 when the recipe is gone; `updatedAt` untouched (§7E.5) |
 | POST | `/recipes/from-video` | member | `{ url }` → recipe (201); 400 / 409 `duplicate` (+ `recipeId`) / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed`, in the §7E.2 order |
 | POST | `/recipes/{id}/transcript` | member | `{ screenshots?: { type, data }[] (≤ 4, base64), text? (≤ PASTED_MAX) }`, at least one → recipe (200), re-read from the pasted transcript; 404 / 400 `invalid_input` / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed` / 422 `no_recipe` (nothing changed), in the §7E.2b order |
-| POST | `/captions/claim` | the home helper: `Authorization: Bearer <CAPTIONS_TOKEN>`, no session | → 200 `{ recipeId, videoId }` (the job claimed) / 204 nothing to do; 503 `captions_helper_off` when the token is unset or empty (never open); 401 `unauthorized` (§7E.2c) |
-| POST | `/captions/report` | the home helper (as claim) | `{ recipeId, result: CaptionsResult }` → 200 `{ outcome: "reread" \| "captions_failed" \| "edited" \| "no_recipe" \| "reread_failed" }`; 400 `invalid_input`; 409 `not_claimed`; 503 / 401 as claim (§7E.2c) |
 | GET | `/lists` | member | → `{ id, name, createdBy, openCount }[]`, by name (§7A) |
 | POST | `/lists` | member | `{ name }` → list (201); 409 `duplicate`; 400 at `LISTS_MAX` |
 | PATCH/DELETE | `/lists/{id}` | creator or admin (seeded lists: admin) | PATCH `{ name }` → list; DELETE → 204 |
@@ -3477,14 +3474,13 @@ checks.
 - ✅ Manual: screenshots of a YouTube transcript taken on the iPhone, read on a "watch it" recipe on
   the deployed URL; the picker and thumbnails at 320 px.
 
-**M4s — Captions from home** (v1.15.0)
-- Migration 0020 (the captions job columns), `CAPTIONS_JOB`, `captions-jobs.ts`, `POST /captions/claim`
-  and `/captions/report` behind `CAPTIONS_TOKEN`, the queue in from-video, `captionsPending` and the
-  pending line in the view, the SogoAI helper and `npm run build:home` (§2, §2.5, §4.2s, §7E.2c, §8.12,
-  §10).
-- ✅ Tests H-C1–H-C15, CJ-M.
-- ✅ Manual: the helper running on SogoAI as a startup task; a video blocked from Cloudflare read on the
-  deployed URL, its captions arriving from home within a minute, the view updating by itself.
+**M4s — Captions from home** (v1.15.0; asked in-line since v1.16.0)
+- `home-captions.ts` (Worker → Access → the `sogoai` tunnel → SogoAI, in-line in from-video),
+  `HOME_CAPTIONS_URL`, the SogoAI helper as a `127.0.0.1:8790` server and `npm run build:home`; migration
+  0020 added the job columns and 0021 drops them (§2, §2.4, §2.5, §4.2s, §4.2t, §7E.2c).
+- ✅ Tests H-C1–H-C9, CJ-M, CJ-D.
+- ✅ Manual: the helper running on SogoAI as a startup task behind the tunnel; a video blocked from
+  Cloudflare read on the deployed URL, saved complete with `captions` in its source.
 
 **M4l — The laundry loop** (v1.8.0)
 - Migration 0014 (`machines` + the `fires` rebuild), `MACHINE` / `MACHINE_STATE` + the
@@ -3697,16 +3693,12 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q93 | Keeping the screenshots | ⚑ Not stored — read once and dropped; no R2, no migration (§12) |
 | Q94 | Screenshots or text | ⚑ Screenshots first (the phone); pasting the text is secondary, collapsed under "or paste the text" |
 | Q95 | Which captions failures go to the home PC (§7E.2c) | ⚑ Only `blocked` — `none` (no captions) and `failed` would fail at home too |
-| Q96 | When a captions-from-home job is given up | ⚑ After 30 min queued, 3 attempts, or a claim stale for 2 min past either; `captions_error` "Couldn't get captions from home: the home PC didn't answer in 30 minutes." |
+| Q96 | How long the Worker waits for SogoAI (§7E.2c) | ⚑ 20 s (`HOME_CAPTIONS_TIMEOUT_MS`); longer is a failure, "from home: error: …" |
 | Q97 | The home PC couldn't read the captions either | ⚑ `captions_error` = "from home: {reason}" — shown "captions couldn't be read: from home: …" |
-| Q98 | The captions from home hold no recipe | ⚑ The recipe is untouched, the job ends, `captions_error` = "read from home, but they hold no recipe" |
-| Q99 | The recipe was edited by hand after the job was queued | ⚑ Not replaced; `captions_error` = "captions came from home, but the recipe was edited by hand since — not replaced" |
-| Q100 | Does a re-read from home count against the 20 a day? | ⚑ No — it neither checks nor counts the daily cap (the paste already counted once) |
-| Q101 | A transcript re-read while a job is pending | ⚑ A successful one ends the job; a later report for it is refused (409) |
-| Q102 | Older recipes whose captions were blocked | ⚑ No backfill and no "try from home" button — only new reads queue |
-| Q103 | Waiting for captions from home in the PWA | ⚑ "⏳ Getting captions from home…", the transcript box hidden; the open view polls every 10 s |
-| Q104 | Limits on what the helper reports | ⚑ Text cut to `TRANSCRIPT_MAX` (20 000), a failure reason to 300 characters |
-| Q105 | How often the helper polls | ⚑ Every 10 s when idle; after a network error it backs off, doubling up to 60 s |
+| Q102 | Older recipes whose captions were blocked | ⚑ No backfill and no "try from home" button — only new reads ask |
+| Q104 | Limits on what the helper answers | ⚑ Text cut to `TRANSCRIPT_MAX` (20 000), a failure reason to 300 characters |
+| Q105 | Where the helper listens | ⚑ `127.0.0.1:8790` on SogoAI, loopback only, reached only through the `sogoai` Cloudflare Tunnel behind Access |
+| Q106 | Captions blocked and captions from home not set up | ⚑ `captions_error` = "from home: captions from home aren't set up." — shown "captions couldn't be read: from home: …" (the YouTube reason is not kept) |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -3842,16 +3834,21 @@ VALUES ('evt_<16 base32>', 'Put the goats away', NULL, '2026-10-03', NULL, '2026
 
 No `event_optins` row is inserted: it is off for everyone until each person turns it on in
 Optional calendar items (Shelly and John will).
-**M4s Captions from home** (v1.15.0, §7E.2c): migration 0020 (`recipes.captions_job` /
-`captions_queued_at` / `captions_claimed_at` / `captions_attempts`, `CAPTIONS_JOB`), `captions-jobs.ts`
-(queue, conditional claim with stale reclaim, give up — also on every cron), `POST /captions/claim` and
-`/captions/report` behind `CAPTIONS_TOKEN` (503 when unset), the re-read through `rereadRecipe` (not
-counted), `captionsPending` on the wire and "⏳ Getting captions from home…" in the view with a 10 s
-poll, and the SogoAI helper `home/captions-helper.ts` (`npm run build:home`). §2.5 now scans `home/`
-with its own layer (`allowed`: `src/worker/youtube-captions.ts`). Tests H-C1–H-C15 and CJ-M reach only
-fakes. Migration 0020 is applied only in tests so far. **Still owed:** apply 0020 in production; set
-`CAPTIONS_TOKEN` (Worker secret and SogoAI's env file); install the helper on SogoAI as a startup task
-(README); a real blocked video read on the deployed URL, its captions arriving from home.
+**Captions from home, in-line** (v1.16.0, §7E.2c): decided by MojoSOGO 2026-10-04 — no polling. When
+YouTube blocks the Worker's captions request, from-video asks SogoAI in-line (`home-captions.ts`: one GET
+through Cloudflare Access and the `sogoai` tunnel to `HOME_CAPTIONS_URL`, the `enso-worker` service
+token plus Bearer `CAPTIONS_TOKEN`, 20 s), reads the recipe once and saves it complete, counted once.
+The job queue is deleted: `captions-jobs.ts`, `routes/captions.ts` (`/captions/claim`, `/captions/report`),
+the cron give-up, `CAPTIONS_JOB`, the job texts, `captionsPending` and the PWA's pending line and 10 s
+poll. Migration 0021 drops 0020's columns and index (§4.2t). The helper is now a `127.0.0.1:8790` server
+(`handle` + a `node:http` `main`); §2.5 allows `package:node:http` in `home/`. Tests H-C1–H-C9, CJ-M,
+CJ-D reach only fakes. **Still owed:** deploy the Worker, then apply 0021 in production, then swap the
+helper on SogoAI (its env file holds `CAPTIONS_TOKEN` only); a real blocked video read on the deployed
+URL, saved with `captions` in its source.
+**M4s Captions from home** (v1.15.0, §7E.2c): the first build polled — a job queue on the recipe row
+(migration 0020), `POST /captions/claim` / `/captions/report`, and a helper that polled every 10 s.
+Superseded by v1.16.0 above; 0020 stays (applied migrations are
+never edited) and 0021 drops it.
 **M4r The transcript, by hand** (v1.14.0): `POST /recipes/{id}/transcript` (§7E.2b) taking 1–4
 screenshots (base64 in JSON, read as image blocks, never stored) and/or pasted text, `transcript` in
 `RECIPE_SOURCE`, `cleanTranscript` / `PASTED_MAX` / `parseScreenshots` / `SCREENSHOTS_MAX` in
