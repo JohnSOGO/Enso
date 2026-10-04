@@ -96,6 +96,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/ChoresToday.tsx` | Lists → Today: today's chore runs, Mine \| Everyone, tick/undo a step (§8.8) |
 | `frontend/src/components/ThingsToDo.tsx` | Lists → Things to do: open rows (window text, 📅 planned date, 📷, ⏰), "Done & let go", ＋ Add, opens ThingForm (§8.11) |
 | `frontend/src/components/ThingForm.tsx` | The thing form modal: title, dates, place, link, note, reminders + channels, fill-empty-fields from a photo reading marked "from photo — check it", Done / Let it go / Put back, Save / Cancel / Delete (§8.11) |
+| `frontend/src/components/Grow.tsx` | A textarea that grows to fit its text; `oneLine` (Enter does nothing, pasted line breaks become spaces) (§8.11, §8.12) |
 | `frontend/src/components/ThingPlan.tsx` | Plan it: a date (+ optional time) → `POST /things/{id}/plan`; the refusal shown inside (§7C.2) |
 | `frontend/src/components/ThingPhoto.tsx` | A thing's photo: pick (camera/library), shrink, thumbnail, full size inside the dialog, remove/replace, the read-photo request; and `FromThing`, the "From Things to do" block for the event form (§7C.3, §8.4, §8.11) |
 | `frontend/src/shrink-photo.ts` | Shrinks a picked image on the phone to PHOTO_LONG_SIDE px, JPEG PHOTO_QUALITY, via canvas (§7C.3) — no app state |
