@@ -2086,13 +2086,23 @@ may add, edit or delete any recipe ⚑ Q66. Their own tab, 🍳 Recipes (§8.12)
   too ⚑ Q83; the thumbnail loads from `i.ytimg.com` in the phone's browser (no referrer sent).
   Accepted by MojoSOGO.
 
-### 7E.2b Paste the transcript — `POST /recipes/{id}/transcript { text }`
+### 7E.2b The transcript, by hand — `POST /recipes/{id}/transcript { screenshots?, text? }`
 
 Decided by MojoSOGO 2026-10-04. In production the captions attempt is often refused from
 Cloudflare's addresses ("LOGIN_REQUIRED: Sign in to confirm you're not a bot" — YouTube judges the
-IP, so no client change fixes it from a Worker). He can copy the transcript from YouTube himself
-(⋯ → **Show transcript**, select all, copy). On a video recipe he pastes it and Claude **re-reads
-the recipe** from it, in place of captions.
+IP, so no client change fixes it from a Worker). He can open the transcript on YouTube himself
+(⋯ → **Show transcript**). He can't copy text on his phone, but he can **screenshot** it (decided by
+MojoSOGO 2026-10-04, mid-build): on a video recipe he adds 1–4 screenshots — or, on a computer, pastes
+the text — and Claude **re-reads the recipe** from them, in place of captions.
+
+**The body** (JSON): `screenshots` — 0 to **`SCREENSHOTS_MAX` = 4** ⚑ Q92, each `{ type, data }`:
+`type` one of `SCREENSHOT_TYPES` = the photo types (`PHOTO_TYPES`, §7C.3) less HEIC, which Claude can't
+read (JPEG, PNG, WebP); `data` the bytes in base64, at most `PHOTO_MAX_BYTES` once decoded
+(`parseScreenshots`, pure). Base64 in JSON — not multipart, not a raw body — so one request carries
+up to four pictures and the text, and the base64 goes to Claude's image block as it came. The phone
+shrinks each picture to a JPEG first, exactly like a thing's photo (§7C.3, which also turns an Apple
+HEIC photo into a JPEG). `text` — optional pasted text. Screenshots are **read, never stored**: no R2,
+no migration ⚑ Q93 (§12).
 
 **Check order** (each step's failure answers at once; nothing later runs):
 
@@ -2100,8 +2110,11 @@ the recipe** from it, in place of captions.
 2. a live recipe with that id → else 404 `not_found`;
 3. the recipe has a `video_id` → else 400 `invalid_input` "Only a recipe read from a video takes a
    transcript.";
-4. `text` is a string of at most **`PASTED_MAX` = 100 000** characters ⚑ Q89 and
-   `cleanTranscript(text)` is not null → else 400 `invalid_input` with a message; **no read is spent**;
+4. `parseScreenshots(screenshots)` accepts them (too many, HEIC or another type, damaged, too large →
+   400); `text`, when given, is a string of at most **`PASTED_MAX` = 100 000** characters ⚑ Q89 (else
+   400); and there is **at least one screenshot or a `cleanTranscript(text)` that is not null** → else
+   400 `invalid_input` "Add a screenshot of the transcript, or paste its text." — every 400 here comes
+   **before any read is spent** and before any fetch;
 5. the daily cap, shared with from-video (`RECIPE_READS_PER_DAY`, one count of `recipe_reads`) →
    429 `rate_limited`;
 6. `YOUTUBE_API_KEY` **and** `ANTHROPIC_API_KEY` present → else 503 `recipe_reading_off`, before any
@@ -2111,8 +2124,11 @@ the recipe** from it, in place of captions.
    `video_unavailable` / 502 `youtube_failed` and **nothing changes**; a comments failure is never
    fatal (as §7E.2 step 8). **No captions attempt** — that is what failed;
 8. count the read;
-9. Claude (`readRecipe`), given the description, the cleaned transcript in the captions slot, and the
-   creator's comments → refusal 422 `recipe_refused`; failure 502 `recipe_reading_failed`;
+9. Claude (`readRecipe`), given the screenshots as image blocks (with one prompt line: they are
+   screenshots of the video's transcript or captions, read as spoken text), the description, the
+   cleaned pasted text in the captions slot, and the creator's comments → refusal 422
+   `recipe_refused`; failure 502 `recipe_reading_failed`. "Never invent a recipe from the title"
+   holds for the screenshots too;
 10. `cleanRecipeReading(raw, videoTitle)`;
 11. **found false → 422 `no_recipe`** "No recipe in that transcript — nothing was changed." The
     recipe is untouched (hand edits survive) and the read still counts ⚑ Q86;
@@ -2122,8 +2138,9 @@ the recipe** from it, in place of captions.
     is asked: the view says what it replaces (§8.12) ⚑ Q86.
 
 The route never decides `found` or `source` itself: `cleanRecipeReading` and `sourcesOf` do.
-**source** gains `transcript` — its own value, never `captions` ⚑ Q85: `VideoText.pasted`, offered
-as `transcript` (so `sourcesOf` / `hasRecipeText` derive it, like the others). The server takes a
+**source** gains `transcript` — its own value, never `captions` ⚑ Q85: `VideoText.pasted` (text) or
+`VideoText.screenshots` (at least one), offered as `transcript` (so `sourcesOf` / `hasRecipeText`
+derive it, like the others). The server takes a
 transcript for **any** video recipe; the PWA only offers it on "watch it" or failed captions ⚑ Q87.
 
 - **`cleanTranscript(text)`** (pure) ⚑ Q88 — what YouTube's transcript panel copies is a timestamp
@@ -2172,11 +2189,12 @@ transcript for **any** video recipe; the PWA only offers it on "watch it" or fai
 | R14 | comments turned off (403 `commentsDisabled`); comments 500 | saved both times; `commentsError` null when turned off, the reason when it failed |
 | R15 | `creatorComments`: viewers' comments; a null `channelId`; past `CREATOR_COMMENTS_MAX`; a cut at an emoji; `lookUpComments` ok / disabled / quota / network | only the creator's, in order; null; cut to the max; never half an emoji; the honest kinds, the key never in a reason |
 | CM-M | migration check (§4.2r) | earlier rows intact; existing recipes have `comments_error` NULL |
-| R16 | a "watch it" video recipe with captions failed; POST a pasted transcript (fake YouTube, comments and Anthropic) | 200; ingredients and steps saved; source includes `transcript`; `captionsError` null; **no request to `/youtubei/v1/player`**; one read counted; Claude's text holds the cleaned transcript |
-| R17 | transcript on a typed recipe; empty or timestamps-only text; the daily cap used up; the keys empty | 400; 400 with no read spent; 429; 503 with zero fetches |
-| R18 | Claude answers `found: false` for a pasted transcript on a hand-edited recipe | 422 `no_recipe`; the row unchanged (the hand edits survive); the read counted |
+| R16 | a "watch it" video recipe with captions failed; POST pasted text; POST two screenshots (fake YouTube, comments and Anthropic) | 200; ingredients and steps saved; source includes `transcript`; `captionsError` null; **no request to `/youtubei/v1/player`**; one read counted; Claude's text holds the cleaned transcript; for screenshots, Claude's request holds one image block per screenshot and the screenshots line |
+| R17 | transcript on a typed recipe; nothing, empty or timestamps-only text; a HEIC or oversize screenshot; more than 4; text over `PASTED_MAX`; the daily cap used up; the keys empty | 400; 400 with no read spent and nothing fetched (each); 429; 503 with zero fetches |
+| R18 | Claude answers `found: false` for a transcript (text and a screenshot) on a hand-edited recipe | 422 `no_recipe`; the row unchanged (the hand edits survive); the read counted |
+| R19b | `parseScreenshots`: none; 4; each readable type; 5; HEIC; damaged base64; one byte over `PHOTO_MAX_BYTES` | []; 4; accepted; refused with a message each |
 | R19 | `cleanTranscript` on a realistic copied YouTube transcript (timestamps on their own lines and inline, spoken durations, a chapter title); past `TRANSCRIPT_MAX` cut at an emoji; empty / only timestamps | speech and the chapter title kept, the rest gone; never half an emoji; null |
-| R20 | every value `sourcesOf` can emit (found by calling it) | accepted by `recipeFromRow` and named in the view's `READ_FROM` |
+| R20 | every value `sourcesOf` can emit (found by calling it over every combination of inputs) | accepted by `recipeFromRow` and named in the view's `READ_FROM` |
 
 ### 7E.5 Each person's emoji — decided by MojoSOGO 2026-10-03
 
@@ -2690,12 +2708,16 @@ Pumpkin patch        📅 Sat Oct 12
     hand" / "Nothing in the video's text to read", plus "· captions couldn't be read: {reason}" and
     "· comments couldn't be read: {reason}" when those happened;
   - `found` false: **"Recipe not in the video's text — watch it"** above the ▶ link;
-  - **Paste the transcript** (`RecipeTranscript.tsx`, §7E.2b), under the source note, only on a
+  - **The transcript, by hand** (`RecipeTranscript.tsx`, §7E.2b), under the source note, only on a
     video recipe that is "watch it" or whose `captionsError` is set ⚑ Q87 (never on the paste-a-link
-    step ⚑ Q91): a button that opens a box that grows to fit (`Grow`, 16 px, line breaks kept), the
-    hint "On YouTube: ⋯ → Show transcript, select all, copy" ⚑ Q90, and **Read it** → `POST
+    step ⚑ Q91): **📷 Add transcript screenshots** — a file input (`accept="image/*"`, `multiple`; on
+    the iPhone it offers Photo Library or Take Photo), each picture shrunk to a JPEG like a thing's
+    photo (§8.11, the same HEIC handling), up to 4 ⚑ Q92 (more are left out, and it says so), shown as
+    thumbnails each with a ✕ (44 px); the hint "On YouTube: ⋯ → Show transcript, then screenshot it."
+    ⚑ Q90; below it **or paste the text**, collapsed, which opens a box that grows to fit (`Grow`,
+    16 px, line breaks kept) ⚑ Q94; and, once there is a screenshot or text, **Read it** → `POST
     /recipes/{id}/transcript`. While it works: "Reading…". When the recipe already has ingredients or
-    steps the box says "This replaces the ingredients and steps shown." A refusal shows in place
+    steps it says "This replaces the ingredients and steps shown." A refusal shows in place
     (`role="alert"`) with the server's message; the re-read recipe goes back to the view and the row;
   - **Ingredients**, each with a pick box; a **Pick all** chip; **Add to Shopping (n)**. Nothing
     is picked at first ⚑ Q69. Adding calls `POST /lists/{SHOPPING_LIST_ID}/items` once per picked
@@ -3101,7 +3123,7 @@ acked, nothing is scheduled — **now only**.
 | GET/PATCH/DELETE | `/recipes/{id}` | member | GET → recipe; PATCH the POST fields, all optional, merged → recipe (found recomputed); DELETE → 204 (soft); 404 when gone |
 | PUT/DELETE | `/recipes/{id}/emoji` | member (their own) | PUT `{ emoji }` → recipe (200), my emoji set (upsert); DELETE → recipe (200), mine cleared; 400 `invalid_input` (`emojiError`); 404 when the recipe is gone; `updatedAt` untouched (§7E.5) |
 | POST | `/recipes/from-video` | member | `{ url }` → recipe (201); 400 / 409 `duplicate` (+ `recipeId`) / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed`, in the §7E.2 order |
-| POST | `/recipes/{id}/transcript` | member | `{ text }` (≤ `PASTED_MAX`) → recipe (200), re-read from the pasted transcript; 404 / 400 `invalid_input` / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed` / 422 `no_recipe` (nothing changed), in the §7E.2b order |
+| POST | `/recipes/{id}/transcript` | member | `{ screenshots?: { type, data }[] (≤ 4, base64), text? (≤ PASTED_MAX) }`, at least one → recipe (200), re-read from the pasted transcript; 404 / 400 `invalid_input` / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed` / 422 `no_recipe` (nothing changed), in the §7E.2b order |
 | GET | `/lists` | member | → `{ id, name, createdBy, openCount }[]`, by name (§7A) |
 | POST | `/lists` | member | `{ name }` → list (201); 409 `duplicate`; 400 at `LISTS_MAX` |
 | PATCH/DELETE | `/lists/{id}` | creator or admin (seeded lists: admin) | PATCH `{ name }` → list; DELETE → 204 |
@@ -3284,12 +3306,13 @@ checks.
 - ✅ Manual: a real video whose recipe is only in the creator's pinned comment, read on the
   deployed URL.
 
-**M4r — Paste the transcript** (v1.14.0)
-- `POST /recipes/{id}/transcript`, `transcript` in `RECIPE_SOURCE`, `cleanTranscript`, `PASTED_MAX`,
-  `RecipeTranscript.tsx` in the recipe view (§7E.2b, §8.12, §10). No migration.
-- ✅ Tests R16–R20.
-- ✅ Manual: a transcript copied from YouTube on the iPhone, pasted on a "watch it" recipe on the
-  deployed URL; the box at 320 px.
+**M4r — The transcript, by hand** (v1.14.0)
+- `POST /recipes/{id}/transcript` (screenshots and/or text), `transcript` in `RECIPE_SOURCE`,
+  `cleanTranscript`, `PASTED_MAX`, `parseScreenshots`, `SCREENSHOTS_MAX`, the screenshots line in the
+  prompt, `RecipeTranscript.tsx` in the recipe view (§7E.2b, §8.12, §10, §12). No migration.
+- ✅ Tests R16–R20, R19b.
+- ✅ Manual: screenshots of a YouTube transcript taken on the iPhone, read on a "watch it" recipe on
+  the deployed URL; the picker and thumbnails at 320 px.
 
 **M4l — The laundry loop** (v1.8.0)
 - Migration 0014 (`machines` + the `fires` rebuild), `MACHINE` / `MACHINE_STATE` + the
@@ -3370,7 +3393,8 @@ Captured from v1.0-draft so nothing is lost:
 - Queued offline acks
 - Photos anywhere other than Things to do (§7C.3 is the only attachment). A recipe's video
   thumbnail (§7E.1) is hotlinked from YouTube — not stored, not in R2, not an attachment — so it
-  is not one.
+  is not one. Transcript screenshots (§7E.2b) are read once and never stored — not in R2, not an
+  attachment — so they are not one either ⚑ Q93.
 - Data export
 - Audit-log screen
 - Event templates
@@ -3492,11 +3516,14 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q84 | A pasted transcript: the rest of the video's text (§7E.2b) | ⚑ The description and the creator's comments are fetched again (they are not stored): 2 quota units, and the read counts against the 20 a day |
 | Q85 | What a pasted transcript is called | ⚑ Its own source, `transcript` — "From the description and pasted transcript" — never `captions` |
 | Q86 | A pasted transcript that holds no recipe | ⚑ Only a reading that finds a recipe is saved; one that doesn't changes nothing (422, "nothing was changed"); no confirm dialog, the box says what it replaces |
-| Q87 | When Paste the transcript is offered | ⚑ Only on a "watch it" video recipe or one whose captions couldn't be read; the server allows any video recipe |
+| Q87 | When the transcript, by hand, is offered | ⚑ Only on a "watch it" video recipe or one whose captions couldn't be read; the server allows any video recipe |
 | Q88 | Cleaning a pasted transcript | ⚑ Timestamps and YouTube's spoken durations dropped, chapter titles kept, whitespace collapsed, cut to `TRANSCRIPT_MAX` |
 | Q89 | The longest paste | ⚑ `PASTED_MAX` = 100 000 characters before cleaning |
-| Q90 | Wording | ⚑ "Paste the transcript"; hint "On YouTube: ⋯ → Show transcript, select all, copy"; **Read it** |
-| Q91 | A transcript when pasting the link | ⚑ Not offered on the paste-a-link step — read the video first, then paste it on the recipe |
+| Q90 | Wording | ⚑ "📷 Add transcript screenshots"; hint "On YouTube: ⋯ → Show transcript, then screenshot it."; "or paste the text"; **Read it** |
+| Q91 | A transcript when pasting the link | ⚑ Not offered on the paste-a-link step — read the video first, then add it on the recipe |
+| Q92 | How many screenshots | ⚑ At most 4 per read (he said one; a transcript usually needs a few) |
+| Q93 | Keeping the screenshots | ⚑ Not stored — read once and dropped; no R2, no migration (§12) |
+| Q94 | Screenshots or text | ⚑ Screenshots first (the phone); pasting the text is secondary, collapsed under "or paste the text" |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -3632,12 +3659,16 @@ VALUES ('evt_<16 base32>', 'Put the goats away', NULL, '2026-10-03', NULL, '2026
 
 No `event_optins` row is inserted: it is off for everyone until each person turns it on in
 Optional calendar items (Shelly and John will).
-**M4r Paste the transcript** (v1.14.0): `POST /recipes/{id}/transcript` (§7E.2b), `transcript` in
-`RECIPE_SOURCE`, `cleanTranscript` / `PASTED_MAX` in `src/shared/recipes.ts`, `RecipeTranscript.tsx` in
-the recipe view (§8.12). No migration. The daily-cap check is one helper shared with from-video. Tests
+**M4r The transcript, by hand** (v1.14.0): `POST /recipes/{id}/transcript` (§7E.2b) taking 1–4
+screenshots (base64 in JSON, read as image blocks, never stored) and/or pasted text, `transcript` in
+`RECIPE_SOURCE`, `cleanTranscript` / `PASTED_MAX` / `parseScreenshots` / `SCREENSHOTS_MAX` in
+`src/shared/recipes.ts`, the screenshots line in `recipe-reader.ts`, `RecipeTranscript.tsx` in the recipe
+view (§8.12). No migration. The daily-cap check is one helper shared with from-video. Tests
 R16–R20 reach only fakes. **Not done:** a retry of the captions attempt as YouTube's iOS client —
 LOGIN_REQUIRED is IP reputation, and no test can reach Cloudflare's addresses, so it is deferred.
-**Still owed:** a real transcript pasted on the deployed URL, and the box checked at 320 px on the iPhone.
+**Still owed:** real transcript screenshots from the iPhone read on the deployed URL; the picker,
+thumbnails and paste box checked at 320 px on the iPhone (the file picker's Photo Library / Take Photo
+sheet is iOS-only).
 **M4q The creator's comments** (v1.13.0): migration 0019 (`recipes.comments_error`), `comments`
 in `RECIPE_SOURCE`, `lookUpComments` in `youtube.ts` (one shared failure mapping with `lookUpVideo`),
 `creatorComments` in `src/shared/recipes.ts`, the comments step run beside the captions attempt, the
