@@ -98,3 +98,71 @@ describe('H-C8 handle', () => {
     expect(lines().join('\n')).not.toContain(TOKEN);
   });
 });
+
+// SN13 (SPEC §7A.3) — POST /identify on the same helper: 405 another method, 401 no or a wrong bearer, 400 not an
+// image or an empty body, 413 a body past the cap (as main() marks it), else 200 with identify's report as it came;
+// LM Studio is never asked before the checks pass; one log line per request, never the token.
+describe('SN13 handle /identify', () => {
+  const PHOTO = new Uint8Array([0xff, 0xd8, 0xff, 9, 9]);
+  /** A fake LM Studio, counting calls. */
+  function lmStudio(content = 'Heinz Tomato Ketchup 32 oz') {
+    const calls: string[] = [];
+    const f: typeof fetch = async (input) => {
+      calls.push(input instanceof Request ? input.url : String(input));
+      return Response.json({ choices: [{ message: { content } }] });
+    };
+    return { f, calls };
+  }
+  type Over = { method?: string; authorization?: string | null; contentType?: string; body?: Uint8Array | 'too_large' };
+  const identifyReq = (over: Over = {}, f = lmStudio().f, model: string | undefined = 'qwen-uncensored') => handle({
+    method: over.method ?? 'POST', url: '/identify', contentType: over.contentType ?? 'image/jpeg', body: over.body ?? PHOTO,
+    ...(over.authorization === null ? {} : { authorization: over.authorization ?? `Bearer ${TOKEN}` }),
+  }, { token: TOKEN, fetch: f, model });
+
+  it('a good request → 200 with the report as identify made it; one log line naming what came back', async () => {
+    const lines = logs();
+    const lm = lmStudio();
+    const r = await identifyReq({}, lm.f);
+    expect(r).toEqual({ status: 200, body: { ok: true, text: 'Heinz Tomato Ketchup 32 oz' } });
+    expect(lm.calls).toEqual(['http://127.0.0.1:1234/v1/chat/completions']);
+    const said = lines();
+    expect(said).toHaveLength(1);
+    expect(said[0]).toContain('Heinz Tomato Ketchup');
+  });
+
+  it('IDENTIFY_MODEL unset → 200 with an off report, LM Studio never asked', async () => {
+    logs();
+    const lm = lmStudio();
+    const r = await identifyReq({}, lm.f, ''); // main() passes undefined for an unset or empty IDENTIFY_MODEL
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: false, kind: 'off' });
+    expect(lm.calls).toEqual([]);
+  });
+
+  it('405 / 401 / 400 / 413 in that order — LM Studio never asked; the token in no log line', async () => {
+    const lines = logs();
+    const lm = lmStudio();
+    const cases: [Over, number][] = [
+      [{ method: 'GET' }, 405],
+      [{ method: 'PUT', authorization: null }, 405],
+      [{ authorization: null }, 401],
+      [{ authorization: 'Bearer wrong', contentType: 'text/plain' }, 401],
+      [{ authorization: TOKEN }, 401],
+      [{ contentType: 'text/plain' }, 400],
+      [{ contentType: '' }, 400],
+      [{ contentType: 'application/json', body: 'too_large' }, 400],
+      [{ body: 'too_large' }, 413],
+      [{ contentType: 'image/png; charset=binary', body: 'too_large' }, 413],
+      [{ body: new Uint8Array() }, 400],
+    ];
+    for (const [over, status] of cases) {
+      const r = await identifyReq(over, lm.f);
+      expect(r.status, JSON.stringify(over)).toBe(status);
+      expect(r.body).toHaveProperty('error');
+    }
+    expect(lm.calls).toEqual([]);
+    const said = lines();
+    expect(said).toHaveLength(cases.length);
+    expect(said.join('\n')).not.toContain(TOKEN);
+  });
+});

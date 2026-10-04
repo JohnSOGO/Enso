@@ -1,8 +1,10 @@
-// SPEC §7C.4 — reads one photo via claude.ts (the only importer of the Anthropic SDK, and only lazily).
-// This file owns the photo prompt, its schema and its image block. It returns the raw fields or an
-// honest failure; it never decides what is saved — the route cleans the answer with cleanPhotoReading
-// (src/shared/things.ts) and the person reviews it.
-import { askClaude } from './claude';
+// SPEC §7C.4, §7A.3 — reads one photo via claude.ts (the only importer of the Anthropic SDK, and only lazily):
+// a thing's flyer (readPhoto) or a snapped list item (readItemPhoto). This file owns the flyer prompt, both
+// schemas and the image block (the item prompt is IDENTIFY_PROMPT, src/shared/item-reading.ts). It returns the raw
+// answer or an honest failure; it never decides what is saved — the routes clean the answer (cleanPhotoReading,
+// cleanItemName) and the person reviews it.
+import { askClaude, type ClaudeBlock } from './claude';
+import { IDENTIFY_PROMPT } from '../shared/item-reading';
 
 /** Media types the Claude API reads as an image block. The phone sends JPEG (§7C.3). */
 const READABLE = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
@@ -36,17 +38,22 @@ const prompt = (today: string, tz: string) =>
   `else useful, such as times or what to bring). Give every detail the photo shows, copied exactly as written. ` +
   `Use null for anything not shown.`;
 
+/** The photo as an image block, or the failure when Claude can't read its type. */
+function imageBlock(bytes: ArrayBuffer, mediaType: string): ClaudeBlock | { ok: false; kind: 'failed'; reason: string } {
+  if (!(READABLE as readonly string[]).includes(mediaType)) {
+    return { ok: false, kind: 'failed', reason: `Claude can't read ${mediaType} pictures; send a JPEG.` };
+  }
+  return { type: 'image', source: { type: 'base64', media_type: mediaType as Readable, data: base64(bytes) } };
+}
+
 /** One photo, one structured-output request through askClaude. `fetch` is for tests only. */
 export async function readPhoto(input: ReadPhotoInput, opts: { fetch?: typeof fetch } = {}): Promise<ReadPhotoResult> {
-  if (!(READABLE as readonly string[]).includes(input.mediaType)) {
-    return { ok: false, kind: 'failed', reason: `Claude can't read ${input.mediaType} pictures; send a JPEG.` };
-  }
+  const image = imageBlock(input.bytes, input.mediaType);
+  if ('ok' in image) return image;
   const res = await askClaude({
     apiKey: input.apiKey,
     fetch: opts.fetch,
-    content: [
-      { type: 'image', source: { type: 'base64', media_type: input.mediaType as Readable, data: base64(input.bytes) } },
-    ],
+    content: [image],
     prompt: prompt(input.today, input.tz),
     schema: (z) => z.object({
       title: z.string().nullable(), startDate: z.string().nullable(), endDate: z.string().nullable(),
@@ -55,4 +62,19 @@ export async function readPhoto(input: ReadPhotoInput, opts: { fetch?: typeof fe
     }),
   });
   return res.ok ? { ok: true, raw: res.value } : res;
+}
+
+export type ReadItemPhotoResult = { ok: true; name: string } | { ok: false; kind: 'refused' | 'failed'; reason: string };
+
+/** A snapped list item (§7A.3): one request with IDENTIFY_PROMPT and the schema { name } → the raw name (the route
+ *  runs cleanItemName), or an honest failure. `fetch` is for tests only. */
+export async function readItemPhoto(input: { apiKey: string; bytes: ArrayBuffer; mediaType: string },
+  opts: { fetch?: typeof fetch } = {}): Promise<ReadItemPhotoResult> {
+  const image = imageBlock(input.bytes, input.mediaType);
+  if ('ok' in image) return image;
+  const res = await askClaude({
+    apiKey: input.apiKey, fetch: opts.fetch, content: [image], prompt: IDENTIFY_PROMPT,
+    schema: (z) => z.object({ name: z.string() }),
+  });
+  return res.ok ? { ok: true, name: res.value.name } : res;
 }

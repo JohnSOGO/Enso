@@ -4,7 +4,9 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import type { Env } from '../src/worker/env';
-import { HOME_CAPTIONS_TIMEOUT_MS, homeCaptionsConfigOf, readCaptionsFromHome, type HomeCaptionsConfig } from '../src/worker/home-captions';
+import {
+  HOME_CAPTIONS_TIMEOUT_MS, HOME_IDENTIFY_TIMEOUT_MS, homeCaptionsConfigOf, identifyFromHome, readCaptionsFromHome, type HomeCaptionsConfig,
+} from '../src/worker/home-captions';
 import { CAPTIONS_REPORT_REASON_MAX, TRANSCRIPT_MAX } from '../src/shared/recipe-reading';
 import { VIDEO_ID } from './recipe-fakes';
 
@@ -95,4 +97,48 @@ describe('H-C3 readCaptionsFromHome — every failure is honest', () => {
     const r = await readCaptionsFromHome(CFG, VIDEO_ID, { fetch: f });
     expect(!r.ok && r.reason.length).toBe(CAPTIONS_REPORT_REASON_MAX);
   });
+});
+
+// SN1, SN15 (SPEC §7A.3) — identifyFromHome over a fake fetch: one POST of the image bytes to {url}/identify with both
+// Access headers, the bearer, the photo's type and redirect 'manual' → the raw text; every failure honest.
+describe('SN1 identifyFromHome', () => {
+  const PHOTO = new Uint8Array([0xff, 0xd8, 0xff, 7, 7, 7]).buffer as ArrayBuffer;
+
+  it('one POST of the bytes to {url}/identify with the headers → the text as it came', async () => {
+    const { f, seen } = fake(json({ ok: true, text: '  Heinz Ketchup ' }));
+    expect(await identifyFromHome(CFG, PHOTO, 'image/jpeg', { fetch: f })).toEqual({ ok: true, text: '  Heinz Ketchup ' });
+    expect(seen).toHaveLength(1);
+    const { req, signal } = seen[0];
+    expect(req.method).toBe('POST');
+    expect(req.url).toBe('https://sogoai.test/identify');
+    expect(req.headers.get('CF-Access-Client-Id')).toBe(CFG.accessId);
+    expect(req.headers.get('CF-Access-Client-Secret')).toBe(CFG.accessSecret);
+    expect(req.headers.get('Authorization')).toBe(`Bearer ${CFG.token}`);
+    expect(req.headers.get('Content-Type')).toBe('image/jpeg');
+    expect(req.redirect).toBe('manual');
+    expect(new Uint8Array(await req.arrayBuffer())).toEqual(new Uint8Array(PHOTO));
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(HOME_IDENTIFY_TIMEOUT_MS).toBe(20_000);
+  });
+
+  const cases: [string, (() => Response) | Error, RegExp | string][] = [
+    ['a 302 (Access refused the service token)', () => new Response(null, { status: 302 }), /^HTTP 302: $/],
+    ['a 401 from the helper', json({ error: 'unauthorized' }, 401), 'HTTP 401: {"error":"unauthorized"}'],
+    ['a network failure', new Error('connection refused'), 'error: connection refused'],
+    ['the timeout', new DOMException('The operation was aborted due to timeout', 'TimeoutError'), /^error: .*timeout/],
+    ['a body that is not JSON', () => new Response('<html>'), /not JSON/],
+    ['JSON that is not a report', json({ hello: 1 }), 'ok must be true or false.'],
+    ['the helper is off', json({ ok: false, kind: 'off', reason: "IDENTIFY_MODEL isn't set on SogoAI." }), "IDENTIFY_MODEL isn't set on SogoAI."],
+    ['LM Studio failed', json({ ok: false, kind: 'failed', reason: 'LM Studio HTTP 500: x' }), 'LM Studio HTTP 500: x'],
+  ];
+  for (const [what, answer, reason] of cases) {
+    it(`${what} → an honest failure, never a throw, never a secret`, async () => {
+      const r = await identifyFromHome(CFG, PHOTO, 'image/jpeg', { fetch: fake(answer).f });
+      expect(r.ok).toBe(false);
+      if (r.ok) return;
+      if (typeof reason === 'string') expect(r.reason).toBe(reason);
+      else expect(r.reason).toMatch(reason);
+      for (const s of SECRETS) expect(r.reason).not.toContain(s);
+    });
+  }
 });

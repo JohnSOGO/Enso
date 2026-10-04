@@ -1,7 +1,8 @@
 // SPEC §7A, §10 — household lists: list CRUD and list item CRUD. Every add/re-open/duplicate
 // decision and who may rename/delete a list is made by src/shared/lists.ts; this route
 // validates, persists and shapes the response. Items of a deleted list are unreachable:
-// every item read and write joins lists.deleted_at IS NULL (L16).
+// every item read and write joins lists.deleted_at IS NULL (L16). Deleting an item or a list
+// deletes its items' photos from R2 (§7A.3); the photo routes are routes/item-photos.ts.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import {
@@ -19,7 +20,7 @@ interface ListRow {
 interface ItemRow {
   id: string; list_id: string; text: string; text_key: string; note: string | null; assignee_id: string | null;
   created_by: string; created_at: string; updated_at: string;
-  checked_at: string | null; checked_by: string | null; deleted_at: string | null;
+  checked_at: string | null; checked_by: string | null; deleted_at: string | null; photo_key: string | null;
 }
 
 const listView = (l: ListRow) => ({ id: l.id, name: l.name, createdBy: l.created_by });
@@ -27,6 +28,7 @@ const listView = (l: ListRow) => ({ id: l.id, name: l.name, createdBy: l.created
 const itemView = (r: ItemRow) => ({
   id: r.id, listId: r.list_id, text: r.text, note: r.note, assigneeId: r.assignee_id, createdBy: r.created_by,
   createdAt: r.created_at, checkedAt: r.checked_at, checkedBy: r.checked_by,
+  hasPhoto: r.photo_key !== null, updatedAt: r.updated_at, // §7A.3: the photo's key is never on the wire
 });
 
 const loadLists = (db: D1Database) => all<ListRow>(db, 'SELECT * FROM lists WHERE deleted_at IS NULL');
@@ -34,17 +36,20 @@ const loadList = (db: D1Database, id: string) => first<ListRow>(db, 'SELECT * FR
 /** A list's non-deleted items. Callers have already found the list itself non-deleted. */
 const loadItems = (db: D1Database, listId: string) =>
   all<ItemRow>(db, 'SELECT * FROM list_items WHERE list_id = ? AND deleted_at IS NULL', listId);
-/** One non-deleted item on a non-deleted list. */
-const loadItem = (db: D1Database, id: string) =>
+/** One non-deleted item on a non-deleted list. Shared with routes/item-photos.ts. */
+export const loadItem = (db: D1Database, id: string) =>
   first<ItemRow>(db,
     `SELECT i.* FROM list_items i JOIN lists l ON l.id = i.list_id
       WHERE i.id = ? AND i.deleted_at IS NULL AND l.deleted_at IS NULL`, id);
+
+/** R2 deletes at most this many keys in one call. */
+const R2_DELETE_MAX = 1000;
 
 const TEXT_MSG = `Item text must be 1–${TEXT_MAX} characters.`;
 const NOTE_MSG = `A note can be at most ${NOTE_MAX} characters.`;
 const NAME_MSG = `A list name must be 1–${LIST_NAME_MAX} characters.`;
 const LIST_GONE = 'That list no longer exists.';
-const ITEM_GONE = 'That item is no longer on the list.';
+export const ITEM_GONE = 'That item is no longer on the list.';
 
 /** A list name: trimmed, 1–LIST_NAME_MAX characters; null otherwise. */
 function listName(v: unknown): string | null {
@@ -112,8 +117,15 @@ lists.delete('/lists/:id', requireMember, async (c) => {
   if (!canManageList(list.created_by, c.get('member'))) {
     return fail(c, 403, 'forbidden', list.created_by ? 'Only the person who made this list or an admin can delete it.' : 'Only an admin can delete this list.');
   }
-  const now = nowIso();
-  await run(c.env.DB, 'UPDATE lists SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL', now, now, list.id);
+  const db = c.env.DB, now = nowIso();
+  // §7A.3: its items' photos go with it — the keys read, cleared with the list's delete, then the objects removed.
+  const keys = (await all<{ photo_key: string }>(db,
+    'SELECT photo_key FROM list_items WHERE list_id = ? AND photo_key IS NOT NULL', list.id)).map((r) => r.photo_key);
+  await db.batch([
+    db.prepare('UPDATE list_items SET photo_key = NULL WHERE list_id = ? AND photo_key IS NOT NULL').bind(list.id),
+    db.prepare('UPDATE lists SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL').bind(now, now, list.id),
+  ]);
+  for (let i = 0; i < keys.length; i += R2_DELETE_MAX) await c.env.PHOTOS.delete(keys.slice(i, i + R2_DELETE_MAX));
   return c.body(null, 204);
 });
 
@@ -185,11 +197,14 @@ lists.patch('/list-items/:id', requireMember, async (c) => {
 });
 
 lists.delete('/list-items/:id', requireMember, async (c) => {
+  const row = await loadItem(c.env.DB, c.req.param('id'));
+  if (!row) return fail(c, 404, 'not_found', ITEM_GONE);
   const now = nowIso();
   const r = await run(c.env.DB,
-    `UPDATE list_items SET deleted_at = ?, updated_at = ?
+    `UPDATE list_items SET deleted_at = ?, photo_key = NULL, updated_at = ?
       WHERE id = ? AND deleted_at IS NULL AND list_id IN (SELECT id FROM lists WHERE deleted_at IS NULL)`,
-    now, now, c.req.param('id'));
+    now, now, row.id);
   if (r.meta.changes !== 1) return fail(c, 404, 'not_found', ITEM_GONE);
+  if (row.photo_key) await c.env.PHOTOS.delete(row.photo_key); // §7A.3: deleting an item deletes its photo
   return c.body(null, 204);
 });

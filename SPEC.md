@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.37 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
+**Version:** 2.38 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -118,6 +118,7 @@ calendars, anything in §12.
   |   - Web Push sender  (VAPID)                 |
   |   - House delivery   (house.ts, §9.2)        |
   |   - Captions from home (§7E.2c)              |
+  |   - Snap an item: SogoAI first (§7A.3)       |
   |            |                                 |
   |           D1 (SQLite)                        |
   +---------------------------------------------+
@@ -125,6 +126,7 @@ calendars, anything in §12.
             |  HTTPS + CF-Access-Client-Id/-Secret (the enso-worker service token):
             |    https://ha.sogodojo.com              + Bearer HA_TOKEN        (House, §9.2)
             |    https://sogoai.sogodojo.com/captions + Bearer CAPTIONS_TOKEN  (in-line, §7E.2c)
+            |    https://sogoai.sogodojo.com/identify + Bearer CAPTIONS_TOKEN  (in-line, §7A.3)
             v
   +---------------------------+  Cloudflare Tunnel +-------------------------+
   |  Cloudflare Access         | -----------------> |  Home Assistant          |
@@ -137,6 +139,9 @@ calendars, anything in §12.
   |  SogoAI (home PC, Windows 11, Node 24)   |   http://127.0.0.1:8790 — GET /captions?v=…
   |  home/dist/captions-helper.mjs           |   -> readCaptions from the home IP -> the
   |  (Task Scheduler, at startup)            |   CaptionsResult as JSON (§7E.2c)
+  |                                          |   POST /identify (an image) -> LM Studio's
+  |                                          |   local vision model at 127.0.0.1:1234 ->
+  |                                          |   an IdentifyReport as JSON (§7A.3)
   +-----------------------------------------+
 ```
 
@@ -147,6 +152,11 @@ Access → Cloudflare Tunnel → SogoAI — and gets the captions back in the sa
 listens on `127.0.0.1:8790` only; `cloudflared` (a Windows service on SogoAI) carries the tunnel
 outbound, so no port is opened at home, and Access lets through only the `enso-worker` service token
 (the same one House delivery uses).
+
+**Why SogoAI reads snapped items first:** decided by MojoSOGO 2026-10-04 — "use SogoAI as necessary to
+avoid paying fees but pay the claude api if that is the only option". A photo of an item to buy again
+(§7A.3) goes to SogoAI's local vision model (LM Studio, free) through the same helper, Access application
+and bearer; the Claude API is asked only when SogoAI gives no name.
 
 **Why a tunnel:** Home Assistant is only on the LAN (`external_url` is null, no
 Nabu Casa), and no port is opened to it. Until v1.7.0 a relay process on the home PC
@@ -166,8 +176,9 @@ Cloudflare Tunnel + Access**.
 | Styling | CSS Modules + CSS custom properties | Follow `C:\Users\Public\git\MOJOSOGO-PREFERENCES.md` and the `phone-ui` skill |
 | Push | Web Push (VAPID) from the Worker via **`@block65/webcrypto-web-push` 2.0.0** (pinned exactly) | WebCrypto only. Sends `Content-Encoding: aes128gcm` (RFC 8291) + `Authorization: vapid t=…, k=…` (RFC 8292) — the legacy `aesgcm` that some libraries send is refused by Apple. The 2026-10-03 spike decrypted its output under Node **and** workerd, and cross-checked it with `http_ece`. |
 | House delivery | The Worker calls Home Assistant's REST API through **Cloudflare Tunnel + Access** (§9.2) | `src/worker/house.ts`; no process at home besides HA itself. |
-| Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Private: photos are served only through the API to signed-in members (§7C.3). |
-| Reading photos and recipes | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4, §7E) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). One caller of the SDK: `src/worker/claude.ts`. |
+| Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Two attachments: a thing's photo (`things/…`, §7C.3) and a list item's photo (`list-items/…`, §7A.3). Private: photos are served only through the API to signed-in members. |
+| Reading photos and recipes | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4, §7A.3, §7E) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). One caller of the SDK: `src/worker/claude.ts`. A snapped list item is read by SogoAI first and by Claude only when SogoAI gives no name (§7A.3). |
+| Naming a snapped item at home | **LM Studio** on SogoAI, `http://127.0.0.1:1234/v1/chat/completions` (OpenAI-compatible), the always-loaded vision model named by `IDENTIFY_MODEL` (`qwen-uncensored`) (§7A.3) | Free. Reached only by the SogoAI helper, never by the Worker directly. |
 | Recipes from videos | **YouTube Data API v3** `videos.list?part=snippet&id=…` and `commentThreads.list?part=snippet&videoId=…&order=relevance&maxResults=20&textFormat=plainText` (§7E) | Secret `YOUTUBE_API_KEY`; 1 quota unit per call, so 2 per read ⚑ Q82. Plus an **unofficial, keyless** captions attempt (YouTube's player endpoint asked as its Android app), which may be blocked — a failure is recorded and shown, never faked. |
 | QR codes | `uqr` (MIT, zero dependencies, renders SVG) | **Loaded lazily** (dynamic `import()`) only when an invite card opens — never in the main bundle. |
 | Tests | **Vitest**; `@cloudflare/vitest-pool-workers` for API tests | API tests apply `migrations/` via `readD1Migrations` / `applyD1Migrations` |
@@ -198,7 +209,9 @@ Enso/
 │   ├── 0018_recipe_emojis.sql   # §4.2q
 │   ├── 0019_recipe_comments.sql # §4.2r
 │   ├── 0020_recipe_captions_job.sql # §4.2s
-│   └── 0021_drop_captions_job.sql   # §4.2t
+│   ├── 0021_drop_captions_job.sql   # §4.2t
+│   ├── 0022_delivery_title.sql      # §4.2u
+│   └── 0023_list_item_photo.sql     # §4.2v
 ├── src/
 │   ├── shared/             # pure TS, no I/O — imported by worker and frontend
 │   │   ├── vocab.ts        # §3
@@ -207,6 +220,7 @@ Enso/
 │   │   ├── holidays.ts     # §7.3
 │   │   ├── markets.ts      # §7.4
 │   │   ├── lists.ts        # §7A.1 item rules: itemKey, add/reopen decision, limits, 30-day window
+│   │   ├── item-reading.ts # §7A.3 naming a snapped item: the prompt, cleanItemName, the helper's report
 │   │   ├── machines.ts     # §7D the laundry loop: state, transitions, done message
 │   │   ├── sun.ts          # §7.7 sunset per local date and place (NOAA)
 │   │   ├── recipes.ts      # §7E recipe rules: limits, YouTube link → video id, typed input, the wire
@@ -221,7 +235,8 @@ Enso/
 │       │                   # invites) · events.ts (/calendar, events) · alarms.ts ·
 │       │                   # alerts.ts (timers, fires + actions) · household.ts (settings,
 │       │                   # days off, /push/*, /status) · announce.ts ·
-│       │                   # lists.ts (§7A) · machines.ts (§7D) · recipes.ts (§7E)
+│       │                   # lists.ts (§7A) · item-photos.ts (§7A.3) · machines.ts (§7D) ·
+│       │                   # recipes.ts (§7E)
 │       ├── recipe-reread.ts # §7E.2b re-reading a recipe in place
 │       ├── claude.ts       # the one Claude API call (§7C.4, §7E)
 │       ├── recipe-reader.ts # §7E the recipe prompt + schema
@@ -230,14 +245,15 @@ Enso/
 │       ├── tick.ts         # loads rows, calls engine, writes results
 │       ├── push.ts         # Web Push sending
 │       ├── house.ts        # House delivery via HA through Cloudflare Tunnel + Access (§9.2)
-│       ├── home-captions.ts # §7E.2c asking SogoAI for captions, through Access + the tunnel
+│       ├── home-captions.ts # §7E.2c, §7A.3 asking SogoAI for captions or an item's name, through Access + the tunnel
 │       └── session.ts      # password hashing, session cookie
 ├── frontend/               # Vite root
 │   ├── index.html
 │   ├── vite.config.ts
 │   └── src/
 ├── home/                   # runs on SogoAI, not in the Worker (§7E.2c)
-│   ├── captions-helper.ts  # 127.0.0.1:8790 GET /captions?v=… → readCaptions from the home IP
+│   ├── captions-helper.ts  # 127.0.0.1:8790 GET /captions?v=… → readCaptions from the home IP; POST /identify → identify.ts
+│   ├── identify.ts         # §7A.3 one photo → LM Studio's local vision model → an IdentifyReport
 │   ├── captions-helper.cmd # the Task Scheduler launcher (node --env-file, appends to a log)
 │   ├── tsconfig.json       # Node types; part of `npm run typecheck`
 │   └── dist/               # `npm run build:home` output (gitignored)
@@ -280,8 +296,9 @@ against the deployed Worker. On iPhone, push works only after
 | `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` (secrets) | Worker | The Cloudflare Access **service token** (`enso-worker`) for `ha.sogodojo.com` **and** `sogoai.sogodojo.com`, sent as `CF-Access-Client-Id` / `CF-Access-Client-Secret` (§9.2, §7E.2c). One token, two Access applications. Never logged. Tests pin them empty (House and captions from home are then not configured). |
 | `HA_URL`, `ECHO_TARGETS` (JSON array), `ECHO_TYPE`, `SATELLITE_ENTITY` (vars, `wrangler.toml`) | Worker | Where and on what House speaks (§9.2). |
 | `YOUTUBE_API_KEY` (secret) | Worker | A Google Cloud API key with the YouTube Data API v3 enabled, for reading a recipe video's title and description (§7E). Set it with `npx wrangler secret put YOUTUBE_API_KEY` **in a real PowerShell window**. Never logged, never in an error message. Reading recipes also needs `ANTHROPIC_API_KEY`; without either, `POST /recipes/from-video` is 503 `recipe_reading_off` and typed recipes still work. Tests pin it empty. |
-| `CAPTIONS_TOKEN` (secret) | Worker **and** SogoAI's `C:\Enso\captions-helper.env` | The bearer the Worker sends to the SogoAI helper (`Authorization: Bearer …`, §7E.2c), checked by the helper in constant time — a second lock behind Access. A long random string, set with `npx wrangler secret put CAPTIONS_TOKEN` in a real PowerShell window and the same value in the helper's env file (never in the repo). Unset or empty on the Worker → captions from home are not set up (§7E.2c); unset on SogoAI → the helper does not start. Never logged, by the Worker or the helper. Tests pin a test-only value. |
-| `HOME_CAPTIONS_URL` (var, `wrangler.toml`) | Worker | Where the SogoAI helper is reached: `https://sogoai.sogodojo.com` (§7E.2c). Tests pin `https://sogoai.test`, which only a fetch spy answers. |
+| `CAPTIONS_TOKEN` (secret) | Worker **and** SogoAI's `C:\Enso\captions-helper.env` | The bearer the Worker sends to the SogoAI helper (`Authorization: Bearer …`, §7E.2c), checked by the helper in constant time — a second lock behind Access. A long random string, set with `npx wrangler secret put CAPTIONS_TOKEN` in a real PowerShell window and the same value in the helper's env file (never in the repo). Unset or empty on the Worker → captions from home are not set up (§7E.2c) and a snapped item goes straight to Claude (§7A.3); unset on SogoAI → the helper does not start. The same bearer guards `/identify` (§7A.3). Never logged, by the Worker or the helper. Tests pin a test-only value. |
+| `HOME_CAPTIONS_URL` (var, `wrangler.toml`) | Worker | Where the SogoAI helper is reached: `https://sogoai.sogodojo.com` (§7E.2c), for `/captions` and `/identify` (§7A.3) alike. Tests pin `https://sogoai.test`, which only a fetch spy answers. |
+| `IDENTIFY_MODEL` (SogoAI's `C:\Enso\captions-helper.env`, not a Worker setting) | SogoAI helper | The LM Studio model id `/identify` asks (§7A.3): `qwen-uncensored`, the always-loaded vision model ⚑ Q115. Unset or empty → `/identify` answers `{ ok: false, kind: "off" }` (the Worker then asks Claude); captions keep working and the helper still starts. Not a secret. |
 | `OPS_NOTIFY_TOKEN` (secret) | Worker **and** MojoSOGO's machines (`%USERPROFILE%\.enso\ops-notify-token`) | The bearer a Claude Code session sends to `POST /ops/notify` to push a message to the founder's phone (§9.4), checked in constant time. A long random string, set with `npx wrangler secret put OPS_NOTIFY_TOKEN` in a real PowerShell window and the same value in the token file (never in the repo). Unset or empty → `/ops/notify` is 503 `ops_notify_off` (never open). Never logged, never in a message or a delivery's detail. Tests pin a test-only value. |
 
 Dev secrets go in `.dev.vars` (gitignored); production uses `wrangler secret put`, typed
@@ -301,8 +318,9 @@ Source files are everything under `src/`, `frontend/src/`, `scripts/` and `home/
 - an import crosses a layering ban (`LAYERS` in `scripts/arch.ts`): `src/shared/`
   imports only its own siblings (no packages, no I/O); the worker and the frontend
   never import each other; nothing imports `scripts/` or `home/`; `home/` (the SogoAI
-  helper, §7E.2c) imports nothing from the repo **except** `src/worker/youtube-captions.ts`,
-  and no package **except** `node:http` (the helper's one server) — a layer may name exact repo
+  helper, §7E.2c, §7A.3) imports nothing from the repo **except** `src/worker/youtube-captions.ts`
+  and `src/shared/item-reading.ts` (and its own siblings), and no package **except** `node:http`
+  (the helper's one server) — a layer may name exact repo
   paths, or `package:<name>`, in `allowed`, which the ban then skips;
 - a `src/shared/` file uses `Date.now(`, `new Date()`, `fetch(` or `D1Database`
   (§0.3 — `now` is always a parameter);
@@ -340,6 +358,8 @@ export const MACHINE_STATE = ['free', 'running', 'done'] as const;              
 export const SUN_EVENT    = ['sunset'] as const;                                 // §7.7 events.start_sun
 export const RECIPE_SOURCE = ['description', 'captions', 'transcript', 'comments', 'typed'] as const; // §7E what a recipe was read from ('transcript': pasted, §7E.2b)
 export const CAPTIONS_FAILURE = ['blocked', 'none', 'failed'] as const;         // §7E why captions couldn't be read
+export const IDENTIFY_FAILURE = ['off', 'failed'] as const;                     // §7A.3 why SogoAI gave no reading
+export const ITEM_READ_VIA = ['sogoai', 'claude'] as const;                     // §7A.3 who named a snapped item
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
 ```
@@ -362,6 +382,8 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `description` / `captions` | A recipe was read from the video's description / its captions (§7E); a recipe can carry both |
 | `typed` | A recipe typed by hand, with no video (§7E) |
 | `blocked` / `none` / `failed` | Why a video's captions couldn't be read (§7E): YouTube refused the keyless request / the video has no captions / anything else (network, an unreadable answer) |
+| `off` / `failed` (identify) | Why SogoAI gave no reading of a snapped item (§7A.3): `IDENTIFY_MODEL` isn't set on SogoAI / LM Studio failed or answered something unreadable |
+| `sogoai` / `claude` | Who named a snapped item (§7A.3): SogoAI's local vision model (free) / the Claude API (the fallback) |
 | `at` | Chore rings at its time, like an alarm |
 | `by` | Chore is quiet: due by its time, optionally one nudge then |
 | `superseded` | A newer occurrence of the same event started ringing while this one still was |
@@ -1067,6 +1089,20 @@ ALTER TABLE deliveries ADD COLUMN title TEXT;
 (§9.1). The column is also what the hourly limit counts by (§9.4). **Migration check (ON-M):** rows
 written under 0001–0021 survive 0022 unchanged with `title` NULL; `PRAGMA foreign_key_check` is empty.
 
+### 4.2v Schema change — `migrations/0023_list_item_photo.sql`
+
+Decided by MojoSOGO 2026-10-04: a snapped item keeps its photo (§7A.3).
+
+```sql
+-- §7A.3 — a list item's photo: its R2 key (list-items/{itemId}/{random}.jpg), NULL when it has none.
+ALTER TABLE list_items ADD COLUMN photo_key TEXT;
+```
+
+`photo_key` is NULL on every existing row. It is written only by `PUT /list-items/{id}/photo` and cleared by
+`DELETE /list-items/{id}/photo`, by deleting the item and by deleting its list (§7A.1). It is never sent on the
+wire: an item carries `hasPhoto` instead. **Migration check (SN-M):** rows written under 0001–0022 survive 0023
+unchanged with `photo_key` NULL; `PRAGMA foreign_key_check` is empty.
+
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
 
@@ -1715,7 +1751,8 @@ is done in JS with `itemKey` — never with SQLite `lower()`/`NOCASE`, which fol
 - **Any member may create a list.** **Rename or delete:** its creator or an admin; the two
   seeded lists (no creator): admins only. ⚑ DEFAULT
 - **Delete** is a soft delete. Its items go with it: they are no longer reachable
-  (`GET` → 404, item calls → 404). The name becomes free again.
+  (`GET` → 404, item calls → 404). The name becomes free again. Every one of its items'
+  photos (§7A.3) is deleted from R2 and its key cleared.
 
 **Items** (on any list):
 - **Text** is trimmed, 1–120 characters. **Note** ≤ 1000 characters.
@@ -1736,7 +1773,8 @@ is done in JS with `itemKey` — never with SQLite `lower()`/`NOCASE`, which fol
 - **Visible checked items** = checked within the last `CHECKED_VISIBLE_DAYS = 30`
   days, newest first. Older checked items stay in the table (so adding them again
   re-opens rather than duplicates) but are not returned.
-- **Delete** is a soft delete. Adding the same text later creates a new item.
+- **Delete** is a soft delete. Adding the same text later creates a new item. Its photo
+  (§7A.3) is deleted from R2 and its key cleared in the same UPDATE.
 - Any member may add, edit, check, assign or delete any item. ⚑ DEFAULT
 - Lists never ring, push or speak. They are things to look at, not alerts — being
   assigned an item notifies nobody.
@@ -1765,6 +1803,114 @@ is done in JS with `itemKey` — never with SQLite `lower()`/`NOCASE`, which fol
 | L18 | a member renames or deletes the seeded Shopping list | 403; an admin may |
 | L19 | name "" / 41 characters / a 31st list | 400 `invalid_input` with a message |
 | L20 | migration check (§4.2f) | items on the old `shopping`/`wishlist` lists, and wish-list owners, are on `lst_shopping`/`lst_wishlist` with the same assignee |
+
+### 7A.3 Snap an item — a photo kept with a list item
+
+Decided by MojoSOGO 2026-10-04. He photographs an item he needs to replace; the server names it; the
+name goes into the add box with a hint to check it; he taps **Add** as usual. **Nothing is added
+automatically.** The photo is **kept** with the list item, so he can look at it when he replaces the
+item. On cost, his words: "use SogoAI as necessary to avoid paying fees but pay the claude api if that is
+the only option" — SogoAI's local vision model first (free), the Claude API only when SogoAI gives no name.
+
+**The rules** — `src/shared/item-reading.ts` (pure; imports lists, things (photo limits) and vocab only):
+
+- `ITEM_NAME_ASK` = 60 — the length the prompt asks for ⚑ Q116; the name kept is cut at `TEXT_MAX` (120).
+- `IDENTIFY_PROMPT` — the same text to SogoAI and to Claude: "This is a photo of a household item someone
+  needs to buy again. Reply with ONLY a short shopping-list name for it (brand + product + size if visible),
+  max 60 characters. If you cannot tell what it is, reply exactly: UNKNOWN." The helper appends
+  " /no_think" (it turns the local model's thinking off).
+- `IDENTIFY_UNKNOWN` = "UNKNOWN".
+- `cleanItemName(raw)` → the name, or null: drops any `<think>…</think>` block, takes the first non-empty
+  line, collapses whitespace, strips wrapping quotes / backticks and a trailing full stop; null when what is
+  left is empty, only quotes, or `UNKNOWN` (any case); else cut to `TEXT_MAX` (never inside a surrogate
+  pair). A model's answer is input, never trusted as-is.
+- `IDENTIFY_BODY_MAX` = `PHOTO_MAX_BYTES` (4 MB) — the helper's body cap.
+- `IdentifyReport` = `{ ok: true, text }` | `{ ok: false, kind, reason }`, `kind` one of `IDENTIFY_FAILURE`
+  (`off` | `failed`), and `parseIdentifyReport(body)` → the report or a message: `text` a string, cut to
+  `IDENTIFY_TEXT_MAX` (2000); `reason` non-empty, cut to `IDENTIFY_REASON_MAX` (300).
+- `ItemReading` = `{ name, via }`, `via` one of `ITEM_READ_VIA` (`sogoai` | `claude`) — the read's answer.
+
+**Reading — `POST /list-items/read-photo`** with the (already shrunk) image → `{ name, via }`. **Nothing is
+stored** — no row, no R2 object. The check order:
+
+1. signed in → else 401;
+2. the body (`photoBody`, as §7C.3: type, size, empty) → else 400;
+3. `homeCaptionsConfigOf(env)` set → `identifyFromHome` (20 s ⚑ Q114), then `cleanItemName` on its text:
+   a name → **200 `{ name, via: "sogoai" }`**, and no read is counted ⚑ Q113;
+4. otherwise — SogoAI not configured, failed, or gave no name (UNKNOWN) ⚑ Q112 — the Claude API, as
+   §7C.4: the daily cap (the household's 40-a-day `photo_reads` budget, shared with Things) → 429
+   `rate_limited`; no `ANTHROPIC_API_KEY` → 503 `photo_reading_off` "Reading photos isn't set up yet.";
+   count the read; `readItemPhoto` (photo-reader.ts: `IDENTIFY_PROMPT`, schema `{ name }`) → a refusal: 422
+   `photo_refused` "Couldn't read that photo."; a failure: 502 `photo_reading_failed` "Couldn't read that
+   photo: {reason} (SogoAI: {why it gave no name})"; `cleanItemName` null: 422 `item_unknown` "Couldn't tell
+   what that is — type it in."; a name: **200 `{ name, via: "claude" }`**.
+
+Why SogoAI gave no name, in that 502: "it isn't set up", its failure reason, or "it couldn't tell what it is".
+
+**The call** — `identifyFromHome(cfg, photo, type, { fetch? })` in `src/worker/home-captions.ts`: one
+`POST {url}/identify`, the image bytes as the body with `Content-Type` the photo's type and
+`Authorization: Bearer {CAPTIONS_TOKEN}`, through `access.ts` (both Access headers, `redirect: 'manual'`,
+2xx only) with `AbortSignal.timeout(HOME_IDENTIFY_TIMEOUT_MS)` = 20 s; a 2xx body goes through
+`parseIdentifyReport`. It answers `{ ok: true, text }` or `{ ok: false, reason }` — the honest reasons of
+§7E.2c ("HTTP n: …", "error: …", the parse message) or the home's own. It never throws, never names a
+secret, and never decides; the route runs `cleanItemName`.
+
+**The helper** — `POST /identify` on the same `home/captions-helper.ts` server (§7E.2c), the same tunnel,
+Access application and bearer. Its check order: a path other than `/captions` or `/identify` → 404; a
+method other than POST → **405**; the bearer (constant time) → **401**; `Content-Type` not `image/*` →
+**400**; a body over `IDENTIFY_BODY_MAX` → **413** (the body is read in `main()`, which keeps no bytes past
+the cap); an empty body → 400; then `identify` (`home/identify.ts`) → **200** with the `IdentifyReport` as
+JSON, whatever its `ok`. `home/identify.ts`: one POST to LM Studio at
+`http://127.0.0.1:1234/v1/chat/completions` — `model` = `IDENTIFY_MODEL` (the helper's env), one user
+message with a text part `IDENTIFY_PROMPT + " /no_think"` and an `image_url` part holding the image as a
+`data:` URL, `temperature` 0, `max_tokens` 100, `stream` false — with a 15 s timeout ⚑ Q114. It answers
+`{ ok: true, text: choices[0].message.content }`, else `{ ok: false, kind: "failed", reason }` ("LM Studio
+HTTP n: {body ≤ 200}", "LM Studio error: {message}", "LM Studio answered in an unexpected shape.").
+`IDENTIFY_MODEL` unset or empty → `{ ok: false, kind: "off", reason: "IDENTIFY_MODEL isn't set on SogoAI." }`,
+nothing called ⚑ Q115; captions keep working and the helper still starts. It never throws and never decides.
+One log line per request (the outcome, never the token, never the image).
+
+**The photo — R2, private, like §7C.3:**
+
+- `list_items.photo_key` (§4.2v) holds the R2 key `list-items/{itemId}/{random}.jpg`. The key is never on
+  the wire: an `Item` carries `hasPhoto` and `updatedAt` instead.
+- `PUT /list-items/{id}/photo` — the raw image (`photoBody`, the same limits) → 204. Replacing deletes the old
+  object. It bumps `updated_at` (the item comes to the top of the open list, as any change does).
+- `GET /list-items/{id}/photo` → the image, `Cache-Control: private, max-age=3600`. No photo, or the item is
+  gone → 404 "This item has no photo."
+- `DELETE /list-items/{id}/photo` → 204; the object removed and the key cleared.
+- PUT or DELETE on an item that is gone (deleted, or its list deleted) → 404 "That item is no longer on the list."
+- Deleting an item deletes its photo; deleting a list deletes all its items' photos (§7A.1).
+- **Bought items keep their photo** ⚑ Q123 — a checked item too, however old — so adding it again (which
+  re-opens it, §7A.1) brings its photo back. Re-opening never touches the photo.
+- `POST /lists/{id}/items` and `PATCH /list-items/{id}` take the same bodies as before: a photo is attached
+  only by its own PUT.
+
+**Privacy:** the photo goes to SogoAI at home first; only when SogoAI gives no name is it sent to Anthropic
+(Q30's choice, as for Things). Stored photos stay in the household's own R2.
+
+**PWA:** §8.8.
+
+**Acceptance (M4u — each row is a test; fakes only, never a real network):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| SN1 | read-photo, SogoAI names it | 200 `{ name, via: "sogoai" }`; one POST to `{url}/identify` with both Access headers, the bearer and the image as its body; no `photo_reads` row; nothing in R2 |
+| SN2 | read-photo, SogoAI answers UNKNOWN / fails / isn't configured, and Claude names it | 200 `{ name, via: "claude" }`; one `photo_reads` row each |
+| SN3 | read-photo at the daily cap, SogoAI gives no name | 429 `rate_limited`; Claude not asked |
+| SN4 | read-photo with no `ANTHROPIC_API_KEY`, SogoAI gives no name | 503 `photo_reading_off`; no read counted |
+| SN5 | Claude answers UNKNOWN | 422 `item_unknown` "Couldn't tell what that is — type it in."; one read counted |
+| SN6 | Claude fails | 502 `photo_reading_failed`, naming Claude's reason and SogoAI's |
+| SN7 | read-photo without a session; with a bad type | 401; 400 |
+| SN8 | PUT a photo, GET it, PUT another | the bytes round-trip; `private, max-age=3600`; the old object gone from R2; `hasPhoto` true in `GET /lists/{id}`; the key in no answer |
+| SN9 | GET with no photo; GET / PUT on a deleted item; DELETE the photo | 404 "This item has no photo."; 404; 204, the object gone, `hasPhoto` false |
+| SN10 | delete an item with a photo; delete a list whose items have photos | their R2 objects are gone |
+| SN11 | tick an item with a photo, then add its text again | `reopened`; the photo still there |
+| SN12 | `cleanItemName`, `parseIdentifyReport` | as the rules above |
+| SN13 | the helper's `/identify`: no / a wrong bearer; GET; a type that isn't an image; a body over the cap; a good request | 401; 405; 400; 413; 200 with the report |
+| SN14 | `identify` over a fake LM Studio: a good answer; a timeout; a non-2xx; `IDENTIFY_MODEL` unset | one POST with the model, the prompt + " /no_think", the image as a data URL, temperature 0 → `ok`; `failed` "LM Studio error: …"; `failed` "LM Studio HTTP …"; `off`, nothing called |
+| SN15 | every report `identify` produces (found by **calling** it over fake LM Studio answers) through `handle()` and the wire into `identifyFromHome` | each accepted: the text for `ok`, the reason for a failure |
+| SN-M | migration check (§4.2v) | rows written before 0023 survive with `photo_key` NULL; `foreign_key_check` empty |
 
 ---
 
@@ -1958,7 +2104,7 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
 - `cleanPhotoReading` (pure) trims to the limits, drops dates that aren't real calendar
   dates, swaps start/end if reversed, and passes the link through `webLink` — the model's answer
   is input, never trusted as-is.
-- **Cost guard:** at most **40 reads per household per day** ⚑ (`photo_reads`), then 429
+- **Cost guard:** at most **40 reads per household per day** ⚑ (`photo_reads`; a snapped list item that Claude reads counts too, §7A.3), then 429
   with a message. Roughly a cent per photo. A read is counted when the model is called, so
   failed reads count too.
 - **Check order:** signed in → size/type (400) → daily cap (429) → key present (503) →
@@ -2711,9 +2857,9 @@ every 30 s while visible (§10 Freshness).
 **Any list** (all alike — Q24):
 
 ```
-[ Add to Shopping…              ][ Add ]
+[ Add to Shopping…          ][📷][ Add ]
 ☐ Milk                       Kai      ✎
-☐ Dish soap                           ✎
+☐ Dish soap              📷           ✎
 ☐ Paint the fence     📝     Shelly   ✎
 ▸ Done (12)
 ```
@@ -2724,14 +2870,31 @@ every 30 s while visible (§10 Freshness).
 - Adding something already open says so under the box in plain text (“Milk is already
   on the list”) — a fact, not an error. Re-opening says “Milk is back on the list”.
   The note clears on the next typing, tick or edit.
+- **📷** beside **Add** on every list (accessible name "Snap an item") — snap an item (§7A.3). It picks a
+  photo (the phone offers the camera or the library), shrinks it as a thing's photo is (§7C.3) and sends it
+  to `POST /list-items/read-photo`, busy ("Reading the photo…") until the answer. The name **replaces**
+  whatever is in the box ⚑ Q118, with the hint **"Read from your photo — check it."** under it ⚑ Q117 (`via`
+  is never shown). A refusal shows as an error; the photo still waits, so the name can be typed instead.
+  Nothing is added until **Add**.
+- The **waiting photo** shows as a small thumbnail beside 📷 with **✕** ("Drop the photo") ⚑ Q120. Emptying
+  the box, ✕, or switching list drops it. Editing the text keeps it (the hint goes).
+- After **Add** succeeds — added, re-opened or already there alike — the waiting photo is PUT to that item,
+  replacing any older photo ⚑ Q119, and the thumbnail goes. If the PUT fails: "{item} was added, but its photo
+  wasn't saved: {reason}. Open ✎ to add it again."
 - Open items: most recently added or changed first (so a re-added item comes back to
   the top), one line each. **Tapping the row ticks it** (≥ 44 px); a ticked item leaves
-  the open list straight away. The row shows 📝 when there is a note and the
+  the open list straight away. The row shows 📝 when there is a note, **📷** when there is a
+  photo (§7A.3, "Has a photo") ⚑ Q121, and the
   **assignee's chip** when there is one (the chip truncates; the row stays one line).
 - **✎** on each row (accessible name "Edit Milk") opens the **item form** (modal): text,
   note (multi-line), **Assigned to** (member chips, single choice, plus **Nobody**), Save /
   Cancel / **Delete** (asks first). The old ✕ quick-remove is gone: ticking is the quick
   action, and deleting lives in the form. ⚑
+- The item form shows the item's **photo** (§7A.3) when it has one — tap for full size — with
+  **Replace photo** / **Remove photo**, or **📷 Add photo** when it has none ⚑ Q121. A photo added here is
+  not read ⚑ Q122. The photo saves on **Save**, after the item's fields: a new one is PUT, a removed one
+  DELETEd. A photo-only change counts as a change. The image URL carries `?v={updatedAt}` so a replaced
+  photo is never shown stale from the private cache.
 - The item form has no Mark done / Not done: ticking is the row's tap, everywhere.
 - **Done** is collapsed by default and dim, newest first. Tapping a done row puts it back
   on the list; its ✎ still opens the form. A done row shows who ticked it and when (in
@@ -3359,11 +3522,13 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | POST | `/recipes/{id}/transcript` | member | `{ screenshots?: { type, data }[] (≤ 4, base64), text? (≤ PASTED_MAX) }`, at least one → recipe (200), re-read from the pasted transcript; 404 / 400 `invalid_input` / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed` / 422 `no_recipe` (nothing changed), in the §7E.2b order |
 | GET | `/lists` | member | → `{ id, name, createdBy, openCount }[]`, by name (§7A) |
 | POST | `/lists` | member | `{ name }` → list (201); 409 `duplicate`; 400 at `LISTS_MAX` |
-| PATCH/DELETE | `/lists/{id}` | creator or admin (seeded lists: admin) | PATCH `{ name }` → list; DELETE → 204 |
-| GET | `/lists/{id}` | member | → `{ list: { id, name, createdBy }, open: Item[], checked: Item[] }` (§7A.1); `Item = { id, listId, text, note, assigneeId, createdBy, createdAt, checkedAt, checkedBy }` |
+| PATCH/DELETE | `/lists/{id}` | creator or admin (seeded lists: admin) | PATCH `{ name }` → list; DELETE → 204 (and its items' photos, §7A.3) |
+| GET | `/lists/{id}` | member | → `{ list: { id, name, createdBy }, open: Item[], checked: Item[] }` (§7A.1); `Item = { id, listId, text, note, assigneeId, createdBy, createdAt, checkedAt, checkedBy, hasPhoto, updatedAt }` |
 | POST | `/lists/{id}/items` | member | `{ text, note?, assigneeId? }` → `{ item, result: "added" \| "existing" \| "reopened" }`, 201 when added, else 200 |
 | PATCH | `/list-items/{id}` | member | `{ text?, note?, assigneeId?, checked?: boolean }` → item; 409 `duplicate` on a key clash |
-| DELETE | `/list-items/{id}` | member | → 204 |
+| DELETE | `/list-items/{id}` | member | → 204 (and its photo, §7A.3) |
+| POST | `/list-items/read-photo` | member | raw image body → `{ name, via: "sogoai" \| "claude" }` (`ItemReading`); nothing stored; 400 / 429 / 503 `photo_reading_off` / 422 `photo_refused` / 502 `photo_reading_failed` / 422 `item_unknown`, in the §7A.3 order |
+| PUT/GET/DELETE | `/list-items/{id}/photo` | member | PUT raw image body (≤ 4 MB) → 204 (replaces); GET → the image (`private, max-age=3600`); DELETE → 204; 404 when the item is gone, and GET also when it has no photo (§7A.3) |
 | POST | `/dev/tick?now=ISO` | only if `DEV_ENDPOINTS=1` | runs `tick(db, now)` → summary |
 
 **Freshness:** there are no WebSockets. The app refetches the visible calendar range
@@ -3563,6 +3728,16 @@ checks.
 - ✅ Manual: the secret and the token file set; a ping from a Claude session arrives on the founder's
   iPhone with its title.
 
+**M4u — Snap an item** (v1.18.0)
+- Migration 0023 (`list_items.photo_key`), `src/shared/item-reading.ts`, `IDENTIFY_FAILURE` / `ITEM_READ_VIA`,
+  `POST /list-items/read-photo` and `/list-items/{id}/photo` (`routes/item-photos.ts`), `identifyFromHome`,
+  `readItemPhoto`, the helper's `POST /identify` + `home/identify.ts` (LM Studio on SogoAI), the 📷 on every
+  list's add row (`ItemPhoto.tsx`), the 📷 row marker and the photo in the item form (§2, §2.4, §2.5, §3, §4.2v,
+  §7A.1, §7A.3, §8.8, §10, §12).
+- ✅ Tests SN1–SN15, SN-M.
+- ✅ Manual: the helper updated on SogoAI with `IDENTIFY_MODEL`; a real item snapped on the iPhone named by
+  SogoAI, added, and its photo seen in the ✎ form; the add row at 320 px.
+
 **M4l — The laundry loop** (v1.8.0)
 - Migration 0014 (`machines` + the `fires` rebuild), `MACHINE` / `MACHINE_STATE` + the
   `machine` kind, `src/shared/machines.ts`, the `/machines` routes, machine rows in the
@@ -3640,7 +3815,8 @@ Captured from v1.0-draft so nothing is lost:
 - Offline **editing** and conflict resolution. v1 offline = the cached app shell;
   actions need network, and buttons show disabled "offline".
 - Queued offline acks
-- Photos anywhere other than Things to do (§7C.3 is the only attachment). A recipe's video
+- Photos anywhere other than Things to do (§7C.3) and list items (§7A.3), the only two
+  attachments. A recipe's video
   thumbnail (§7E.1) is hotlinked from YouTube — not stored, not in R2, not an attachment — so it
   is not one. Transcript screenshots (§7E.2b) are read once and never stored — not in R2, not an
   attachment — so they are not one either ⚑ Q93.
@@ -3785,6 +3961,19 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q109 | A `level` for pings (like the FunHouse's) | ⚑ None — an emoji in the title does that job |
 | Q110 | How many pings | ⚑ 30 an hour, then 429 `rate_limited` |
 | Q111 | Are pings visible to the household? | ⚑ Yes — they show in Settings → Status' last 20 deliveries like any other delivery. His call later |
+| Q112 | SogoAI can't tell what a snapped item is (§7A.3) | ⚑ When SogoAI says UNKNOWN, Claude is asked, and that counts against the cap. If Claude can't tell either → 422 "Couldn't tell what that is — type it in." |
+| Q113 | Which snaps count against the daily cap | ⚑ Only Claude fallbacks count, sharing the 40-a-day `photo_reads` budget with Things; a name from SogoAI is free and uncounted |
+| Q114 | How long a snap may wait | ⚑ 20 s from the Worker to the helper (`HOME_IDENTIFY_TIMEOUT_MS`); 15 s from the helper to LM Studio |
+| Q115 | Which local model names items | ⚑ `IDENTIFY_MODEL=qwen-uncensored`, the always-loaded vision model on SogoAI. Unset → SogoAI counts as off and Claude is asked |
+| Q116 | How long a name | ⚑ The prompt asks for at most 60 characters (`ITEM_NAME_ASK`); the name is cut at 120 (`TEXT_MAX`) |
+| Q117 | The hint under a snapped name | ⚑ "Read from your photo — check it." `via` is always in the answer, but the UI doesn't show it |
+| Q118 | Snapping with text already in the box | ⚑ The name replaces whatever text is in the box |
+| Q119 | Snapping something already on the list | ⚑ The photo is attached on added, re-opened or already-there alike, replacing any older photo |
+| Q120 | Before Add | ⚑ The waiting photo shows as a thumbnail with ✕ |
+| Q121 | Seeing a kept photo | ⚑ A 📷 row marker; the photo in the ✎ form (tap for full size; Replace / Remove / Add) |
+| Q122 | Adding a photo in the item form | ⚑ It is not read — the form only keeps it |
+| Q123 | Bought items' photos | ⚑ Kept indefinitely; adding the item again re-opens it and brings its photo back |
+| Q124 | Names for the SogoAI pieces | ⚑ No renames: `CAPTIONS_TOKEN`, `HOME_CAPTIONS_URL` and the `captions-helper` files keep their names though they now carry `/identify` too |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -3920,6 +4109,21 @@ VALUES ('evt_<16 base32>', 'Put the goats away', NULL, '2026-10-03', NULL, '2026
 
 No `event_optins` row is inserted: it is off for everyone until each person turns it on in
 Optional calendar items (Shelly and John will).
+**M4u Snap an item** (v1.18.0, §7A.3; 540 tests incl. SN1–SN15 and SN-M): decided by MojoSOGO 2026-10-04. 📷 beside
+Add on every list (`ItemPhoto.tsx`) → `POST /list-items/read-photo` (`routes/item-photos.ts`): SogoAI first —
+`identifyFromHome` POSTs the image through Access to the helper's new `POST /identify`, which asks LM Studio's
+`IDENTIFY_MODEL` (`home/identify.ts`) — and the Claude API (`readItemPhoto`) only when SogoAI gives no name, counted
+against the shared 40-a-day `photo_reads`. The rules are `src/shared/item-reading.ts`; `IDENTIFY_FAILURE` and
+`ITEM_READ_VIA` join vocab. The name fills the box with "Read from your photo — check it."; after Add the waiting
+photo is PUT to the item. Migration 0023 (`list_items.photo_key`, §4.2v); `/list-items/{id}/photo` PUT / GET / DELETE;
+deleting an item or a list deletes its photos from R2; items carry `hasPhoto` and `updatedAt`; 📷 row marker; the
+photo in the ✎ form (PhotoField, saved on Save). `build:home` is still one file importing only `node:http` (6.2 →
+9.8 kB). **Deviations:** `src/worker/access.ts`'s `AccessRequest.body` type widened to `string | ArrayBuffer` (type
+only) — a string body can't carry the image's bytes. The helper's `main()` reads every request's body (keeping
+nothing past 4 MB) before `handle()` checks the path, method and bearer, so the 413 can come after them as specified.
+**Still owed (coordinator):** deploy, then apply 0023 in production; update the helper on SogoAI (the new `.mjs`,
+`IDENTIFY_MODEL=qwen-uncensored` in its env file, restart; README); a real item snapped on the iPhone and named by
+SogoAI; the add row, thumbnail and ✎ form photo checked at 320 px (not checked in a browser in this build).
 **M4t Ping the founder's phone** (v1.17.0, §9.4): decided by MojoSOGO 2026-10-04. `POST /ops/notify` (`routes/ops.ts`,
 rules in `src/shared/ops.ts`) — Bearer `OPS_NOTIFY_TOKEN` in constant time (unset → 503 `ops_notify_off`), one
 fire-less `push` delivery to the founder (`FOUNDER_SQL`, now exported from `routes/members.ts`) carrying its own

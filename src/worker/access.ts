@@ -13,7 +13,7 @@ export interface AccessRequest {
   timeoutMs: number;
   /** Extra headers beside the two CF-Access ones (a Bearer token, a Content-Type). */
   headers?: Record<string, string>;
-  body?: string;
+  body?: string | ArrayBuffer;
   fetch?: typeof fetch;
 }
 
