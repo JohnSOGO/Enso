@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.17-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.17-push · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -141,7 +141,7 @@ from the Worker and speaks them through HA. This is the same pattern AskRoxy use
 | Backend | Cloudflare Worker + **Hono** + **D1** | One Worker serves API, assets and cron |
 | Frontend | **React + TypeScript + Vite**, `vite-plugin-pwa` | No state library in v1; plain `fetch` + hooks |
 | Styling | CSS Modules + CSS custom properties | Follow `C:\Users\Public\git\MOJOSOGO-PREFERENCES.md` and the `phone-ui` skill |
-| Push | Web Push (VAPID) from the Worker | Must use a WebCrypto-based implementation — the Node `web-push` package does not run on Workers. M5 begins with a spike to confirm the library. |
+| Push | Web Push (VAPID) from the Worker via **`@block65/webcrypto-web-push` 2.0.0** (pinned exactly) | WebCrypto only. Sends `Content-Encoding: aes128gcm` (RFC 8291) + `Authorization: vapid t=…, k=…` (RFC 8292) — the legacy `aesgcm` that some libraries send is refused by Apple. The 2026-10-03 spike decrypted its output under Node **and** workerd, and cross-checked it with `http_ece`. |
 | Relay | Node 20+ script run with `tsx` | No framework. Imports `src/shared/vocab.ts`. |
 | Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Private: photos are served only through the API to signed-in members (§7C.3). |
 | Reading photos | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). |
@@ -229,7 +229,7 @@ against the deployed Worker. On iPhone, push works only after
 | Name | Used by | Purpose |
 |------|---------|---------|
 | `SETUP_TOKEN` | Worker | One-time owner creation (§6.1) |
-| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Worker | Web Push |
+| `VAPID_PUBLIC_KEY` (var, 65-byte raw P-256 key, base64url), `VAPID_PRIVATE_KEY` (secret, the JWK `d`), `VAPID_SUBJECT` (var, `https://enso.sogodojo.com`) | Worker | Web Push (§9.1). Generated once with WebCrypto; never rotated casually — rotating invalidates every phone's subscription. |
 | `RELAY_TOKEN` | Worker + relay | Authenticates the relay |
 | HA token | relay only | Read from `C:\Users\Public\git\HomeAssistant\secrets\ha_token.txt` at startup. Never sent to the Worker, never logged. |
 
@@ -1951,32 +1951,67 @@ Dark by default. Colors are defined as tokens on `:root`:
 
 ## 9. Delivery
 
-### 9.1 Web Push
+### 9.1 Web Push — phone notifications
 
-- **Subscribe:** in Settings → Me, the button calls
-  `pushManager.subscribe({ userVisibleOnly: true, applicationServerKey })`, then
-  `POST /api/v1/push/subscriptions`.
-- **Payload** (JSON, encrypted aes128gcm):
-  `{ fireId, kind, title, body, actions }`.
-- **The service worker's `push` handler** calls `showNotification` with
-  `tag: fireId` (a re-alert replaces the old notification rather than stacking)
-  and `requireInteraction: true`. Actions:
-  - reminder: `[{action:'done'}, {action:'snooze'}]`
-  - timer: `[{action:'ack'}]`
-  - chore: `[{action:'done'}]`
-- **`notificationclick`:**
-  - With an action, the handler `POST`s `/api/v1/fires/{id}/actions` with the
-    session cookie (same origin) and closes the notification.
-  - Without one, it focuses or opens the app.
-- **iPhone:** home-screen web apps show no action buttons. Tapping the
-  notification opens the app, where the Ringing bar has the buttons. This is
-  expected, not a bug.
-- **Send results:**
-  - HTTP 404/410 → delete the subscription.
-  - Any other failure → delivery `failed` with the status code + body in `detail`,
-    and the subscription's `last_error` set.
-  - A recipient with **no** subscriptions → delivery `failed`, detail
-    `no_subscription`. Never skip silently.
+Each person turns phone alerts on **once per phone**, in Settings → Me (decided by MojoSOGO
+2026-10-03: Web Push through the installed app, not SMS).
+
+**Turning it on** (`frontend/src/…` — placement decides):
+- A **Phone alerts** row in Settings → Me shows this phone's state, honestly:
+  - **On for this phone** (with **Send a test** and **Turn off**);
+  - **Off** — **Turn on**;
+  - **Blocked** — the phone's settings deny notifications for Ensō (say where to change it);
+  - **iPhone: add Ensō to the Home Screen first** — iOS allows push only in a home-screen
+    app (shown when on iOS and not running standalone);
+  - **Not supported in this browser.**
+- **Turn on** runs from the tap itself (iOS requires a user gesture):
+  `Notification.requestPermission()` → `registration.pushManager.subscribe({ userVisibleOnly:
+  true, applicationServerKey: VAPID public key })` → `POST /push/subscriptions`.
+- **Turn off** unsubscribes and `DELETE`s the subscription.
+- The "📵 Phone alerts off" badge (§8.1) stays until this member has at least one subscription.
+
+**Service worker** — `frontend/public/sw.js`, plain static JS, registered on app start with
+`{ scope: '/', updateViaCache: 'none' }` and served `Cache-Control: no-cache`:
+- **No `fetch` listener at all** → it never caches or serves the app (§8.10 always-fresh).
+  Not `vite-plugin-pwa`/Workbox, which precaches the shell by default.
+- `push` → **always** `showNotification` (iOS revokes permission for a push that shows
+  nothing): `title`, `body`, `tag: fireId` (a re-alert replaces the old one), `icon:
+  /icon-192.png`, `data: { fireId }`, `actions` (ignored on iOS).
+- `notificationclick` → with an action: `POST /api/v1/fires/{id}/actions {action}` (same-origin
+  cookie) and close; without: focus the open app or open `/`.
+
+**Payload** (JSON, encrypted): `{ fireId, kind, title, body, actions }`, under Apple's 4 KB.
+Actions: reminder and thing `done` + `snooze`; timer `ack`; chore `done`. iPhone shows no
+buttons — tapping opens the app, where the Ringing bar has them; expected, not a bug.
+
+**Sending** (`tick` step 3, and `POST /push/test`):
+- `buildPushPayload` with `ttl: 3600`, `urgency: 'high'`, `topic: fireId`.
+- **VAPID header cached per push-service origin for ~1 hour** — Apple: don't refresh the JWT
+  more often than hourly. (The library signs per send by default; use its `vapidHeaders`.)
+- One delivery row per recipient as today; each of that member's subscriptions is sent to.
+- **Results:** 201 → delivery `sent`, subscription `last_ok_at`; **404/410** → delete that
+  subscription (it is gone); any other status → delivery `failed` with status + body in
+  `detail` and the subscription's `last_error`; **no subscriptions** → `failed`,
+  `no_subscription` — never skipped silently. Several subscriptions: `sent` if any succeeded.
+- **Send a test** (`POST /push/test`): one push to *my* subscriptions now — "Ensō test —
+  phone alerts work" — so a person can check a phone without waiting for a reminder.
+
+**Acceptance (M5):**
+
+| # | Call | Expected |
+|---|---|---|
+| P1 | `GET /push/vapid-key` | the configured public key; `null` (and the row says "not set up") when unset |
+| P2 | subscribe, list, delete | stored per member; `DELETE` of someone else's → 404 |
+| P3 | a ringing reminder for A (one subscription) with an outbound fetch mock returning 201 | one POST to the endpoint with `content-encoding: aes128gcm` and `authorization: vapid t=…, k=<public key>`; delivery `sent` |
+| P4 | the mock returns 410 | subscription deleted; delivery `failed`, detail names 410 |
+| P5 | the mock returns 500 | delivery `failed` with status + body; `last_error` set |
+| P6 | a member with no subscription | delivery `failed`, `no_subscription` |
+| P7 | two sends to the same origin within the hour | the same VAPID JWT is reused |
+| P8 | `POST /push/test` | a push to each of my subscriptions; 409 with a message when I have none |
+| P9 | the encrypted body decrypts (test-side RFC 8291 decryptor) to the payload JSON | equal |
+
+Manual on the live site: iPhone home-screen app → Turn on → Send a test arrives; a reminder
+arrives on the lock screen; tapping opens the Ringing bar. Android: Done/Snooze work.
 
 ### 9.2 LAN relay — `relay/relay.ts`
 
@@ -2237,11 +2272,11 @@ checks.
 - ✅ Manual at 320 px: create the Laundry loop; on Today tick step 1, see "rings …";
   undo it; the four tabs still fit.
 
-**M5 — Web Push**
-- Spike first: send one push from a Worker to Chrome desktop and record which
-  library works.
-- Then subscriptions, sending, service-worker handlers, "Phone alerts off" badge,
-  delivery rows.
+**M5 — Web Push** (v1.3.0)
+- Spike done 2026-10-03 (library chosen, encryption round-trips under workerd, §2.1).
+- VAPID keys generated and set (`VAPID_PUBLIC_KEY`/`VAPID_SUBJECT` as vars,
+  `VAPID_PRIVATE_KEY` as a secret — piped, never typed through `!`), `sw.js`, Phone alerts row
+  in Settings → Me, sending with results, `POST /push/test` (§9.1). P1–P9.
 - ✅ Manual, **on the deployed URL**:
   - Android: the notification shows Done/Snooze; tapping Done closes the fire.
   - iPhone home-screen app: the notification arrives, and tapping it opens the
@@ -2264,7 +2299,7 @@ checks.
   `sogodojo.com` zone is on the same Cloudflare account, like AskRoxy).
 - Secrets (§2.4): `SETUP_TOKEN` and `RELAY_TOKEN`, each 32+ random characters, set with
   `wrangler secret put`. **`DEV_ENDPOINTS` is never set in production** (no `/dev/*`).
-  VAPID keys wait for M5 — until then the "Phone alerts off" badge stays, honestly.
+  VAPID keys arrive with M5 (§9.1).
 - **Production starts clean** (decided by MojoSOGO 2026-10-03): no events, alarms, chores,
   timers, list items or accounts. It carries over from the local dev database only the
   household's settings (name, time zone, days off) and its school holidays. Public
