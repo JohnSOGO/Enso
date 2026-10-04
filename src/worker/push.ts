@@ -16,7 +16,7 @@ const DETAIL_MAX = 500;
 
 /**
  * The notification the service worker shows (sw.js). A test push and an announcement (§9.3) have no
- * fire, no kind, no actions. `tag` is what the phone collapses by, and the push topic: a fire's push →
+ * fire, no kind, no actions. `tag` is what the phone collapses by (never sent as a Topic — Apple refuses it): a fire's push →
  * its fireId; a delivery with no fire → its delivery id; the test push → TEST_TAG.
  */
 export interface PushPayload { fireId: string | null; kind: AlertKind | null; tag: string; title: string; body: string; actions: Action[] }
@@ -39,7 +39,7 @@ const subsOf = (db: D1Database, memberId: string) =>
  */
 async function sendToAll(db: D1Database, vapid: VapidKeys, subs: Sub[], payload: PushPayload, now: string) {
   const results = await Promise.all(subs.map((s) =>
-    sendWebPush(vapid, s, JSON.stringify(payload), { topic: payload.tag, now })));
+    sendWebPush(vapid, s, JSON.stringify(payload), { now }))); // no Topic: Apple refuses it (§9.1)
   const stmts: D1PreparedStatement[] = [];
   const failures: string[] = [];
   results.forEach((r, i) => {

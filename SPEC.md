@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.25 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.26 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2135,7 +2135,7 @@ Each person turns phone alerts on **once per phone**, in Settings → Me (decide
 `title` **"Ensō"**, `body` = the delivery's `message` (already "Reminder: …", "Chore for
 Sam: …"), `kind` from the delivery's fire, `actions` from the engine's `pushActions(kind)` —
 the same table the Ringing bar's buttons follow. ⚑
-**`tag`** — what the phone collapses notifications by, and the push `topic`: a fire's push →
+**`tag`** — what the phone collapses notifications by: a fire's push →
 its `fireId` (a re-alert replaces the last one); a delivery with no fire (an announcement,
 §9.3) → its **delivery id**, so two announcements never replace each other; the test push →
 `'enso-test'`. A delivery with no fire has `fireId: null`, `kind: null`, `actions: []` and the
@@ -2144,7 +2144,9 @@ Actions: reminder and thing `done` + `snooze`; timer `ack`; chore `done`. iPhone
 buttons — tapping opens the app, where the Ringing bar has them; expected, not a bug.
 
 **Sending** (`tick` step 3, and `POST /push/test`):
-- `buildPushPayload` with `ttl: 3600`, `urgency: 'high'`, `topic: tag` (above).
+- `buildPushPayload` with `ttl: 3600`, `urgency: 'high'`, and **no `Topic` header**: Apple's push
+  service refused every push carrying one (`400 BadWebPushTopic`, found 2026-10-03 — `enso-test`
+  and delivery ids alike), and it is optional. The phone still collapses by `tag`.
 - **VAPID header cached per push-service origin for ~1 hour** — Apple: don't refresh the JWT
   more often than hourly. (The library signs per send by default; use its `vapidHeaders`.)
   The cache lives in the Worker instance's memory, so a cold start signs afresh — still well
@@ -2315,9 +2317,9 @@ acked, nothing is scheduled — **now only**.
 | AN2 | `POST /announce { text: " Dinner is ready ", channels: ["house"] }` | 201; one `house` delivery: `fire_id` NULL, `member_id` NULL, `alert_number` 1, `"MojoSOGO says: Dinner is ready"`, `queued`; no push rows |
 | AN3 | the same, with the House settings present and a fake HA (§9.2), after `waitUntil` settles | the 201 still says `queued`; the row is then `sent`, and the fake HA heard `"MojoSOGO says: Dinner is ready"` on both surfaces |
 | AN4 | Phone, with the sender, a member with a phone, one without, one disabled | one push row each for the other two active members; the sender and the disabled member get none; with a phone → `sent`, without → `failed`, `no_subscription` |
-| AN5 | the push to that phone | decrypts to the payload above with `tag` = the delivery id; the `topic` header is the delivery id |
+| AN5 | the push to that phone | decrypts to the payload above with `tag` = the delivery id; no `topic` header |
 | AN6 | blank text, 201 chars, no channels, an unknown channel; no session; a `name` in the body; Phone only with nobody else | 400 with a message ×4; 401; the name in the body is ignored; 409 `no_recipients` |
-| AN7 | tag rules | a fire's push: `tag` = `topic` = `fireId`; the test push: `tag` = `topic` = `"enso-test"` |
+| AN7 | tag rules | a fire's push: `tag` = `fireId`; the test push: `tag` = `"enso-test"`; no push carries a `topic` header |
 | AN8 | migration 0012 | rows survive unchanged; `foreign_key_check` empty; a fire-less delivery is accepted (§4.2k) |
 
 ---
@@ -2725,6 +2727,8 @@ nullable (applied only in tests so far); the push payload gains `tag`. Built as:
 nobody else to push to → 409 `no_recipients` rather than a quiet success. **Still to check:**
 the box at 320 px and on the iPhone, an announcement spoken on the Echos + Voice PE, and one
 arriving on another member's phone.
+**Push fix** (v1.7.1): no `Topic` header — Apple refused pushes carrying one (BadWebPushTopic)
+since v1.6.0.
 **Emoji instead of a dot** (v1.5.1): on phones an event whose emoji shows beside the date has no
 dot (§7.1); checked at 320 px.
 **Open from the thing form** (v1.5.0): ↗ link, 🗺️ maps, 📞 call beside the fields, checked at
