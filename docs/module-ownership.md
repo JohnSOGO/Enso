@@ -28,7 +28,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/shared/markets.ts` | Monthly options expiration dates, Easter computus (§7.4) |
 | `src/shared/chores.ts` | Chore rules: whose turn (assigneeFor), run planning, step advance/undo, a chore fire's config/person/step, input validation and limits (§7B) — pure |
 | `src/shared/things.ts` | Thing rules: limits, input validation (title/note/place/link, window end ≥ start), remindersFor + planThingFires, canPlanOn, cleanPhotoReading, open-list order, photo limits + shrink constants, the Thing/PhotoReading wire types (§7C) — pure; imports engine, never the reverse |
-| `src/shared/engine.ts` | The alert engine: plan, step, act, timer commands (§5) — pure |
+| `src/shared/engine.ts` | The alert engine: plan, step, act, timer commands (§5) — pure + pushActions(kind) |
 | `src/shared/lists.ts` | Household list rules: itemKey, add/re-open decision, item clash, list-name clash, who may rename/delete a list (canManageList), text/note/name limits, LISTS_MAX, SHOPPING_LIST_ID, 30-day visible window (§7A.1) — pure |
 | `src/shared/invite-link.ts` | The invite link format (§6.2a): `JOIN_PATH`, build `{origin}/join#{code}`, take the code from a pasted link or a bare code — pure |
 
@@ -42,7 +42,8 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/http.ts` | Error envelope (§10) and input checks |
 | `src/worker/session.ts` | Password hashing, session cookie, `requireMember` / owner guards |
 | `src/worker/tick.ts` | `tick()` orchestration: load rows, call the engine, write results, deliveries (§5.6–5.7), chore run planning (§7B.3), thing reminder planning (§7C.2) |
-| `src/worker/push.ts` | Web Push sending (§9.1) |
+| `src/worker/push.ts` | Web Push delivery (§9.1): for queued push deliveries and /push/test, builds the payload { fireId, kind, title, body, actions }, sends to each of the member's subscriptions via web-push.ts, records results (201 → sent + last_ok_at; 404/410 → delete the subscription; else failed with status + body, last_error; none → no_subscription; keys missing → failed, visibly) |
+| `src/worker/web-push.ts` | Web Push protocol (RFC 8291/8292) — the only importer of `@block65/webcrypto-web-push`: encrypt the payload, VAPID headers cached per push-service origin (~1 h, expiry checked against a passed-in `now`), ttl 3600 / urgency high / topic (≤ 32 url-safe chars), one POST to one subscription → its status + body text; no D1, never decides what is sent or what a result means (§9.1) |
 | `src/worker/routes/auth.ts` | Setup, login/logout, signup, invite preview, rate limit, `/me` |
 | `src/worker/routes/members.ts` | Members list/disable, invites |
 | `src/worker/event-rows.ts` | The event row (§4.2): EventRow + eventView, EventInput + parseEventInput, insertEventStatement, removeFutureFires, every event_optins read/write — no Hono, no routes |
@@ -50,7 +51,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/routes/optins.ts` | `/optional-events`, `/events/{id}/optin` PUT/DELETE — a member's own switch on an optional event (§7.5, §10) |
 | `src/worker/routes/alarms.ts` | `/alarms` — scheduled alarms as `is_alarm` events (§4.2a) |
 | `src/worker/routes/alerts.ts` | Timers + commands, fires + actions |
-| `src/worker/routes/household.ts` | Household settings, days off, push subscriptions, `/status` |
+| `src/worker/routes/household.ts` | Household settings, days off, `/status`, `/push/*` (vapid-key, subscriptions, test) |
 | `src/worker/routes/relay.ts` | `/relay/claim`, `/relay/report` (§9.2) |
 | `src/worker/routes/lists.ts` | `/lists`, `/lists/{id}`, `/lists/{id}/items`, `/list-items/{id}` — list CRUD and list item CRUD (§7A, §10) |
 | `src/worker/routes/chores.ts` | `/chores`, `/chores/today`, `/chore-runs/{id}/done\|undo` — chore CRUD, today's runs, step done/undo and edit re-plan persistence (§7B, §10) |

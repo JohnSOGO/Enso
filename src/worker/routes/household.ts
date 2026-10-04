@@ -1,4 +1,4 @@
-// SPEC §10 — settings, status, push subscriptions.
+// SPEC §10 — settings, status, /push/* (vapid-key, subscriptions, test).
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { isValidTimeZone } from '../../shared/time';
@@ -6,6 +6,7 @@ import { DEFAULT_DAYS_OFF, HOLIDAYS, HOLIDAY_KEYS, isHolidayKey, type HolidayKey
 import { all, first, newId, nowIso, parseJson, run } from '../db';
 import { body, fail, str } from '../http';
 import { requireMember, requireOwner } from '../session';
+import { NO_SUBSCRIPTION, PUSH_NOT_CONFIGURED, sendTestPush } from '../push';
 
 export const RELAY_STALE_MS = 2 * 60_000;
 
@@ -55,7 +56,7 @@ household.get('/status', requireMember, async (c) => {
     relayLastSeen: lastSeen,
     relayOnline: lastSeen !== null && Date.now() - Date.parse(lastSeen) < RELAY_STALE_MS,
     mySubscriptions: await all(c.env.DB,
-      'SELECT id, user_agent AS userAgent, created_at AS createdAt, last_ok_at AS lastOkAt, last_error AS lastError FROM push_subscriptions WHERE member_id = ?', me),
+      'SELECT id, endpoint, user_agent AS userAgent, created_at AS createdAt, last_ok_at AS lastOkAt, last_error AS lastError FROM push_subscriptions WHERE member_id = ?', me),
     recentDeliveries: await all(c.env.DB,
       `SELECT d.id, d.channel, d.message, d.status, d.detail, d.created_at AS createdAt, m.display_name AS member
          FROM deliveries d LEFT JOIN members m ON m.id = d.member_id ORDER BY d.created_at DESC LIMIT 20`),
@@ -69,11 +70,19 @@ household.post('/push/subscriptions', requireMember, async (c) => {
   const keys = (b.keys ?? {}) as Record<string, unknown>;
   const endpoint = str(b.endpoint, 1000), p256dh = str(keys.p256dh, 200), auth = str(keys.auth, 100);
   if (!endpoint || !endpoint.startsWith('https://') || !p256dh || !auth) return fail(c, 400, 'invalid_input', 'Not a valid push subscription.');
-  await run(c.env.DB,
+  // Upserted by endpoint: the same phone subscribing again keeps its row (and id).
+  const row = await first<{ id: string }>(c.env.DB,
     `INSERT INTO push_subscriptions (id, member_id, endpoint, p256dh, auth, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(endpoint) DO UPDATE SET member_id = excluded.member_id, p256dh = excluded.p256dh, auth = excluded.auth`,
+     ON CONFLICT(endpoint) DO UPDATE SET member_id = excluded.member_id, p256dh = excluded.p256dh, auth = excluded.auth
+     RETURNING id`,
     newId('sub'), c.get('member').id, endpoint, p256dh, auth, str(b.userAgent, 300), nowIso());
-  return c.json({ ok: true }, 201);
+  return c.json({ id: row!.id }, 201);
+});
+
+household.post('/push/test', requireMember, async (c) => {
+  const r = await sendTestPush(c.env, c.get('member').id, nowIso());
+  if ('sent' in r) return c.json(r);
+  return fail(c, r.error === NO_SUBSCRIPTION ? 409 : r.error === PUSH_NOT_CONFIGURED ? 503 : 502, r.error, r.message);
 });
 
 household.delete('/push/subscriptions/:id', requireMember, async (c) => {
