@@ -15,6 +15,7 @@ import type { Env } from './env';
 import { all, first, newId, parseJson } from './db';
 import { sendPushDeliveries } from './push';
 import { sendHouseDeliveries } from './house';
+import { deliverySpeakers } from './speaker-choices';
 import { onMemberIds } from './event-rows';
 
 export interface TickSummary { materialized: number; stepped: number; alerts: number; deliveries: number }
@@ -225,10 +226,12 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
              VALUES (?, ?, ?, 'push', ?, ?, 'queued', ?, ?)`).bind(id, ...base, memberId, message, now, now));
         }
       }
-      if (src.cfg.channels.includes('house') && aud.house) {
+      // §9.2a: on the speakers of everyone it is for — none ticked by any of them → not spoken.
+      const speakers = src.cfg.channels.includes('house') && aud.house ? await deliverySpeakers(db, aud.push) : [];
+      if (speakers === null || speakers.length) {
         stmts.push(db.prepare(
-          `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, status, created_at, updated_at)
-           VALUES (?, ?, ?, 'house', NULL, ?, 'queued', ?, ?)`).bind(newId('dlv'), ...base, message, now, now));
+          `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, status, speakers, created_at, updated_at)
+           VALUES (?, ?, ?, 'house', NULL, ?, 'queued', ?, ?, ?)`).bind(newId('dlv'), ...base, message, speakers && JSON.stringify(speakers), now, now));
       }
       summary.deliveries += stmts.length - 1;
       if (fire.state === 'scheduled' && fire.kind === 'reminder') {

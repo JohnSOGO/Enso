@@ -5,6 +5,8 @@ import { MEMBER_PALETTE } from '../../shared/vocab';
 import { all, first, newId, nowIso, run } from '../db';
 import { body, fail, str } from '../http';
 import { endSession, hashPassword, requireMember, sha256hex, startSession, verifyPassword } from '../session';
+import { speakersError } from '../../shared/speakers';
+import { choiceOf } from '../speaker-choices';
 
 export const MIN_PASSWORD = 10;
 const FAIL_WINDOW_MIN = 15;
@@ -55,11 +57,13 @@ async function createMember(db: D1Database, b: Record<string, unknown>, role: 'o
 }
 
 export async function memberView(db: D1Database, id: string) {
-  return first(db,
+  const row = await first<Record<string, unknown> & { houseSpeakers: string | null }>(db,
     `SELECT m.id, m.email, m.display_name AS displayName, m.color, m.role,
             p.show_public_holidays AS showPublicHolidays,
-            p.show_options_expiration AS showOptionsExpiration
+            p.show_options_expiration AS showOptionsExpiration,
+            p.house_speakers AS houseSpeakers
        FROM members m LEFT JOIN member_prefs p ON p.member_id = m.id WHERE m.id = ?`, id);
+  return row && { ...row, houseSpeakers: choiceOf(row.houseSpeakers) };
 }
 
 export const auth = new Hono<AppEnv>();
@@ -159,6 +163,12 @@ auth.patch('/me', requireMember, async (c) => {
       if (typeof b[key] !== 'boolean') return fail(c, 400, 'invalid_input', `${key} must be true or false.`);
       stmts.push(c.env.DB.prepare(`UPDATE member_prefs SET ${col} = ? WHERE member_id = ?`).bind(b[key] ? 1 : 0, id));
     }
+  }
+  if (b.houseSpeakers !== undefined) {
+    const err = speakersError(b.houseSpeakers);
+    if (err) return fail(c, 400, 'invalid_input', err);
+    stmts.push(c.env.DB.prepare('UPDATE member_prefs SET house_speakers = ? WHERE member_id = ?')
+      .bind(b.houseSpeakers === null ? null : JSON.stringify(b.houseSpeakers), id));
   }
   if (stmts.length) await c.env.DB.batch(stmts);
   return c.json(await memberView(c.env.DB, id));

@@ -1,9 +1,11 @@
 // SPEC §9.2 — House delivery: the Worker speaks `house` deliveries through Home Assistant, over a
-// Cloudflare Tunnel guarded by Cloudflare Access. It never decides what is sent (tick and
-// POST /announce write the rows); every row it takes ends sent / partial or visibly failed.
+// Cloudflare Tunnel guarded by Cloudflare Access. It never decides what is sent or on which speakers
+// (tick and POST /announce write the rows, §9.2a); every row it takes ends sent / partial or visibly
+// failed. It also asks HA for its speaker list (§9.2a), giving back the raw answer.
 import type { Env } from './env';
-import { all, first } from './db';
+import { all, first, parseJson } from './db';
 import { callThroughAccess } from './access';
+import { splitSpeakers } from '../shared/speakers';
 import type { DeliveryStatus, HouseState } from '../shared/vocab';
 
 export const HOUSE_NOT_CONFIGURED = 'house_not_configured';
@@ -31,31 +33,50 @@ export function houseConfigOf(env: Env): HouseConfig | null {
   };
 }
 
+/** §9.2a — the default speakers as configured: the Echo names, then the Voice PE. */
+export const defaultSpeakers = (cfg: HouseConfig): string[] => [...cfg.echoTargets, cfg.satelliteEntity];
+
 export type HouseResult = Exclude<DeliveryStatus, 'queued' | 'claimed'>;
 
-/** Both surfaces ok → sent; one → partial; neither → failed. */
-export function classifyHouse(echoOk: boolean, satOk: boolean): HouseResult {
-  if (echoOk && satOk) return 'sent';
-  if (echoOk || satOk) return 'partial';
-  return 'failed';
+/** Over the surfaces that were called: all ok → sent; some → partial; none (or none called) → failed. */
+export function classifyHouse(oks: readonly boolean[]): HouseResult {
+  const n = oks.filter(Boolean).length;
+  return n === 0 ? 'failed' : n === oks.length ? 'sent' : 'partial';
 }
 
-/** One POST to HA → "ok" (a 2xx only), "HTTP <status>: <body>" or "error: <message>". Never names a token. */
-async function ha(cfg: HouseConfig, path: string, payload: unknown, timeoutMs: number): Promise<string> {
-  const r = await callThroughAccess(cfg, `${cfg.haUrl}${path}`, {
+/** One POST to HA → its answer text on a 2xx, else access.ts's honest reason. Never names a token. */
+function ha(cfg: HouseConfig, path: string, payload: unknown, timeoutMs: number) {
+  return callThroughAccess(cfg, `${cfg.haUrl}${path}`, {
     method: 'POST', timeoutMs, body: JSON.stringify(payload),
     headers: { Authorization: `Bearer ${cfg.haToken}`, 'Content-Type': 'application/json; charset=utf-8' },
   });
-  return r.ok ? 'ok' : r.reason;
+}
+const said = async (r: ReturnType<typeof ha>) => { const x = await r; return x.ok ? 'ok' : x.reason; };
+
+/** §9.2 step 4: on the row's speakers (NULL → the defaults); a surface with no speaker is not called. */
+async function speak(cfg: HouseConfig, message: string, speakers: string[] | null): Promise<{ status: HouseResult; detail: string }> {
+  const { echo, satellite } = speakers === null ? { echo: cfg.echoTargets, satellite: [cfg.satelliteEntity] } : splitSpeakers(speakers);
+  const [e, v] = await Promise.all([
+    echo.length ? said(ha(cfg, '/api/services/notify/alexa_media', { target: echo, message, data: { type: cfg.echoType } }, ECHO_TIMEOUT_MS)) : null,
+    satellite.length ? said(ha(cfg, '/api/services/assist_satellite/announce',
+      { entity_id: speakers === null ? cfg.satelliteEntity : satellite, message }, SATELLITE_TIMEOUT_MS)) : null,
+  ]);
+  const called = { ...(e !== null && { echo: e }), ...(v !== null && { voice_pe: v }) };
+  return { status: classifyHouse(Object.values(called).map((r) => r === 'ok')), detail: JSON.stringify(called) };
 }
 
-async function speak(cfg: HouseConfig, message: string): Promise<{ status: HouseResult; detail: string }> {
-  const [echo, voicePe] = await Promise.all([
-    ha(cfg, '/api/services/notify/alexa_media', { target: cfg.echoTargets, message, data: { type: cfg.echoType } }, ECHO_TIMEOUT_MS),
-    ha(cfg, '/api/services/assist_satellite/announce', { entity_id: cfg.satelliteEntity, message }, SATELLITE_TIMEOUT_MS),
-  ]);
-  return { status: classifyHouse(echo === 'ok', voicePe === 'ok'), detail: JSON.stringify({ echo, voice_pe: voicePe }) };
-}
+/** §9.2a — HA's speaker list, rendered by HA from this template; read by speakerList, never here. */
+export const SPEAKER_TEMPLATE = `{%- set ns = namespace(out=[]) -%}
+{%- for e in integration_entities('alexa_media') | select('match', 'media_player[.]') -%}
+  {%- set ns.out = ns.out + [{'id': e, 'name': state_attr(e, 'friendly_name') or e}] -%}
+{%- endfor -%}
+{%- for s in states.assist_satellite -%}
+  {%- set ns.out = ns.out + [{'id': s.entity_id, 'name': s.name}] -%}
+{%- endfor -%}
+{{ ns.out | tojson }}`;
+
+/** One POST of SPEAKER_TEMPLATE to /api/template → HA's raw answer, or an honest reason. */
+export const houseSpeakerList = (cfg: HouseConfig) => ha(cfg, '/api/template', { template: SPEAKER_TEMPLATE }, ECHO_TIMEOUT_MS);
 
 /**
  * Tick step 4 (all house rows) and POST /announce (`ids`: its one row): fail the exhausted rows, then
@@ -80,15 +101,15 @@ export async function sendHouseDeliveries(env: Env, now: string, ids?: string[])
     return;
   }
 
-  const picked = await all<{ id: string; message: string }>(db,
-    `SELECT id, message FROM deliveries WHERE ${takeable}${only} ORDER BY created_at LIMIT ?`, stale, ...idArgs, DRAIN_BATCH);
+  const picked = await all<{ id: string; message: string; speakers: string | null }>(db,
+    `SELECT id, message, speakers FROM deliveries WHERE ${takeable}${only} ORDER BY created_at LIMIT ?`, stale, ...idArgs, DRAIN_BATCH);
   for (const d of picked) {
     const claim = await db.prepare(
       `UPDATE deliveries SET status = 'claimed', claimed_at = ?, attempts = attempts + 1, updated_at = ?
         WHERE id = ? AND channel = 'house' AND (status = 'queued' OR (status = 'claimed' AND claimed_at < ?))`)
       .bind(now, now, d.id, stale).run();
     if (claim.meta.changes !== 1) continue; // another drain took it
-    const r = await speak(cfg, d.message);
+    const r = await speak(cfg, d.message, parseJson<string[] | null>(d.speakers, null));
     await db.prepare(`UPDATE deliveries SET status = ?, detail = ?, updated_at = ? WHERE id = ? AND status = 'claimed' AND claimed_at = ?`)
       .bind(r.status, r.detail, now, d.id, now).run();
   }
