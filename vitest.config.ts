@@ -21,8 +21,11 @@ export default defineConfig(async () => {
             ANTHROPIC_API_KEY: '',
             // §7E — pinned empty too: no test reaches the real YouTube API (recipe tests set a fake key per call).
             YOUTUBE_API_KEY: '',
-            // §7E.2c — a TEST-ONLY bearer for the home captions helper's door; it opens nothing real.
+            // §7E.2c — a TEST-ONLY bearer for the SogoAI helper and a fake host. With CF_ACCESS_* empty
+            // (below) captions from home are not configured; test/home-captions.test.ts and the from-video
+            // tests override per call, with a fetch spy answering https://sogoai.test.
             CAPTIONS_TOKEN: 'test-captions-token',
+            HOME_CAPTIONS_URL: 'https://sogoai.test',
             // §9.2 — pinned so a test can never speak in the real house: a fake host, and the secrets
             // empty (House is then not configured). test/house.test.ts overrides them per call, with a
             // fetch spy answering https://ha.test.

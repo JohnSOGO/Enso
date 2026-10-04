@@ -3,7 +3,7 @@
 // (§7E.2, §7E.2b) is recipe-reading.ts; each person's emoji rules are recipe-emoji.ts.
 // Imports lists and vocab only.
 import { TEXT_MAX } from './lists';
-import { RECIPE_SOURCE, type CaptionsJob, type RecipeSource } from './vocab';
+import { RECIPE_SOURCE, type RecipeSource } from './vocab';
 
 export const RECIPE_TITLE_MAX = 120;
 /** Every ingredient fits a Shopping item as it is (§7E.3): the lists' own limit, never restated. */
@@ -110,11 +110,6 @@ export interface RecipeRow {
   source: string;
   captions_error: string | null;
   comments_error: string | null;
-  /** §7E.2c the captions-from-home job (§4.2s): NULL = none. */
-  captions_job: CaptionsJob | null;
-  captions_queued_at: string | null;
-  captions_claimed_at: string | null;
-  captions_attempts: number;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -138,8 +133,6 @@ export interface Recipe {
   source: RecipeSource[];
   captionsError: string | null;
   commentsError: string | null;
-  /** A captions-from-home job is queued or claimed (§7E.2c). */
-  captionsPending: boolean;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -165,7 +158,7 @@ export function recipeFromRow(r: RecipeRow, emojis: readonly RecipeEmojiRow[] = 
     watchUrl: r.video_id ? watchUrl(r.video_id) : null, thumbnailUrl: r.video_id ? thumbnailUrl(r.video_id) : null,
     ingredients: strings(r.ingredients), steps: strings(r.steps), servings: r.servings, time: r.time_text,
     found: r.found === 1, source: RECIPE_SOURCE.filter((s) => listed.includes(s)),
-    captionsError: r.captions_error, commentsError: r.comments_error, captionsPending: r.captions_job != null, createdBy: r.created_by, createdAt: r.created_at, updatedAt: r.updated_at,
+    captionsError: r.captions_error, commentsError: r.comments_error, createdBy: r.created_by, createdAt: r.created_at, updatedAt: r.updated_at,
     emojis: emojis.filter((e) => e.recipe_id === r.id).map((e) => ({ memberId: e.member_id, emoji: e.emoji })),
   };
 }

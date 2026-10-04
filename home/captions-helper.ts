@@ -1,69 +1,88 @@
-// SPEC §7E.2c — the SogoAI captions helper. Runs at home (Node 24), never in the Worker: polls the Worker's
-// POST /api/v1/captions/claim, reads that video's captions from the home IP with the SAME youtube-captions.ts, and
-// reports the CaptionsResult exactly as it came; claims again until 204, then waits 10 s. A network error doubles
-// the wait up to 60 s; it never exits. One log line per job and per error; the token is never logged. Node globals
-// and youtube-captions.ts only (§2.5) — `npm run build:home` bundles it into home/dist/captions-helper.mjs. Config:
-// ENSO_URL and CAPTIONS_TOKEN from the environment (captions-helper.env, via node --env-file).
+// SPEC §7E.2c — the SogoAI captions helper. Runs at home (Node 24), never in the Worker: a server on
+// 127.0.0.1:8790 (loopback only; the `sogoai` Cloudflare Tunnel behind Access is its only way in) answering
+// GET /captions?v=… with the CaptionsResult that the SAME youtube-captions.ts reads from the home IP. The
+// Worker asks it in-line when YouTube blocks the Worker. Bearer CAPTIONS_TOKEN, compared in constant time.
+// One log line per request; the token is never logged. youtube-captions.ts, node:http and Node globals only
+// (§2.5) — `npm run build:home` bundles it into home/dist/captions-helper.mjs. Config: CAPTIONS_TOKEN from the
+// environment (captions-helper.env, via node --env-file).
+import { createServer } from 'node:http';
 import { readCaptions } from '../src/worker/youtube-captions';
 
-export const IDLE_MS = 10_000;
-export const BACKOFF_MAX_MS = 60_000;
+export const HOST = '127.0.0.1';
+export const PORT = 8790;
+const VIDEO_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
-export interface HelperConfig {
-  fetch: typeof fetch;
-  /** The Worker's origin, e.g. https://enso.sogodojo.com */
-  url: string;
-  token: string;
-  log?: (line: string) => void;
-}
+export interface HelperRequest { method: string; url: string; authorization?: string }
+export interface HelperDeps { token: string; fetch: typeof fetch }
+export interface HelperAnswer { status: number; body: unknown }
 
 const stamp = (line: string) => `${new Date().toISOString()} ${line}`;
 
-/** One pass: claim → readCaptions → report, until the claim answers 204. → how many jobs were reported. Throws on a
- *  network error or a claim answering anything but 200 / 204 (the loop backs off). */
-export async function runOnce(cfg: HelperConfig): Promise<number> {
-  const log = cfg.log ?? ((line: string) => console.log(stamp(line)));
-  const api = `${cfg.url.replace(/\/+$/, '')}/api/v1/captions`;
-  const headers = { authorization: `Bearer ${cfg.token}`, 'content-type': 'application/json' };
-  for (let done = 0; ; done++) {
-    const claim = await cfg.fetch(`${api}/claim`, { method: 'POST', headers });
-    if (claim.status === 204) return done;
-    if (claim.status !== 200) throw new Error(`claim answered HTTP ${claim.status}`);
-    const job = (await claim.json()) as { recipeId: string; videoId: string };
-    const result = await readCaptions(job.videoId, { fetch: cfg.fetch });
-    const report = await cfg.fetch(`${api}/report`, {
-      method: 'POST', headers, body: JSON.stringify({ recipeId: job.recipeId, result }),
-    });
-    const answer = (await report.json().catch(() => null)) as { outcome?: string; error?: string } | null;
-    const got = result.ok ? `captions (${result.text.length} chars)` : `${result.kind}: ${result.reason}`;
-    log(`${job.videoId} ${got} → ${report.ok ? answer?.outcome : `report HTTP ${report.status} ${answer?.error ?? ''}`.trim()}`);
-  }
+const digest = async (s: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
+
+/** Constant time: the SHA-256 of each (equal lengths), every byte compared. */
+async function sameSecret(a: string, b: string): Promise<boolean> {
+  const [x, y] = await Promise.all([digest(a), digest(b)]);
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
+  return diff === 0;
 }
 
-const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
+/** One request → its answer, and one log line. Only GET /captions?v=… with the bearer; the CaptionsResult
+ *  whatever its ok. */
+export async function handle(req: HelperRequest, deps: HelperDeps): Promise<HelperAnswer> {
+  const answer = await answerFor(req, deps);
+  console.log(stamp(outcome(req, answer)));
+  return answer;
+}
 
-/** The loop: never exits. */
-export async function main(cfg: HelperConfig): Promise<never> {
-  console.log(stamp(`captions helper polling ${cfg.url} every ${IDLE_MS / 1000} s`));
-  for (let wait = IDLE_MS; ; await sleep(wait)) {
-    try {
-      await runOnce(cfg);
-      wait = IDLE_MS;
-    } catch (err) {
-      wait = Math.min(wait * 2, BACKOFF_MAX_MS);
-      console.error(stamp(`error: ${err instanceof Error ? err.message : String(err)} — trying again in ${wait / 1000} s`));
-    }
-  }
+async function answerFor(req: HelperRequest, deps: HelperDeps): Promise<HelperAnswer> {
+  const url = new URL(req.url, `http://${HOST}`);
+  if (url.pathname !== '/captions') return { status: 404, body: { error: 'not_found' } };
+  if (req.method !== 'GET') return { status: 405, body: { error: 'method_not_allowed' } };
+  const given = /^Bearer (.+)$/.exec(req.authorization ?? '')?.[1] ?? '';
+  if (!(await sameSecret(given, deps.token))) return { status: 401, body: { error: 'unauthorized' } };
+  const v = url.searchParams.get('v') ?? '';
+  if (!VIDEO_ID.test(v)) return { status: 400, body: { error: 'invalid_video_id' } };
+  return { status: 200, body: await readCaptions(v, { fetch: deps.fetch }) };
+}
+
+/** What one log line says came of a request: never the token, never a header. */
+function outcome(req: HelperRequest, answer: HelperAnswer): string {
+  const v = new URL(req.url, `http://${HOST}`).searchParams.get('v') ?? '-';
+  const shown = VIDEO_ID.test(v) ? v : '(bad id)';
+  const body = answer.body as { ok?: boolean; text?: string; kind?: string; reason?: string; error?: string };
+  if (answer.status !== 200) return `${req.method} ${shown} → ${answer.status} ${body.error ?? ''}`.trim();
+  return `${shown} → ${body.ok ? `captions (${body.text?.length ?? 0} chars)` : `${body.kind}: ${body.reason}`}`;
+}
+
+/** The server: the only node:http user. */
+export function main(token: string): void {
+  const server = createServer((req, res) => {
+    const r: HelperRequest = { method: req.method ?? 'GET', url: req.url ?? '/', authorization: req.headers.authorization };
+    handle(r, { token, fetch }).then(
+      (answer) => {
+        res.writeHead(answer.status, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(answer.body));
+      },
+      (err: unknown) => {
+        console.error(stamp(`error: ${err instanceof Error ? err.message : String(err)}`));
+        res.writeHead(500, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'internal' }));
+      },
+    );
+  });
+  server.listen(PORT, HOST, () => console.log(stamp(`captions helper listening on http://${HOST}:${PORT}`)));
 }
 
 // Run only as the bundled script (node captions-helper.mjs), never when a test imports this file.
 const proc = (globalThis as { process?: { argv?: string[]; env?: Record<string, string | undefined>; exitCode?: number } }).process;
 if (proc?.argv?.[1]?.endsWith('captions-helper.mjs')) {
-  const url = proc.env?.ENSO_URL, token = proc.env?.CAPTIONS_TOKEN;
-  if (!url || !token) {
-    console.error(stamp('ENSO_URL and CAPTIONS_TOKEN must be set (captions-helper.env)'));
+  const token = proc.env?.CAPTIONS_TOKEN;
+  if (!token) {
+    console.error(stamp('CAPTIONS_TOKEN must be set (captions-helper.env)'));
     proc.exitCode = 1;
   } else {
-    void main({ fetch, url, token });
+    main(token);
   }
 }

@@ -8,7 +8,7 @@ import worker from '../src/worker/index';
 import {
   INGREDIENT_MAX, parseRecipeInput, type Recipe, type RecipeInput,
 } from '../src/shared/recipes';
-import { RECIPE_READS_PER_DAY, cleanRecipeReading } from '../src/shared/recipe-reading';
+import { HOME_CAPTIONS_OFF, RECIPE_READS_PER_DAY, cleanRecipeReading, homeCaptionsError } from '../src/shared/recipe-reading';
 import { SHOPPING_LIST_ID } from '../src/shared/lists';
 import { BASE, Client, owner } from './helpers';
 import {
@@ -90,12 +90,12 @@ describe('M4o from-video — reading', () => {
     expect((await o.get('/recipes')).json.map((x: Recipe) => x.id)).toEqual([r.json.id]);
   });
 
-  it('R7 captions blocked → still saved from the description, captionsError visible', async () => {
+  it('R7 captions blocked (captions from home not set up, the pinned config) → still saved from the description, captionsError visible', async () => {
     fakeWorld(happy({ player: { status: 429, body: 'Too many requests' } }));
     const r = await readVideo(LINK);
     expect(r.status).toBe(201);
     expect(r.json.source).toEqual(['description']);
-    expect(r.json.captionsError).toMatch(/refused.*429/);
+    expect(r.json.captionsError).toBe(homeCaptionsError(HOME_CAPTIONS_OFF));
     expect(r.json.found).toBe(true);
   });
 

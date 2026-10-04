@@ -1,6 +1,6 @@
 // SPEC §7E.2, §7E.2b, §7E.2c — reading a recipe from a video (pure): what a video offered to be read, the creator's own
 // comments, a transcript pasted or screenshotted, when a video's text is worth reading, cleaning Claude's reading, and
-// the captions-from-home rules (when to queue, the helper's report, the texts, whether a home re-read may replace).
+// the captions-from-home rules (when to ask SogoAI, checking its answer, the texts).
 // Imports recipes (the limits), things (the photo limits) and vocab only; recipes.ts never imports this file.
 import { INGREDIENT_MAX, INGREDIENTS_MAX, RECIPE_TITLE_MAX, SERVINGS_MAX, STEP_MAX, STEPS_MAX, TIME_MAX } from './recipes';
 import { PHOTO_MAX_BYTES, PHOTO_TYPES } from './things';
@@ -136,22 +136,16 @@ export function cleanRecipeReading(raw: Record<string, unknown> | null | undefin
 
 // ---- §7E.2c captions from home (SogoAI) ----
 
-/** Claims a captions-from-home job gets before it is given up. ⚑ Q96 */
-export const CAPTIONS_JOB_ATTEMPTS = 3;
-/** A claim older than this many minutes is stale: the helper died mid-job. ⚑ Q96 */
-export const CAPTIONS_CLAIM_STALE_MIN = 2;
-/** A job queued longer than this many minutes is given up. ⚑ Q96 */
-export const CAPTIONS_JOB_GIVE_UP_MIN = 30;
-/** A reported failure's reason is cut to this many characters. ⚑ Q104 */
+/** A failure reason from home is cut to this many characters. ⚑ Q104 */
 export const CAPTIONS_REPORT_REASON_MAX = 300;
 
 /** Only captions YouTube refused (from Cloudflare's addresses) are worth asking the home PC for. ⚑ Q95 */
 export const wantsHomeCaptions = (failure: { kind: CaptionsFailure } | null): boolean => failure?.kind === 'blocked';
 
-/** The helper's report, checked. */
+/** The helper's answer, checked. */
 export type CaptionsReport = { ok: true; text: string } | { ok: false; kind: CaptionsFailure; reason: string };
 
-/** The report's `result` (a CaptionsResult as readCaptions returned it, through JSON) → the report, or a message.
+/** The helper's answer (a CaptionsResult as readCaptions returned it, through JSON) → checked, or a message.
  *  The text is cut to TRANSCRIPT_MAX, never cleanTranscript'd (captions carry no timestamps). ⚑ Q104 */
 export function parseCaptionsReport(result: unknown): CaptionsReport | string {
   if (!result || typeof result !== 'object' || Array.isArray(result)) return 'result must be a captions result.';
@@ -166,15 +160,7 @@ export function parseCaptionsReport(result: unknown): CaptionsReport | string {
   return reason ? { ok: false, kind: r.kind, reason } : 'result.reason must be non-empty text.';
 }
 
-/** captions_error when the home PC couldn't read them either, or the re-read from home failed. ⚑ Q97 */
+/** captions_error when the home PC couldn't read them either, or couldn't be asked. ⚑ Q97 */
 export const homeCaptionsError = (reason: string): string => `from home: ${reason}`;
-/** captions_error when the home PC never answered. ⚑ Q96 */
-export const HOME_CAPTIONS_GAVE_UP = `Couldn't get captions from home: the home PC didn't answer in ${CAPTIONS_JOB_GIVE_UP_MIN} minutes.`;
-/** captions_error when the captions from home hold no recipe; the recipe is untouched. ⚑ Q98 */
-export const HOME_CAPTIONS_NO_RECIPE = 'read from home, but they hold no recipe';
-/** captions_error when the recipe was edited by hand after the job was queued. ⚑ Q99 */
-export const HOME_CAPTIONS_EDITED = 'captions came from home, but the recipe was edited by hand since — not replaced';
-
-/** A home re-read replaces the recipe only when nobody edited it since the job was queued. ⚑ Q99 */
-export const homeRereadMayReplace = (row: { updated_at: string; captions_queued_at: string | null }): boolean =>
-  row.captions_queued_at !== null && row.updated_at <= row.captions_queued_at;
+/** The reason when captions were blocked and captions from home aren't configured. ⚑ Q106 */
+export const HOME_CAPTIONS_OFF = "captions from home aren't set up.";

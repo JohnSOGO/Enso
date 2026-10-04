@@ -2,14 +2,13 @@
 // note with any "captions / comments couldn't be read" marker, ingredients with pick boxes → Add to Shopping (one
 // POST /lists/{SHOPPING_LIST_ID}/items per ingredient, in order; the summary inside ⚑ Q69), the steps, ✎;
 // under the title everyone's emoji ("Shelly 🌶 · John ⭐", ⚑ Q73) and RecipeEmoji, mine (§7E.5); under the source note
-// RecipeTranscript on a "watch it" video recipe or one whose captions couldn't be read (§7E.2b ⚑ Q87) — hidden, with
-// "⏳ Getting captions from home…" and a 10 s re-fetch while the view is open, while captions are pending (§7E.2c ⚑ Q103).
-import { useEffect, useRef, useState } from 'react';
+// RecipeTranscript on a "watch it" video recipe or one whose captions couldn't be read (§7E.2b ⚑ Q87).
+import { useState } from 'react';
 import { Modal } from './Modal';
 import { RecipeEmoji } from './RecipeEmoji';
 import { RecipeTranscript } from './RecipeTranscript';
 import { useApp, type Member } from '../state';
-import { errorText, get, post } from '../api';
+import { errorText, post } from '../api';
 import { SHOPPING_LIST_ID } from '../../../src/shared/lists';
 import type { Recipe } from '../../../src/shared/recipes';
 import type { RecipeSource } from '../../../src/shared/vocab';
@@ -55,17 +54,6 @@ export function RecipeView({ recipe: r, recipes, onChange, onEdit, onClose }: Pr
   const [said, setSaid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const toggle = (i: number) => setPicked((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
-  const changed = useRef(onChange);
-  changed.current = onChange;
-
-  // §7E.2c — while captions come from home, re-fetch this recipe every 10 s; a failed fetch just waits for the next.
-  useEffect(() => {
-    if (!r.captionsPending) return;
-    const timer = setInterval(() => {
-      get<Recipe>(`/recipes/${r.id}`).then((fresh) => changed.current(fresh), () => {});
-    }, 10_000);
-    return () => clearInterval(timer);
-  }, [r.id, r.captionsPending]);
 
   async function addToShopping() {
     const items = r.ingredients.filter((_, i) => picked.includes(i));
@@ -109,8 +97,7 @@ export function RecipeView({ recipe: r, recipes, onChange, onEdit, onClose }: Pr
       )}
       {(r.servings || r.time) && <p>{[r.servings && `Serves: ${r.servings}`, r.time && `Time: ${r.time}`].filter(Boolean).join(' · ')}</p>}
       <p className={`muted ${s.note}`}>{sourceNote(r)}</p>
-      {r.captionsPending && <p className={`muted ${s.note}`} role="status">⏳ Getting captions from home…</p>}
-      {r.videoId && !r.captionsPending && (!r.found || r.captionsError) && <RecipeTranscript recipe={r} onChange={onChange} />}
+      {r.videoId && (!r.found || r.captionsError) && <RecipeTranscript recipe={r} onChange={onChange} />}
 
       {r.ingredients.length > 0 && (
         <>
