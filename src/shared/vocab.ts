@@ -17,6 +17,8 @@ export const MACHINE_STATE = ['free', 'running', 'done'] as const; // §7D, deri
 export const SUN_EVENT = ['sunset'] as const; // §7.7 events.start_sun — there is no sunrise
 export const RECIPE_SOURCE = ['description', 'captions', 'transcript', 'comments', 'typed'] as const; // §7E what a recipe was read from ('transcript': pasted, §7E.2b)
 export const CAPTIONS_FAILURE = ['blocked', 'none', 'failed'] as const; // §7E why captions couldn't be read
+export const IDENTIFY_FAILURE = ['off', 'failed'] as const; // §7A.3 why SogoAI gave no reading of a snapped item
+export const ITEM_READ_VIA = ['sogoai', 'claude'] as const; // §7A.3 who named a snapped item
 
 export type AlertKind = (typeof ALERT_KIND)[number];
 export type Channel = (typeof CHANNEL)[number];
@@ -35,6 +37,8 @@ export type MachineState = (typeof MACHINE_STATE)[number];
 export type SunEvent = (typeof SUN_EVENT)[number];
 export type RecipeSource = (typeof RECIPE_SOURCE)[number];
 export type CaptionsFailure = (typeof CAPTIONS_FAILURE)[number];
+export type IdentifyFailure = (typeof IDENTIFY_FAILURE)[number];
+export type ItemReadVia = (typeof ITEM_READ_VIA)[number];
 
 /** /status `house.state` (§9.2) — derived from the deliveries table, never stored. */
 export const HOUSE_STATE = ['ok', 'failing', 'not_configured', 'untried'] as const;

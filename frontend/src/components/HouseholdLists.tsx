@@ -1,13 +1,14 @@
 // SPEC §8.8 — the 🛒 Lists tab: the list picker (Today + Things to do + every list + ＋ New list…, ⋯ options),
-// composing ChoresToday, ThingsToDo (§8.11) and HouseholdListOptions, and the list panel (add box, rows, Done). Every
-// list behaves the same (Q24). The server decides added / existing / reopened and who may manage
-// a list (§7A.1); this screen shows what it returns.
+// composing ChoresToday, ThingsToDo (§8.11) and HouseholdListOptions, and the list panel (add box with ItemPhoto's 📷,
+// rows, Done). Every list behaves the same (Q24). The server decides added / existing / reopened and who may manage
+// a list (§7A.1); this screen shows what it returns. A snapped photo waits here until Add, then is saved (§7A.3).
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { ChoresToday } from './ChoresToday';
 import { ThingsToDo } from './ThingsToDo';
 import { ItemForm, type Item } from './HouseholdListItemForm';
 import { ListOptions, NewListForm, type ListSummary } from './HouseholdListOptions';
-import { errorText, get, patch, post } from '../api';
+import { ItemPhoto, type Snap } from './ItemPhoto';
+import { errorText, get, patch, post, upload } from '../api';
 import { useApp } from '../state';
 import { SHOPPING_LIST_ID, TEXT_MAX, canManageList } from '../../../src/shared/lists';
 import ls from './Lists.module.css';
@@ -28,6 +29,9 @@ function remembered(): string | null {
 }
 
 const byName = (a: ListSummary, b: ListSummary) => a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+
+/** §8.8 ⚑ Q117 — under a name read from a snapped photo. */
+const SNAP_HINT = 'Read from your photo — check it.';
 
 /** The shell: the list picker, ⋯ options, and the chosen view. */
 export function HouseholdLists() {
@@ -107,6 +111,8 @@ function ListPanel({ list, onItemsChanged }: { list: ListSummary; onItemsChanged
   const [said, setSaid] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<Item | null>(null);
+  /** §7A.3: the snapped photo waiting for Add. Switching list drops it (the panel is keyed by list). */
+  const [waiting, setWaiting] = useState<Blob | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
@@ -115,6 +121,13 @@ function ListPanel({ list, onItemsChanged }: { list: ListSummary; onItemsChanged
   useEffect(() => { load(); }, [load, version]);
   /** After any item change: this list, and the picker's open counts. */
   const changed = () => { load(); onItemsChanged(); };
+
+  /** A snap: the photo waits; its name replaces the box's text (⚑ Q118), or the refusal shows. */
+  function snapped(snap: Snap) {
+    setError(null);
+    if (snap.photo) setWaiting(snap.photo);
+    if (snap.name !== undefined) { setText(snap.name); setSaid(SNAP_HINT); } else setError(snap.error);
+  }
 
   async function add(e: FormEvent) {
     e.preventDefault();
@@ -125,6 +138,15 @@ function ListPanel({ list, onItemsChanged }: { list: ListSummary; onItemsChanged
       setText('');
       if (r.result === 'existing') setSaid(`${r.item.text} is already on the list`);
       if (r.result === 'reopened') setSaid(`${r.item.text} is back on the list`);
+      // §7A.3 ⚑ Q119: the waiting photo goes to the item, whether added, re-opened or already there.
+      if (waiting) {
+        try {
+          await upload('PUT', `/list-items/${r.item.id}/photo`, waiting);
+        } catch (err) {
+          setError(`${r.item.text} was added, but its photo wasn't saved: ${errorText(err).replace(/[.\s]+$/, '')}. Open ✎ to add it again.`);
+        }
+        setWaiting(null);
+      }
       changed();
     } catch (err) {
       setError(errorText(err));
@@ -167,6 +189,7 @@ function ListPanel({ list, onItemsChanged }: { list: ListSummary; onItemsChanged
         <span aria-hidden className={ls.box}>{done ? '☑' : '☐'}</span>
         <span className={`${ls.title} ${s.text}`}>{i.text}</span>
         {i.note && <span className={s.glyph} aria-hidden title="Has a note">📝</span>}
+        {i.hasPhoto && <span className={s.glyph} aria-hidden title="Has a photo">📷</span>}
         {done ? <span className={`muted ${s.whoWhen}`}>{whoWhen(i)}</span> : assigneeChip(i)}
       </button>
       <button className={`plain ${s.edit}`} aria-label={`Edit ${i.text}`} title={`Edit ${i.text}`} onClick={() => setEditing(i)}>✎</button>
@@ -177,7 +200,9 @@ function ListPanel({ list, onItemsChanged }: { list: ListSummary; onItemsChanged
     <>
       <form className="row" onSubmit={add}>
         <input ref={input} value={text} maxLength={TEXT_MAX} placeholder={`Add to ${list.name}…`}
-          aria-label={`Add to ${list.name}`} enterKeyHint="enter" onChange={(e) => { setText(e.target.value); setSaid(null); }} />
+          aria-label={`Add to ${list.name}`} enterKeyHint="enter"
+          onChange={(e) => { setText(e.target.value); setSaid(null); if (!e.target.value) setWaiting(null); }} />
+        <ItemPhoto waiting={waiting} onSnap={snapped} onDrop={() => setWaiting(null)} />
         <button type="submit" className="primary" disabled={busy || !text.trim()}>Add</button>
       </form>
       <p className={`muted ${s.said}`} aria-live="polite">{said ?? ''}</p>

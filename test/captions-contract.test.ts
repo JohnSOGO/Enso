@@ -7,8 +7,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readCaptions, type CaptionsResult } from '../src/worker/youtube-captions';
 import { parseCaptionsReport } from '../src/shared/recipe-reading';
 import { handle } from '../home/captions-helper';
-import { readCaptionsFromHome } from '../src/worker/home-captions';
-import { CAPTIONS_FAILURE } from '../src/shared/vocab';
+import { identifyFromHome, readCaptionsFromHome } from '../src/worker/home-captions';
+import { CAPTIONS_FAILURE, IDENTIFY_FAILURE } from '../src/shared/vocab';
+import { identify } from '../home/identify';
+import { parseIdentifyReport } from '../src/shared/item-reading';
 import { TRACKS, VIDEO_ID, json3, playerAnswer } from './recipe-fakes';
 
 type Answer = { status?: number; body: string | object } | 'throw';
@@ -73,5 +75,52 @@ describe('H-C9 readCaptions → handle() → the wire → readCaptionsFromHome',
       expect(got, what).toEqual(result.ok ? { ok: true, text: result.text } : { ok: false, reason: result.reason });
     }
     expect([...kinds].sort(), 'the fakes must reach every outcome').toEqual(['ok', ...CAPTIONS_FAILURE].sort());
+  });
+});
+
+// SN15 (SPEC §7A.3) — the same wire for POST /identify: every report identify() can produce, found by CALLING it over
+// fake LM Studio answers (and without a model), goes through handle() and the faked tunnel into the Worker's
+// identifyFromHome, which must accept it. The kinds seen are checked against IDENTIFY_FAILURE itself.
+describe('SN15 identify → handle() → the wire → identifyFromHome', () => {
+  const PHOTO = new Uint8Array([0xff, 0xd8, 0xff, 4, 2]);
+  const lm = (answer: (() => Response) | 'throw'): typeof fetch => async () => {
+    if (answer === 'throw') throw new Error('connect ECONNREFUSED 127.0.0.1:1234');
+    return answer();
+  };
+  const chat = (content: unknown) => () => Response.json({ choices: [{ message: { content } }] });
+  const LM_WORLDS: [string, typeof fetch, string | undefined][] = [
+    ['a name', lm(chat('Heinz Tomato Ketchup 32 oz')), 'qwen-uncensored'],
+    ['UNKNOWN', lm(chat('UNKNOWN')), 'qwen-uncensored'],
+    ['a thinking block, then a name', lm(chat('<think>\n\n</think>\n\nDawn dish soap')), 'qwen-uncensored'],
+    ['an empty answer', lm(chat('')), 'qwen-uncensored'],
+    ['no model set', lm(chat('x')), undefined],
+    ['LM Studio is down', lm('throw'), 'qwen-uncensored'],
+    ['LM Studio 500s', lm(() => new Response('x'.repeat(400), { status: 500 })), 'qwen-uncensored'],
+    ['an unexpected shape', lm(() => Response.json({ nope: 1 })), 'qwen-uncensored'],
+  ];
+
+  it("every report handle answers /identify with is accepted by the Worker's side", async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const token = 'contract-token';
+    const cfg = { url: 'https://sogoai.test', accessId: 'id', accessSecret: 'secret', token };
+    const kinds = new Set<string>();
+    for (const [what, lmFetch, model] of LM_WORLDS) {
+      const report = await identify(PHOTO, 'image/jpeg', { model, fetch: lmFetch });
+      kinds.add(report.ok ? 'ok' : report.kind);
+      const tunnel: typeof fetch = async (input, init) => {
+        const req = new Request(input, init);
+        const u = new URL(req.url);
+        const answer = await handle({
+          method: req.method, url: `${u.pathname}${u.search}`, authorization: req.headers.get('authorization') ?? undefined,
+          contentType: req.headers.get('content-type') ?? undefined, body: new Uint8Array(await req.arrayBuffer()),
+        }, { token, fetch: lmFetch, model });
+        return new Response(JSON.stringify(answer.body), { status: answer.status });
+      };
+      const got = await identifyFromHome(cfg, PHOTO.slice().buffer as ArrayBuffer, 'image/jpeg', { fetch: tunnel });
+      const parsed = parseIdentifyReport(JSON.parse(JSON.stringify(report)));
+      expect(typeof parsed, what).toBe('object');
+      expect(got, what).toEqual(report.ok ? { ok: true, text: report.text } : { ok: false, reason: (parsed as { reason: string }).reason });
+    }
+    expect([...kinds].sort(), 'the fakes must reach every outcome').toEqual(['ok', ...IDENTIFY_FAILURE].sort());
   });
 });

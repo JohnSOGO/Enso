@@ -135,6 +135,15 @@ on SogoAI, carries the tunnel outbound, so no port is opened at home. Access let
 `wrangler.toml`. Without the Access secrets or `CAPTIONS_TOKEN`, a blocked video is saved with "captions
 couldn't be read: from home: captions from home aren't set up."
 
+**Snap an item (SPEC §7A.3).** The same helper names a photographed list item: the Worker sends the image to
+`POST https://sogoai.sogodojo.com/identify` (same Access token, same bearer, 20 s), and the helper asks **LM
+Studio** on SogoAI (`http://127.0.0.1:1234/v1/chat/completions`, OpenAI-compatible) with the always-loaded
+vision model named by `IDENTIFY_MODEL` (`qwen-uncensored`), the prompt plus ` /no_think`, the image as a data
+URL, 15 s. It answers `{ ok: true, text }` or `{ ok: false, kind: off | failed, reason }`; the Worker cleans the
+text into a name. Only when SogoAI gives no name — not set up, failed, or "UNKNOWN" — does the Worker pay for
+the Claude API (counted against the 40-a-day photo reads). Without `IDENTIFY_MODEL` the helper still starts
+and serves captions; `/identify` answers `off` and Claude is asked.
+
 ### The Worker's secret (once)
 
 In a **real PowerShell window** (never a `!` command), with a long random value:
@@ -151,13 +160,13 @@ npx wrangler secret put CAPTIONS_TOKEN                                # paste th
 |---|---|
 | `captions-helper.mjs` | `npm run build:home` on the dev PC → `home/dist/captions-helper.mjs` (one file; it imports only `node:http`) |
 | `captions-helper.cmd` | `home/captions-helper.cmd` (runs `node --env-file=captions-helper.env captions-helper.mjs`, appending to `captions-helper.log`) |
-| `captions-helper.env` | written by hand there: `CAPTIONS_TOKEN` only |
+| `captions-helper.env` | written by hand there: `CAPTIONS_TOKEN` and `IDENTIFY_MODEL=qwen-uncensored` |
 
 Write the env file without a byte-order mark (PowerShell 5's `Set-Content -Encoding utf8` adds one):
 
 ```powershell
 New-Item -ItemType Directory -Force C:\Enso | Out-Null
-[IO.File]::WriteAllText('C:\Enso\captions-helper.env', "CAPTIONS_TOKEN=<the token>`n")
+[IO.File]::WriteAllText('C:\Enso\captions-helper.env', "CAPTIONS_TOKEN=<the token>`nIDENTIFY_MODEL=qwen-uncensored`n")
 ```
 
 The tunnel's public hostname `sogoai.sogodojo.com` points at `http://127.0.0.1:8790`, and its Access
@@ -181,10 +190,12 @@ Get-Content C:\Enso\captions-helper.log -Tail 5   # "captions helper listening o
 ```
 
 `node` must be on the machine PATH (the Node installer puts it there). Without `CAPTIONS_TOKEN` in the env
-file the helper logs that and exits (code 1). The log gets one line per request (the video id and what
-came back); the token is never written to it.
+file the helper logs that and exits (code 1). At start it also logs `identify: model qwen-uncensored` (or
+`identify: off (IDENTIFY_MODEL is not set)`). The log gets one line per request (the video id, or `identify`,
+and what came back); the token and the image are never written to it.
 
-To check it: on SogoAI, `Invoke-WebRequest http://127.0.0.1:8790/captions?v=x` answers 401 (no bearer).
+To check it: on SogoAI, `Invoke-WebRequest http://127.0.0.1:8790/captions?v=x` answers 401 (no bearer), and
+`Invoke-WebRequest -Method Post http://127.0.0.1:8790/identify` answers 401 too.
 From anywhere else, `https://sogoai.sogodojo.com` answers 403 without the Access service token, and 502
 with it while the helper isn't running.
 
@@ -201,8 +212,16 @@ Start-ScheduledTask -TaskName 'Enso captions helper'
 Get-Content C:\Enso\captions-helper.log -Tail 3
 ```
 
+Coming from v1.16.0 or v1.17.0 (captions only): stop it as above, copy the new `.mjs`, add
+`IDENTIFY_MODEL=qwen-uncensored` to the env file (keeping `CAPTIONS_TOKEN`; no byte-order mark), then start the
+task and check the log says `identify: model qwen-uncensored`:
+
+```powershell
+[IO.File]::AppendAllText('C:\Enso\captions-helper.env', "IDENTIFY_MODEL=qwen-uncensored`n")
+```
+
 Coming from the polling helper (v1.15.0): stop it as above, copy the new `.mjs`, rewrite the env file to
-`CAPTIONS_TOKEN` only (drop `ENSO_URL`), then start the task.
+`CAPTIONS_TOKEN` and `IDENTIFY_MODEL` only (drop `ENSO_URL`), then start the task.
 
 A new token is `npx wrangler secret put CAPTIONS_TOKEN` plus the same value in `captions-helper.env`, then
 the restart above.

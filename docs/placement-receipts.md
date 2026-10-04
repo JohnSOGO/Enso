@@ -7,6 +7,34 @@ carry its result.
 
 ---
 
+## 2026-10-04 — Snap an item: a list item's photo, named by SogoAI first, Claude second (placement-advisor; feature/snap-item)
+
+PLACEMENT RECEIPT
+- Feature:      §7A.3 — 📷 on every list's add row; the server names the photographed item (SogoAI's local vision
+  model through the existing helper and tunnel, the Claude API only when SogoAI gives no name); the name fills the
+  add box; the photo is kept with the list item (R2) and shown in the ✎ form. Migration 0023 (§4.2v).
+- New owners:   `src/shared/item-reading.ts` (the prompt, cleanItemName, the helper's IdentifyReport and its check,
+  the ItemReading wire type; pure; imports lists, things (photo limits) and vocab); `src/worker/routes/item-photos.ts`
+  (`POST /list-items/read-photo` and `/list-items/{id}/photo`, mounted in index.ts before lists); `home/identify.ts`
+  (one LM Studio request → an IdentifyReport; never decides); `frontend/src/components/ItemPhoto.tsx` (the 📷 on the
+  add row; no list state).
+- Widened:      routes/lists.ts (itemView hasPhoto / updatedAt; `export const loadItem` and ITEM_GONE; an item's or a
+  list's delete deletes its items' photos from R2); home-captions.ts (identifyFromHome through access.ts);
+  photo-reader.ts (readItemPhoto; claude.ts stays the only SDK importer); home/captions-helper.ts (POST /identify,
+  the body read in main() up to IDENTIFY_BODY_MAX); HouseholdLists.tsx (the waiting photo, the hint, the PUT after
+  Add, the 📷 row marker); HouseholdListItemForm.tsx (PhotoField as built, saved on Save); vocab.ts
+  (IDENTIFY_FAILURE, ITEM_READ_VIA).
+- Structure:    `scripts/arch.ts` home/ layer `allowed` gains `src/shared/item-reading.ts` (approved by the
+  coordinator). `npm run build:home` stays one file importing only `node:http`: 6.2 kB → 9.8 kB; esbuild keeps one
+  line of things.ts (PHOTO_MAX_BYTES), so the things import stays.
+- Unchanged:    the POST items / PATCH item bodies, shared/lists.ts, shared/things.ts, thing-photos.ts, things.ts,
+  photo-reads.ts, http.ts, house.ts, claude.ts, env.ts, ThingPhoto.tsx, PhotoField.tsx, ThingForm.tsx,
+  shrink-photo.ts, api.ts, package.json scripts, captions-helper.cmd.
+- Deviation:    `src/worker/access.ts` was on the do-not-touch list; its `AccessRequest.body` type widened from
+  `string` to `string | ArrayBuffer` (one line, type only, no behaviour change) so identifyFromHome can send the
+  image bytes through it — a string body cannot carry binary, and base64 would have broken the helper's
+  `image/*` + byte-cap contract.
+
 ## 2026-10-04 — The photo field gets its own owner, ready for list-item photos (reorganizer; refactor/photo-field-seam)
 
 REORG RECEIPT
