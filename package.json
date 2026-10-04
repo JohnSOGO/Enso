@@ -1,6 +1,6 @@
 {
   "name": "enso",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
+    "@block65/webcrypto-web-push": "2.0.0",
     "hono": "^4.13.11",
     "zod": "^4.6.5"
   },

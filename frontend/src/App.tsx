@@ -56,7 +56,7 @@ function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boo
           )}
           {phoneOff && (
             <button className="badge bad" onClick={() => setOverlay({ kind: 'explain', title: 'Phone alerts off',
-              text: 'This account has no phone subscribed for push alerts, so “Phone” alerts cannot reach you. Phone push arrives in milestone M5 (it needs the app deployed on HTTPS). See Settings → Status for each delivery.' })}>
+              text: 'This account has no phone subscribed for push alerts, so “Phone” alerts cannot reach you. Turn them on in Settings → Me → Phone alerts (on iPhone: from the Ensō app on the Home Screen). See Settings → Status for each delivery.' })}>
               📵 Phone alerts off
             </button>
           )}

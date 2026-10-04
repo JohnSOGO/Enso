@@ -28,7 +28,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/shared/markets.ts` | Monthly options expiration dates, Easter computus (§7.4) |
 | `src/shared/chores.ts` | Chore rules: whose turn (assigneeFor), run planning, step advance/undo, a chore fire's config/person/step, input validation and limits (§7B) — pure |
 | `src/shared/things.ts` | Thing rules: limits, input validation (title/note/place/address/phone/cost/link, window end ≥ start), remindersFor + planThingFires, canPlanOn, cleanPhotoReading, open-list order, photo limits + shrink constants, the Thing/PhotoReading wire types (§7C) — pure; imports engine, never the reverse |
-| `src/shared/engine.ts` | The alert engine: plan, step, act, timer commands (§5) — pure |
+| `src/shared/engine.ts` | The alert engine: plan, step, act, timer commands (§5) — pure + pushActions(kind) |
 | `src/shared/lists.ts` | Household list rules: itemKey, add/re-open decision, item clash, list-name clash, who may rename/delete a list (canManageList), text/note/name limits, LISTS_MAX, SHOPPING_LIST_ID, 30-day visible window (§7A.1) — pure |
 | `src/shared/invite-link.ts` | The invite link format (§6.2a): `JOIN_PATH`, build `{origin}/join#{code}`, take the code from a pasted link or a bare code — pure |
 
@@ -42,7 +42,8 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/http.ts` | Error envelope (§10) and input checks |
 | `src/worker/session.ts` | Password hashing, session cookie, `requireMember` / owner guards |
 | `src/worker/tick.ts` | `tick()` orchestration: load rows, call the engine, write results, deliveries (§5.6–5.7), chore run planning (§7B.3), thing reminder planning (§7C.2) |
-| `src/worker/push.ts` | Web Push sending (§9.1) |
+| `src/worker/push.ts` | Web Push delivery (§9.1): for queued push deliveries and /push/test, builds the payload { fireId, kind, title, body, actions }, sends to each of the member's subscriptions via web-push.ts, records results (201 → sent + last_ok_at; 404/410 → delete the subscription; else failed with status + body, last_error; none → no_subscription; keys missing → failed, visibly) |
+| `src/worker/web-push.ts` | Web Push protocol (RFC 8291/8292) — the only importer of `@block65/webcrypto-web-push`: encrypt the payload, VAPID headers cached per push-service origin (~1 h, expiry checked against a passed-in `now`), ttl 3600 / urgency high / topic (≤ 32 url-safe chars), one POST to one subscription → its status + body text; no D1, never decides what is sent or what a result means (§9.1) |
 | `src/worker/routes/auth.ts` | Setup, login/logout, signup, invite preview, rate limit, `/me` |
 | `src/worker/routes/members.ts` | Members list/disable, invites |
 | `src/worker/event-rows.ts` | The event row (§4.2): EventRow + eventView, EventInput + parseEventInput, insertEventStatement, removeFutureFires, every event_optins read/write — no Hono, no routes |
@@ -50,7 +51,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/routes/optins.ts` | `/optional-events`, `/events/{id}/optin` PUT/DELETE — a member's own switch on an optional event (§7.5, §10) |
 | `src/worker/routes/alarms.ts` | `/alarms` — scheduled alarms as `is_alarm` events (§4.2a) |
 | `src/worker/routes/alerts.ts` | Timers + commands, fires + actions |
-| `src/worker/routes/household.ts` | Household settings, days off, push subscriptions, `/status` |
+| `src/worker/routes/household.ts` | Household settings, days off, `/status`, `/push/*` (vapid-key, subscriptions, test) |
 | `src/worker/routes/relay.ts` | `/relay/claim`, `/relay/report` (§9.2) |
 | `src/worker/routes/lists.ts` | `/lists`, `/lists/{id}`, `/lists/{id}/items`, `/list-items/{id}` — list CRUD and list item CRUD (§7A, §10) |
 | `src/worker/routes/chores.ts` | `/chores`, `/chores/today`, `/chore-runs/{id}/done\|undo` — chore CRUD, today's runs, step done/undo and edit re-plan persistence (§7B, §10) |
@@ -63,7 +64,8 @@ receipt in `docs/placement-receipts.md`, then the code.
 | Module | Owns (one concern) |
 |---|---|
 | `frontend/src/components/AppRefresh.tsx` | Always-fresh (§8.10): reload on resume unless a `dialog[open]` exists, pull-to-refresh gesture on the active scroll area + its pill — no app state, no data fetching |
-| `frontend/src/main.tsx` | React root mount |
+| `frontend/src/main.tsx` | React root mount; starts the service worker registration (push-client.ts) |
+| `frontend/src/push-client.ts` | Browser push plumbing (§9.1): registers `/sw.js` (scope `/`, updateViaCache none), this browser's facts (supported, iOS-not-standalone, permission, current subscription), Turn on (permission → subscribe → POST /push/subscriptions) and Turn off (unsubscribe → DELETE) via api.ts — no React, no app state |
 | `frontend/src/App.tsx` | The frame (§8.1): Ringing bar, badges, tabs, ＋ button |
 | `frontend/src/api.ts` | HTTP transport to the Worker; every failure an `ApiError` with a message |
 | `frontend/src/state.tsx` | App-wide state context + freshness polling (§10) — the home for cross-cutting client state |
@@ -91,6 +93,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/shrink-photo.ts` | Shrinks a picked image on the phone to PHOTO_LONG_SIDE px, JPEG PHOTO_QUALITY, via canvas (§7C.3) — no app state |
 | `frontend/src/components/RingingBar.tsx` | Ringing bar (§8.2) |
 | `frontend/src/components/Settings.tsx` | Settings: Me, Household, Status (§8.6) |
+| `frontend/src/components/PhoneAlerts.tsx` | Settings → Me → Phone alerts row (§9.1): this phone's state (on / off / blocked / iPhone: add to Home Screen first / not supported / not set up), Turn on from the tap, Turn off, Send a test; calls refresh() so the 📵 badge follows |
 | `frontend/src/components/useAction.tsx` | Runs an async action, tracks busy, renders its failure in place (`role="alert"`) — the Settings sections' action hook |
 | `frontend/src/components/Invites.tsx` | Settings → Household → Invites: create, list with states, revoke (§8.9) |
 | `frontend/src/components/InviteCard.tsx` | The one-time invite card modal: lazy `uqr` QR, Share, Copy link, the code (§8.9) — the only importer of `uqr` |

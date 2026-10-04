@@ -1,0 +1,3 @@
+# SPEC §8.10 / §9.1 — Workers static assets headers. The service worker is always re-fetched.
+/sw.js
+  Cache-Control: no-cache

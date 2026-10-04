@@ -6,6 +6,7 @@ import { MEMBER_PALETTE } from '../../../src/shared/vocab';
 import { useAction } from './useAction';
 import { Invites } from './Invites';
 import { OptionalItems } from './OptionalItems';
+import { PhoneAlerts } from './PhoneAlerts';
 import s from './Lists.module.css';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -37,27 +38,6 @@ function MeSection({ onLogout }: { onLogout: () => void }) {
       <PhoneAlerts />
       <button onClick={() => run(async () => { await post('/auth/logout'); onLogout(); })}>Log out</button>
     </Section>
-  );
-}
-
-function PhoneAlerts() {
-  const { status } = useApp();
-  const [key, setKey] = useState<string | null | undefined>(undefined);
-  useEffect(() => { get('/push/vapid-key').then((r) => setKey(r.key)).catch(() => setKey(null)); }, []);
-  const subs = status?.mySubscriptions.length ?? 0;
-  return (
-    <div className="field">
-      <span className="muted" style={{ fontSize: '.8rem' }}>Phone alerts</span>
-      <div className="row" style={{ marginTop: 4 }}>
-        {subs ? <span className="badge good">{subs} device{subs > 1 ? 's' : ''} subscribed</span> : <span className="badge bad">Phone alerts off</span>}
-      </div>
-      {key === null && (
-        <p className="muted" style={{ fontSize: '.85rem', marginTop: 6 }}>
-          Not available yet: the server has no push keys. Phone push is milestone M5 and needs the app deployed on HTTPS.
-          Until then, alerts show in the red Ringing bar and (if chosen) are spoken in the house.
-        </p>
-      )}
-    </div>
   );
 }
 

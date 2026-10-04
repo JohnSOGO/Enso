@@ -159,3 +159,9 @@ export function alertMessage(kind: AlertKind, title: string, alertNumber: number
     : `${chore?.personName ? `Chore for ${chore.personName}` : 'Chore'}: ${title}${chore && chore.stepCount > 1 ? ` — ${chore.stepTitle}` : ''}`;
   return alertNumber >= 2 ? `${base} (alert ${alertNumber})` : base;
 }
+
+/** §9.1 — the actions a phone notification offers for a kind: the Ringing bar's table (§8.2). */
+const PUSH_ACTIONS: Record<AlertKind, readonly Action[]> = {
+  reminder: ['done', 'snooze'], thing: ['done', 'snooze'], timer: ['ack'], chore: ['done'],
+};
+export const pushActions = (kind: AlertKind): Action[] => [...PUSH_ACTIONS[kind]];

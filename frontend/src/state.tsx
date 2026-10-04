@@ -19,7 +19,7 @@ export interface Fire {
 }
 export interface Status {
   relayLastSeen: string | null; relayOnline: boolean;
-  mySubscriptions: { id: string; userAgent: string | null; createdAt: string; lastOkAt: string | null; lastError: string | null }[];
+  mySubscriptions: { id: string; endpoint: string; userAgent: string | null; createdAt: string; lastOkAt: string | null; lastError: string | null }[];
   recentDeliveries: { id: string; channel: string; message: string; status: string; detail: string | null; createdAt: string; member: string | null }[];
 }
 
