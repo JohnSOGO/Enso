@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.29 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.30-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -150,7 +150,8 @@ Cloudflare Tunnel + Access**.
 | Push | Web Push (VAPID) from the Worker via **`@block65/webcrypto-web-push` 2.0.0** (pinned exactly) | WebCrypto only. Sends `Content-Encoding: aes128gcm` (RFC 8291) + `Authorization: vapid t=…, k=…` (RFC 8292) — the legacy `aesgcm` that some libraries send is refused by Apple. The 2026-10-03 spike decrypted its output under Node **and** workerd, and cross-checked it with `http_ece`. |
 | House delivery | The Worker calls Home Assistant's REST API through **Cloudflare Tunnel + Access** (§9.2) | `src/worker/house.ts`; no process at home besides HA itself. |
 | Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Private: photos are served only through the API to signed-in members (§7C.3). |
-| Reading photos | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). |
+| Reading photos and recipes | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4, §7E) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). One caller of the SDK: `src/worker/claude.ts`. |
+| Recipes from videos | **YouTube Data API v3** `videos.list?part=snippet&id=…` (§7E) | Secret `YOUTUBE_API_KEY`; 1 quota unit per lookup. Plus an **unofficial, keyless** captions attempt (the watch page's caption track), which may be blocked — a failure is recorded and shown, never faked. |
 | QR codes | `uqr` (MIT, zero dependencies, renders SVG) | **Loaded lazily** (dynamic `import()`) only when an invite card opens — never in the main bundle. |
 | Tests | **Vitest**; `@cloudflare/vitest-pool-workers` for API tests | API tests apply `migrations/` via `readD1Migrations` / `applyD1Migrations` |
 | Passwords | PBKDF2-SHA256 via WebCrypto, 100 000 iterations, 16-byte salt | 100k is the Workers cap. Not bcrypt. |
@@ -175,7 +176,8 @@ Enso/
 │   ├── 0013_retire_relay.sql    # §4.2l
 │   ├── 0014_machines.sql        # §4.2m
 │   ├── 0015_timer_window.sql    # §4.2n
-│   └── 0016_sun_alerts.sql      # §4.2o
+│   ├── 0016_sun_alerts.sql      # §4.2o
+│   └── 0017_recipes.sql         # §4.2p
 ├── src/
 │   ├── shared/             # pure TS, no I/O — imported by worker and frontend
 │   │   ├── vocab.ts        # §3
@@ -186,6 +188,7 @@ Enso/
 │   │   ├── lists.ts        # §7A.1 item rules: itemKey, add/reopen decision, limits, 30-day window
 │   │   ├── machines.ts     # §7D the laundry loop: state, transitions, done message
 │   │   ├── sun.ts          # §7.7 sunset per local date and place (NOAA)
+│   │   ├── recipes.ts      # §7E recipe rules: limits, YouTube link → video id, cleaning a reading
 │   │   └── engine.ts       # §5
 │   └── worker/
 │       ├── index.ts        # Hono app + scheduled() handler
@@ -196,7 +199,11 @@ Enso/
 │       │                   # invites) · events.ts (/calendar, events) · alarms.ts ·
 │       │                   # alerts.ts (timers, fires + actions) · household.ts (settings,
 │       │                   # days off, /push/*, /status) · announce.ts ·
-│       │                   # lists.ts (§7A) · machines.ts (§7D)
+│       │                   # lists.ts (§7A) · machines.ts (§7D) · recipes.ts (§7E)
+│       ├── claude.ts       # the one Claude API call (§7C.4, §7E)
+│       ├── recipe-reader.ts # §7E the recipe prompt + schema
+│       ├── youtube.ts      # §7E YouTube Data API videos.list
+│       ├── youtube-captions.ts # §7E the unofficial captions attempt
 │       ├── tick.ts         # loads rows, calls engine, writes results
 │       ├── push.ts         # Web Push sending
 │       ├── house.ts        # House delivery via HA through Cloudflare Tunnel + Access (§9.2)
@@ -243,6 +250,7 @@ against the deployed Worker. On iPhone, push works only after
 | `HA_TOKEN` (secret) | Worker | Home Assistant long-lived access token, sent as `Authorization: Bearer …` to HA (§9.2). Never logged, never stored in a delivery's detail. |
 | `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` (secrets) | Worker | The Cloudflare Access **service token** for `ha.sogodojo.com`, sent as `CF-Access-Client-Id` / `CF-Access-Client-Secret` (§9.2). Never logged. |
 | `HA_URL`, `ECHO_TARGETS` (JSON array), `ECHO_TYPE`, `SATELLITE_ENTITY` (vars, `wrangler.toml`) | Worker | Where and on what House speaks (§9.2). |
+| `YOUTUBE_API_KEY` (secret) | Worker | A Google Cloud API key with the YouTube Data API v3 enabled, for reading a recipe video's title and description (§7E). Set it with `npx wrangler secret put YOUTUBE_API_KEY` **in a real PowerShell window**. Never logged, never in an error message. Reading recipes also needs `ANTHROPIC_API_KEY`; without either, `POST /recipes/from-video` is 503 `recipe_reading_off` and typed recipes still work. Tests pin it empty. |
 
 Dev secrets go in `.dev.vars` (gitignored); production uses `wrangler secret put`, typed
 in a real PowerShell window (never through a `!` shell, which saves an empty value).
@@ -295,6 +303,8 @@ export const HOUSE_STATE  = ['ok', 'failing', 'not_configured', 'untried'] as co
 export const MACHINE      = ['washer', 'dryer'] as const;                        // §7D, in load order
 export const MACHINE_STATE = ['free', 'running', 'done'] as const;               // §7D, derived, never stored
 export const SUN_EVENT    = ['sunset'] as const;                                 // §7.7 events.start_sun
+export const RECIPE_SOURCE = ['description', 'captions', 'typed'] as const;      // §7E what a recipe was read from
+export const CAPTIONS_FAILURE = ['blocked', 'none', 'failed'] as const;         // §7E why captions couldn't be read
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
 ```
@@ -314,6 +324,9 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `washer` / `dryer` | The two laundry machines (§7D); the washer's load moves on to the dryer |
 | `free` / `running` / `done` | A machine's state (§7D): no load / a load, before done-at / a load, done-at passed — derived from the row and `now` |
 | `sunset` | An event whose start is the day's local sunset (§7.7, `events.start_sun`); there is no sunrise |
+| `description` / `captions` | A recipe was read from the video's description / its captions (§7E); a recipe can carry both |
+| `typed` | A recipe typed by hand, with no video (§7E) |
+| `blocked` / `none` / `failed` | Why a video's captions couldn't be read (§7E): YouTube refused the keyless request / the video has no captions / anything else (network, an unreadable answer) |
 | `at` | Chore rings at its time, like an alarm |
 | `by` | Chore is quiet: due by its time, optionally one nudge then |
 | `superseded` | A newer occurrence of the same event started ringing while this one still was |
@@ -891,6 +904,41 @@ the goat item is created in production by SQL (§14).
 **Migration check (SA-M):** settings and events that exist before 0016 survive it, the settings
 row gains 33.20 / −117.29, every existing event has `start_sun` NULL, and `start_sun = 'sunrise'`
 is refused by the CHECK.
+
+### 4.2p Schema change — `migrations/0017_recipes.sql`
+
+```sql
+-- §7E — recipes, household-shared: read from a YouTube video, or typed by hand. Additive only.
+CREATE TABLE recipes (
+  id             TEXT PRIMARY KEY,               -- 'rcp_' + 16 base32
+  title          TEXT NOT NULL,                  -- 1–RECIPE_TITLE_MAX; the dish, else the video's title
+  video_id       TEXT,                           -- the 11-character YouTube id; NULL = typed
+  video_title    TEXT,                           -- as YouTube gave it; NULL when typed
+  channel        TEXT,                           -- the channel's name; NULL when typed
+  ingredients    TEXT NOT NULL,                  -- JSON string[], each ≤ INGREDIENT_MAX
+  steps          TEXT NOT NULL,                  -- JSON string[]
+  servings       TEXT,                           -- free text as stated ("4", "serves 6–8")
+  time_text      TEXT,                           -- free text as stated ("45 min")
+  found          INTEGER NOT NULL CHECK (found IN (0, 1)),
+  source         TEXT NOT NULL,                  -- JSON RECIPE_SOURCE[]: what was read (§7E.1)
+  captions_error TEXT,                           -- why captions couldn't be read; NULL = read, or not tried
+  created_by     TEXT NOT NULL REFERENCES members(id),
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL,
+  deleted_at     TEXT
+);
+-- One live recipe per video (§7E.2): a second paste of the same link is 409 duplicate.
+CREATE UNIQUE INDEX uq_recipe_video ON recipes(video_id) WHERE deleted_at IS NULL AND video_id IS NOT NULL;
+-- Daily cap on reading videos (§7E.2), counted apart from photo_reads.
+CREATE TABLE recipe_reads (at TEXT NOT NULL, member_id TEXT NOT NULL REFERENCES members(id));
+```
+
+There is **no url or thumbnail column**: both are derived from `video_id` (`watchUrl`,
+`thumbnailUrl`, §7E.1). `source` holds a JSON list, so it has no CHECK; the route writes only
+`RECIPE_SOURCE` values. Nothing existing is rebuilt or altered.
+**Migration check (RC-M):** rows written under 0001–0016 (members, things, list items) survive
+0017 unchanged; a second live recipe for one video is refused by `uq_recipe_video`, while a
+soft-deleted one does not block it and any number of typed recipes (NULL `video_id`) coexist.
 
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
@@ -1896,6 +1944,117 @@ deferred.
 
 ---
 
+## 7E. Recipes — `src/shared/recipes.ts` (pure)
+
+Decided by MojoSOGO 2026-10-03. The household finds dishes on YouTube; a recipe in the app keeps
+what to buy and what to do, next to the video. **Paste a YouTube link** and the Worker reads the
+recipe out of the video's own text, or **type one by hand**. Recipes are household-shared: anyone
+may add, edit or delete any recipe ⚑ Q66. Their own tab, 🍳 Recipes (§8.12).
+
+### 7E.1 A recipe
+
+- **Title** 1–120 (`RECIPE_TITLE_MAX`, required): the dish's name, else the video's title.
+- **Ingredients** — at most 60 (`INGREDIENTS_MAX`), each 1–`INGREDIENT_MAX` characters, where
+  `INGREDIENT_MAX` **is** the lists' `TEXT_MAX` (imported, never restated), so every ingredient
+  fits a Shopping item as it is. **Steps** — at most 60 (`STEPS_MAX`), each 1–1000 (`STEP_MAX`).
+- **Servings** ≤ 60 and **time** ≤ 60 (`SERVINGS_MAX`, `TIME_MAX`), free text as stated, optional.
+- **Video:** `video_id` (11 characters `[A-Za-z0-9_-]`), its YouTube title and channel. The link
+  and the picture are **derived**, never stored: `watchUrl(id)` =
+  `https://www.youtube.com/watch?v={id}`, `thumbnailUrl(id)` =
+  `https://i.ytimg.com/vi/{id}/hqdefault.jpg`. The thumbnail is **hotlinked** from YouTube's image
+  host: it is not stored, not in R2 and not an attachment, so §7C.3 stays the only attachment (§12).
+- **found** — the recipe holds ingredients or steps. It is `false` exactly when both lists are
+  empty: a video whose text holds no recipe is saved with the video's title, no ingredients, no
+  steps, and reads **"Recipe not in the video's text — watch it"** with the ▶ link. Every save
+  recomputes it, so a hand edit that adds ingredients or steps sets it `true` ⚑ Q67.
+- **source** — what the recipe was read from, a set of `RECIPE_SOURCE` (§3): `description`
+  and/or `captions` for a video (empty when the video's text held nothing to read), `typed` for
+  one typed by hand. **captions_error** — when the captions attempt failed, its reason.
+- **One live recipe per video** (`uq_recipe_video`). A typed recipe has no video and cannot be
+  given one in v1 ⚑ Q68. Delete is soft (`deleted_at`).
+- `youtubeVideoId(text)` → the id or null. It accepts `https://`, `http://` or no scheme, and
+  the hosts `youtube.com`, `www.`, `m.` and `music.youtube.com` (`/watch?v=ID`, `/shorts/ID`,
+  `/embed/ID`, `/live/ID`) and `youtu.be/ID`. Every other query parameter (`&t=42s`, `?si=…`,
+  `&list=…`) is ignored; another host, or an id that is not exactly 11 such characters, is null.
+
+### 7E.2 Reading a video — `POST /recipes/from-video { url }`
+
+**Check order** (each step's failure answers at once; nothing later runs):
+
+1. signed in (401);
+2. `youtubeVideoId(url)` → else 400 `invalid_input` "That isn't a YouTube video link.";
+3. a live recipe for that video (`recipeVideoClash`) → **409 `duplicate`** `{ error, message,
+   recipeId }`; **no read is spent**;
+4. daily cap: at most **`RECIPE_READS_PER_DAY` = 20** reads per household per local day ⚑ Q65
+   (`recipe_reads`, counted apart from photo reads) → 429 `rate_limited` with a message;
+5. `YOUTUBE_API_KEY` **and** `ANTHROPIC_API_KEY` present → else **503 `recipe_reading_off`**
+   "Reading recipes from videos isn't set up yet." — **before any fetch**, the captions attempt
+   included;
+6. YouTube lookup (`src/worker/youtube.ts`, `videos.list?part=snippet&id={id}`) → `{ title,
+   channel, description }`; no such video (or private) → 404 `video_unavailable`; quota used up
+   or any other failure → 502 `youtube_failed` with the reason (never the key);
+7. the captions attempt (`src/worker/youtube-captions.ts`) → transcript text, or a failure
+   `{ kind: CAPTIONS_FAILURE, reason }` that is **kept**, never fatal;
+8. count the read (`INSERT INTO recipe_reads`) — every read from here on counts, failed or not;
+9. `hasRecipeText({ description, transcript })` false (no description and no captions) → **Claude
+   is not asked**: a `found: false` reading. Otherwise Claude (`src/worker/recipe-reader.ts` via
+   `claude.ts`): refusal → 422 `recipe_refused` "Couldn't read a recipe from that video."; failure
+   → 502 `recipe_reading_failed` with the reason;
+10. `cleanRecipeReading(raw, videoTitle)` (pure; the answer is input, never trusted);
+11. INSERT (a unique-index race → 409 `duplicate`);
+12. → **201** the recipe.
+
+- **The prompt** gives the video's title, channel, description and captions (cut to
+  `TRANSCRIPT_MAX` = 20 000 characters), and asks for `found`, `title` (the dish), `ingredients`,
+  `steps`, `servings` and `time` (null unless stated). **Claude must never invent a recipe from the
+  title** or from general knowledge: only what the text says; when it holds no recipe, `found` is
+  false and the lists are empty.
+- **`cleanRecipeReading`**: `found` not `true` → no ingredients, no steps; every string trimmed,
+  inner whitespace collapsed to one space, cut to its limit; empty ones dropped; lists cut to their
+  counts; `found` is then "has ingredients or steps". The title is the dish's name when found, else
+  the video's title (cut to the limit; "Recipe from YouTube" when YouTube gave none).
+- **source** = `description` when the description was non-empty, plus `captions` when a transcript
+  was read — what Claude was given, whatever it found there.
+- **Captions** are unofficial: no key, the public watch page's caption track (English preferred),
+  parsed to plain text. YouTube may refuse it (`blocked`), the video may have none (`none`), or it
+  may fail otherwise (`failed`); the recipe is still read from the description and its
+  `captions_error` keeps the reason, shown as "captions couldn't be read: {reason}" (§8.12). The
+  captions module never throws and can be deleted alone.
+- **Privacy** ⚑ Q70: the video's text goes to Anthropic to be read; the thumbnail loads from
+  `i.ytimg.com` in the phone's browser (no referrer sent). Accepted by MojoSOGO.
+
+### 7E.3 Typing and editing
+
+- `POST /recipes` and `PATCH /recipes/{id}` take `{ title, ingredients: string[], steps:
+  string[], servings, time }` through `parseRecipeInput` (each line trimmed with inner whitespace
+  collapsed, empty lines dropped, each length and count checked → 400 naming the field). PATCH
+  merges over the stored recipe; the video fields, `source` and `captions_error` never change by
+  hand. A typed recipe has `source` `["typed"]`.
+- **Add ingredients to Shopping** is the PWA calling the existing `POST
+  /lists/{SHOPPING_LIST_ID}/items { text }` once per picked ingredient, in order (§8.12). There is
+  no server bulk route. Every ingredient `cleanRecipeReading` or `parseRecipeInput` can produce is
+  accepted by that route (R11).
+
+### 7E.4 Acceptance (M4o — each row is a test)
+
+| # | Setup / call | Expected |
+|---|---|---|
+| R1 | `youtubeVideoId` on watch?v=, youtu.be, /shorts/, /embed/, /live/, m., music., `&t=`, `?si=`, no scheme; a vimeo link, a 10-char id | the id for each YouTube form; null for the others |
+| R2 | from-video with the keys empty | 503 `recipe_reading_off`; **zero fetches**; no read counted |
+| R3 | from-video with an unreadable link; without a session | 400 / 401, no fetch |
+| R4 | a link to a video that already has a live recipe | 409 `duplicate` with its `recipeId`; no read counted; no fetch |
+| R5 | `RECIPE_READS_PER_DAY` reads already today, then one more | 429 with a message, no fetch |
+| R6 | fake YouTube + fake captions + fake Anthropic | 201; ingredients and steps saved; source `description` + `captions`; one read counted |
+| R7 | captions blocked | the recipe is still saved, from the description, with `captionsError` set |
+| R8 | empty description and no captions | Claude is not called; saved `found: false`, no ingredients or steps, the video's title |
+| R9 | Claude answers `found: false` with ingredients; a refusal; a failure | saved with none; 422; 502 — `cleanRecipeReading` trims and caps |
+| R10 | PATCH a found:false recipe with ingredients; DELETE | found becomes true; the deleted one is gone from GET and its video may be read again |
+| R11 | every ingredient `cleanRecipeReading` / `parseRecipeInput` produce from hostile input | each accepted by the real `POST /lists/{shopping}/items` |
+| R12 | YouTube: not found / quota / network; captions: blocked / none / failed | the honest failure kinds, the key never in a reason |
+| RC-M | migration check (§4.2p) | earlier rows intact; the unique index refuses a second live recipe per video |
+
+---
+
 ## 8. Screens
 
 General rules come from `MOJOSOGO-PREFERENCES.md`: chips are entities, badges are
@@ -1927,10 +2086,13 @@ only the grey backdrop):
 |  S   M   T   W   T   F   S          |
 |  ...continuous weeks...             |
 +-------------------------------------+
-| 📅 Calendar ⏰ Alarms 🛒 Lists ⚙ Settings |  <- bottom tab bar
+| 📅 Calendar ⏰ Alarms 🛒 Lists 🍳 Recipes ⚙ Settings | <- bottom tab bar
 +-------------------------------------+
 ```
 
+- **Five tabs** (since v1.11.0, ⚑ Q60): 🍳 Recipes sits between Lists and Settings. The bar is a
+  grid with one equal column per tab (`grid-auto-flow: column`), icon above label, so all five
+  fit one line at 320 px without wrapping or truncating.
 - The **＋** floating button appears on Calendar only and creates an event. The
   Alarms tab has its own **＋ Add** button in each section header.
 - **Status badges:**
@@ -2324,6 +2486,42 @@ Pumpkin patch        📅 Sat Oct 12
 - Tapping the photo thumbnail shows it full size (inside the dialog).
 - A thing ending in the past stays listed until done or let go — no red, no nagging (§1.0).
 
+### 8.12 Recipes (the 🍳 tab)
+
+```
+[ Paste a YouTube link…          ] [Read it]
+[ ＋ Type a recipe ]
+[thumb] Chicken tikka masala
+[thumb] Sourdough focaccia        [watch it]
+        Lentil soup
+```
+
+- **Paste box** (`type="url"`, 16 px) and **Read it** → `POST /recipes/from-video`. While it
+  works: "Reading the video…" (it can take a while). The new recipe is **saved at once** and its
+  view opens with its source note; ✎ fixes anything wrong ⚑ Q61. A refusal or failure shows in
+  place (`role="alert"`) with the server's message.
+- **A link already read** (409 `duplicate`) opens the existing recipe instead ⚑ Q63.
+- **Rows**, newest first ⚑ Q62: a small thumbnail (64×36, hotlinked, `loading="lazy"`,
+  `referrerPolicy="no-referrer"`; a typed recipe has none), the dish's name on one line, and a
+  **watch it** badge when `found` is false. Tapping a row opens the **recipe view**.
+- **＋ Type a recipe** opens the **recipe form** empty.
+- **Recipe view** (modal, `RecipeView.tsx`), titled with the dish:
+  - the thumbnail, full width, and **▶ Watch on YouTube** (opens the video, a new tab);
+    the channel; servings and time when stated;
+  - the **source note** ⚑ Q64, muted: "From the description and captions" / "From the
+    description" / "From the captions" / "Typed by hand" / "Nothing in the video's text to read",
+    plus "· captions couldn't be read: {reason}" when that happened;
+  - `found` false: **"Recipe not in the video's text — watch it"** above the ▶ link;
+  - **Ingredients**, each with a pick box; a **Pick all** chip; **Add to Shopping (n)**. Nothing
+    is picked at first ⚑ Q69. Adding calls `POST /lists/{SHOPPING_LIST_ID}/items` once per picked
+    ingredient, in order; the summary shows inside the view: "Added 4 · Milk already on the list"
+    (`added` and `reopened` count as added, `existing` as already there). On a failure it stops and
+    names what wasn't added: "Added 2 · Not added: Eggs, Flour — {error}";
+  - **Steps**, numbered; then **✎ Edit** and **Close**.
+- **Recipe form** (modal, `RecipeForm.tsx`): Title · Ingredients (one per line) · Steps (one per
+  line) · Servings · Time. Title, ingredients and steps grow to fit (`Grow`). Save / Cancel /
+  Delete (asks; existing recipes only). The video, its title and the source are not editable.
+
 ### 8.9 Invites (owner) and the join page
 
 **In Settings → Household → Invites:**
@@ -2713,6 +2911,10 @@ acked, nothing is scheduled — **now only**.
 | POST | `/things/{id}/plan` | member | `{ date, time? }` → `{ thing, eventId }`; 400 outside the window |
 | PUT/GET/DELETE | `/things/{id}/photo` | member | PUT raw image body (≤ 4 MB) → 204; GET → the image; DELETE → 204 |
 | POST | `/things/read-photo` | member | raw image body → `{ title, startDate, endDate, place, address, phone, cost, url, note }` (each nullable); 503 / 502 / 422 / 429 per §7C.4 |
+| GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, createdBy, createdAt, updatedAt }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed) (§7E) |
+| POST | `/recipes` | member | `{ title, ingredients, steps, servings?, time? }` → recipe (201), typed by hand; 400 `invalid_input` |
+| GET/PATCH/DELETE | `/recipes/{id}` | member | GET → recipe; PATCH the POST fields, all optional, merged → recipe (found recomputed); DELETE → 204 (soft); 404 when gone |
+| POST | `/recipes/from-video` | member | `{ url }` → recipe (201); 400 / 409 `duplicate` (+ `recipeId`) / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed`, in the §7E.2 order |
 | GET | `/lists` | member | → `{ id, name, createdBy, openCount }[]`, by name (§7A) |
 | POST | `/lists` | member | `{ name }` → list (201); 409 `duplicate`; 400 at `LISTS_MAX` |
 | PATCH/DELETE | `/lists/{id}` | creator or admin (seeded lists: admin) | PATCH `{ name }` → list; DELETE → 204 |
@@ -2872,6 +3074,14 @@ checks.
 - ✅ Manual: after the production insert (§14), Shelly and John turn it on in Optional
   calendar items; a real goat alert arrives on their phones and is spoken in the house.
 
+**M4o — Recipes** (v1.11.0)
+- Migration 0017 (`recipes`, `recipe_reads`), `RECIPE_SOURCE` / `CAPTIONS_FAILURE`,
+  `src/shared/recipes.ts`, `youtube.ts`, `youtube-captions.ts`, `recipe-reader.ts`, the `/recipes`
+  routes, the 🍳 Recipes tab with its view and form (§4.2p, §7E, §8.12, §10).
+- ✅ Tests R1–R12, RC-M.
+- ✅ Manual: the five tabs at 320 px; a real video read on the deployed URL (keys set), its
+  ingredients added to Shopping.
+
 **M4l — The laundry loop** (v1.8.0)
 - Migration 0014 (`machines` + the `fires` rebuild), `MACHINE` / `MACHINE_STATE` + the
   `machine` kind, `src/shared/machines.ts`, the `/machines` routes, machine rows in the
@@ -2949,7 +3159,9 @@ Captured from v1.0-draft so nothing is lost:
 - Offline **editing** and conflict resolution. v1 offline = the cached app shell;
   actions need network, and buttons show disabled "offline".
 - Queued offline acks
-- Photos anywhere other than Things to do (§7C.3 is the only attachment)
+- Photos anywhere other than Things to do (§7C.3 is the only attachment). A recipe's video
+  thumbnail (§7E.1) is hotlinked from YouTube — not stored, not in R2, not an attachment — so it
+  is not one.
 - Data export
 - Audit-log screen
 - Event templates
@@ -3044,6 +3256,17 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q57 | The household place | ⚑ 33.20 / −117.29 (ZIP 92056, Oceanside), set by migration 0016; no edit UI |
 | Q58 | Who edits or deletes the goat item | ⚑ Only coordinator SQL; the event routes give 404 |
 | Q59 | Sunrise too? | ⚑ No — sunset only |
+| Q60 | Where do recipes live (§8.1, §8.12)? | ⚑ Their own tab, "Recipes" 🍳, between Lists and Settings; five tabs fit at 320 px (Q12's "no fifth tab" was about chores) |
+| Q61 | Pasting a link | ⚑ Saves the recipe at once, then opens its view with the source note; ✎ fixes it |
+| Q62 | A recipe row | ⚑ A small thumbnail + the dish's name, plus a "watch it" badge when nothing was found; newest first |
+| Q63 | The same link pasted twice | ⚑ 409 `duplicate`; the PWA opens the existing recipe |
+| Q64 | The source note | ⚑ Says what was read ("From the description and captions"), plus "captions couldn't be read: {reason}" when that happened |
+| Q65 | Recipe reads per day | ⚑ 20 (`RECIPE_READS_PER_DAY`), counted apart from photo reads |
+| Q66 | Who edits or deletes a recipe? | ⚑ Anyone in the household; delete is soft |
+| Q67 | A hand edit of a "watch it" recipe | ⚑ Adding ingredients or steps sets found = true (found = has ingredients or steps) |
+| Q68 | A typed recipe with a video link | ⚑ Not in v1 — a typed recipe has no video |
+| Q69 | Add to Shopping | ⚑ Nothing picked at first, a "Pick all" chip; summary "Added 4 · Milk already on the list"; on a failure it stops and names what wasn't added |
+| Q70 | Privacy of recipe reading | ⚑ The video's text goes to Anthropic; the thumbnail loads from i.ytimg.com (no referrer). Accepted |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
