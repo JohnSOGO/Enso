@@ -2728,7 +2728,7 @@ nobody else to push to → 409 `no_recipients` rather than a quiet success. **St
 the box at 320 px and on the iPhone, an announcement spoken on the Echos + Voice PE, and one
 arriving on another member's phone.
 **Push fix** (v1.7.1): no `Topic` header — Apple refused pushes carrying one (BadWebPushTopic)
-since v1.6.0.
+since v1.6.0. Verified 2026-10-03: a test push arrived on MojoSOGO's iPhone home-screen app.
 **Emoji instead of a dot** (v1.5.1): on phones an event whose emoji shows beside the date has no
 dot (§7.1); checked at 320 px.
 **Open from the thing form** (v1.5.0): ↗ link, 🗺️ maps, 📞 call beside the fields, checked at
