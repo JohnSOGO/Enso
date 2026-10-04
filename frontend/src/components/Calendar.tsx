@@ -163,7 +163,10 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
       const stay = spans.find((sp) => sp.start <= i && i <= sp.end);
       // §7.2 day icons: beside the date number at every width — holiday, 📈, then the day's event emoji; at most two.
       const withEmoji = items.filter((o) => o.emoji);
-      const icons = [...pub.slice(0, 1), ...market.slice(0, 1), ...withEmoji.map((o) => ({ emoji: o.emoji! }))].slice(0, 2);
+      const lead = [...pub.slice(0, 1), ...market.slice(0, 1)];
+      const iconed = withEmoji.slice(0, 2 - lead.length);
+      const icons = [...lead, ...iconed.map((o) => ({ emoji: o.emoji! }))];
+      const dotted = single.filter((o) => !iconed.includes(o)); // §7.1: an event shown by its emoji gets no dot
       const cls = [
         s.cell,
         (y * 12 + m) % 2 ? s.toneB : s.toneA,
@@ -195,8 +198,8 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
           {lanes > 0 && <span aria-hidden style={{ height: lanes * (barH + 1), flex: 'none' }} />}
           {narrow ? (
             <span className={s.dots}>
-              {single.slice(0, 4).map((o, k) => <i key={k} style={{ background: o.color }} />)}
-              {single.length > 4 && <b>+</b>}
+              {dotted.slice(0, 4).map((o, k) => <i key={k} style={{ background: o.color }} />)}
+              {dotted.length > 4 && <b>+</b>}
             </span>
           ) : (
             <span className={s.chips}>
