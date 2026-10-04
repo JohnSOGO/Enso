@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.17-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.18-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -181,7 +181,7 @@ Enso/
 │       ├── routes/         # auth.ts (setup, login, signup, /me) · members.ts (members,
 │       │                   # invites) · events.ts (/calendar, events) · alarms.ts ·
 │       │                   # alerts.ts (timers, fires + actions) · household.ts (settings,
-│       │                   # days off, school holidays, push subscriptions, /status) · relay.ts ·
+│       │                   # days off, push subscriptions, /status) · relay.ts ·
 │       │                   # lists.ts (§7A)
 │       ├── tick.ts         # loads rows, calls engine, writes results
 │       ├── push.ts         # Web Push sending
@@ -745,6 +745,15 @@ CREATE TABLE event_optins (
 );
 ```
 
+### 4.2i Schema change — `migrations/0010_calendar_tidy.sql`
+
+```sql
+-- §7.2 / §7.6 — school holidays removed (the table and the member switch); event emoji added.
+DROP TABLE school_holidays;
+ALTER TABLE member_prefs DROP COLUMN show_school_holidays;
+ALTER TABLE events ADD COLUMN emoji TEXT;
+```
+
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
 
@@ -1008,7 +1017,7 @@ never stored.
 | Edit/delete **own** | ✓ | ✓ |
 | Edit/delete **others'** | ✓ | ✗ |
 | Done / snooze / ack any fire; start/stop any timer; tick any list item or chore | ✓ | ✓ |
-| Invites, disable members, household settings, school holidays | ✓ | ✗ |
+| Invites, disable members, household settings | ✓ | ✗ |
 | **Make a member an admin, or remove an admin** | ✓ | ✗ |
 
 **Rules for changing people** (`PATCH /members/{id}`, owner only):
@@ -1098,20 +1107,29 @@ Sep '26  30   31  Sep1   2    3    4    5     <- Aug 30–31 in the previous mon
 Oct '26   4    5    6    7    8    9   10
 ```
 
-### 7.2 Holidays
+### 7.2 Holidays and day icons
 
 | Type | Source | Treatment |
 |------|--------|-----------|
-| Public (days off) | Computed in `src/shared/holidays.ts`, filtered to the household's **days off** (§7.3) — no hand-typed yearly dates | **Whole cell tinted faint yellow** (`--holiday-public-cell`) + the holiday's **emoji next to the date number**; name in the day sheet |
-| School | `school_holidays` table, edited by the owner in Settings → School holidays (add a single date or a date range + label) | Blue (`--holiday-school`) date number + circle + 🏫 next to it; label in the day sheet |
+| Public (days off) | Computed in `src/shared/holidays.ts`, filtered to the household's **days off** (§7.3) — no hand-typed yearly dates | **Whole cell tinted faint yellow** (`--holiday-public-cell`) + the holiday's **emoji**; name in the day sheet |
+
+**School holidays were removed** (decided by MojoSOGO 2026-10-03): a school break is entered
+as an ordinary event when wanted. Migration 0010 drops the table, the member switch and
+the 5 carried-over "Fall break" days (deleted, not converted — his choice).
+
+**Day icons** — a day's icons sit **to the right of the date number, on the same line, at
+every width** (phones included; never on the line below — decided by MojoSOGO). Icons, in
+order: the public holiday's emoji, 📈 (§7.4), then the emoji of that day's events (§7.6).
+At most **two** show beside the number; the rest are in the day sheet. Each is shown only if
+it is on for the member (§7.5).
 
 - **Legend:** shown once, directly under the sticky month header: a yellow square
-  (`--holiday-public-swatch`) "Public holiday", a blue dot "School holiday", and
-  "📈 Options expiration" (§7.4). Each entry shows only while that type is switched
-  on for the member.
-- **Toggles:** each member can hide either type (`member_prefs`).
-- **Both on one day:** the cell is yellow *and* the date has the blue circle; the day
-  sheet lists both.
+  (`--holiday-public-swatch`) "Public holiday" and "📈 Options expiration" (§7.4), each only
+  while it is on for the member.
+- **Switches:** public holidays and 📈 are rows of **Optional calendar items** (§7.5), not
+  separate checkboxes.
+- **Off means off everywhere** for that member — the cell tint and icon, the legend entry
+  **and the day sheet** (a public holiday switched off is not listed there either). ⚑
 
 ### 7.3 Holidays and household days off (`holidays.ts`)
 
@@ -1174,6 +1192,14 @@ options expiration"; `member_prefs.show_options_expiration`, §4.2c).
 
 ### 7.5 Optional events — each person turns them on
 
+**Optional calendar items** (Settings → Me) is the one list of everything a member can
+switch on for their own calendar (decided by MojoSOGO 2026-10-03):
+1. **Public holidays** — built in, on by default (`member_prefs.show_public_holidays`);
+2. **📈 Monthly options expiration** — built in, off by default
+   (`member_prefs.show_options_expiration`, §7.4);
+3. then every **optional event** (below), each with its emoji and how it repeats.
+The old separate checkboxes in Me are gone.
+
 Some calendar items matter only to whoever wants them — street sweeping (move the car),
 a recycling day, a club's meetings. An event can be marked **optional** (decided by
 MojoSOGO 2026-10-03); then **each member decides for themselves** whether it is on.
@@ -1210,6 +1236,18 @@ MojoSOGO 2026-10-03); then **each member decides for themselves** whether it is 
 | O7 | `GET /optional-events` as B | the event, `on: false` (after O5) |
 | O8 | B (not creator, not admin) PATCH `optional: false` | 403 |
 | O9 | a non-optional event | unchanged for everyone (regression) |
+
+### 7.6 Event emoji
+
+An event may carry **one emoji** (`events.emoji`, optional; decided by MojoSOGO): street
+sweeping 🧹, taking out the trash 🗑️. It must be a single emoji (one grapheme of emoji
+presentation, ≤ 16 bytes) — anything else is 400 with a message. Where it shows:
+- beside the date number on each day the event occurs (§7.2 day icons);
+- before the title in the day sheet, on wide-screen chips, and in Optional calendar items;
+- in the Ringing bar and alert text it is **not** added (messages stay plain text).
+
+**Acceptance:** E1 an event with emoji 🧹 round-trips through POST/GET; E2 `"ab"`, `"🧹🧹"`
+or 17 bytes → 400; E3 `/calendar` occurrences carry `emoji`.
 
 ---
 
@@ -1528,7 +1566,7 @@ only the grey backdrop):
 | RINGING BAR (only when something is ringing)                 |
 +-------------------------------------+
 | Sep 2026               [Today]      |  <- sticky month header
-| ■ Public holiday  ● School holiday  |  <- legend
+| ■ Public holiday  📈 Options         |  <- legend
 |  S   M   T   W   T   F   S          |
 |  ...continuous weeks...             |
 +-------------------------------------+
@@ -1584,6 +1622,8 @@ Fields:
   Last** (at least one; the date's own week is pre-ticked), e.g. "Thursdays: 1st · 3rd" /
   Yearly, plus an optional end date
 - Assigned to (member chips, none = everyone)
+- **Emoji** (optional, §7.6): one emoji — typed with the phone's emoji keyboard — shown
+  beside the title.
 - **☐ Optional — each person turns it on** (creator or admin, §7.5). On an optional event
   the form also shows **☐ On for me** — every member's own switch. It takes effect the
   moment it is ticked (like the Settings switch), needs no Save, and stays usable for
@@ -1659,15 +1699,15 @@ Time      Chore            Days        This week
 
 ### 8.6 Settings
 
-- **Me:** **Optional calendar items** — one line per optional event (title, how it repeats)
-  with an **On** switch (§7.5); name, color, enable phone alerts (subscribe), show/hide holiday types,
-  show/hide 📈 options expiration (§7.4), log out.
+- **Me:** **Optional calendar items** — Public holidays, 📈 options expiration, then one line
+  per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); name,
+  color, enable phone alerts (subscribe),
+  log out.
 - **Household (admins):** name, timezone, days off (§7.3), **invites (§8.9)**, members list:
   one line per member — name · **Owner** / **Admin** chip (nothing for a regular member) ·
   **Make admin** / **Remove admin** (asks first; never on the founder) · **Disable** /
   **Enable** (never on the founder). An admin removing their own admin role is warned
   that they will lose these settings at once.
-- **School holidays (admins).**
 - **Status:** relay last seen, the current member's push subscriptions with last
   success/error, and the last 20 deliveries with their status badge.
 
@@ -1940,12 +1980,11 @@ Dark by default. Colors are defined as tokens on `:root`:
 | `--border` | `#334155` |
 | `--text` | `#F8FAFC` |
 | `--text-dim` | `#94A3B8` |
-| `--accent` | `#6366F1` (indigo — kept apart from school-holiday blue ⚑) |
+| `--accent` | `#6366F1` (indigo) |
 | `--month-a` | `#0F172A` |
 | `--month-b` | `#162033` |
 | `--holiday-public-cell` | `rgba(250, 204, 21, .16)` — a faint yellow tint over the dark cell, the same 16% strength as a multi-day event's tint; normal light text |
 | `--holiday-public-swatch` | `#FACC15` — the legend's public-holiday square |
-| `--holiday-school` | `#3B82F6` |
 
 ---
 
@@ -2052,13 +2091,13 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | POST | `/auth/login` | public | `{ email, password }` → member; sets cookie |
 | POST | `/auth/logout` | member | → 204; clears cookie |
 | GET | `/me` | member | → member + prefs |
-| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showSchoolHolidays?, showOptionsExpiration? }` |
+| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration? }` |
 | GET | `/members` | member | → `{ id, email, displayName, color, role, isFounder, disabledAt }[]` (no hashes; `email` only for owners) |
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
 | DELETE | `/invites/{id}` | owner | revoke |
-| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], schoolHolidays[], marketDays[] }`; recurring events expanded server-side with `recurrence.ts`; alarms excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
-| GET | `/optional-events` | member | → `{ id, title, recurrence, startDate, on }[]` — every optional event, with this member's switch |
+| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[] }` (each occurrence carries `emoji`); recurring events expanded server-side with `recurrence.ts`; alarms excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
+| GET | `/optional-events` | member | → `{ id, title, emoji, recurrence, startDate, on }[]` — every optional event, with this member's switch |
 | PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |
 | GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6) |
@@ -2074,8 +2113,6 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | POST | `/push/subscriptions` | member | `PushSubscriptionJSON` + userAgent |
 | DELETE | `/push/subscriptions/{id}` | owner of the subscription | |
 | GET | `/push/vapid-key` | public | → `{ key }` |
-| GET/PUT | `/school-holidays` | GET member / PUT owner | PUT `{ from, to, label }` (a single date: `from = to`) |
-| DELETE | `/school-holidays/{date}` | owner | removes that one date |
 | GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff }`; PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
 | GET | `/status` | member | → `{ relayLastSeen, mySubscriptions[], recentDeliveries[] }` |
 | POST | `/relay/claim` | bearer `RELAY_TOKEN` | → deliveries |
@@ -2221,6 +2258,14 @@ checks.
 - ✅ Production: "Street sweeping" exists — 1st & 3rd Thursday, all-day, optional,
   reminder the evening before at 8 pm by phone; on for MojoSOGO; everyone else can turn it on.
 
+**M4i — Calendar tidy** (v1.2.0)
+- Migration 0010, school holidays removed everywhere, event emoji, day icons beside the
+  date at every width, public holidays + 📈 as rows of Optional calendar items (§7.2, §7.5,
+  §7.6, §8.4, §8.6).
+- ✅ Tests E1–E3; existing holiday/market tests unchanged; no `school` left in code.
+- ✅ Production: Street sweeping gets 🧹; a new optional **🗑️ Take out trash**, every Sunday
+  at **18:00**, ringing at 18:00 by phone, on for MojoSOGO (decided by MojoSOGO).
+
 **M4d — Invites**
 - `/auth/invite-preview`, the invites list states, the invite card (QR, Share, Copy),
   the join page at `/join`, the welcome card (§6.2a, §8.9).
@@ -2353,6 +2398,8 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q29 | Reminders | **Decided:** when it starts, and on a picked date (09:00 local ⚑); whole household ⚑ |
 | Q31 | Street sweeping / per-person items | **Decided by MojoSOGO 2026-10-03:** optional events any person turns on; reminder the evening before at 8 pm |
 | Q32 | Is the creator of an optional event turned on automatically? | Yes ⚑ |
+| Q33 | School holidays | **Decided 2026-10-03:** removed; the 5 Fall break days deleted |
+| Q34 | Take out trash | **Decided:** optional, every Sunday 18:00, rings at 18:00, 🗑️ |
 | Q30 | Reading photos | **Decided:** Claude reads them (`claude-opus-5-5`); ≤ 40 reads a day ⚑ |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
@@ -2380,6 +2427,10 @@ home-screen tags, `AppRefresh` (reload on resume unless a dialog is open; pull t
 — verified with real touch events in an emulated phone; its on-iPhone check is still to do.
 The ensō mark (scripts/draw-enso.mjs) and the opening screen are built; the 7 iPhone launch
 images are rendered from it. Its on-iPhone check is still to do.
+**M4i calendar tidy** is built (v1.2.0; 243 tests; 0010 applied locally with nothing but the
+school table lost; no "school" left in code). Checked at 320 and 440 px: day icons sit on the
+date's line inside the cell (15🧹, 16📈, 18🗑️). Known limit: on the **1st** of a month the
+month tag ("OCT") fills the line, so that day's icon is clipped (still in the day sheet).
 **M4h optional events + certain weeks** is built (O1–O9 + §4.3 rows green, 225 tests; 0009
 applied locally with nothing lost; v1.1.0). Built as: reminders of optional events are planned
 for everyone and only deliveries and /fires are filtered; a non-optional event's House rule is

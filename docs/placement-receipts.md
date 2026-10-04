@@ -7,6 +7,28 @@ carry its result.
 
 ---
 
+## 2026-10-03 — Re-pin after M4i (coordinator)
+
+- `Settings.tsx` ceiling 219 + 40 → **187 + 40**: M4i deleted the holiday checkboxes and the
+  school-holidays section (refinement deletes). Bless-and-raise not needed; nothing extracted.
+
+---
+
+## 2026-10-03 — M4i calendar tidy (placement-advisor)
+
+- **Verdict:** NEW `src/shared/emoji.ts` (the one-emoji rule: one grapheme, Extended_Pictographic
+  or Regional_Indicator, ≤ 16 bytes — not \p{Emoji}, which lets "1" through, nor
+  \p{Emoji_Presentation}, which rejects 🗑️); NEW `ReminderFields.tsx` (R5, before the
+  feature); EXISTING event-rows, events, optins, household (school routes deleted), auth (/me
+  prefs), state.tsx, EventForm, Calendar(.module.css), DaySheet, OptionalItems (built-in rows),
+  Settings (deletions only), theme.css, seed-dev.mjs; NEW migration 0010.
+- **R5:** EventForm 214/235 (in the band) → reminder section verbatim into ReminderFields.tsx,
+  no visible text change; merging it into AlertFields stays MojoSOGO's call (changes labels).
+- **Settings:** deletions shrink it to ~187/259 — no reorganizer; the MeSettings.tsx seam is
+  retired; re-pin Settings down after merge.
+
+---
+
 ## 2026-10-03 — M4h optional events + certain weeks (placement-advisor)
 
 - **Verdict:** NEW `src/shared/optins.ts` (the one opt-in rule: isOnFor + audience incl. House;

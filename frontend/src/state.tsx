@@ -7,7 +7,7 @@ import type { AlertKind, Role } from '../../src/shared/vocab';
 
 export interface Me {
   id: string; email: string; displayName: string; color: string; role: Role;
-  showPublicHolidays: number; showSchoolHolidays: number; showOptionsExpiration: number;
+  showPublicHolidays: number; showOptionsExpiration: number;
 }
 /** §6.3: role 'owner' reads Admin; the founder (isFounder) reads Owner and is protected. */
 export interface Member { id: string; displayName: string; color: string; role: Role; isFounder: boolean; email?: string; disabledAt: string | null }

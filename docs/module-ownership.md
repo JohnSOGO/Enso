@@ -24,6 +24,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/shared/recurrence.ts` | Recurrence expansion to local dates (§4.3) — the one recurrence format |
 | `src/shared/optins.ts` | Optional-event rule (§7.5): isOnFor (an event exists for a member only if not optional or they have it on) and audience (who gets a fire's push: active ∩ assigned-or-everyone ∩ opted-in when optional; whether House speaks) — pure, imports nothing but vocab |
 | `src/shared/holidays.ts` | The `HOLIDAYS` table, observed rule, default days off (§7.3) |
+| `src/shared/emoji.ts` | The one-emoji rule (§7.6): EMOJI_MAX_BYTES (16), emojiError(v): one grapheme of emoji presentation within the byte cap, or a message — pure, imports nothing |
 | `src/shared/markets.ts` | Monthly options expiration dates, Easter computus (§7.4) |
 | `src/shared/chores.ts` | Chore rules: whose turn (assigneeFor), run planning, step advance/undo, a chore fire's config/person/step, input validation and limits (§7B) — pure |
 | `src/shared/things.ts` | Thing rules: limits, input validation (title/note/place/link, window end ≥ start), remindersFor + planThingFires, canPlanOn, cleanPhotoReading, open-list order, photo limits + shrink constants, the Thing/PhotoReading wire types (§7C) — pure; imports engine, never the reverse |
@@ -49,7 +50,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/routes/optins.ts` | `/optional-events`, `/events/{id}/optin` PUT/DELETE — a member's own switch on an optional event (§7.5, §10) |
 | `src/worker/routes/alarms.ts` | `/alarms` — scheduled alarms as `is_alarm` events (§4.2a) |
 | `src/worker/routes/alerts.ts` | Timers + commands, fires + actions |
-| `src/worker/routes/household.ts` | Household settings, days off, school holidays, push subscriptions, `/status` |
+| `src/worker/routes/household.ts` | Household settings, days off, push subscriptions, `/status` |
 | `src/worker/routes/relay.ts` | `/relay/claim`, `/relay/report` (§9.2) |
 | `src/worker/routes/lists.ts` | `/lists`, `/lists/{id}`, `/lists/{id}/items`, `/list-items/{id}` — list CRUD and list item CRUD (§7A, §10) |
 | `src/worker/routes/chores.ts` | `/chores`, `/chores/today`, `/chore-runs/{id}/done\|undo` — chore CRUD, today's runs, step done/undo and edit re-plan persistence (§7B, §10) |
@@ -72,7 +73,8 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/DaySheet.tsx` | Day sheet modal (§8.3) |
 | `frontend/src/components/EventForm.tsx` | Event form modal (§8.4) |
 | `frontend/src/components/RepeatFields.tsx` | The event form's Repeat section (§8.4): repeat select, weekday chips, until; Recurrence ⇄ form mapping, certain-weeks chips, repeatText |
-| `frontend/src/components/OptionalItems.tsx` | Settings → Me → Optional calendar items: GET /optional-events, one line per event (title, repeatText), On switch → PUT/DELETE /events/{id}/optin (§8.6) |
+| `frontend/src/components/ReminderFields.tsx` | The event form's Reminder section (§8.4): reminder select incl. the evening-before option, Remind via Phone/House, repeat-the-alert select; reminder ⇄ form mapping |
+| `frontend/src/components/OptionalItems.tsx` | Settings → Me → Optional calendar items: the built-in Public holidays and 📈 rows via PATCH /me, then GET /optional-events, one line per event (emoji, title, repeatText), On switch → PUT/DELETE /events/{id}/optin (§8.6) |
 | `frontend/src/components/Alarms.tsx` | Alarms tab: scheduled alarm list + alarm form (§8.5) |
 | `frontend/src/components/Timers.tsx` | Rolling timers list + timer form (§8.5) |
 | `frontend/src/components/Chores.tsx` | Chores section of the Alarms tab (§8.5) |

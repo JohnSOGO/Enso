@@ -1,7 +1,7 @@
-// SPEC §10 — settings, school holidays, status, push subscriptions.
+// SPEC §10 — settings, status, push subscriptions.
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
-import { addDays, diffDays, isDate, isValidTimeZone } from '../../shared/time';
+import { isValidTimeZone } from '../../shared/time';
 import { DEFAULT_DAYS_OFF, HOLIDAYS, HOLIDAY_KEYS, isHolidayKey, type HolidayKey } from '../../shared/holidays';
 import { all, first, newId, nowIso, parseJson, run } from '../db';
 import { body, fail, str } from '../http';
@@ -45,31 +45,6 @@ household.patch('/settings', requireMember, requireOwner, async (c) => {
   }
   if (stmts.length) await c.env.DB.batch(stmts);
   return c.json(await settingsView(c.env.DB));
-});
-
-household.get('/school-holidays', requireMember, async (c) =>
-  c.json(await all(c.env.DB, 'SELECT date, label FROM school_holidays ORDER BY date')));
-
-household.put('/school-holidays', requireMember, requireOwner, async (c) => {
-  const b = await body(c);
-  const label = str(b.label, 80);
-  const to = b.to ?? b.from;
-  if (!isDate(b.from) || !isDate(to) || to < b.from) return fail(c, 400, 'invalid_input', 'from/to must be YYYY-MM-DD with from ≤ to.');
-  if (!label) return fail(c, 400, 'invalid_input', 'Enter a label, e.g. "Winter break".');
-  const days = diffDays(to, b.from);
-  if (days > 60) return fail(c, 400, 'invalid_input', 'A school holiday range can be at most 60 days.');
-  const stmts = [];
-  for (let i = 0; i <= days; i++) {
-    stmts.push(c.env.DB.prepare('INSERT OR REPLACE INTO school_holidays (date, label) VALUES (?, ?)').bind(addDays(b.from, i), label));
-  }
-  await c.env.DB.batch(stmts);
-  return c.json({ ok: true, days: days + 1 });
-});
-
-household.delete('/school-holidays/:date', requireMember, requireOwner, async (c) => {
-  const r = await run(c.env.DB, 'DELETE FROM school_holidays WHERE date = ?', c.req.param('date'));
-  if (r.meta.changes !== 1) return fail(c, 404, 'not_found', 'No school holiday on that date.');
-  return c.json({ ok: true });
 });
 
 household.get('/status', requireMember, async (c) => {

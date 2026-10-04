@@ -29,7 +29,6 @@ const events = [
 for (const e of events) await call(c, 'POST', '/events', e);
 await call(c, 'POST', '/alarms', { title: 'Take out trash', time: '19:00', days: ['TU'], channels: ['push', 'house'] });
 await call(c, 'POST', '/alarms', { title: 'Morning meds', time: '08:00', days: ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'], channels: ['push'], renotifyMin: 10 });
-await call(c, 'PUT', '/school-holidays', { from: plus(20), to: plus(24), label: 'Fall break' });
 const t = await call(c, 'POST', '/timers', { title: 'Check on the dog', intervalMin: 60, channels: ['push'], renotifyMin: 15 });
 await call(c, 'POST', '/timers', { title: 'Drink water', intervalMin: 90, channels: ['push'], renotifyMin: null });
 await call(c, 'POST', `/timers/${t.json.id}/commands`, { cmd: 'start' });
