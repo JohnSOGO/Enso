@@ -1,8 +1,9 @@
 # Ensō — working agreement
 
 Adds to the global `~/.claude/CLAUDE.md` (its loop, worktrees, warning band and
-FunHouse notices all apply here); does not restate it. Run, test and relay setup are
-in `README.md`. Modularity doctrine: `docs/modularity.md`.
+FunHouse notices all apply here); does not restate it. Run, test and deploy steps are
+in `README.md`. Modularity doctrine: `docs/modularity.md`. **Start a new session with
+`docs/where-things-stand.md`**: what runs where, where secrets live, the deploy routine, and what is owed.
 
 ## The loop: spec → placement → build → audit
 
