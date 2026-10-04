@@ -16,7 +16,7 @@ import s from './Recipes.module.css';
 
 /** How the source note names each thing a recipe was read from (⚑ Q81). */
 export const READ_FROM: Record<Exclude<RecipeSource, 'typed'>, string> = {
-  description: 'description', captions: 'captions', transcript: 'pasted transcript', comments: "the creator's comment",
+  description: 'description', captions: 'captions', transcript: 'the transcript you added', comments: "the creator's comment",
 };
 
 /** "A", "A and B", "A, B and C". */

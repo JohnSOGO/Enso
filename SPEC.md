@@ -2703,7 +2703,7 @@ Pumpkin patch        📅 Sat Oct 12
   - the thumbnail, full width, and **▶ Watch on YouTube** (opens the video, a new tab);
     the channel; servings and time when stated;
   - the **source note** ⚑ Q64 ⚑ Q81, muted: "From the " + what was read, each named — description,
-    captions, "pasted transcript", "the creator's comment" — joined as "A, B and C" ("From the description, captions and
+    captions, "the transcript you added" (screenshots or pasted text), "the creator's comment" — joined as "A, B and C" ("From the description, captions and
     the creator's comment", "From the description", "From the creator's comment") / "Typed by
     hand" / "Nothing in the video's text to read", plus "· captions couldn't be read: {reason}" and
     "· comments couldn't be read: {reason}" when those happened;
@@ -3514,7 +3514,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q82 | Quota per read | ⚑ Two YouTube API units per read (video + comments); the 20-a-day cap is unchanged |
 | Q83 | Privacy of the creator's comments | ⚑ The creator's kept comment text goes to Anthropic too, like the description |
 | Q84 | A pasted transcript: the rest of the video's text (§7E.2b) | ⚑ The description and the creator's comments are fetched again (they are not stored): 2 quota units, and the read counts against the 20 a day |
-| Q85 | What a pasted transcript is called | ⚑ Its own source, `transcript` — "From the description and pasted transcript" — never `captions` |
+| Q85 | What a pasted transcript is called | ⚑ Its own source, `transcript` — "From the description and the transcript you added" (screenshots or pasted) — never `captions` |
 | Q86 | A pasted transcript that holds no recipe | ⚑ Only a reading that finds a recipe is saved; one that doesn't changes nothing (422, "nothing was changed"); no confirm dialog, the box says what it replaces |
 | Q87 | When the transcript, by hand, is offered | ⚑ Only on a "watch it" video recipe or one whose captions couldn't be read; the server allows any video recipe |
 | Q88 | Cleaning a pasted transcript | ⚑ Timestamps and YouTube's spoken durations dropped, chapter titles kept, whitespace collapsed, cut to `TRANSCRIPT_MAX` |
