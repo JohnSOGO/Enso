@@ -1,10 +1,11 @@
 // M4r acceptance (SPEC §7E.2b) — the pure transcript rules: R19 cleanTranscript, parseScreenshots, and R20 the
 // source vocabulary checked producer against consumers (sourcesOf → recipeFromRow and the view's READ_FROM).
 import { describe, expect, it } from 'vitest';
+import { recipeFromRow, type RecipeRow } from '../src/shared/recipes';
 import {
-  PASTED_MAX, SCREENSHOTS_MAX, SCREENSHOT_TYPES, TRANSCRIPT_MAX, cleanTranscript, parseScreenshots, recipeFromRow, sourcesOf,
-  type RecipeRow, type VideoText,
-} from '../src/shared/recipes';
+  PASTED_MAX, SCREENSHOTS_MAX, SCREENSHOT_TYPES, TRANSCRIPT_MAX, cleanTranscript, parseScreenshots, sourcesOf,
+  type VideoText,
+} from '../src/shared/recipe-reading';
 import { PHOTO_MAX_BYTES, PHOTO_TYPES } from '../src/shared/things';
 
 /** The view's own names for the sources (the consumer). A .tsx module, so it is loaded at run time: the Worker

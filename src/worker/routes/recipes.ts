@@ -1,15 +1,19 @@
 // SPEC §7E, §10 — recipes: CRUD, reading one from a YouTube video, and re-reading one from its transcript, pasted or
 // screenshotted (§7E.2b; screenshots are read, never stored). Every rule (limits, the link → id,
-// whose comments are the creator's, when to ask Claude, cleaning the answer, found, the clash) is src/shared/recipes.ts; the fetching is
+// whose comments are the creator's, when to ask Claude, cleaning the answer, found, the clash) is src/shared/recipes.ts or,
+// for reading a video, src/shared/recipe-reading.ts; the fetching is
 // youtube.ts, youtube-captions.ts and recipe-reader.ts. This route keeps the §7E.2 / §7E.2b check orders, counts
 // reads, and persists. Any member may do anything; delete is soft (⚑ Q66). Each person sets only their own
 // emoji (§7E.5), and every recipe answered carries everyone's through toRecipes.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import {
-  COMMENTS_LOOKED_AT, PASTED_MAX, RECIPE_READS_PER_DAY, cleanRecipeReading, cleanTranscript, creatorComments, hasRecipeText, isFound, parseRecipeInput,
-  parseScreenshots, recipeFromRow, recipeVideoClash, sourcesOf, youtubeVideoId, type Recipe, type RecipeEmojiRow, type RecipeInput, type RecipeRow,
+  isFound, parseRecipeInput, recipeFromRow, recipeVideoClash, youtubeVideoId, type Recipe, type RecipeEmojiRow, type RecipeInput, type RecipeRow,
 } from '../../shared/recipes';
+import {
+  COMMENTS_LOOKED_AT, PASTED_MAX, RECIPE_READS_PER_DAY, cleanRecipeReading, cleanTranscript, creatorComments, hasRecipeText,
+  parseScreenshots, sourcesOf,
+} from '../../shared/recipe-reading';
 import { emojiError } from '../../shared/emoji';
 import type { RecipeSource } from '../../shared/vocab';
 import { addDays, localToUtc, utcToLocal } from '../../shared/time';

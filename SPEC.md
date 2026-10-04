@@ -190,7 +190,8 @@ Enso/
 │   │   ├── lists.ts        # §7A.1 item rules: itemKey, add/reopen decision, limits, 30-day window
 │   │   ├── machines.ts     # §7D the laundry loop: state, transitions, done message
 │   │   ├── sun.ts          # §7.7 sunset per local date and place (NOAA)
-│   │   ├── recipes.ts      # §7E recipe rules: limits, YouTube link → video id, cleaning a reading
+│   │   ├── recipes.ts      # §7E recipe rules: limits, YouTube link → video id, typed input, the wire
+│   │   ├── recipe-reading.ts # §7E.2, §7E.2b reading a video: sources, creator's comments, transcript, cleaning a reading
 │   │   └── engine.ts       # §5
 │   └── worker/
 │       ├── index.ts        # Hono app + scheduled() handler
@@ -2018,6 +2019,9 @@ may add, edit or delete any recipe ⚑ Q66. Their own tab, 🍳 Recipes (§8.12)
   `&list=…`) is ignored; another host, or an id that is not exactly 11 such characters, is null.
 
 ### 7E.2 Reading a video — `POST /recipes/from-video { url }`
+
+The reading rules here and in §7E.2b (the limits, what a video offered, the creator's comments, a
+transcript given by hand, cleaning Claude's reading) live in `src/shared/recipe-reading.ts` (pure).
 
 **Check order** (each step's failure answers at once; nothing later runs):
 
