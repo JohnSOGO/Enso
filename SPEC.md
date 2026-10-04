@@ -1128,6 +1128,8 @@ it is on for the member (§7.5).
   while it is on for the member.
 - **Switches:** public holidays and 📈 are rows of **Optional calendar items** (§7.5), not
   separate checkboxes.
+- **Off means off everywhere** for that member — the cell tint and icon, the legend entry
+  **and the day sheet** (a public holiday switched off is not listed there either). ⚑
 
 ### 7.3 Holidays and household days off (`holidays.ts`)
 
