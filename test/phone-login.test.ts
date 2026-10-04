@@ -1,4 +1,4 @@
-// M4v (SPEC §6.6, PL1–PL3) — the pure rules of Sign in with my phone. The routes are phone-login-api.test.ts.
+// M4w (SPEC §6.6, PL1–PL3) — the pure rules of Sign in with my phone. The routes are phone-login-api.test.ts.
 import { expect, it } from 'vitest';
 import {
   APPROVE_LOGIN_PATH, LOGIN_REQUEST_TTL_MIN, MATCH_RANDOM_BYTES, NOTICE_TITLE, PLACE_UNKNOWN, USER_AGENT_MAX, UNKNOWN_BROWSER,

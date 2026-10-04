@@ -1,4 +1,4 @@
-// M4v acceptance (SPEC §6.6, PL4–PL15) — Sign in with my phone through the Worker. No push ever leaves the
+// M4w acceptance (SPEC §6.6, PL4–PL15) — Sign in with my phone through the Worker. No push ever leaves the
 // isolate: outbound fetch to *.push.test is answered here and any other host fails the test. The waiting browser
 // calls the Worker with its own ExecutionContext and waits on it, so the push sent inside waitUntil has settled
 // before a test looks. Time is moved by rewriting a row's instants. The pure rules are phone-login.test.ts; the

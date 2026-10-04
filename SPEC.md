@@ -1631,7 +1631,7 @@ approval (they just approved it), not after signup or setup. Push only, never ho
 - **The number is never in the push** — not in its body, title or the delivery's `message` (deliveries show in
   Settings → Status).
 
-**Acceptance (M4v — each row is a test):**
+**Acceptance (M4w — each row is a test):**
 
 | # | Check | Expected |
 |---|---|---|
@@ -4473,7 +4473,7 @@ nothing past 4 MB) before `handle()` checks the path, method and bearer, so the 
 **Still owed (coordinator):** deploy, then apply 0023 in production; update the helper on SogoAI (the new `.mjs`,
 `IDENTIFY_MODEL=qwen-uncensored` in its env file, restart; README); a real item snapped on the iPhone and named by
 SogoAI; the add row, thumbnail and ✎ form photo checked at 320 px (not checked in a browser in this build).
-**M4v Sign in with my phone** (§6.6, §8.13; decided by MojoSOGO 2026-10-04; built on `feature/phone-login`, 557
+**M4w Sign in with my phone** (v1.20.0, live 2026-10-04, 0025 applied in production; §6.6, §8.13; decided by MojoSOGO 2026-10-04; 568
 tests incl. PL1–PL15 and PL-M): **Sign in with my phone** on the sign-in page (`PhoneSignIn.tsx`, hosted by
 `SignIn.tsx`) → `POST /auth/phone-login` → the identical 202 + waiting cookie for every well-formed email (a
 decoy row with `member_id` NULL for an unknown, disabled or rate-limited one) and, inside `waitUntil`, a push with
