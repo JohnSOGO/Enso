@@ -1,8 +1,10 @@
-// SPEC §6, §6.2a — first-run owner setup, login, and signup with a typed or pasted invite code.
+// SPEC §6, §6.2a — first-run owner setup, login, and signup with a typed or pasted invite code;
+// §6.6, §8.13 — the "Sign in with my phone" entry point, sharing the email field, hosting PhoneSignIn.
 import { useEffect, useState, type FormEvent } from 'react';
 import { errorText, get, post } from '../api';
 import { inviteCodeFrom } from '../../../src/shared/invite-link';
 import type { Me } from '../state';
+import { PhoneSignIn } from './PhoneSignIn';
 
 type Mode = 'login' | 'invite' | 'setup';
 
@@ -11,6 +13,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: (m: Me, how?: { joined: boo
   const [f, setF] = useState({ email: '', password: '', displayName: '', code: '', setupToken: '' });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [byPhone, setByPhone] = useState(false);
 
   useEffect(() => {
     get('/setup').then((r) => { if (r.needed) setMode('setup'); }).catch(() => undefined);
@@ -32,9 +35,15 @@ export function SignIn({ onSignedIn }: { onSignedIn: (m: Me, how?: { joined: boo
     </label>
   );
 
+  const card = { width: 'min(380px, 100%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 } as const;
+  const page = { height: '100%', overflowY: 'auto', display: 'grid', placeItems: 'center', padding: 16 } as const;
+  if (byPhone) {
+    return <main style={page}><div style={card}><PhoneSignIn email={f.email.trim()} onSignedIn={(m) => onSignedIn(m)} onBack={() => setByPhone(false)} /></div></main>;
+  }
+
   return (
-    <main style={{ height: '100%', overflowY: 'auto', display: 'grid', placeItems: 'center', padding: 16 }}>
-      <form onSubmit={submit} style={{ width: 'min(380px, 100%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 }}>
+    <main style={page}>
+      <form onSubmit={submit} style={card}>
         <h1 style={{ fontSize: '1.2rem', marginBottom: 4 }}>Ensō</h1>
         <p className="muted" style={{ marginBottom: 14 }}>
           {mode === 'setup' ? 'First run — create the owner account.' : mode === 'invite' ? 'Join the household with your invite code.' : 'Sign in'}
@@ -48,6 +57,12 @@ export function SignIn({ onSignedIn }: { onSignedIn: (m: Me, how?: { joined: boo
         <button className="primary" type="submit" disabled={busy} style={{ width: '100%' }}>
           {mode === 'setup' ? 'Create owner' : mode === 'invite' ? 'Join household' : 'Sign in'}
         </button>
+        {mode === 'login' && (
+          <button type="button" style={{ width: '100%', marginTop: 8 }}
+            onClick={() => { if (f.email.trim()) { setError(null); setByPhone(true); } else setError('Enter your email first.'); }}>
+            📱 Sign in with my phone
+          </button>
+        )}
         {mode !== 'setup' && (
           <button type="button" className="plain" style={{ marginTop: 12, color: 'var(--accent)' }} onClick={() => { setError(null); setMode(mode === 'login' ? 'invite' : 'login'); }}>
             {mode === 'login' ? 'I have an invite code' : 'I already have an account'}

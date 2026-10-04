@@ -150,7 +150,7 @@ it('ON5 + ON8: the founder with a phone → sent, whatever `member` says; the pu
   expect(more).toEqual([]);
   expect(req.headers.get('topic')).toBeNull();
   expect(JSON.parse(await decryptPush(sub, req.body))).toEqual({
-    fireId: null, kind: null, tag: id, title: '🤖 Claude ⭕🔁🏠', body: 'It is live', actions: [],
+    fireId: null, kind: null, tag: id, title: '🤖 Claude ⭕🔁🏠', body: 'It is live', actions: [], url: null,
   });
 
   // No title → the default.

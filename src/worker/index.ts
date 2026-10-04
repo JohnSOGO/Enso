@@ -19,6 +19,7 @@ import { announce } from './routes/announce';
 import { machines } from './routes/machines';
 import { recipes } from './routes/recipes';
 import { ops } from './routes/ops';
+import { phoneLogin } from './routes/phone-login';
 
 const api = new Hono<AppEnv>();
 
@@ -36,6 +37,7 @@ api.get('/health', async (c) => {
 });
 
 api.route('/', auth);
+api.route('/', phoneLogin); // §6.6 /auth/phone-login
 api.route('/', members);
 api.route('/', events);
 api.route('/', optins);

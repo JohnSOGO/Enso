@@ -24,6 +24,27 @@ PLACEMENT RECEIPT
   tick.ts (83 %, and household.ts must not import tick); a one-route routes/house.ts.
 - Caps:         no reorganizer, no re-pin. tick.ts stays below the band only because the read lives elsewhere.
 
+## 2026-10-04 — Sign in with my phone: phone-approved browser sign-in with number matching (placement-advisor; feature/phone-login)
+
+PLACEMENT RECEIPT
+- Feature:      §6.6, §8.13 — a browser asks to be signed in by the member's phone; the phone gets a push, opens an
+  approve page and picks the number the browser shows; the waiting browser is then signed in. A "New sign-in on …"
+  push after a password sign-in. Migration 0025 (§4.2x).
+- New owners:   `src/shared/phone-login.ts` (limits, matchNumbers with randomness passed in, pollView / approveView /
+  decide / claim, browserSummary, placeText, the notice texts; pure, imports only vocab);
+  `src/worker/routes/phone-login.ts` (`/auth/phone-login` POST / GET / GET {id} / approve / deny, the waiting cookie,
+  the guarded claim, sendSignInNotice; mounted in index.ts); `frontend/src/components/PhoneSignIn.tsx` (the waiting
+  browser, hosted by SignIn.tsx); `frontend/src/components/ApproveLogin.tsx` (the approve page, routed by App.tsx
+  like JoinPage).
+- Widened:      vocab.ts (LOGIN_REQUEST_STATUS, NOTICE_KIND — not ALERT_KIND; LOGIN_VIEW added by the worker, see
+  below); push.ts (selects `d.url`, PushPayload gains `url`); routes/ops.ts (hourly count `AND notice IS NULL`);
+  sw.js (`data.url`, notificationclick navigates or opens it); routes/auth.ts (the one sendSignInNotice call);
+  SignIn.tsx (the entry point); App.tsx (the /approve-login route).
+- Unchanged:    session.ts (startSession / sha256hex / requireMember reused as they are), engine.ts, db.ts, http.ts.
+- Worker's own additions (not in the verdict): `LOGIN_VIEW` in vocab.ts — the four statuses the wire carries, derived
+  and never stored, kept with the other vocabulary strings (like MACHINE_STATE); the column is `match_number`, not
+  `match` (an SQLite operator).
+
 ---
 
 ## 2026-10-04 — Snap an item: a list item's photo, named by SogoAI first, Claude second (placement-advisor; feature/snap-item)

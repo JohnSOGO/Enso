@@ -5,6 +5,7 @@ import { MEMBER_PALETTE } from '../../shared/vocab';
 import { all, first, newId, nowIso, run } from '../db';
 import { body, fail, str } from '../http';
 import { endSession, hashPassword, requireMember, sha256hex, startSession, verifyPassword } from '../session';
+import { sendSignInNotice } from './phone-login';
 import { speakersError } from '../../shared/speakers';
 import { choiceOf } from '../speaker-choices';
 
@@ -135,6 +136,7 @@ auth.post('/auth/login', async (c) => {
   }
   await run(c.env.DB, 'DELETE FROM login_failures WHERE email = ?', email);
   await startSession(c, m.id);
+  await sendSignInNotice(c.env, m.id, c.req.header('user-agent'), nowIso()); // §6.6 ⚑ Q133
   return c.json(await memberView(c.env.DB, m.id));
 });
 

@@ -20,6 +20,9 @@ export const CAPTIONS_FAILURE = ['blocked', 'none', 'failed'] as const; // §7E 
 export const SPEAKER_KIND = ['echo', 'satellite'] as const; // §9.2a a house speaker, from its HA entity id
 export const IDENTIFY_FAILURE = ['off', 'failed'] as const; // §7A.3 why SogoAI gave no reading of a snapped item
 export const ITEM_READ_VIA = ['sogoai', 'claude'] as const; // §7A.3 who named a snapped item
+export const LOGIN_REQUEST_STATUS = ['pending', 'approved', 'denied', 'used'] as const; // §6.6 login_requests.status
+export const LOGIN_VIEW = ['pending', 'approved', 'denied', 'expired'] as const; // §6.6 what the waiting browser / the phone is told — derived, never stored
+export const NOTICE_KIND = ['login', 'new_sign_in'] as const; // §6.6 deliveries.notice — a sign-in notice push, never an ALERT_KIND
 
 export type AlertKind = (typeof ALERT_KIND)[number];
 export type Channel = (typeof CHANNEL)[number];
@@ -41,6 +44,9 @@ export type CaptionsFailure = (typeof CAPTIONS_FAILURE)[number];
 export type SpeakerKind = (typeof SPEAKER_KIND)[number];
 export type IdentifyFailure = (typeof IDENTIFY_FAILURE)[number];
 export type ItemReadVia = (typeof ITEM_READ_VIA)[number];
+export type LoginRequestStatus = (typeof LOGIN_REQUEST_STATUS)[number];
+export type LoginView = (typeof LOGIN_VIEW)[number];
+export type NoticeKind = (typeof NOTICE_KIND)[number];
 
 /** /status `house.state` (§9.2) — derived from the deliveries table, never stored. */
 export const HOUSE_STATE = ['ok', 'failing', 'not_configured', 'untried'] as const;
