@@ -7,6 +7,56 @@ carry its result.
 
 ---
 
+## 2026-10-04 — photoBody to http.ts, the photo-read budget to its own owner (reorganizer; refactor/access-photo-reads-seams, 2 of 2)
+
+REORG RECEIPT
+- Trigger:      the "📷 snap an item" feature adds a second photo reader; it needs the same photo-body check and the
+  same household daily photo-read budget, both of which were file-local to routes/thing-photos.ts.
+- Seam moved:   (a) photoBody (type / size / empty → 400) from `src/worker/routes/thing-photos.ts` to
+  `src/worker/http.ts` [EXISTING owner, row widened]; (b) the photo_reads daily cap — householdToday (today in the
+  household zone, via db.ts's householdTz, replacing thing-photos' file-local copy of the same query),
+  photoReadsUsedUp, recordPhotoRead — from `src/worker/routes/thing-photos.ts` to `src/worker/photo-reads.ts`
+  [NEW owner row].
+- Room opened:  thing-photos.ts 83 → 64 lines; http.ts 25 → 41; photo-reads.ts new at 24; no CEILINGS entry (all
+  under GLOBAL_FILE_CAP 300).
+- Behavior:     PRESERVED — `npm run typecheck && npm test` all green, things-api tests unchanged. The §7C.4 order
+  (signed in → size/type → daily cap → key present → count the read → call the model) and every status, error
+  code and message are identical; same SQL (settings timezone, COUNT over [local midnight, next local midnight),
+  INSERT INTO photo_reads), the same `now` for the day and the recorded read.
+- Sources read: docs/module-ownership.md, docs/placement-receipts.md, scripts/arch.ts, routes/thing-photos.ts,
+  http.ts, db.ts, SPEC.md §7C.4 (by grep).
+- Restraint:    the 429 message and READS_PER_DAY's meaning stay in the route; claude.ts, photo-reader.ts, lists,
+  the frontend and home/ untouched; recipe_reads' own cap not merged in.
+- New owner row: | `src/worker/photo-reads.ts` | The household's daily photo-read budget (§7C.4, §7A.3): today in
+  the household zone, used-up check over photo_reads, record one read |
+
+## 2026-10-04 — The Access fetch gets its own owner (reorganizer; refactor/access-photo-reads-seams, 1 of 2)
+
+REORG RECEIPT
+- Trigger:      the "📷 snap an item" feature adds a third Worker→home-through-Cloudflare-Access caller; house.ts and
+  home-captions.ts each carried their own copy of the Access fetch, and a third copy would be the wrong move.
+- Seam moved:   the Access fetch (the two CF-Access headers plus the caller's, redirect 'manual',
+  AbortSignal.timeout, 2xx only → { ok: true, text } or "HTTP n: body ≤ 200" / "error: message") from
+  `src/worker/house.ts` (ha()) and `src/worker/home-captions.ts` (readCaptionsFromHome) to `src/worker/access.ts`
+  (callThroughAccess) [NEW owner row].
+- Room opened:  house.ts 122 → 109 lines; home-captions.ts 53 → 40 lines; access.ts new at 42; no CEILINGS entry
+  (all under GLOBAL_FILE_CAP 300).
+- Behavior:     PRESERVED — `npm run typecheck && npm test` all green, house.test.ts and home-captions*.test.ts
+  unchanged. Same URLs, methods, headers (CF-Access pair, Authorization, Content-Type), bodies, timeouts
+  (ECHO 15 s, SATELLITE 25 s, HOME_CAPTIONS 20 s), redirect 'manual', status mapping (2xx → ok), reason texts,
+  and both still never throw. Two edge cases unify, neither reachable by a test: a failed body read now gives ''
+  for both callers (house's old rule; home-captions used to say "error: …" — now "HTTP n: " or the not-JSON reason,
+  still a failure), and an error with an empty message reads "error: <String(e)>" for both (home-captions' old
+  rule; house used to print "error: "). No 2xx/non-2xx outcome changes for either caller.
+- Sources read: CLAUDE.md, docs/module-ownership.md, docs/placement-receipts.md, scripts/arch.ts,
+  test/architecture.test.ts, test/home-captions.test.ts, test/ha-helpers.ts, house.ts, home-captions.ts,
+  shared/recipe-reading.ts (parseCaptionsReport). docs/modularity.md not re-read this run.
+- Restraint:    config readers (houseConfigOf, homeCaptionsConfigOf), classifyHouse, speak and the parse of the
+  captions report stay where they were; claude.ts, photo-reader.ts and home/ untouched.
+- New owner row: | `src/worker/access.ts` | Calling home through Cloudflare Access (§9.2, §7E.2c, §7A.3): the two
+  CF-Access headers, redirect 'manual', AbortSignal.timeout, 2xx only → { ok: true, text } or an honest reason
+  ("HTTP n: body ≤ 200" / "error: message"); never throws, never names a secret, never decides; no D1, no Hono |
+
 ## 2026-10-04 — Ping the founder's phone from a Claude session (placement-advisor; feature/ops-notify, v1.17.0)
 
 PLACEMENT RECEIPT
