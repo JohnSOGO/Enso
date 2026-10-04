@@ -13,7 +13,6 @@
      strength as a multi-day event's tint (16%). */
   --holiday-public-cell: rgba(250, 204, 21, .16);
   --holiday-public-swatch: #FACC15;
-  --holiday-school: #3B82F6;
   --good: #22C55E;
   --warn: #EAB308;
   --bad: #EF4444;

@@ -6,7 +6,6 @@
 .legend { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 12px 6px; font-size: .75rem; color: var(--text-dim); }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 99px; vertical-align: -1px; margin-right: 3px; }
 .legendPub { background: var(--holiday-public-swatch); opacity: .55; border-radius: 3px !important; }
-.legendSchool { background: var(--holiday-school); }
 
 .dow {
   display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -38,7 +37,11 @@
 .past .num { opacity: .6; }
 
 .hEmoji { font-size: .8rem; line-height: 1; white-space: nowrap; }
-.dots .hEmoji { font-size: .72rem; margin-right: 1px; }
+/* Phone widths (§7.2): two day icons stay on the number's line — a little smaller, a little tighter. */
+.narrow .cell { padding-left: 2px; padding-right: 2px; }
+.narrow .num { gap: 1px; }
+.narrow .dot { min-width: 20px; padding: 0 2px; }
+.narrow .hEmoji { font-size: .62rem; letter-spacing: -1px; }
 .num { font-size: .82rem; display: flex; align-items: center; gap: 2px; white-space: nowrap; min-height: 22px; }
 .monthTag { font-weight: 700; font-size: .72rem; color: var(--text); text-transform: uppercase; letter-spacing: .3px; }
 .dot {
@@ -59,8 +62,6 @@
 .cell.pub { background-color: var(--month-a); background-image: linear-gradient(var(--holiday-public-cell), var(--holiday-public-cell)); }
 .cell.pub.toneB { background-color: var(--month-b); }
 .cell.pub .num { font-weight: 700; opacity: 1; }
-.school .dot { background: var(--holiday-school); color: #fff; font-weight: 700; }
-.today.school .dot { box-shadow: 0 0 0 2px var(--accent); }
 
 .dots { display: flex; gap: 3px; flex-wrap: wrap; align-items: center; padding-left: 2px; }
 .dots i { width: 7px; height: 7px; border-radius: 99px; display: block; }

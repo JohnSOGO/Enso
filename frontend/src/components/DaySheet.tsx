@@ -28,7 +28,7 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
         <span className={s.when}>{o.allDay ? (o.continued ? 'cont.' : 'All day') : o.startTime}</span>
         <span className={s.bar} style={{ background: o.color }} />
         <span className={s.what}>
-          <span className={s.title}>{o.title}{o.hasReminder && <span aria-label="has reminder" title="Has a reminder"> 🔔</span>}{o.recurring && <span aria-label="repeats" title="Repeats"> 🔁</span>}</span>
+          <span className={s.title}>{o.emoji && `${o.emoji} `}{o.title}{o.hasReminder && <span aria-label="has reminder" title="Has a reminder"> 🔔</span>}{o.recurring && <span aria-label="repeats" title="Repeats"> 🔁</span>}</span>
           <span className={s.meta}>
             <span className="chip" style={{ borderColor: o.color }}>{o.creatorName}</span>
             {o.assignedTo.map((id) => <span key={id} className="chip">→ {memberById(id)?.displayName ?? 'unknown member'}</span>)}
@@ -40,8 +40,7 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
 
   return (
     <Modal title={longDate(date)} onClose={onClose} footer={<button className="primary" onClick={onAdd}>＋ Add event</button>}>
-      {data?.publicHolidays.map((h) => <p key={h.name} className={s.holiday} style={{ background: 'var(--holiday-public-cell)', borderRadius: 6, padding: '2px 8px' }}>{h.emoji} {h.name} — day off</p>)}
-      {data?.schoolHolidays.map((h) => <p key={h} className={s.holiday} style={{ color: 'var(--holiday-school)' }}>🏫 {h} (school)</p>)}
+      {!!me.showPublicHolidays && data?.publicHolidays.map((h) => <p key={h.name} className={s.holiday} style={{ background: 'var(--holiday-public-cell)', borderRadius: 6, padding: '2px 8px' }}>{h.emoji} {h.name} — day off</p>)}
       {!!me.showOptionsExpiration && data?.marketDays.map((m) => <p key={m.name} className={s.holiday}>{m.emoji} {m.name}</p>)}
       {items.length === 0 && <p className="muted">Nothing on this day.</p>}
       <ul className={s.list}>

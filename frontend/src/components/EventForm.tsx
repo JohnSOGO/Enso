@@ -13,13 +13,13 @@ import { ReminderFields, reminderOf, toReminder, type ReminderValue } from './Re
 
 interface Form extends RepeatValue, ReminderValue {
   title: string; notes: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string;
-  assignedTo: string[]; optional: boolean;
+  assignedTo: string[]; optional: boolean; emoji: string;
 }
 
 function blank(date: string): Form {
   return {
     title: '', notes: '', date, allDay: false, startTime: '09:00', endTime: '', endDate: date,
-    repeat: 'none', byDay: [WEEKDAY[weekdayOf(date)]], weeks: ownWeek(date), until: '', assignedTo: [], optional: false,
+    repeat: 'none', byDay: [WEEKDAY[weekdayOf(date)]], weeks: ownWeek(date), until: '', assignedTo: [], optional: false, emoji: '',
     ...reminderOf(null),
   };
 }
@@ -30,7 +30,7 @@ function fromEvent(e: any): Form {
   return {
     title: e.title, notes: e.notes ?? '', date: e.startDate, allDay: e.allDay, startTime: e.startTime ?? '09:00',
     endTime: e.endTime ?? '', endDate: e.endDate, repeat, byDay: r?.byDay ?? [WEEKDAY[weekdayOf(e.startDate)]],
-    weeks: weeksOf(r, e.startDate), until: r?.until ?? '', assignedTo: e.assignedTo, optional: !!e.optional,
+    weeks: weeksOf(r, e.startDate), until: r?.until ?? '', assignedTo: e.assignedTo, optional: !!e.optional, emoji: e.emoji ?? '',
     ...reminderOf(e.reminder),
   };
 }
@@ -41,7 +41,7 @@ function toPayload(f: Form) {
     title: f.title, notes: f.notes || null, startDate: f.date,
     startTime: f.allDay ? null : f.startTime, endTime: f.allDay || !f.endTime ? null : f.endTime,
     endDate: f.allDay ? f.endDate : f.date,
-    recurrence, assignedTo: f.assignedTo, optional: f.optional,
+    recurrence, assignedTo: f.assignedTo, optional: f.optional, emoji: f.emoji.trim() || null,
     reminder: toReminder(f),
   };
 }
@@ -157,6 +157,9 @@ export function EventForm({ eventId, date, onClose }: Props) {
               ))}
             </div>
           </div>
+          <label className="field"><span>Emoji (optional)</span>
+            <input value={form.emoji} onChange={(e) => set('emoji', e.target.value)} placeholder="🧹" style={{ width: '5rem' }} />
+          </label>
 
           <ReminderFields value={form} allDay={form.allDay} onChange={(c) => setForm((f) => (f ? { ...f, ...c } : f))} />
           <label className="row" style={{ marginBottom: 12, minHeight: 44 }}>

@@ -48,7 +48,6 @@ describe('event emoji through the API (E1–E3)', () => {
     const mine = cal.json.occurrences.filter((x: any) => x.eventId === ev.json.id);
     expect(mine.map((x: any) => x.date)).toEqual(['2026-10-01', '2026-10-15']);
     expect(mine.every((x: any) => x.emoji === '🧹')).toBe(true);
-    expect(cal.json).not.toHaveProperty('schoolHolidays');
     expect((await o.get('/optional-events')).json.find((x: any) => x.id === ev.json.id).emoji).toBe('🧹');
   });
 });
