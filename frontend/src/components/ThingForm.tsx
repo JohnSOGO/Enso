@@ -1,6 +1,6 @@
 // SPEC §8.11 — the thing form (modal): photo, title, From / To, place, address, phone, cost, link, note,
-// reminders and channels; ↗ / 🗺️ / 📞 beside Link / Address / Phone open them; every text field but phone grows to fit its text; Plan it / Done / Let it go / Put back by status; Save / Cancel / Delete. A photo reading
-// fills only empty fields, each marked "from photo — check it". The photo (new, replaced or removed)
+// reminders and channels; ↗ / 🗺️ / 📞 beside Link / Address / Phone open them; every text field but phone grows to fit its text; Plan it / Done / Let it go / Put back by status; Save / Cancel / Delete. A photo or link
+// reading (ThingPhoto / ThingLinkFill) fills only empty fields, each marked "from photo" / "from link — check it". The photo (new, replaced or removed)
 // goes to the server on Save, after the thing itself. Rules and validation are the server's (§7C).
 import { useRef, useState, type ReactNode } from 'react';
 import { Modal } from './Modal';
@@ -8,6 +8,7 @@ import { Grow } from './Grow';
 import { ChannelChecks } from './AlertFields';
 import { ThingPhoto, photoSrc } from './ThingPhoto';
 import { ThingPlan } from './ThingPlan';
+import { ThingLinkFill } from './ThingLinkFill';
 import { del, errorText, get, patch, post, upload } from '../api';
 import { useApp } from '../state';
 import type { Channel, ThingStatus } from '../../../src/shared/vocab';
@@ -20,7 +21,7 @@ export const shortDate = (d: string, weekday = false) =>
   new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { ...(weekday ? { weekday: 'short' } : {}), month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 type Field = 'title' | 'windowStart' | 'windowEnd' | 'place' | 'address' | 'phone' | 'cost' | 'url' | 'note';
-/** Which form field each part of a photo reading may fill (§7C.4). */
+/** Which form field each part of a photo or link reading may fill (§7C.4, §7C.4b). */
 const FROM_READING: [keyof PhotoReading, Field][] = [
   ['title', 'title'], ['startDate', 'windowStart'], ['endDate', 'windowEnd'], ['place', 'place'],
   ['address', 'address'], ['phone', 'phone'], ['cost', 'cost'], ['url', 'url'], ['note', 'note'],
@@ -65,7 +66,8 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
   latest.current = f;
   /** The thing as saved — a new one becomes saved when its POST succeeds, even if the photo then fails. */
   const [saved, setSaved] = useState(thing);
-  const [fromPhoto, setFromPhoto] = useState<Field[]>([]);
+  /** Fields a reading filled, and from what; editing one by hand clears its mark. */
+  const [filledFrom, setFilledFrom] = useState<Partial<Record<Field, 'photo' | 'link'>>>({});
   const [pending, setPending] = useState<Blob | null>(null);
   const [removed, setRemoved] = useState(false);
   const [planning, setPlanning] = useState<Thing | null>(null);
@@ -75,15 +77,15 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setF((x) => ({ ...x, [k]: v }));
-    setFromPhoto((p) => p.filter((x) => x !== k)); // edited by hand: no longer "from photo"
+    setFilledFrom((p) => { const { [k as Field]: _, ...rest } = p; return rest; }); // edited by hand: no longer "from photo/link"
   };
 
-  function fill(r: PhotoReading) {
+  function fill(r: PhotoReading, source: 'photo' | 'link') {
     const cur = latest.current;
     const filled = FROM_READING.filter(([from, to]) => r[from] && !cur[to].trim());
     if (filled.length) {
       setF((x) => ({ ...x, ...Object.fromEntries(filled.map(([from, to]) => [to, r[from]])) }));
-      setFromPhoto((p) => [...p, ...filled.map(([, to]) => to)]);
+      setFilledFrom((p) => ({ ...p, ...Object.fromEntries(filled.map(([, to]) => [to, source])) }));
     }
     return filled.length;
   }
@@ -126,7 +128,7 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
   }
   const planIt = () => run(async () => setPlanning(dirty || !saved ? await persist() : saved), false);
 
-  const mark = (k: Field) => fromPhoto.includes(k) && <em className="muted"> · from photo — check it</em>;
+  const mark = (k: Field) => filledFrom[k] && <em className="muted"> · from {filledFrom[k]} — check it</em>;
   const status = saved?.status;
   const savedSrc = saved?.hasPhoto && !removed ? photoSrc(saved) : null;
 
@@ -141,7 +143,7 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
           {status === 'planned' && saved?.plannedDate && (
             <p className="muted" style={{ marginBottom: 10 }}>📅 Planned for {shortDate(saved.plannedDate, true)} — it's on the calendar.</p>
           )}
-          <ThingPhoto savedSrc={savedSrc} pending={pending} onReading={fill}
+          <ThingPhoto savedSrc={savedSrc} pending={pending} onReading={(r) => fill(r, 'photo')}
             onPick={(p) => { setPending(p); setRemoved(false); }}
             onRemove={() => { setPending(null); setRemoved(!!saved?.hasPhoto); }} />
           <label className="field"><span>Title{mark('title')}</span>
@@ -177,6 +179,7 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
                 maxLength={URL_MAX} onChange={(e) => set('url', e.target.value)} />
             </WithGo>
           </label>
+          <ThingLinkFill url={f.url} onReading={(r) => fill(r, 'link')} />
           <label className="field"><span>Note{mark('note')}</span>
             <Grow value={f.note} maxLength={NOTE_MAX} onChange={(e) => set('note', e.target.value)} />
           </label>
