@@ -105,7 +105,19 @@ export interface ThingInput {
 }
 
 const empty = (v: unknown) => v === undefined || v === null || v === '';
-const isWebLink = (s: string) => /^https?:\/\/\S+$/i.test(s);
+/**
+ * §7C.1 — the one link rule, for typing and photo readings alike: `http(s)://…` is kept; a bare
+ * web address as flyers print it ("pumpkinjunctionsd.com", "www.example.org/tickets") gets
+ * `https://`; another scheme (javascript:, ftp:) or no dotted host → null. Fits URL_MAX or null.
+ */
+export function webLink(raw: string): string | null {
+  const s = raw.trim();
+  let link: string | null = null;
+  if (/^https?:\/\/[^\s/?#]+\.[^\s/?#]+\S*$/i.test(s)) link = s;
+  else if (/^[a-z][a-z0-9+-]*:/i.test(s) && !/^[^\s/]+\.[^\s/]+:\d/.test(s)) link = null; // has a scheme: not ours
+  else if (/^[\w-]+(\.[\w-]+)+(:\d+)?([/?#]\S*)?$/.test(s)) link = `https://${s}`;
+  return link && link.length <= URL_MAX ? link : null;
+}
 
 /** Optional text: empty → null; else trimmed and at most `max`, or an error naming the field. */
 function optText(v: unknown, field: string, max: number): string | null | { error: string } {
@@ -130,7 +142,8 @@ export function parseThingInput(b: Record<string, unknown>): ThingInput | string
   if (cost && typeof cost === 'object') return cost.error;
   const url = optText(b.url, 'url', URL_MAX);
   if (url && typeof url === 'object') return url.error;
-  if (url && !isWebLink(url)) return 'url must be a web link starting with http:// or https://.';
+  const link = url ? webLink(url) : null;
+  if (url && !link) return 'url must be a web address, like pumpkinjunction.com or https://….';
   for (const f of ['windowStart', 'windowEnd', 'remindOn'] as const) {
     if (!empty(b[f]) && !isDate(b[f])) return `${f} must be a real date, YYYY-MM-DD.`;
   }
@@ -147,7 +160,7 @@ export function parseThingInput(b: Record<string, unknown>): ThingInput | string
   if (channels.length === 0 && (remind_start || remind_on)) return 'channels: choose at least one for a thing with a reminder.';
   if (b.status !== undefined && !isOneOf(THING_STATUS, b.status)) return `status must be one of: ${THING_STATUS.join(', ')}.`;
   return {
-    title, note, place, address, phone, cost, url, window_start, window_end, remind_start, remind_on, channels,
+    title, note, place, address, phone, cost, url: link, window_start, window_end, remind_start, remind_on, channels,
     ...(b.status !== undefined ? { status: b.status as ThingStatus } : {}),
   };
 }
@@ -222,7 +235,7 @@ const cleanText = (v: unknown, max: number): string | null =>
 
 /**
  * The model's answer → fields the form may fill: trimmed to the limits, unreal dates dropped, a reversed
- * start/end swapped, links other than http(s) dropped, empty → null. `today` is in the §7C.2 signature;
+ * start/end swapped, the link through webLink (bare www… gets https://, other schemes dropped), empty → null. `today` is in the §7C.2 signature;
  * no written rule reads it yet.
  */
 export function cleanPhotoReading(raw: Partial<Record<keyof PhotoReading, unknown>> | null | undefined, _today: string): PhotoReading {
@@ -234,6 +247,6 @@ export function cleanPhotoReading(raw: Partial<Record<keyof PhotoReading, unknow
   return {
     title: cleanText(r.title, TITLE_MAX), startDate, endDate, place: cleanText(r.place, PLACE_MAX),
     address: cleanText(r.address, ADDRESS_MAX), phone: cleanText(r.phone, PHONE_MAX), cost: cleanText(r.cost, COST_MAX),
-    url: url && isWebLink(url) ? url : null, note: cleanText(r.note, NOTE_MAX),
+    url: url ? webLink(url) : null, note: cleanText(r.note, NOTE_MAX),
   };
 }

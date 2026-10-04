@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.21-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.21 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2520,6 +2520,8 @@ images are rendered from it. Its on-iPhone check is still to do.
 is not built — an open app picks the alert up on its 30 s poll, and a reopened app reloads
 (§8.10). Still to check on real phones: Turn on → Send a test (iPhone home-screen app and
 Android), a reminder on the lock screen, Android Done/Snooze.
+**Link fix** (v1.4.1; 260 tests): one `webLink` rule — a bare `www.….com` from a flyer or typed
+is kept with `https://` added; other schemes are refused (§7C.1).
 **M4j thing details** are built (v1.3.0; 245 tests): address / phone / cost, photo reading
 fills them, the form's text fields grow to fit. Title and Link stay one line.
 **M4i calendar tidy** is built (v1.2.0; 243 tests; 0010 applied locally with nothing but the
