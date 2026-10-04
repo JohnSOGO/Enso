@@ -1,6 +1,6 @@
 // SPEC §3 — the only place these strings are defined. Import; never retype.
 
-export const ALERT_KIND = ['reminder', 'timer', 'chore', 'thing'] as const;
+export const ALERT_KIND = ['reminder', 'timer', 'chore', 'thing', 'machine'] as const;
 export const CHANNEL = ['push', 'house'] as const;
 export const FIRE_STATE = ['scheduled', 'ringing', 'closed'] as const;
 export const CLOSE_REASON = ['done', 'acked', 'missed', 'superseded', 'stopped', 'removed'] as const;
@@ -12,6 +12,8 @@ export const FREQ = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'] as const;
 export const WEEKDAY = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;
 export const CHORE_TIMING = ['at', 'by'] as const; // §7B
 export const THING_STATUS = ['idea', 'planned', 'done', 'dropped'] as const; // §7C
+export const MACHINE = ['washer', 'dryer'] as const; // §7D, in load order
+export const MACHINE_STATE = ['free', 'running', 'done'] as const; // §7D, derived, never stored
 
 export type AlertKind = (typeof ALERT_KIND)[number];
 export type Channel = (typeof CHANNEL)[number];
@@ -25,6 +27,8 @@ export type Freq = (typeof FREQ)[number];
 export type Weekday = (typeof WEEKDAY)[number];
 export type ChoreTiming = (typeof CHORE_TIMING)[number];
 export type ThingStatus = (typeof THING_STATUS)[number];
+export type MachineId = (typeof MACHINE)[number];
+export type MachineState = (typeof MACHINE_STATE)[number];
 
 /** /status `house.state` (§9.2) — derived from the deliveries table, never stored. */
 export const HOUSE_STATE = ['ok', 'failing', 'not_configured', 'untried'] as const;

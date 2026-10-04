@@ -7,6 +7,43 @@ carry its result.
 
 ---
 
+## 2026-10-03 — M4l The laundry loop (placement-advisor)
+
+- **Ask:** MojoSOGO decided the laundry loop (the dishwasher deferred): Washer and Dryer on the
+  Alarms tab, each free / running / done-waiting; start = whose load + a 30/45/60/90 chip; at
+  done-at remind the owner by Phone + House every 15 min up to 4 times; Move to dryer; Fold & out;
+  Clear. The weekly Laundry chore (§7B) stays as it is.
+- **Verdict:** three NEW owners — `src/shared/machines.ts` (rules and message text, pure, takes
+  `now`; imports engine + vocab + time, never the reverse), `src/worker/routes/machines.ts` (the
+  `/machines` routes, one batch per transition) and `frontend/src/components/Machines.tsx` (the
+  section and the chooser) — plus `migrations/0014_machines.sql` (the `machines` table and the
+  `fires` rebuild with kind `machine` + `machine_id`, `uq_machine_open`). Small edits: vocab.ts
+  (`machine` kind, MACHINE, MACHINE_STATE), engine.ts (newMachineFire, `machine_id: null` in
+  every constructor, an explicit machine branch in alertMessage, `PUSH_ACTIONS.machine = []`,
+  applyAction refuses machine fires), tick.ts (insertFire column, a `sourceOf('machine')` branch
+  — sourceOf now takes `now`, for the derived "load is waiting"), routes/alerts.ts (`/fires`
+  label + owner + machineId), index.ts, Alarms.tsx, RingingBar.tsx, state.tsx.
+- **Why not timers:** a timer restarts on Ack and speaks "Timer: …"; a load is handed off from
+  one machine to the next and occupies it — bolting handoff and occupancy onto timers would put
+  a special case in every timer path. **Why not chore runs:** a run is UNIQUE per chore and date
+  and follows the weekly rotation; a load is whoever's load it is, any number of times a day.
+- **Reused:** the whole fire pipeline — stepFire (renotify 15 / max 4, never missed), audience
+  → push rows + one house row, tick steps 3 and 4, the Ringing bar. push.ts and house.ts are
+  untouched; no new ACTION, no new CLOSE_REASON, no new tick planning step (the route inserts the
+  fire at start/move, the way timers do).
+- **Threats it avoids:** the **fall-through "Chore:" text** (alertMessage's final else is the
+  chore sentence — machine has its own explicit branch, tested); a **Ringing bar Done that 409s**
+  (machine rows get Move to dryer / Fold & out instead); a **second close path** (applyAction
+  refuses machine fires; only the `/machines` routes close them); **double fires on concurrent
+  taps** (each machine-row write is guarded by its `started_at` as read inside the same batch as
+  the fire writes — a stale guard aborts and rolls back the whole batch → 409 `conflict` — and
+  `uq_machine_open` backs it in the schema).
+- **Considerations:** no CHECK on `machines.id` (the route validates with isOneOf against MACHINE);
+  seeds carry literal timestamps; done-waiting and "load is waiting" are derived, never stored.
+  No reorganizer needed: every touched owner had room; CEILINGS untouched.
+
+---
+
 ## 2026-10-03 — House delivery direct, the relay retired (placement-advisor)
 
 - **Ask:** MojoSOGO retired the LAN relay. The Worker calls Home Assistant itself at

@@ -28,6 +28,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/shared/markets.ts` | Monthly options expiration dates, Easter computus (§7.4) |
 | `src/shared/chores.ts` | Chore rules: whose turn (assigneeFor), run planning, step advance/undo, a chore fire's config/person/step, input validation and limits (§7B) — pure |
 | `src/shared/things.ts` | Thing rules: limits, input validation (title/note/place/address/phone/cost/link, window end ≥ start), remindersFor + planThingFires, canPlanOn, cleanPhotoReading, open-list order, photo limits + shrink constants, the Thing/PhotoReading wire types (§7C) — pure; imports engine, never the reverse |
+| `src/shared/machines.ts` | The laundry loop (§7D): MACHINE_MINUTES / MACHINE_RENOTIFY_MIN / MACHINE_MAX_ALERTS / MACHINE_CHANNELS, labels, the next machine, machineState(row, now) → free/running/done, the start/move/finish/clear transitions → `{ rows, closeFire?, newFire? }` or a refusal + its text, doneMessage (incl. the waiting suffix), waitingLoad, input validation — pure; imports engine + vocab + time, never the reverse |
 | `src/shared/engine.ts` | The alert engine: plan, step, act, timer commands (§5) — pure + pushActions(kind) |
 | `src/shared/lists.ts` | Household list rules: itemKey, add/re-open decision, item clash, list-name clash, who may rename/delete a list (canManageList), text/note/name limits, LISTS_MAX, SHOPPING_LIST_ID, 30-day visible window (§7A.1) — pure |
 | `src/shared/announce.ts` | House announcements (§9.3): ANNOUNCE_MAX, ANNOUNCE_TITLE, announceError (text trimmed 1..max, channels a non-empty set of CHANNEL), announceMessage → "{name} says: {text}" — pure, imports only vocab |
@@ -42,7 +43,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/db.ts` | D1 helpers and id minting |
 | `src/worker/http.ts` | Error envelope (§10) and input checks |
 | `src/worker/session.ts` | Password hashing, session cookie, `requireMember` / owner guards |
-| `src/worker/tick.ts` | `tick()` orchestration: load rows, call the engine, write results, deliveries (§5.6–5.7), chore run planning (§7B.3), thing reminder planning (§7C.2); step 3 sendPushDeliveries, step 4 sendHouseDeliveries |
+| `src/worker/tick.ts` | `tick()` orchestration: load rows, call the engine, write results, deliveries (§5.6–5.7), chore run planning (§7B.3), thing reminder planning (§7C.2), a machine fire's source (owner, done message, §7D.3); step 3 sendPushDeliveries, step 4 sendHouseDeliveries |
 | `src/worker/push.ts` | Web Push delivery (§9.1): for queued push deliveries and /push/test, builds the payload { fireId, kind, tag, title, body, actions } (tag: fireId / the delivery id when there is no fire, an announcement / 'enso-test'; it is also the topic), sends to each of the member's subscriptions via web-push.ts, records results (201 → sent + last_ok_at; 404/410 → delete the subscription; else failed with status + body, last_error; none → no_subscription; keys missing → failed, visibly) |
 | `src/worker/house.ts` | House delivery (§9.2): houseConfigOf, drain with a conditional per-row claim, speak via HA through Cloudflare Access, classifyHouse, houseState for /status — no Hono, never decides what is sent |
 | `src/worker/web-push.ts` | Web Push protocol (RFC 8291/8292) — the only importer of `@block65/webcrypto-web-push`: encrypt the payload, VAPID headers cached per push-service origin (~1 h, expiry checked against a passed-in `now`), ttl 3600 / urgency high / topic (≤ 32 url-safe chars), one POST to one subscription → its status + body text; no D1, never decides what is sent or what a result means (§9.1) |
@@ -57,6 +58,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/routes/announce.ts` | `POST /announce` (§9.3): validate, the sender's name from the session, one batch of fire-less deliveries (one `house`; one `push` per audience member but the sender), then sendPushDeliveries, read the 201 body, then waitUntil an id-restricted sendHouseDeliveries |
 | `src/worker/routes/lists.ts` | `/lists`, `/lists/{id}`, `/lists/{id}/items`, `/list-items/{id}` — list CRUD and list item CRUD (§7A, §10) |
 | `src/worker/routes/chores.ts` | `/chores`, `/chores/today`, `/chore-runs/{id}/done\|undo` — chore CRUD, today's runs, step done/undo and edit re-plan persistence (§7B, §10) |
+| `src/worker/routes/machines.ts` | `GET /machines`, `POST /machines/{id}/start\|move\|finish\|clear` (§7D, §10): validate, call the machines.ts transition, save it in one batch (machine rows guarded by their `started_at` as read + updateFire close + insertFire) → 409 `conflict` when another tap won; the only closer of machine fires |
 | `src/worker/routes/things.ts` | `/things`, `/things/{id}`, `/things/{id}/plan` — thing CRUD, Plan it (event + thing + fire closes in one batch), closing a thing's scheduled fires on edit/delete (§7C, §10) |
 | `src/worker/routes/thing-photos.ts` | `/things/{id}/photo` (R2 put/get/delete, private) and `/things/read-photo` (size/type check, daily cap via photo_reads, error mapping) (§7C.3–7C.4) |
 | `src/worker/photo-reader.ts` | Reads one photo with the Claude API — the only importer of `@anthropic-ai/sdk` (lazy import); returns raw fields or an honest failure (off / refused / failed + reason); never decides what is saved (§7C.4) |
@@ -82,6 +84,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/Alarms.tsx` | Alarms tab: scheduled alarm list + alarm form (§8.5) |
 | `frontend/src/components/Announce.tsx` | The 📢 Announce button at the top of the Alarms tab and its box: message (≤ ANNOUNCE_MAX), ChannelChecks, Send → POST /announce, the refusal inside the box (§8.5, §9.3) |
 | `frontend/src/components/Timers.tsx` | Rolling timers list + timer form (§8.5) |
+| `frontend/src/components/Machines.tsx` | The Machines section of the Alarms tab (§8.5): one card per machine (state badge, whose load, done-at; Start / Move to dryer / Fold & out / Clear) and `MachineChooser`, the whose-load + minute-chip modal the Ringing bar reuses for Move (§8.2) |
 | `frontend/src/components/Chores.tsx` | Chores section of the Alarms tab (§8.5) |
 | `frontend/src/components/ChoreForm.tsx` | Chore form modal: days, at/by, people turn order, steps (§8.5) |
 | `frontend/src/components/AlertFields.tsx` | Fields shared by the alarm, timer and chore forms: day chips + days text, channel checkboxes, repeat-alert options (§8.5) |
