@@ -17,6 +17,8 @@ import { thingPhotos } from './routes/thing-photos';
 import { announce } from './routes/announce';
 import { machines } from './routes/machines';
 import { recipes } from './routes/recipes';
+import { captions } from './routes/captions';
+import { giveUpCaptionsJobs } from './captions-jobs';
 
 const api = new Hono<AppEnv>();
 
@@ -47,6 +49,7 @@ api.route('/', things);
 api.route('/', announce);
 api.route('/', machines);
 api.route('/', recipes);
+api.route('/', captions); // §7E.2c the home helper's door: bearer, no session
 
 api.post('/dev/tick', async (c) => {
   if (c.env.DEV_ENDPOINTS !== '1') return fail(c, 404, 'not_found', 'Not found.');
@@ -66,8 +69,10 @@ app.onError((err, c) => {
 export default {
   fetch: app.fetch,
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(tick(env, new Date().toISOString()).then((s) => {
+    const now = new Date().toISOString();
+    ctx.waitUntil(tick(env, now).then((s) => {
       if (s.alerts || s.materialized) console.log('tick', JSON.stringify(s));
     }));
+    ctx.waitUntil(giveUpCaptionsJobs(env.DB, now)); // §7E.2c, beside tick, never inside it
   },
 } satisfies ExportedHandler<Env>;

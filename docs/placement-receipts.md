@@ -7,6 +7,29 @@ carry its result.
 
 ---
 
+## 2026-10-04 — Captions from home: the SogoAI helper (placement-advisor; feature/home-captions, v1.15.0)
+
+PLACEMENT RECEIPT
+- Feature:      §7E.2c — a helper on the home PC polls the Worker for blocked captions, reads them from home with
+  the same youtube-captions.ts, reports them; the Worker re-reads the recipe.
+- Rules:        `src/shared/vocab.ts` (CAPTIONS_JOB); `src/shared/recipe-reading.ts` (the CAPTIONS_JOB_* limits,
+  CAPTIONS_REPORT_REASON_MAX, wantsHomeCaptions, parseCaptionsReport, homeCaptionsError, the give-up / no-recipe /
+  edited texts, homeRereadMayReplace); `src/shared/recipes.ts` (the four row columns, `captionsPending`).
+- Storage:      migration 0020 (§4.2s). NEW owner `src/worker/captions-jobs.ts` — every write of the job columns
+  (queue, conditional claim with stale reclaim and attempts, end statement, give up); `index.ts` scheduled() runs
+  giveUpCaptionsJobs beside tick (tick.ts untouched).
+- Routes:       NEW owner `src/worker/routes/captions.ts` — claim / report behind a file-local CAPTIONS_TOKEN bearer
+  (503 when unset, never open). Queueing stays in routes/recipes.ts from-video, its one place.
+- Re-read:      `src/worker/recipe-reread.ts`, feature additions only: its success UPDATE ends any job.
+- Helper:       NEW owner `home/captions-helper.ts` under a NEW source root `home/` with its own layer (imports
+  nothing but `src/worker/youtube-captions.ts`, via the new `Layer.allowed`; no packages); the other layers ban
+  `home/`. Structure rules approved by the coordinator.
+- PWA:          `RecipeView.tsx` only (pending line, hidden transcript box, view-local 10 s poll); Recipes.tsx and
+  RecipeTranscript.tsx untouched.
+- Caps:         every touched file under the global cap; no CEILINGS entry added.
+
+---
+
 ## 2026-10-04 — Recipe re-read seam (reorganizer; prepares the SogoAI captions helper)
 
 REORG RECEIPT

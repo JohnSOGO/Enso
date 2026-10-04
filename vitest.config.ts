@@ -21,6 +21,8 @@ export default defineConfig(async () => {
             ANTHROPIC_API_KEY: '',
             // §7E — pinned empty too: no test reaches the real YouTube API (recipe tests set a fake key per call).
             YOUTUBE_API_KEY: '',
+            // §7E.2c — a TEST-ONLY bearer for the home captions helper's door; it opens nothing real.
+            CAPTIONS_TOKEN: 'test-captions-token',
             // §9.2 — pinned so a test can never speak in the real house: a fake host, and the secrets
             // empty (House is then not configured). test/house.test.ts overrides them per call, with a
             // fetch spy answering https://ha.test.

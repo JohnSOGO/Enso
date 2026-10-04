@@ -60,7 +60,7 @@ describe('parseScreenshots', () => {
 describe('R20 producer vs consumers — every source sourcesOf can emit is understood', () => {
   const row = (source: string): RecipeRow => ({
     id: 'rcp_1', title: 'Soup', video_id: 'dQw4w9WgXcQ', video_title: null, channel: null, ingredients: '[]', steps: '[]',
-    servings: null, time_text: null, found: 0, source, captions_error: null, comments_error: null, created_by: 'mem_1',
+    servings: null, time_text: null, found: 0, source, captions_error: null, comments_error: null, captions_job: null, captions_queued_at: null, captions_claimed_at: null, captions_attempts: 0, created_by: 'mem_1',
     created_at: 't', updated_at: 't', deleted_at: null,
   });
   // Every combination of what a reading can be given, so the emitted set comes from calling sourcesOf.
