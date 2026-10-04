@@ -15,7 +15,7 @@ self.addEventListener('push', (event) => {
     body: p.body || 'Something needs you — open Ensō.',
     tag: p.tag || p.fireId || 'enso-test', // §9.1: fire → fireId, announcement → delivery id, test → enso-test
     icon: '/icon-192.png',
-    data: { fireId: p.fireId || null },
+    data: { fireId: p.fireId || null, url: typeof p.url === 'string' ? p.url : null }, // url: a sign-in request's approve page (§6.6)
     actions,
     requireInteraction: true,
   }));
@@ -23,8 +23,8 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const fireId = event.notification.data && event.notification.data.fireId;
-  event.waitUntil(event.action && fireId ? act(fireId, event.action) : openApp());
+  const data = event.notification.data || {};
+  event.waitUntil(event.action && data.fireId ? act(data.fireId, event.action) : data.url ? openAt(data.url) : openApp());
 });
 
 async function act(fireId, action) {
@@ -47,6 +47,18 @@ async function act(fireId, action) {
       tag: fireId, icon: '/icon-192.png', data: { fireId: null }, requireInteraction: true,
     });
   }
+}
+
+// §6.6 — a sign-in request opens its approve page: an open app window goes there, else a new one opens.
+async function openAt(url) {
+  const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  if (open.length) {
+    try {
+      await open[0].focus();
+      if (await open[0].navigate(url)) return;
+    } catch { /* not controlled by this worker — it cannot be navigated */ }
+  }
+  return self.clients.openWindow(url);
 }
 
 async function openApp() {

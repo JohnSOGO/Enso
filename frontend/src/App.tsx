@@ -15,6 +15,7 @@ import { Settings } from './components/Settings';
 import { RingingBar } from './components/RingingBar';
 import { SignIn } from './components/SignIn';
 import { JoinPage } from './components/JoinPage';
+import { ApproveLogin, forgetApproveRequest, keepApproveRequest } from './components/ApproveLogin';
 import { Welcome } from './components/Welcome';
 import { JOIN_PATH } from '../../src/shared/invite-link';
 import type { HouseState } from '../../src/shared/vocab';
@@ -121,6 +122,8 @@ export function App() {
   const leaveJoin = useCallback(() => { history.replaceState(null, '', '/'); setJoining(false); }, []);
   useEffect(() => { if (me && joining) leaveJoin(); }, [me, joining, leaveJoin]);
   const signedIn = (m: Me, how?: { joined: boolean }) => { setJustJoined(!!how?.joined); setMe(m); };
+  // §6.6, §8.13 — a sign-in request's push opens /approve-login#{id}; signed out, the sign-in form shows first (⚑ Q128).
+  const [approveId, setApproveId] = useState(keepApproveRequest);
 
   // SPEC §8.10: the opening screen (index.html) covers loading; it leaves once we know who this is,
   // after at least 0.8 s from page start so it never flickers.
@@ -141,6 +144,7 @@ export function App() {
       ? <JoinPage onJoined={(m) => { leaveJoin(); signedIn(m, { joined: true }); }} onSignIn={leaveJoin} />
       : <SignIn onSignedIn={signedIn} />;
   }
+  if (approveId) return <ApproveLogin id={approveId} onDone={() => { forgetApproveRequest(); setApproveId(null); }} />;
   return (
     <AppProvider me={me} onMe={onMe}>
       <Shell onLogout={() => { setJustJoined(false); setMe(null); }} justJoined={justJoined} />
