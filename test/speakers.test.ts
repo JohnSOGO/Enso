@@ -37,6 +37,8 @@ it('HS3: speakerList reads Home Assistant\'s answer', () => {
     { id: 'media_player.game_room', name: 'Game Room' },
     { id: 'media_player.sogo', name: 'Sogo again' },
     { id: 'media_player.toasty', name: '  ' },
+    { id: 'media_player.this_device', name: 'This Device' },
+    { id: 'media_player.tostig_s_alexa_app_for_pc', name: "Tostig's Alexa App for PC" },
   ]);
   expect(speakerList(answer)).toEqual([
     { id: 'media_player.game_room', name: 'Game Room', kind: 'echo' },
