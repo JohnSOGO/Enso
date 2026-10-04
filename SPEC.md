@@ -3492,7 +3492,8 @@ No `event_optins` row is inserted: it is off for everyone until each person turn
 Optional calendar items (Shelly and John will).
 **Captions fix** (v1.12.1): captions are read through YouTube's player endpoint as its Android app;
 the website route returned empty caption files for every video. Four real videos read from the home
-PC; still to see from Cloudflare's servers (a re-read in production).
+PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
+captions (5 ingredients, 6 steps — it had been "watch it").
 **Verified by MojoSOGO 2026-10-03:** 📢 announcements spoken through the tunnel (Echos + Voice PE
 `ok`); John opted in to 🐐 Put the goats away (first real alert 2026-10-04 18:00, sunset 18:30).
 **Push fix** (v1.7.1): no `Topic` header — Apple refused pushes carrying one (BadWebPushTopic)
