@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.20-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.21 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1466,8 +1466,13 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
 
 ### 7C.1 A thing
 
-- **Title** 1–120 (required). **Note** ≤ 2000, **place** ≤ 200, **link** ≤ 500 (`http(s)://`
-  only, else 400).
+- **Title** 1–120 (required). **Note** ≤ 2000, **place** ≤ 200, **link** ≤ 500.
+- **Links** go through one rule, `webLink` (things.ts), for typing and photo readings alike:
+  `http(s)://…` is kept; a bare web address as flyers print it — `pumpkinjunctionsd.com`,
+  `www.example.org/tickets` — gets `https://` added; anything with another scheme
+  (`javascript:`, `ftp:`) or no dotted host is refused (400 when typed, dropped from a
+  reading). (Found 2026-10-03: a flyer's link printed without `https://` was silently
+  dropped from a reading.)
 - **Address** ≤ 300, **phone** ≤ 50, **cost** ≤ 200 — free text, kept exactly as written
   ("$15 adults · kids under 3 free", "(619) 555-0134"); optional (decided by MojoSOGO
   2026-10-03). **Place** is the venue's name; **address** its street address.
@@ -1522,7 +1527,7 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
   gives today's date and the household time zone so "Sat Oct 12" becomes a full date. Refusal
   fallback on (`server-side-fallback-2026-07-01` beta, `fallbacks: "default"`).
 - `cleanPhotoReading` (pure) trims to the limits, drops dates that aren't real calendar
-  dates, swaps start/end if reversed, and keeps only `http(s)` links — the model's answer
+  dates, swaps start/end if reversed, and passes the link through `webLink` — the model's answer
   is input, never trusted as-is.
 - **Cost guard:** at most **40 reads per household per day** ⚑ (`photo_reads`), then 429
   with a message. Roughly a cent per photo. A read is counted when the model is called, so
@@ -2515,6 +2520,8 @@ images are rendered from it. Its on-iPhone check is still to do.
 is not built — an open app picks the alert up on its 30 s poll, and a reopened app reloads
 (§8.10). Still to check on real phones: Turn on → Send a test (iPhone home-screen app and
 Android), a reminder on the lock screen, Android Done/Snooze.
+**Link fix** (v1.4.1; 260 tests): one `webLink` rule — a bare `www.….com` from a flyer or typed
+is kept with `https://` added; other schemes are refused (§7C.1).
 **M4j thing details** are built (v1.3.0; 245 tests): address / phone / cost, photo reading
 fills them, the form's text fields grow to fit. Title and Link stay one line.
 **M4i calendar tidy** is built (v1.2.0; 243 tests; 0010 applied locally with nothing but the

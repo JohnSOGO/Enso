@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ADDRESS_MAX, COST_MAX, PHONE_MAX, TITLE_MAX, canPlanOn, cleanPhotoReading, isStartReminder, openOrder, parseThingInput, planThingFires, plannedEventNotes,
-  remindersFor, type ThingReminderSource,
+  remindersFor, webLink, type ThingReminderSource,
 } from '../src/shared/things';
 import { localToUtc } from '../src/shared/time';
 
@@ -139,5 +139,32 @@ describe('cleanPhotoReading (§7C.4)', () => {
       .toEqual({ title: null, startDate: null, endDate: null, place: null, address: null, phone: null, cost: null, url: null, note: null });
     expect(cleanPhotoReading(null, '2026-10-03'))
       .toEqual({ title: null, startDate: null, endDate: null, place: null, address: null, phone: null, cost: null, url: null, note: null });
+  });
+});
+
+describe('webLink — the one link rule (§7C.1)', () => {
+  it('keeps http(s) links as they are', () => {
+    expect(webLink('https://www.pumpkinjunctionsd.com')).toBe('https://www.pumpkinjunctionsd.com');
+    expect(webLink('http://example.org/a?b=1')).toBe('http://example.org/a?b=1');
+  });
+  it('adds https:// to a bare web address as flyers print it', () => {
+    expect(webLink('www.pumpkinjunctionsd.com')).toBe('https://www.pumpkinjunctionsd.com');
+    expect(webLink('  pumpkinjunctionsd.com ')).toBe('https://pumpkinjunctionsd.com');
+    expect(webLink('www.example.org/tickets?day=sat')).toBe('https://www.example.org/tickets?day=sat');
+    expect(webLink('shop.example.com:8443/x')).toBe('https://shop.example.com:8443/x');
+  });
+  it('refuses other schemes, hosts without a dot, and plain words', () => {
+    for (const bad of ['javascript:alert(1)', 'ftp://files.example.com', 'mailto:a@b.com', 'localhost', 'pumpkins', 'two words.com', 'https://nodot', '']) {
+      expect(webLink(bad), bad).toBeNull();
+    }
+  });
+  it('typing a bare address saves it with https://; a bad one is 400 with a message', () => {
+    const ok = parseThingInput({ title: 'Fair', url: 'www.pumpkinjunctionsd.com' });
+    expect(typeof ok === 'object' && ok.url).toBe('https://www.pumpkinjunctionsd.com');
+    expect(parseThingInput({ title: 'Fair', url: 'javascript:alert(1)' })).toMatch(/url must be a web address/);
+  });
+  it('a photo reading with a bare www link keeps it (the Pumpkin Junction case)', () => {
+    expect(cleanPhotoReading({ title: 'Pumpkin Junction', url: 'www.pumpkinjunctionsd.com' }, '2026-10-03').url)
+      .toBe('https://www.pumpkinjunctionsd.com');
   });
 });
