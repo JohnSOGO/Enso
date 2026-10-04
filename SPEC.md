@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.18-details · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.19-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1897,7 +1897,9 @@ Pumpkin patch        📅 Sat Oct 12
   - Title · From / To dates (both optional) · Place · Address · Phone · Cost · Link · Note.
   - **Every text field grows to fit its text** (auto-sizing, no inner scrolling), so all of a
     long title, address, cost or note is visible at once (decided by MojoSOGO). Phone is a
-    single line (`type="tel"`); the others wrap.
+    single line (`type="tel"`); the others wrap. In **Title** and **Link** Enter does nothing
+    and a pasted line break becomes a space (they are single values) ⚑; in Place, Address,
+    Cost and Note Enter adds a line.
   - **Reminders:** ☐ When it starts · ☐ On [date] · Phone / House.
   - **Plan it** → a date (+ optional time) → creates the calendar event (§7C.2).
   - **Done** / **Let it go** / **Put back** (by status) · Save / Cancel / Delete (asks).
@@ -2142,7 +2144,7 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | GET | `/chores/today` | member | → `{ date, runs: Run[] }`; `Run = { id, choreId, title, doneMeans, timing, time, step, steps, assigneeId, personId, doneAt, doneBy, nextDueAt, ringing }` (`personId` = the current step's person) |
 | POST | `/chore-runs/{id}/done` | member | advances one step (§7B.3) → run; 409 `already_done` when finished |
 | POST | `/chore-runs/{id}/undo` | member | → run; 409 `nothing_to_undo` at step 0 |
-| GET | `/things` | member | → `{ open: Thing[], closed: Thing[] }` (closed = done/dropped, last 60 days); `Thing = { id, title, note, place, url, windowStart, windowEnd, remindStart, remindOn, channels, hasPhoto, status, plannedEventId, plannedDate, createdBy, updatedAt }` |
+| GET | `/things` | member | → `{ open: Thing[], closed: Thing[] }` (closed = done/dropped, last 60 days); `Thing = { id, title, note, place, address, phone, cost, url, windowStart, windowEnd, remindStart, remindOn, channels, hasPhoto, status, plannedEventId, plannedDate, createdBy, updatedAt }` |
 | POST | `/things` | member | thing fields → thing (201) |
 | GET/PATCH/DELETE | `/things/{id}` | member | GET → thing; PATCH fields, all optional, incl. `status` → thing; DELETE → 204 (and its photo) |
 | POST | `/things/{id}/plan` | member | `{ date, time? }` → `{ thing, eventId }`; 400 outside the window |
@@ -2285,7 +2287,7 @@ checks.
 - ✅ Production: Street sweeping gets 🧹; a new optional **🗑️ Take out trash**, every Sunday
   at **18:00**, ringing at 18:00 by phone, on for MojoSOGO (decided by MojoSOGO).
 
-**M4j — Thing details** (v1.4.0)
+**M4j — Thing details** (v1.3.0)
 - Migration 0011; address / phone / cost on things (input, wire shape, Plan-it notes);
   photo reading returns them; the thing form's text fields auto-size (§7C.1, §7C.4, §8.11).
 - ✅ Tests: the three fields round-trip, their limits 400 with a message, `cleanPhotoReading`
@@ -2452,6 +2454,8 @@ home-screen tags, `AppRefresh` (reload on resume unless a dialog is open; pull t
 — verified with real touch events in an emulated phone; its on-iPhone check is still to do.
 The ensō mark (scripts/draw-enso.mjs) and the opening screen are built; the 7 iPhone launch
 images are rendered from it. Its on-iPhone check is still to do.
+**M4j thing details** are built (v1.3.0; 245 tests): address / phone / cost, photo reading
+fills them, the form's text fields grow to fit. Title and Link stay one line.
 **M4i calendar tidy** is built (v1.2.0; 243 tests; 0010 applied locally with nothing but the
 school table lost; no "school" left in code). Checked at 320 and 440 px: day icons sit on the
 date's line inside the cell (15🧹, 16📈, 18🗑️). Known limit: on the **1st** of a month the

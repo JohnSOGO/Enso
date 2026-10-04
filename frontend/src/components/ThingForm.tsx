@@ -30,7 +30,8 @@ const chip = { padding: '4px 10px', minHeight: 44 } as const;
  * §8.11 — a textarea that grows to fit its text, never scrolling inside: re-measured when the text changes (typed,
  * or filled by a photo reading) and when its width does (the dialog opening, the phone turning).
  */
-function Grow({ value, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string }) {
+/** A textarea that grows to fit its text (§8.11). `oneLine`: Enter does nothing and pasted line breaks become spaces (Title, Link ⚑). */
+function Grow({ value, oneLine, onChange, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string; oneLine?: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const fit = () => {
     const el = ref.current;
@@ -45,7 +46,9 @@ function Grow({ value, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & 
     ro.observe(ref.current!);
     return () => ro.disconnect();
   }, []);
-  return <textarea ref={ref} rows={1} value={value} style={{ overflow: 'hidden', resize: 'none' }} {...rest} />;
+  return <textarea ref={ref} rows={1} value={value} style={{ overflow: 'hidden', resize: 'none' }} {...rest}
+    onKeyDown={oneLine ? (e) => { if (e.key === 'Enter') e.preventDefault(); } : rest.onKeyDown}
+    onChange={(e) => { if (oneLine && /[\r\n]/.test(e.target.value)) e.target.value = e.target.value.replace(/\s*[\r\n]+\s*/g, ' '); onChange?.(e); }} />;
 }
 
 const formOf = (t: Thing | null) => ({
@@ -144,7 +147,7 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
             onPick={(p) => { setPending(p); setRemoved(false); }}
             onRemove={() => { setPending(null); setRemoved(!!saved?.hasPhoto); }} />
           <label className="field"><span>Title{mark('title')}</span>
-            <Grow value={f.title} maxLength={TITLE_MAX} onChange={(e) => set('title', e.target.value)} autoFocus={!thing} />
+            <Grow oneLine value={f.title} maxLength={TITLE_MAX} onChange={(e) => set('title', e.target.value)} autoFocus={!thing} />
           </label>
           <div className="row">
             <label className="field" style={{ flex: 1 }}><span>From (optional){mark('windowStart')}</span>
@@ -167,7 +170,7 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
             <Grow value={f.cost} maxLength={COST_MAX} onChange={(e) => set('cost', e.target.value)} />
           </label>
           <label className="field"><span>Link{mark('url')}</span>
-            <Grow inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="https://…" value={f.url}
+            <Grow oneLine inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="https://…" value={f.url}
               maxLength={URL_MAX} onChange={(e) => set('url', e.target.value)} />
           </label>
           <label className="field"><span>Note{mark('note')}</span>
