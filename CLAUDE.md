@@ -17,7 +17,7 @@ in `README.md`. Modularity doctrine: `docs/modularity.md`.
    - **Light path:** the owner is obvious, there's no cap pressure and no new file.
      Name the owner in the commit message and go.
    - **Full path:** a new file or owner, a file near its cap, an unclear owner, or
-     anything touching rules (`src/shared/`), schema, or the relay/push contracts.
+     anything touching rules (`src/shared/`), schema, or the house/push contracts.
      The coordinating session asks the **`placement-advisor`**. If the owner is
      full, the **`reorganizer`** opens a seam in its own commit first. The verdict
      goes into the worker's brief, and the receipt into `docs/placement-receipts.md`.
