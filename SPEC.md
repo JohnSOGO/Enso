@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.39 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
+**Version:** 2.40-draft · **Date:** 2026-10-04 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -294,7 +294,7 @@ against the deployed Worker. On iPhone, push works only after
 | `VAPID_PUBLIC_KEY` (var, 65-byte raw P-256 key, base64url), `VAPID_PRIVATE_KEY` (secret, the JWK `d`), `VAPID_SUBJECT` (var, `https://enso.sogodojo.com`) | Worker | Web Push (§9.1). Generated once with WebCrypto; never rotated casually — rotating invalidates every phone's subscription. |
 | `HA_TOKEN` (secret) | Worker | Home Assistant long-lived access token, sent as `Authorization: Bearer …` to HA (§9.2). Never logged, never stored in a delivery's detail. |
 | `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` (secrets) | Worker | The Cloudflare Access **service token** (`enso-worker`) for `ha.sogodojo.com` **and** `sogoai.sogodojo.com`, sent as `CF-Access-Client-Id` / `CF-Access-Client-Secret` (§9.2, §7E.2c). One token, two Access applications. Never logged. Tests pin them empty (House and captions from home are then not configured). |
-| `HA_URL`, `ECHO_TARGETS` (JSON array), `ECHO_TYPE`, `SATELLITE_ENTITY` (vars, `wrangler.toml`) | Worker | Where and on what House speaks (§9.2). |
+| `HA_URL`, `ECHO_TARGETS` (JSON array), `ECHO_TYPE`, `SATELLITE_ENTITY` (vars, `wrangler.toml`) | Worker | Where House speaks (§9.2). `ECHO_TARGETS` + `SATELLITE_ENTITY` are the **default speakers**: what a house delivery uses when someone it is for has not chosen their own (§9.2a). |
 | `YOUTUBE_API_KEY` (secret) | Worker | A Google Cloud API key with the YouTube Data API v3 enabled, for reading a recipe video's title and description (§7E). Set it with `npx wrangler secret put YOUTUBE_API_KEY` **in a real PowerShell window**. Never logged, never in an error message. Reading recipes also needs `ANTHROPIC_API_KEY`; without either, `POST /recipes/from-video` is 503 `recipe_reading_off` and typed recipes still work. Tests pin it empty. |
 | `CAPTIONS_TOKEN` (secret) | Worker **and** SogoAI's `C:\Enso\captions-helper.env` | The bearer the Worker sends to the SogoAI helper (`Authorization: Bearer …`, §7E.2c), checked by the helper in constant time — a second lock behind Access. A long random string, set with `npx wrangler secret put CAPTIONS_TOKEN` in a real PowerShell window and the same value in the helper's env file (never in the repo). Unset or empty on the Worker → captions from home are not set up (§7E.2c) and a snapped item goes straight to Claude (§7A.3); unset on SogoAI → the helper does not start. The same bearer guards `/identify` (§7A.3). Never logged, by the Worker or the helper. Tests pin a test-only value. |
 | `HOME_CAPTIONS_URL` (var, `wrangler.toml`) | Worker | Where the SogoAI helper is reached: `https://sogoai.sogodojo.com` (§7E.2c), for `/captions` and `/identify` (§7A.3) alike. Tests pin `https://sogoai.test`, which only a fetch spy answers. |
@@ -358,6 +358,7 @@ export const MACHINE_STATE = ['free', 'running', 'done'] as const;              
 export const SUN_EVENT    = ['sunset'] as const;                                 // §7.7 events.start_sun
 export const RECIPE_SOURCE = ['description', 'captions', 'transcript', 'comments', 'typed'] as const; // §7E what a recipe was read from ('transcript': pasted, §7E.2b)
 export const CAPTIONS_FAILURE = ['blocked', 'none', 'failed'] as const;         // §7E why captions couldn't be read
+export const SPEAKER_KIND = ['echo', 'satellite'] as const;                      // §9.2a a house speaker, from its HA entity id
 export const IDENTIFY_FAILURE = ['off', 'failed'] as const;                     // §7A.3 why SogoAI gave no reading
 export const ITEM_READ_VIA = ['sogoai', 'claude'] as const;                     // §7A.3 who named a snapped item
 
@@ -1102,6 +1103,23 @@ ALTER TABLE list_items ADD COLUMN photo_key TEXT;
 `DELETE /list-items/{id}/photo`, by deleting the item and by deleting its list (§7A.1). It is never sent on the
 wire: an item carries `hasPhoto` instead. **Migration check (SN-M):** rows written under 0001–0022 survive 0023
 unchanged with `photo_key` NULL; `PRAGMA foreign_key_check` is empty.
+
+### 4.2w Schema change — `migrations/0024_house_speakers.sql`
+
+Decided by MojoSOGO 2026-10-04: each person ticks the house speakers they want to be alerted on (§9.2a).
+
+```sql
+-- §9.2a — the house speakers a member chose: a JSON list of HA entity ids; NULL = not chosen (the default speakers).
+ALTER TABLE member_prefs ADD COLUMN house_speakers TEXT;
+-- §9.2a — the speakers a house delivery is spoken on, fixed when it is written; NULL = the default speakers.
+ALTER TABLE deliveries ADD COLUMN speakers TEXT;
+```
+
+Both are NULL on every existing row, so every existing member has not chosen and every queued house row
+speaks on the default speakers, exactly as before. `house_speakers` is written only by `PATCH /me`;
+`deliveries.speakers` only by the two writers of house rows (tick step 2 and `POST /announce`). A push row's
+`speakers` is always NULL. **Migration check (HS-M):** rows written under 0001–0023 survive 0024 unchanged
+with both columns NULL; `PRAGMA foreign_key_check` is empty.
 
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
@@ -2790,7 +2808,7 @@ Time      Chore            Days        This week
 
 - **Me:** **Optional calendar items** — Public holidays, 📈 options expiration, then one line
   per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); name,
-  color, enable phone alerts (subscribe),
+  color, enable phone alerts (subscribe), **🔊 Speak my alerts on** (§9.2a),
   log out.
 - **Household (admins):** name, timezone, days off (§7.3), **invites (§8.9)**, members list:
   one line per member — name · **Owner** / **Admin** chip (nothing for a regular member) ·
@@ -3291,7 +3309,10 @@ With no config, every house delivery the drain would take becomes `failed` with 
    and the row is spoken **only if `meta.changes === 1`**. Two drains that pick the same row
    (a tick and an announcement, or two ticks) speak it once. A row whose isolate dies
    mid-speech stays `claimed` and is retried after 2 min — at most 3 attempts in all.
-4. **Speak** — both surfaces in parallel, the same payloads the relay sent:
+4. **Speak** — on the row's speakers (§9.2a): `speakers` NULL → the default speakers
+   (`ECHO_TARGETS` and `SATELLITE_ENTITY`); otherwise its `media_player.*` ids are the Echo
+   `target` and its `assist_satellite.*` ids the Voice PE `entity_id` (a list). A surface with no
+   speaker in the row is **not called**. The surfaces that are called run in parallel:
    - Echos: `POST {HA_URL}/api/services/notify/alexa_media`
      `{ "target": ECHO_TARGETS, "message": message, "data": { "type": ECHO_TYPE } }`, timeout
      **15 s**.
@@ -3308,9 +3329,10 @@ With no config, every house delivery the drain would take becomes `failed` with 
    - A surface's result is `"ok"`, `"HTTP <status>: <body, first 200 chars>"`, or
      `"error: <message>"` when the call throws (timeout, DNS, tunnel down). A token is never
      logged or written into a detail.
-5. **Record** — `classifyHouse(echoOk, satOk)`: both ok → `sent`; one → `partial`; neither →
-   `failed`. Its type is `Exclude<DeliveryStatus, 'queued' | 'claimed'>` — only a finished
-   status. `detail` = `{"echo":"ok"|"<error>","voice_pe":"ok"|"<error>"}`.
+5. **Record** — `classifyHouse(results)` over the surfaces that were called: all ok → `sent`;
+   some → `partial`; none → `failed`. Its type is `Exclude<DeliveryStatus, 'queued' | 'claimed'>`
+   — only a finished status. `detail` = `{"echo":…,"voice_pe":…}` with only the called surfaces,
+   each `"ok"` or `"<error>"`.
    **A classified `failed` is final** (HA or the tunnel was down): it is not retried —
    retries cover only stale claims.
 
@@ -3347,6 +3369,89 @@ secrets are set with `wrangler secret put`.
 **Latency budget:** cron granularity (≤ 60 s) + Voice PE (~8 s). An announcement is spoken
 right away (§9.3).
 
+### 9.2a Each person's speakers — `🔊 Speak my alerts on`
+
+Decided by MojoSOGO 2026-10-04: in Settings → Me each person ticks the house speakers they want to be
+alerted on, from the list Home Assistant has. A private bedroom speaker then never announces something
+for someone who is never in that room.
+
+**A speaker** is a Home Assistant entity id, its kind derived from its prefix (`SPEAKER_KIND`, §3):
+`media_player.<slug>` → `echo` (an Echo, Alexa Media Player), `assist_satellite.<slug>` → `satellite`
+(the Voice PE). Nothing else is a speaker. A slug is `[a-z0-9_]+`.
+
+**Rules** (pure, owner per placement):
+- `SPEAKERS_MAX = 20` ⚑.
+- `speakerKind(id)` → `'echo' | 'satellite' | null`.
+- `speakersError(v)` → a message or `null`: `v` is `null` (back to not chosen), or an array of at most
+  `SPEAKERS_MAX` distinct strings, each with a kind. An empty array is allowed: **no speaker** ⚑ Q128.
+  Message: "Speakers must be a list of Home Assistant speaker ids, or null."
+- `speakersFor(choices)` — the speakers of one house delivery, from the choices (`string[] | null`) of
+  everyone it is for: **any `null` → `null`** (someone has not chosen, so the default speakers) ⚑ Q125;
+  otherwise the **union**, in first-seen order ⚑ Q126; no choices at all → `[]`.
+- `splitSpeakers(ids)` → `{ echo: string[], satellite: string[] }` by kind.
+- `speakerList(text)` → `Speaker[]` (`{ id, name, kind }`) or `null`: parses Home Assistant's answer
+  (below), keeps the entries whose `id` has a kind and whose `name` is a non-empty string (else the id),
+  drops duplicate ids, orders Echos first, then by name. Not a JSON array → `null`.
+
+**Who a house delivery is for** is the audience tick already computes (`audience(…).push`, §7.5: active
+members, narrowed to the assigned ones, and for an optional event to those who have it on). An
+**announcement** is for every active member ⚑ Q127 (it has no assignment). The writer reads those members'
+`member_prefs.house_speakers` and stores `speakersFor(…)` on the row as JSON (NULL stays NULL).
+**`speakersFor` = `[]` → no house row is written**: nobody it is for wants it spoken ⚑ Q128. The fire still
+steps and push still goes out. For an announcement with House alone ticked, that is **409 `no_speakers`**
+"Nobody has a house speaker ticked." — nothing would be spoken, so it says so.
+
+**`GET /house/speakers`** (member) — the list to tick from, asked of Home Assistant **live** (never stored):
+- House not configured (`houseConfigOf` null) → **503 `house_not_configured`**, before any fetch.
+- One `POST {HA_URL}/api/template` through Access (§9.2 headers, timeout 15 s), body `{ "template": … }`:
+  ```jinja
+  {%- set ns = namespace(out=[]) -%}
+  {%- for e in integration_entities('alexa_media') | select('match', 'media_player[.]') -%}
+    {%- set ns.out = ns.out + [{'id': e, 'name': state_attr(e, 'friendly_name') or e}] -%}
+  {%- endfor -%}
+  {%- for s in states.assist_satellite -%}
+    {%- set ns.out = ns.out + [{'id': s.entity_id, 'name': s.name}] -%}
+  {%- endfor -%}
+  {{ ns.out | tojson }}
+  ```
+- A non-2xx or a throw → **502 `house_unreachable`** with the reason (no token in it). An answer
+  `speakerList` cannot read → 502 `house_unreachable` "Home Assistant's speaker list couldn't be read."
+- → 200 `{ speakers: Speaker[], mine: string[] | null, defaults: string[] }`: `mine` is the member's own
+  choice; `defaults` the default speakers as they are configured (`ECHO_TARGETS` names, then
+  `SATELLITE_ENTITY`), so the screen can say honestly what "not chosen" means.
+
+**`PATCH /me { houseSpeakers }`** — the member's own list only ⚑ Q129 (`speakersError` → 400
+`invalid_input`). It is not checked against Home Assistant: the house may be unreachable, and an id HA
+no longer lists is shown as such and fails visibly when spoken. `GET /me` carries `houseSpeakers`.
+
+**The screen** (`🔊 Speak my alerts on`, Settings → Me, below Phone alerts):
+- One line per speaker from `GET /house/speakers`: a checkbox, the name, and a dim `Echo` / `Voice PE`.
+  Ticking or unticking saves at once (`PATCH /me` with the whole new list).
+- **Not chosen** (`mine` null): every box is unticked, and a dim line says "Not chosen: alerts for you
+  are spoken on the default speakers ({defaults joined with ', '})." The first tick makes a list of one.
+- **Nothing ticked** (`mine` = `[]`): a dim line says "No speaker: alerts only for you are not spoken."
+- A chosen id the list no longer has shows as its own line, ticked, with "(not in the house any more)".
+- **Use the defaults** — a link shown only when `mine` is not null; sets it back to null.
+- 503 → "House isn't set up." 502 → "Couldn't reach the house: {message}", with **Try again**; the saved
+  choice is not touched.
+- One line per row at 320 px; the checkbox's tap target is the whole line (44 px).
+
+**Acceptance (HS — each row is a test):**
+
+| # | Check | Expected |
+|---|---|---|
+| HS1 | `speakerKind`, `speakersError` | `media_player.game_room` echo; `assist_satellite.voice_pe` satellite; `light.x`, `media_player.Game Room`, `""` null; null ok, `[]` ok, 21 ids / a duplicate / a light / a non-array → message |
+| HS2 | `speakersFor` | `[null]` and `[['a'], null]` → null; `[['a','b'], ['b','c']]` → `['a','b','c']`; `[[], []]` → `[]`; `[]` → `[]` |
+| HS3 | `speakerList` on an HA answer with two Echos, the Voice PE, a `light.*`, a duplicate, a blank name; on `"oops"` | Echos first by name, then the satellite; the light and duplicate gone; the blank name → the id; `null` |
+| HS4 | `GET /house/speakers` against a fake HA | one POST to `/api/template` carrying the template and the three auth headers; 200 with the list, `mine` null, `defaults`; not configured → 503 and zero fetches; HA 500 / 302 / not JSON → 502 `house_unreachable` |
+| HS5 | `PATCH /me { houseSpeakers }` | a list saved and back on `GET /me`; `null` clears it; a bad list → 400 and nothing saved |
+| HS6 | tick: a fire for A (chose Game Room + Voice PE) and B (chose Sogo) | one house row, `speakers` = the union; the drain sends Echo `target` = [game_room, sogo] and Voice PE `entity_id` = [voice_pe]; `sent` |
+| HS7 | tick: a fire for A alone, A chose only Echos | the Voice PE is not called; detail has only `echo`; `sent` |
+| HS8 | tick: a fire for A and C, C has not chosen | `speakers` NULL; spoken on `ECHO_TARGETS` + `SATELLITE_ENTITY` (H2 unchanged) |
+| HS9 | tick: a fire for A alone, A chose `[]` | no house row; the push row still written; the fire steps |
+| HS10 | `POST /announce` House with A `[game_room]`, B `[sogo]`, C disabled `[toasty]`; with everyone `[]` | one house row on game_room + sogo (not toasty); everyone `[]` + House only → 409 `no_speakers`, nothing written; with Phone too → 201, push rows only |
+| HS-M | migration 0024 | earlier rows intact, both columns NULL; `foreign_key_check` empty |
+
 ### 9.3 Announcements — `src/shared/announce.ts`, `POST /announce`
 
 A member sends a house announcement **now** from the Alarms tab (§8.5; decided by MojoSOGO
@@ -3367,8 +3472,9 @@ acked, nothing is scheduled — **now only**.
 - The sender's name is the **session member's** `display_name` — never taken from the body.
 - One `db.batch`:
   - **House** ticked → one `house` delivery: `fire_id NULL`, `member_id NULL`,
-    `alert_number 1`, `message` = `announceMessage(…)`, `queued`. The Worker speaks it
-    on the four Echos and the Voice PE exactly like a House alert (§9.2), **right away**: after
+    `alert_number 1`, `message` = `announceMessage(…)`, `speakers` = the union of every active
+    member's choice (§9.2a), `queued`. The Worker speaks it exactly like a House alert (§9.2),
+    **right away**: after
     the 201 body is read, `c.executionCtx.waitUntil(sendHouseDeliveries(env, now, [houseId]))`
     — a drain restricted to that one row, so the speaker does not wait for the next tick.
   - **Phone** ticked → one `push` delivery per member of `audience(…).push` (§7.5 — with no
@@ -3470,7 +3576,8 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | POST | `/auth/login` | public | `{ email, password }` → member; sets cookie |
 | POST | `/auth/logout` | member | → 204; clears cookie |
 | GET | `/me` | member | → member + prefs |
-| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration? }` |
+| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration?, houseSpeakers?: string[] \| null }` (§9.2a) |
+| GET | `/house/speakers` | member | → `{ speakers: { id, name, kind }[], mine, defaults }` asked of Home Assistant live; 503 `house_not_configured`; 502 `house_unreachable` (§9.2a) |
 | GET | `/members` | member | → `{ id, email, displayName, color, role, isFounder, disabledAt }[]` (no hashes; `email` only for owners) |
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
@@ -3500,7 +3607,7 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | GET | `/push/vapid-key` | public | → `{ key }` |
 | GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff }`; PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
 | GET | `/status` | member | → `{ house: { state: HouseState, lastOkAt, lastFailedAt, lastError } (§9.2, derived, never stored), mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[] }` |
-| POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `no_recipients` (§9.3); spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
+| POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `no_recipients` (§9.3); 409 `no_speakers` (§9.2a); spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
 | POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 409 `no_recipients` (no founder yet) / 429 `rate_limited`, in that order |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek }` (`thisWeek`/`nextWeek` = member id or null) |
 | POST | `/chores` | member | `{ title, doneMeans?, days, timing, time, nudge?, people, steps, channels, renotifyMin? }` → chore (201) |
@@ -3974,6 +4081,11 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q122 | Adding a photo in the item form | ⚑ It is not read — the form only keeps it |
 | Q123 | Bought items' photos | ⚑ Kept indefinitely; adding the item again re-opens it and brings its photo back |
 | Q124 | Names for the SogoAI pieces | ⚑ No renames: `CAPTIONS_TOKEN`, `HOME_CAPTIONS_URL` and the `captions-helper` files keep their names though they now carry `/identify` too |
+| Q125 | A person who hasn't chosen speakers (§9.2a) | ⚑ The default speakers (`ECHO_TARGETS` + `SATELLITE_ENTITY`, as before), so nothing changes until someone ticks |
+| Q126 | An alert for several people | ⚑ Spoken on every speaker any of them ticked (the union) |
+| Q127 | Announcements | ⚑ For every active member: everyone's ticked speakers together |
+| Q128 | Nobody it is for has a speaker ticked | ⚑ Not spoken at all; push still goes out. An announcement with House alone is 409 `no_speakers` |
+| Q129 | Who sets a person's speakers | ⚑ Only that person, in Settings → Me; admins can't set anyone else's |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
