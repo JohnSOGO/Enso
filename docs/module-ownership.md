@@ -62,7 +62,8 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/routes/machines.ts` | `GET /machines`, `POST /machines/{id}/start\|move\|finish\|clear` (§7D, §10): validate, call the machines.ts transition, save it in one batch (machine rows guarded by their `started_at` as read + updateFire close + insertFire) → 409 `conflict` when another tap won; the only closer of machine fires |
 | `src/worker/routes/things.ts` | `/things`, `/things/{id}`, `/things/{id}/plan` — thing CRUD, Plan it (event + thing + fire closes in one batch), closing a thing's scheduled fires on edit/delete (§7C, §10) |
 | `src/worker/routes/thing-photos.ts` | `/things/{id}/photo` (R2 put/get/delete, private) and `/things/read-photo` (size/type check, daily cap via photo_reads, error mapping) (§7C.3–7C.4) |
-| `src/worker/photo-reader.ts` | Reads one photo with the Claude API — the only importer of `@anthropic-ai/sdk` (lazy import); returns raw fields or an honest failure (off / refused / failed + reason); never decides what is saved (§7C.4) |
+| `src/worker/claude.ts` | The one Claude API call — the only importer of `@anthropic-ai/sdk` and zod (lazy import): model CLAUDE_MODEL, structured output from a caller-given schema builder, refusal fallback beta, maps refusal / cut off / unexpected shape / API error to an honest failure; `fetch` injectable for tests; no prompts, never decides what is saved |
+| `src/worker/photo-reader.ts` | Reads one photo via claude.ts: the photo prompt, schema and image block; returns raw fields or an honest failure; never decides what is saved (§7C.4) |
 
 ## PWA (flow stage: render + capture intent)
 
@@ -95,6 +96,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/ChoresToday.tsx` | Lists → Today: today's chore runs, Mine \| Everyone, tick/undo a step (§8.8) |
 | `frontend/src/components/ThingsToDo.tsx` | Lists → Things to do: open rows (window text, 📅 planned date, 📷, ⏰), "Done & let go", ＋ Add, opens ThingForm (§8.11) |
 | `frontend/src/components/ThingForm.tsx` | The thing form modal: title, dates, place, link, note, reminders + channels, fill-empty-fields from a photo reading marked "from photo — check it", Done / Let it go / Put back, Save / Cancel / Delete (§8.11) |
+| `frontend/src/components/Grow.tsx` | A textarea that grows to fit its text; `oneLine` (Enter does nothing, pasted line breaks become spaces) (§8.11, §8.12) |
 | `frontend/src/components/ThingPlan.tsx` | Plan it: a date (+ optional time) → `POST /things/{id}/plan`; the refusal shown inside (§7C.2) |
 | `frontend/src/components/ThingPhoto.tsx` | A thing's photo: pick (camera/library), shrink, thumbnail, full size inside the dialog, remove/replace, the read-photo request; and `FromThing`, the "From Things to do" block for the event form (§7C.3, §8.4, §8.11) |
 | `frontend/src/shrink-photo.ts` | Shrinks a picked image on the phone to PHOTO_LONG_SIDE px, JPEG PHOTO_QUALITY, via canvas (§7C.3) — no app state |

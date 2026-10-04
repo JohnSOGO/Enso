@@ -2,8 +2,9 @@
 // reminders and channels; ↗ / 🗺️ / 📞 beside Link / Address / Phone open them; every text field but phone grows to fit its text; Plan it / Done / Let it go / Put back by status; Save / Cancel / Delete. A photo reading
 // fills only empty fields, each marked "from photo — check it". The photo (new, replaced or removed)
 // goes to the server on Save, after the thing itself. Rules and validation are the server's (§7C).
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type TextareaHTMLAttributes } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Modal } from './Modal';
+import { Grow } from './Grow';
 import { ChannelChecks } from './AlertFields';
 import { ThingPhoto, photoSrc } from './ThingPhoto';
 import { ThingPlan } from './ThingPlan';
@@ -25,31 +26,6 @@ const FROM_READING: [keyof PhotoReading, Field][] = [
   ['address', 'address'], ['phone', 'phone'], ['cost', 'cost'], ['url', 'url'], ['note', 'note'],
 ];
 const chip = { padding: '4px 10px', minHeight: 44 } as const;
-
-/**
- * §8.11 — a textarea that grows to fit its text, never scrolling inside: re-measured when the text changes (typed,
- * or filled by a photo reading) and when its width does (the dialog opening, the phone turning).
- */
-/** A textarea that grows to fit its text (§8.11). `oneLine`: Enter does nothing and pasted line breaks become spaces (Title, Link ⚑). */
-function Grow({ value, oneLine, onChange, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string; oneLine?: boolean }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const fit = () => {
-    const el = ref.current;
-    if (!el || !el.clientWidth) return; // not laid out yet (the dialog is still closed)
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
-  };
-  useLayoutEffect(fit, [value]);
-  useEffect(() => {
-    let width = 0;
-    const ro = new ResizeObserver(([e]) => { if (e.contentRect.width !== width) { width = e.contentRect.width; fit(); } });
-    ro.observe(ref.current!);
-    return () => ro.disconnect();
-  }, []);
-  return <textarea ref={ref} rows={1} value={value} style={{ overflow: 'hidden', resize: 'none' }} {...rest}
-    onKeyDown={oneLine ? (e) => { if (e.key === 'Enter') e.preventDefault(); } : rest.onKeyDown}
-    onChange={(e) => { if (oneLine && /[\r\n]/.test(e.target.value)) e.target.value = e.target.value.replace(/\s*[\r\n]+\s*/g, ' '); onChange?.(e); }} />;
-}
 
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 /** §8.11 — the address in the maps app: Apple Maps on iPhone/iPad, Google Maps elsewhere ⚑. */

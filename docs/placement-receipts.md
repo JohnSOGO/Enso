@@ -7,6 +7,25 @@ carry its result.
 
 ---
 
+## 2026-10-03 — Two seams opened before Recipes (reorganizer)
+
+- **Trigger:** placement-advisor, preparing for Recipes: the Claude plumbing in
+  `photo-reader.ts` and the auto-growing `Grow` textarea in `ThingForm.tsx` are each needed by a
+  second owner, so each moves out first, in its own behaviour-preserving commit (two-commit rule).
+- **Seam 1 (NEW owner row):** the shared Anthropic call (CLAUDE_MODEL, the lazy SDK + zod
+  imports, the client with an injectable `fetch`, `beta.messages.parse` with the refusal fallback
+  beta, the refusal / cut off / unexpected shape / API error → honest-failure mapping) moved from
+  `src/worker/photo-reader.ts` to `src/worker/claude.ts` (`askClaude`). `claude.ts` is now the
+  only importer of `@anthropic-ai/sdk` and zod, still only lazily; photo-reader keeps `readPhoto`'s
+  signature, its prompt, schema and image block. Its row is narrowed to match.
+- **Seam 2 (NEW owner row):** `Grow` moved from `frontend/src/components/ThingForm.tsx` to
+  `frontend/src/components/Grow.tsx`, exported unchanged; ThingForm imports it.
+- **Behaviour:** preserved — the photo-reader tests in `test/things-api.test.ts` pass unchanged
+  (same request body, headers, refusal and API-error results). No ceilings moved: neither file is
+  pinned. Recipes itself is not built here.
+
+---
+
 ## 2026-10-03 — Sun-timed alerts: the goat alert (placement-advisor)
 
 - **Ask:** MojoSOGO decided a daily alert 30 minutes before local sunset, "Put the goats away —
