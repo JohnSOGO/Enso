@@ -94,7 +94,7 @@ describe('M5 Web Push (§9.1)', () => {
     expect(req.headers.get('content-encoding')).toBe('aes128gcm');
     expect(req.headers.get('ttl')).toBe('3600');
     expect(req.headers.get('urgency')).toBe('high');
-    expect(req.headers.get('topic')).toBe(fireId);
+    expect(req.headers.get('topic')).toBeNull();
     const [, jwt, k] = jwtOf(req)!;
     expect(k).toBe(env.VAPID_PUBLIC_KEY);
     const v = await readVapidJwt(jwt, env.VAPID_PUBLIC_KEY);
@@ -196,7 +196,7 @@ describe('M5 Web Push (§9.1)', () => {
     expect(to(other)).toEqual([]);
     for (const s of [s1, s2]) {
       const [p] = to(s);
-      expect(p.headers.get('topic')).toBe('enso-test'); // AN7
+      expect(p.headers.get('topic')).toBeNull(); // AN7
       expect(JSON.parse(await decryptPush(s, p.body))).toEqual({ fireId: null, kind: null, tag: 'enso-test', title: 'Ensō', body: 'Ensō test — phone alerts work', actions: [] });
     }
     const c = await member(o);
@@ -239,7 +239,7 @@ describe('M5 Web Push (§9.1)', () => {
     const [req, ...more] = to(sub);
     expect(more).toEqual([]);
     const id = byMember[withPhone.id].id;
-    expect(req.headers.get('topic')).toBe(id);
+    expect(req.headers.get('topic')).toBeNull();
     expect(JSON.parse(await decryptPush(sub, req.body))).toEqual({
       fireId: null, kind: null, tag: id, title: '📢 Announcement', body: 'MojoSOGO says: Dinner is ready', actions: [],
     });
