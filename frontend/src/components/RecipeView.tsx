@@ -1,8 +1,11 @@
 // SPEC §8.12 — one recipe (modal): the thumbnail and ▶ link to the video, servings and time, the source
 // note with any "captions couldn't be read" marker, ingredients with pick boxes → Add to Shopping (one
-// POST /lists/{SHOPPING_LIST_ID}/items per ingredient, in order; the summary inside ⚑ Q69), the steps, ✎.
+// POST /lists/{SHOPPING_LIST_ID}/items per ingredient, in order; the summary inside ⚑ Q69), the steps, ✎;
+// under the title everyone's emoji ("Shelly 🌶 · John ⭐", ⚑ Q73) and RecipeEmoji, mine (§7E.5).
 import { useState } from 'react';
 import { Modal } from './Modal';
+import { RecipeEmoji } from './RecipeEmoji';
+import { useApp, type Member } from '../state';
 import { errorText, post } from '../api';
 import { SHOPPING_LIST_ID } from '../../../src/shared/lists';
 import type { Recipe } from '../../../src/shared/recipes';
@@ -15,13 +18,23 @@ function sourceNote(r: Recipe): string {
   return r.captionsError ? `${read} · captions couldn't be read: ${r.captionsError}` : read;
 }
 
+/** Everyone's emoji in the household's member order; a member the PWA doesn't know reads "Someone" ⚑ Q73. */
+function everyone(r: Recipe, members: Member[]): string {
+  const at = (id: string) => { const i = members.findIndex((m) => m.id === id); return i < 0 ? members.length : i; };
+  return [...r.emojis].sort((a, b) => at(a.memberId) - at(b.memberId))
+    .map((e) => `${members.find((m) => m.id === e.memberId)?.displayName ?? 'Someone'} ${e.emoji}`).join(' · ');
+}
+
 /** "Added 4 · Milk already on the list" — the parts that apply. */
 const summary = (added: string[], there: string[]) => [
   added.length ? `Added ${added.length}` : '',
   there.length ? `${there.join(', ')} already on the list` : '',
 ].filter(Boolean);
 
-export function RecipeView({ recipe: r, onEdit, onClose }: { recipe: Recipe; onEdit: () => void; onClose: () => void }) {
+interface Props { recipe: Recipe; recipes: Recipe[]; onChange: (r: Recipe) => void; onEdit: () => void; onClose: () => void }
+
+export function RecipeView({ recipe: r, recipes, onChange, onEdit, onClose }: Props) {
+  const { members } = useApp();
   const [picked, setPicked] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
@@ -52,6 +65,8 @@ export function RecipeView({ recipe: r, onEdit, onClose }: { recipe: Recipe; onE
   return (
     <Modal title={r.title} onClose={onClose} error={error}
       footer={<><button onClick={onEdit} disabled={busy}>✎ Edit</button><button onClick={onClose}>Close</button></>}>
+      {r.emojis.length > 0 && <p className={s.everyone}>{everyone(r, members)}</p>}
+      <RecipeEmoji recipe={r} recipes={recipes} onChange={onChange} />
       {r.videoId && r.watchUrl && (
         <>
           {r.thumbnailUrl && (

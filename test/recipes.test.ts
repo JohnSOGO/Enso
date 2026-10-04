@@ -1,9 +1,10 @@
 // M4o acceptance (SPEC §7E) — the pure recipe rules: R1 (youtubeVideoId), R9 (cleanRecipeReading),
-// parseRecipeInput, hasRecipeText / sourcesOf, the clash, recipeFromRow.
+// parseRecipeInput, hasRecipeText / sourcesOf, the clash, recipeFromRow; M4p (§7E.5) RE8 byMyEmoji, RE9 usedEmojis.
 import { describe, expect, it } from 'vitest';
 import {
-  INGREDIENTS_MAX, INGREDIENT_MAX, RECIPE_TITLE_MAX, STEPS_MAX, UNTITLED_VIDEO, cleanRecipeReading, hasRecipeText,
-  parseRecipeInput, recipeFromRow, recipeVideoClash, sourcesOf, thumbnailUrl, watchUrl, youtubeVideoId, type RecipeRow,
+  INGREDIENTS_MAX, INGREDIENT_MAX, RECIPE_TITLE_MAX, STEPS_MAX, UNTITLED_VIDEO, USED_EMOJIS_MAX, byMyEmoji, cleanRecipeReading,
+  hasRecipeText, myEmoji, parseRecipeInput, recipeFromRow, recipeVideoClash, sourcesOf, thumbnailUrl, usedEmojis, watchUrl,
+  youtubeVideoId, type Recipe, type RecipeRow,
 } from '../src/shared/recipes';
 import { TEXT_MAX } from '../src/shared/lists';
 
@@ -142,5 +143,67 @@ describe('the clash and the wire shape', () => {
     expect(recipeFromRow(row({ video_id: null, source: '["typed"]', ingredients: 'not json' }))).toMatchObject({
       watchUrl: null, thumbnailUrl: null, ingredients: [], source: ['typed'],
     });
+  });
+});
+
+describe("M4p each person's emoji (§7E.5)", () => {
+  const ME = 'mem_me', YOU = 'mem_you';
+  const rec = (id: string, createdAt: string, mine: string | null, yours: string | null = null): Recipe => ({
+    id, title: id, videoId: null, videoTitle: null, channel: null, watchUrl: null, thumbnailUrl: null, ingredients: [], steps: [],
+    servings: null, time: null, found: false, source: ['typed'], captionsError: null, createdBy: ME, createdAt, updatedAt: createdAt,
+    emojis: [...(mine ? [{ memberId: ME, emoji: mine }] : []), ...(yours ? [{ memberId: YOU, emoji: yours }] : [])],
+  });
+
+  it("recipeFromRow keeps only its own recipe's emojis; none by default", () => {
+    const row = { id: 'rcp_1', title: 'Soup', video_id: null, video_title: null, channel: null, ingredients: '[]', steps: '[]',
+      servings: null, time_text: null, found: 0, source: '["typed"]', captions_error: null, created_by: ME, created_at: 't',
+      updated_at: 't', deleted_at: null } satisfies RecipeRow;
+    expect(recipeFromRow(row).emojis).toEqual([]);
+    expect(recipeFromRow(row, [
+      { recipe_id: 'rcp_1', member_id: ME, emoji: '🌶' }, { recipe_id: 'rcp_2', member_id: ME, emoji: '⭐' },
+      { recipe_id: 'rcp_1', member_id: YOU, emoji: '⭐' },
+    ]).emojis).toEqual([{ memberId: ME, emoji: '🌶' }, { memberId: YOU, emoji: '⭐' }]);
+  });
+
+  it('myEmoji is mine or null', () => {
+    expect(myEmoji(rec('a', 't', '🌶', '⭐'), ME)).toBe('🌶');
+    expect(myEmoji(rec('a', 't', null, '⭐'), ME)).toBeNull();
+  });
+
+  it('RE8 byMyEmoji: biggest group first; ties by newest, then emoji; newest first within; unrated last', () => {
+    const list = [
+      rec('u1', '2026-10-09', null, '🌶'), // unrated by me (yours doesn't count)
+      rec('s1', '2026-10-08', '⭐'),
+      rec('c1', '2026-10-01', '🌶'),
+      rec('c2', '2026-10-05', '🌶'),
+      rec('p1', '2026-10-03', '🍕'),
+      rec('u2', '2026-10-02', null),
+    ];
+    expect(byMyEmoji(list, ME).map((r) => r.id)).toEqual(['c2', 'c1', 's1', 'p1', 'u1', 'u2']);
+    // for the other member it is their own grouping
+    expect(byMyEmoji(list, YOU).map((r) => r.id)).toEqual(['u1', 's1', 'c2', 'p1', 'u2', 'c1']);
+    expect(list.map((r) => r.id)).toEqual(['u1', 's1', 'c1', 'c2', 'p1', 'u2']); // the input is not reordered
+  });
+
+  it('RE8 equal groups with an equal newest fall back to the emoji string; equal times to the id', () => {
+    const list = [rec('a', '2026-10-01', '🍕'), rec('b', '2026-10-01', '⭐'), rec('d', '2026-10-01', null), rec('e', '2026-10-01', null)];
+    const [x, y] = ['🍕', '⭐'].sort();
+    expect(byMyEmoji(list, ME).map((r) => myEmoji(r, ME))).toEqual([x, y, null, null]);
+    expect(byMyEmoji(list, ME).slice(2).map((r) => r.id)).toEqual(['e', 'd']);
+    expect(byMyEmoji([], ME)).toEqual([]);
+  });
+
+  it('RE9 usedEmojis: most used first, ties by the string, at most USED_EMOJIS_MAX', () => {
+    const many = [...'🍎🍐🍊🍋🍌🍉🍇🍓🫐🍈🍒🍑🥭🍍'];
+    expect(new Set(many).size).toBe(14);
+    const list = [
+      ...many.map((e, i) => rec(`r${i}`, 't', e)),
+      rec('x1', 't', null, '🍍'), rec('x2', 't', '🍍'),
+    ];
+    const used = usedEmojis(list);
+    expect(used).toHaveLength(USED_EMOJIS_MAX);
+    expect(used[0]).toBe('🍍');
+    expect(used.slice(1)).toEqual(many.filter((e) => e !== '🍍').sort().slice(0, USED_EMOJIS_MAX - 1));
+    expect(usedEmojis([])).toEqual([]);
   });
 });

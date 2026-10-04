@@ -17,7 +17,7 @@ import {
 let o: Client;
 beforeAll(async () => { o = await owner(); await warmClaude(); }, 60_000);
 beforeEach(async () => {
-  await env.DB.batch([env.DB.prepare('DELETE FROM recipes'), env.DB.prepare('DELETE FROM recipe_reads')]);
+  await env.DB.batch([env.DB.prepare('DELETE FROM recipe_emojis'), env.DB.prepare('DELETE FROM recipes'), env.DB.prepare('DELETE FROM recipe_reads')]);
 });
 afterEach(() => { vi.restoreAllMocks(); });
 

@@ -21,3 +21,14 @@
 .picks label { display: flex; align-items: center; gap: 10px; min-height: 44px; }
 .steps { padding-left: 1.4em; display: flex; flex-direction: column; gap: 6px; }
 .said { font-size: .9rem; margin: 6px 0; }
+
+/* §7E.5 each person's emoji: the Newest | By emoji chips, everyone's line, and my picker (RecipeEmoji). */
+.sort { margin-bottom: 8px; }
+.pick { min-height: 44px; min-width: 44px; justify-content: center; padding: 4px 12px; font-size: 1rem; }
+.pick[aria-pressed='true'] { border-color: var(--accent); background: var(--surface); font-weight: 600; }
+.everyone { margin: 0 0 8px; }
+.mine { border: 0; padding: 0; margin: 0 0 10px; min-width: 0; }
+.mineLabel { font-size: .8rem; color: var(--text-dim); padding: 0; margin-bottom: 4px; }
+.emojiSet { display: flex; gap: 8px; margin-top: 8px; }
+.emojiSet > input { flex: 0 1 6rem; min-width: 0; min-height: 44px; }
+.emojiSet > button { flex: none; min-height: 44px; }

@@ -2093,8 +2093,8 @@ clear it later. It is personal: the row shows **mine**; the recipe view shows **
   recipe's emojis in one more query.
 - `myEmoji(recipe, memberId)` → my emoji or null.
 - `byMyEmoji(recipes, memberId)` — the **By emoji** order ⚑ Q71: recipes grouped by **my** emoji;
-  the biggest group first; equal groups by their newest recipe (newest first), then by the emoji
-  string; newest first within a group; recipes I haven't given an emoji go **last**, newest first.
+  the biggest group first; equal groups by their newest recipe's `createdAt` (newest first), then
+  by the emoji string; newest first within a group; recipes I haven't given an emoji go **last**, newest first.
   "Newest" is `createdAt`, then `id`, both descending — the server's list order.
 - `usedEmojis(recipes)` — the household's emojis for the picker ⚑ Q72: every emoji anyone has put
   on these recipes, most used first (ties by the emoji string), at most 12 (`USED_EMOJIS_MAX`).
