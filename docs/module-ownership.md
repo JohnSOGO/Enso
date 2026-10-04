@@ -30,6 +30,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/shared/things.ts` | Thing rules: limits, input validation (title/note/place/address/phone/cost/link, window end ≥ start), remindersFor + planThingFires, canPlanOn, cleanPhotoReading, open-list order, photo limits + shrink constants, the Thing/PhotoReading wire types (§7C) — pure; imports engine, never the reverse |
 | `src/shared/engine.ts` | The alert engine: plan, step, act, timer commands (§5) — pure + pushActions(kind) |
 | `src/shared/lists.ts` | Household list rules: itemKey, add/re-open decision, item clash, list-name clash, who may rename/delete a list (canManageList), text/note/name limits, LISTS_MAX, SHOPPING_LIST_ID, 30-day visible window (§7A.1) — pure |
+| `src/shared/announce.ts` | House announcements (§9.3): ANNOUNCE_MAX, ANNOUNCE_TITLE, announceError (text trimmed 1..max, channels a non-empty set of CHANNEL), announceMessage → "{name} says: {text}" — pure, imports only vocab |
 | `src/shared/invite-link.ts` | The invite link format (§6.2a): `JOIN_PATH`, build `{origin}/join#{code}`, take the code from a pasted link or a bare code — pure |
 
 ## Worker (flow stages: route → persist → deliver)
@@ -42,7 +43,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/http.ts` | Error envelope (§10) and input checks |
 | `src/worker/session.ts` | Password hashing, session cookie, `requireMember` / owner guards |
 | `src/worker/tick.ts` | `tick()` orchestration: load rows, call the engine, write results, deliveries (§5.6–5.7), chore run planning (§7B.3), thing reminder planning (§7C.2) |
-| `src/worker/push.ts` | Web Push delivery (§9.1): for queued push deliveries and /push/test, builds the payload { fireId, kind, title, body, actions }, sends to each of the member's subscriptions via web-push.ts, records results (201 → sent + last_ok_at; 404/410 → delete the subscription; else failed with status + body, last_error; none → no_subscription; keys missing → failed, visibly) |
+| `src/worker/push.ts` | Web Push delivery (§9.1): for queued push deliveries and /push/test, builds the payload { fireId, kind, tag, title, body, actions } (tag: fireId / the delivery id when there is no fire, an announcement / 'enso-test'; it is also the topic), sends to each of the member's subscriptions via web-push.ts, records results (201 → sent + last_ok_at; 404/410 → delete the subscription; else failed with status + body, last_error; none → no_subscription; keys missing → failed, visibly) |
 | `src/worker/web-push.ts` | Web Push protocol (RFC 8291/8292) — the only importer of `@block65/webcrypto-web-push`: encrypt the payload, VAPID headers cached per push-service origin (~1 h, expiry checked against a passed-in `now`), ttl 3600 / urgency high / topic (≤ 32 url-safe chars), one POST to one subscription → its status + body text; no D1, never decides what is sent or what a result means (§9.1) |
 | `src/worker/routes/auth.ts` | Setup, login/logout, signup, invite preview, rate limit, `/me` |
 | `src/worker/routes/members.ts` | Members list/disable, invites |
@@ -52,6 +53,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/routes/alarms.ts` | `/alarms` — scheduled alarms as `is_alarm` events (§4.2a) |
 | `src/worker/routes/alerts.ts` | Timers + commands, fires + actions |
 | `src/worker/routes/household.ts` | Household settings, days off, `/status`, `/push/*` (vapid-key, subscriptions, test) |
+| `src/worker/routes/announce.ts` | `POST /announce` (§9.3): validate, the sender's name from the session, one batch of fire-less deliveries (one `house`; one `push` per audience member but the sender), then sendPushDeliveries |
 | `src/worker/routes/relay.ts` | `/relay/claim`, `/relay/report` (§9.2) |
 | `src/worker/routes/lists.ts` | `/lists`, `/lists/{id}`, `/lists/{id}/items`, `/list-items/{id}` — list CRUD and list item CRUD (§7A, §10) |
 | `src/worker/routes/chores.ts` | `/chores`, `/chores/today`, `/chore-runs/{id}/done\|undo` — chore CRUD, today's runs, step done/undo and edit re-plan persistence (§7B, §10) |
@@ -78,6 +80,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/ReminderFields.tsx` | The event form's Reminder section (§8.4): reminder select incl. the evening-before option, Remind via Phone/House, repeat-the-alert select; reminder ⇄ form mapping |
 | `frontend/src/components/OptionalItems.tsx` | Settings → Me → Optional calendar items: the built-in Public holidays and 📈 rows via PATCH /me, then GET /optional-events, one line per event (emoji, title, repeatText), On switch → PUT/DELETE /events/{id}/optin (§8.6) |
 | `frontend/src/components/Alarms.tsx` | Alarms tab: scheduled alarm list + alarm form (§8.5) |
+| `frontend/src/components/Announce.tsx` | The 📢 Announce button at the top of the Alarms tab and its box: message (≤ ANNOUNCE_MAX), ChannelChecks, Send → POST /announce, the refusal inside the box (§8.5, §9.3) |
 | `frontend/src/components/Timers.tsx` | Rolling timers list + timer form (§8.5) |
 | `frontend/src/components/Chores.tsx` | Chores section of the Alarms tab (§8.5) |
 | `frontend/src/components/ChoreForm.tsx` | Chore form modal: days, at/by, people turn order, steps (§8.5) |

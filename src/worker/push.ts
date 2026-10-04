@@ -3,6 +3,7 @@
 import type { Env } from './env';
 import { all } from './db';
 import { pushActions } from '../shared/engine';
+import { ANNOUNCE_TITLE } from '../shared/announce';
 import type { Action, AlertKind } from '../shared/vocab';
 import { sendWebPush, type VapidKeys } from './web-push';
 
@@ -10,10 +11,15 @@ export const NO_SUBSCRIPTION = 'no_subscription';
 export const PUSH_NOT_CONFIGURED = 'push_not_configured';
 export const PUSH_TITLE = 'Ensō';
 export const TEST_BODY = 'Ensō test — phone alerts work';
+export const TEST_TAG = 'enso-test';
 const DETAIL_MAX = 500;
 
-/** The notification the service worker shows (sw.js). A test push has no fire, no kind, no actions. */
-export interface PushPayload { fireId: string | null; kind: AlertKind | null; title: string; body: string; actions: Action[] }
+/**
+ * The notification the service worker shows (sw.js). A test push and an announcement (§9.3) have no
+ * fire, no kind, no actions. `tag` is what the phone collapses by, and the push topic: a fire's push →
+ * its fireId; a delivery with no fire → its delivery id; the test push → TEST_TAG.
+ */
+export interface PushPayload { fireId: string | null; kind: AlertKind | null; tag: string; title: string; body: string; actions: Action[] }
 
 interface Sub { id: string; endpoint: string; p256dh: string; auth: string }
 
@@ -33,7 +39,7 @@ const subsOf = (db: D1Database, memberId: string) =>
  */
 async function sendToAll(db: D1Database, vapid: VapidKeys, subs: Sub[], payload: PushPayload, now: string) {
   const results = await Promise.all(subs.map((s) =>
-    sendWebPush(vapid, s, JSON.stringify(payload), { topic: payload.fireId ?? undefined, now })));
+    sendWebPush(vapid, s, JSON.stringify(payload), { topic: payload.tag, now })));
   const stmts: D1PreparedStatement[] = [];
   const failures: string[] = [];
   results.forEach((r, i) => {
@@ -53,12 +59,15 @@ async function sendToAll(db: D1Database, vapid: VapidKeys, subs: Sub[], payload:
   return { sent: results.filter((r) => r.status === 201).length, failures };
 }
 
-/** Tick step 3: send each queued push delivery to every subscription of its member, and record the outcome. */
+/**
+ * Tick step 3 (and POST /announce): send each queued push delivery to every subscription of its member,
+ * and record the outcome. A delivery with no fire is an announcement (§9.3).
+ */
 export async function sendPushDeliveries(env: Env, deliveryIds: string[], now: string): Promise<void> {
   const db = env.DB;
   const vapid = vapidOf(env);
-  const rows = await all<{ id: string; member_id: string; message: string; fire_id: string; kind: AlertKind }>(db,
-    `SELECT d.id, d.member_id, d.message, d.fire_id, f.kind FROM deliveries d JOIN fires f ON f.id = d.fire_id
+  const rows = await all<{ id: string; member_id: string; message: string; fire_id: string | null; kind: AlertKind | null }>(db,
+    `SELECT d.id, d.member_id, d.message, d.fire_id, f.kind FROM deliveries d LEFT JOIN fires f ON f.id = d.fire_id
       WHERE d.id IN (${deliveryIds.map(() => '?').join(',')})`, ...deliveryIds);
   for (const d of rows) {
     let status: 'sent' | 'failed' = 'failed';
@@ -68,7 +77,9 @@ export async function sendPushDeliveries(env: Env, deliveryIds: string[], now: s
       const subs = await subsOf(db, d.member_id);
       if (subs.length === 0) detail = NO_SUBSCRIPTION;
       else {
-        const payload: PushPayload = { fireId: d.fire_id, kind: d.kind, title: PUSH_TITLE, body: d.message, actions: pushActions(d.kind) };
+        const payload: PushPayload = d.fire_id === null || d.kind === null
+          ? { fireId: null, kind: null, tag: d.id, title: ANNOUNCE_TITLE, body: d.message, actions: [] }
+          : { fireId: d.fire_id, kind: d.kind, tag: d.fire_id, title: PUSH_TITLE, body: d.message, actions: pushActions(d.kind) };
         const r = await sendToAll(db, vapid, subs, payload, now);
         if (r.sent > 0) status = 'sent';
         detail = r.failures.length ? r.failures.join('; ').slice(0, DETAIL_MAX) : null;
@@ -86,6 +97,6 @@ export async function sendTestPush(env: Env, memberId: string, now: string):
   if (subs.length === 0) return { error: NO_SUBSCRIPTION, message: 'No phone is subscribed for you yet — turn phone alerts on first.' };
   const vapid = vapidOf(env);
   if (!vapid) return { error: PUSH_NOT_CONFIGURED, message: 'Phone alerts are not set up on this server (no push keys).' };
-  const r = await sendToAll(env.DB, vapid, subs, { fireId: null, kind: null, title: PUSH_TITLE, body: TEST_BODY, actions: [] }, now);
+  const r = await sendToAll(env.DB, vapid, subs, { fireId: null, kind: null, tag: TEST_TAG, title: PUSH_TITLE, body: TEST_BODY, actions: [] }, now);
   return r.sent > 0 ? { sent: r.sent } : { error: 'push_failed', message: `The test push did not go through: ${r.failures.join('; ')}` };
 }

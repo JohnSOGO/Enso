@@ -13,7 +13,7 @@ self.addEventListener('push', (event) => {
   const actions = Array.isArray(p.actions) ? p.actions.map((a) => ({ action: a, title: LABEL[a] || a })) : [];
   event.waitUntil(self.registration.showNotification(p.title || 'Ensō', {
     body: p.body || 'Something needs you — open Ensō.',
-    tag: p.fireId || 'enso-test',
+    tag: p.tag || p.fireId || 'enso-test', // §9.1: fire → fireId, announcement → delivery id, test → enso-test
     icon: '/icon-192.png',
     data: { fireId: p.fireId || null },
     actions,

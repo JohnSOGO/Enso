@@ -84,7 +84,7 @@ describe('M5 Web Push (§9.1)', () => {
     expect((await a.client.get('/status')).json.mySubscriptions).toEqual([]);
   });
 
-  it('P3 + P9: a ringing reminder → one aes128gcm POST with a VAPID header; it decrypts to the payload; sent', async () => {
+  it('P3 + P9 + AN7: a ringing reminder → one aes128gcm POST with a VAPID header; it decrypts to the payload; sent', async () => {
     const o = await owner();
     const a = await member(o);
     const { sub } = await phone(a.client, 'https://p3.push.test');
@@ -102,7 +102,7 @@ describe('M5 Web Push (§9.1)', () => {
     expect(v.claims).toMatchObject({ aud: 'https://p3.push.test', sub: env.VAPID_SUBJECT });
     // P9 — the test-side RFC 8291 decryptor reads back exactly the payload.
     expect(JSON.parse(await decryptPush(sub, req.body))).toEqual({
-      fireId, kind: 'reminder', title: 'Ensō', body: 'Reminder: Take the bins out', actions: ['done', 'snooze'],
+      fireId, kind: 'reminder', tag: fireId, title: 'Ensō', body: 'Reminder: Take the bins out', actions: ['done', 'snooze'],
     });
     expect(await deliveriesOf(fireId)).toEqual([{ status: 'sent', detail: null }]);
     const [s] = (await a.client.get('/status')).json.mySubscriptions;
@@ -188,7 +188,7 @@ describe('M5 Web Push (§9.1)', () => {
     expect(clock[2]).not.toBe(clock[1]);
   });
 
-  it('P8: /push/test pushes to each of my phones (test body, no fire, no actions); 409 with a message when none', async () => {
+  it('P8 + AN7: /push/test pushes to each of my phones (test body, no fire, no actions); 409 with a message when none', async () => {
     const o = await owner();
     const a = await member(o), b = await member(o);
     const { sub: s1 } = await phone(a.client), { sub: s2 } = await phone(a.client), { sub: other } = await phone(b.client);
@@ -196,8 +196,8 @@ describe('M5 Web Push (§9.1)', () => {
     expect(to(other)).toEqual([]);
     for (const s of [s1, s2]) {
       const [p] = to(s);
-      expect(p.headers.get('topic')).toBeNull();
-      expect(JSON.parse(await decryptPush(s, p.body))).toEqual({ fireId: null, kind: null, title: 'Ensō', body: 'Ensō test — phone alerts work', actions: [] });
+      expect(p.headers.get('topic')).toBe('enso-test'); // AN7
+      expect(JSON.parse(await decryptPush(s, p.body))).toEqual({ fireId: null, kind: null, tag: 'enso-test', title: 'Ensō', body: 'Ensō test — phone alerts work', actions: [] });
     }
     const c = await member(o);
     const none = await c.client.post('/push/test');
@@ -213,5 +213,35 @@ describe('M5 Web Push (§9.1)', () => {
     const r = await a.client.post('/push/test');
     expect(r.status).toBe(502);
     expect(r.json.message).toMatch(/403.*bad jwt/);
+  });
+
+  it('AN4 + AN5: an announcement by phone → a push row per other active member; the push names the sender, tagged by its delivery id', async () => {
+    const o = await owner();
+    const withPhone = await member(o), without = await member(o), gone = await member(o);
+    expect((await o.patch(`/members/${gone.id}`, { disabled: true })).status).toBe(200);
+    const { sub } = await phone(withPhone.client, 'https://an5.push.test');
+    const { sub: ownPhone } = await phone(o, 'https://an5.push.test');
+    const r = await o.post('/announce', { text: ' Dinner is ready ', channels: ['push'] });
+    expect(r.status).toBe(201);
+    const byMember = Object.fromEntries(r.json.deliveries.map((d: any) => [d.memberId, d]));
+    // Every other active member (earlier tests in this file made some too) — not the sender, not the disabled one.
+    const others = (await env.DB.prepare('SELECT id FROM members WHERE disabled_at IS NULL AND id != ?').bind((await o.get('/me')).json.id)
+      .all<{ id: string }>()).results.map((m) => m.id);
+    expect(Object.keys(byMember).sort()).toEqual(others.sort());
+    expect(others).toEqual(expect.arrayContaining([withPhone.id, without.id]));
+    expect(others).not.toContain(gone.id);
+    expect(r.json.deliveries.every((d: any) => d.channel === 'push')).toBe(true);
+    expect(byMember[withPhone.id].status).toBe('sent');
+    const row = await env.DB.prepare('SELECT status, detail, fire_id FROM deliveries WHERE id = ?').bind(byMember[without.id].id).first();
+    expect(row).toEqual({ status: 'failed', detail: 'no_subscription', fire_id: null });
+    expect(to(ownPhone)).toEqual([]);
+
+    const [req, ...more] = to(sub);
+    expect(more).toEqual([]);
+    const id = byMember[withPhone.id].id;
+    expect(req.headers.get('topic')).toBe(id);
+    expect(JSON.parse(await decryptPush(sub, req.body))).toEqual({
+      fireId: null, kind: null, tag: id, title: '📢 Announcement', body: 'MojoSOGO says: Dinner is ready', actions: [],
+    });
   });
 });

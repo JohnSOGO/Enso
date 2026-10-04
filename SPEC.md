@@ -2227,7 +2227,8 @@ acked, nothing is scheduled — **now only**.
   member without a phone gets the honest failed row, as alerts do.
 - → **201** `{ deliveries: { id, channel, memberId, status }[] }`, read after sending (push
   rows final, the house row `queued`). Every row also shows in Settings → Status.
-- 400 `invalid_input` with `announceError`'s message.
+- 400 `invalid_input` with `announceError`'s message. **409 `no_recipients`** when only Phone
+  is ticked and there is no other active member — nothing would be sent, so it says so.
 
 **The push:** `{ fireId: null, kind: null, tag: <delivery id>, title: "📢 Announcement", body:
 "Shelly says: Dinner is ready", actions: [] }`; tapping it opens the app.
@@ -2241,7 +2242,7 @@ acked, nothing is scheduled — **now only**.
 | AN3 | then `/relay/claim`, `/relay/report sent` | the claim returns it `{ id, message }`; the report makes it `sent` |
 | AN4 | Phone, with the sender, a member with a phone, one without, one disabled | one push row each for the other two active members; the sender and the disabled member get none; with a phone → `sent`, without → `failed`, `no_subscription` |
 | AN5 | the push to that phone | decrypts to the payload above with `tag` = the delivery id; the `topic` header is the delivery id |
-| AN6 | blank text, 201 chars, no channels, an unknown channel; no session; a `name` in the body | 400 with a message ×4; 401; the name in the body is ignored |
+| AN6 | blank text, 201 chars, no channels, an unknown channel; no session; a `name` in the body; Phone only with nobody else | 400 with a message ×4; 401; the name in the body is ignored; 409 `no_recipients` |
 | AN7 | tag rules | a fire's push: `tag` = `topic` = `fireId`; the test push: `tag` = `topic` = `"enso-test"` |
 | AN8 | migration 0012 | rows survive unchanged; `foreign_key_check` empty; a fire-less delivery is accepted (§4.2k) |
 
@@ -2287,7 +2288,7 @@ acked, nothing is scheduled — **now only**.
 | GET | `/push/vapid-key` | public | → `{ key }` |
 | GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff }`; PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
 | GET | `/status` | member | → `{ relayLastSeen, mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[] }` |
-| POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
+| POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `no_recipients` (§9.3); spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
 | POST | `/relay/claim` | bearer `RELAY_TOKEN` | → deliveries |
 | POST | `/relay/report` | bearer `RELAY_TOKEN` | `{ id, status, detail }` |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek }` (`thisWeek`/`nextWeek` = member id or null) |
