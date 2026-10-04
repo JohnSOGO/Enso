@@ -7,6 +7,20 @@ carry its result.
 
 ---
 
+## 2026-10-04 — Recipe emoji seam, preparing for reading creator comments (reorganizer)
+
+- **Trigger:** the placement for reading a video's creator comments (§7E) names `src/shared/recipes.ts`
+  as the owner, and it sat at 253 / 300 lines carrying two concerns (the recipe rules and §7E.5).
+- **Seam moved:** USED_EMOJIS_MAX, myEmoji, byMyEmoji, usedEmojis and their private helpers byText /
+  newestFirst, from `src/shared/recipes.ts` to the NEW owner `src/shared/recipe-emoji.ts` (pure; imports
+  recipes types only). `RecipeEmoji` / `RecipeEmojiRow` stay in recipes.ts (recipeFromRow and the wire).
+- **Room opened:** recipes.ts 253 → 218 lines (recipe-emoji.ts 36) under the global cap (300); no CEILINGS entry added.
+- **Behavior:** preserved; bodies moved verbatim, importers (Recipes.tsx, RecipeEmoji.tsx,
+  test/recipes.test.ts) repointed; typecheck, tests, build and arch:audit green.
+- **Restraint:** nothing else in recipes.ts moved; no creator-comment code added.
+
+---
+
 ## 2026-10-03 — Each person's emoji on a recipe (placement-advisor)
 
 - **Ask:** MojoSOGO decided each person can give a recipe their own single emoji (or none, changeable);

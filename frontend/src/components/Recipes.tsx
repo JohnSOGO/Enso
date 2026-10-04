@@ -7,7 +7,8 @@ import { RecipeView } from './RecipeView';
 import { RecipeForm } from './RecipeForm';
 import { ApiError, errorText, get, post } from '../api';
 import { useApp } from '../state';
-import { byMyEmoji, myEmoji, youtubeVideoId, type Recipe } from '../../../src/shared/recipes';
+import { byMyEmoji, myEmoji } from '../../../src/shared/recipe-emoji';
+import { youtubeVideoId, type Recipe } from '../../../src/shared/recipes';
 import ls from './Lists.module.css';
 import s from './Recipes.module.css';
 
