@@ -33,3 +33,8 @@ export function parseJson<T>(text: string | null, fallback: T): T {
   if (text === null || text === undefined) return fallback;
   try { return JSON.parse(text) as T; } catch { return fallback; }
 }
+
+/** The household timezone (§4.1), from the settings row. */
+export async function householdTz(db: D1Database): Promise<string> {
+  return (await first<{ timezone: string }>(db, 'SELECT timezone FROM settings WHERE id = 1'))!.timezone;
+}

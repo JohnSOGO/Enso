@@ -1,15 +1,18 @@
 // SPEC §8.5 — Timers screen (single-line list) and timer form.
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
-import { ChannelChecks, RenotifySelect } from './AlertFields';
+import { ChannelChecks, RenotifySelect, SHORT } from './AlertFields';
 import { del, errorText, get, patch, post } from '../api';
 import { useApp } from '../state';
-import type { Channel } from '../../../src/shared/vocab';
+import { WEEKDAY, type Channel } from '../../../src/shared/vocab';
+import { utcToLocal, weekdayOf } from '../../../src/shared/time';
 import s from './Lists.module.css';
 
 export interface Timer {
   id: string; title: string; intervalMin: number; channels: Channel[]; renotifyMin: number | null; maxAlerts: number;
   assignedTo: string[]; running: boolean; createdBy: string;
+  /** §4.2n — the active time range, "HH:MM"; both null = always. */
+  activeFrom: string | null; activeTo: string | null;
   openFire: { id: string; due_at: string; state: string; alert_count: number } | null;
 }
 
@@ -21,7 +24,7 @@ export function minutesText(min: number) {
 
 /** The "Rolling timers" section of the Alarms tab (SPEC §8.5). */
 export function TimersSection({ onEdit }: { onEdit: (t: Timer | null) => void }) {
-  const { version, localTime, refresh } = useApp();
+  const { version, tz, today, refresh } = useApp();
   const [timers, setTimers] = useState<Timer[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, setNow] = useState(0);
@@ -45,7 +48,9 @@ export function TimersSection({ onEdit }: { onEdit: (t: Timer | null) => void })
   const nextOf = (t: Timer) => {
     if (!t.running || !t.openFire) return '—';
     if (t.openFire.state === 'ringing') return `${Math.max(0, Math.round((Date.now() - Date.parse(t.openFire.due_at)) / 60_000))} min`;
-    return localTime(t.openFire.due_at);
+    // The server's due time; the day is named when it isn't today (§8.5).
+    const l = utcToLocal(t.openFire.due_at, tz);
+    return l.date === today() ? l.time : `${SHORT[WEEKDAY[weekdayOf(l.date)]]} ${l.time}`;
   };
 
   return (
@@ -76,7 +81,7 @@ export function TimersSection({ onEdit }: { onEdit: (t: Timer | null) => void })
                 <th scope="row" className={s.flexible}>
                   <button className="plain" style={{ textAlign: 'left', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}
                     onClick={() => onEdit(t)} title={`Edit ${t.title}`}>
-                    ⏱ {t.title} <span className="muted">· {minutesText(t.intervalMin)}</span>
+                    ⏱ {t.title} <span className="muted">· {minutesText(t.intervalMin)}{t.activeFrom && t.activeTo ? ` · ${t.activeFrom}–${t.activeTo}` : ''}</span>
                   </button>
                 </th>
                 <td className={s.rigid}>{statusOf(t)}</td>
@@ -102,6 +107,7 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
     push: timer ? timer.channels.includes('push') : true, house: timer ? timer.channels.includes('house') : false,
     renotify: timer ? (timer.renotifyMin ? String(timer.renotifyMin) : 'off') : '15',
     assignedTo: timer?.assignedTo ?? [],
+    activeFrom: timer?.activeFrom ?? '', activeTo: timer?.activeTo ?? '',
   }), [timer]);
   const [f, setF] = useState(init);
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +122,8 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
   const save = () => run(async () => {
     const channels = [...(f.push ? ['push'] : []), ...(f.house ? ['house'] : [])];
     if (!channels.length) throw new Error('Pick at least one way to alert (Phone or House).');
-    const body = { title: f.title, intervalMin: Number(f.interval), channels, renotifyMin: f.renotify === 'off' ? null : Number(f.renotify), assignedTo: f.assignedTo };
+    const body = { title: f.title, intervalMin: Number(f.interval), channels, renotifyMin: f.renotify === 'off' ? null : Number(f.renotify), assignedTo: f.assignedTo,
+      activeFrom: f.activeFrom || null, activeTo: f.activeTo || null };
     if (timer) await patch(`/timers/${timer.id}`, body); else await post('/timers', body);
   });
 
@@ -135,6 +142,15 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
         <label className="field"><span>Interval (minutes, 1–1440)</span>
           <input type="number" inputMode="numeric" min={1} max={1440} value={f.interval} onChange={(e) => setF({ ...f, interval: e.target.value })} />
         </label>
+        <div className="row" role="group" aria-label="Active time range (empty = always)">
+          <label className="field" style={{ flex: 1 }}><span>Active from</span>
+            <input type="time" value={f.activeFrom} onChange={(e) => setF({ ...f, activeFrom: e.target.value })} />
+          </label>
+          <label className="field" style={{ flex: 1 }}><span>to</span>
+            <input type="time" value={f.activeTo} onChange={(e) => setF({ ...f, activeTo: e.target.value })} />
+          </label>
+        </div>
+        <p className="muted" style={{ fontSize: '.8rem', marginTop: -4 }}>Both empty = always.</p>
         <ChannelChecks push={f.push} house={f.house} onChange={(c) => setF({ ...f, ...c })} />
         <RenotifySelect label="While ringing, repeat the alert" value={f.renotify} onChange={(renotify) => setF({ ...f, renotify })} />
         <div className="field" role="group" aria-label="Assigned to">

@@ -1,6 +1,6 @@
 // SPEC §5.6 — orchestration only: load rows, call the pure engine, write results.
 import {
-  MATERIALIZE_AHEAD_H, alertMessage, newChoreFire, stepFire, planReminderFires,
+  MATERIALIZE_AHEAD_H, alertMessage, newChoreFire, stepFire, planReminderFires, timerWindow,
   type AlertConfig, type ChoreAlertText, type FireRow, type NewFire,
 } from '../shared/engine';
 import { DEFAULT_MAX_ALERTS, choreFireContext, choreFromRow, planChoreRuns, type Chore, type ChoreRow, type ChoreRun } from '../shared/chores';
@@ -21,6 +21,8 @@ export interface TickSummary { materialized: number; stepped: number; alerts: nu
 interface SourceRow {
   title: string; assigned_to: string; channels: string | null; renotify_min: number | null; max_alerts: number;
   interval_min: number | null; optional: number;
+  /** Timers only (§4.2n): the active time range and the household tz. */
+  active_from?: string | null; active_to?: string | null; tz?: string;
 }
 
 export function insertFire(db: D1Database, f: NewFire, ignoreConflict = false): D1PreparedStatement {
@@ -126,8 +128,10 @@ export async function sourceOf(
   }
   const row = fire.kind === 'reminder'
     ? await first<SourceRow>(db, `SELECT title, assigned_to, remind_channels AS channels, renotify_min, max_alerts, NULL AS interval_min, optional FROM events WHERE id = ?`, fire.event_id)
-    : await first<SourceRow>(db, `SELECT title, assigned_to, channels, renotify_min, max_alerts, interval_min, 0 AS optional FROM timers WHERE id = ?`, fire.timer_id);
+    : await first<SourceRow>(db, `SELECT title, assigned_to, channels, renotify_min, max_alerts, interval_min, 0 AS optional,
+        active_from, active_to, (SELECT timezone FROM settings WHERE id = 1) AS tz FROM timers WHERE id = ?`, fire.timer_id);
   if (!row) return null;
+  const window = timerWindow(row.active_from, row.active_to, row.tz);
   return {
     title: row.title,
     assignedTo: parseJson<string[]>(row.assigned_to, []),
@@ -136,6 +140,7 @@ export async function sourceOf(
       renotifyMin: row.renotify_min,
       maxAlerts: row.max_alerts,
       intervalMin: row.interval_min ?? undefined,
+      ...(window ? { window } : {}),
     },
     ...(row.optional === 1 ? { optional: true, onIds: await onMemberIds(db, fire.event_id) } : {}),
   };

@@ -33,6 +33,49 @@ export interface AlertConfig {
   renotifyMin: number | null;
   maxAlerts: number;
   intervalMin?: number;
+  /** §4.2n — a rolling timer's active time range, if it has one. */
+  window?: TimerWindow;
+}
+
+/** §4.2n — a rolling timer's active time range: local HH:MM in the household tz; from > to = overnight. */
+export interface TimerWindow { from: string; to: string; tz: string }
+
+/** The window of a timer row, or undefined when it has none (both ends must be set). */
+export function timerWindow(from: string | null | undefined, to: string | null | undefined, tz: string | null | undefined): TimerWindow | undefined {
+  return from && to && tz ? { from, to, tz } : undefined;
+}
+
+const minuteOfDay = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+/** §5.1 — why a window cannot be used with this interval, or null when it can. */
+export function timerWindowError(win: Pick<TimerWindow, 'from' | 'to'>, intervalMin: number): string | null {
+  if (win.from === win.to) return 'Active from and to must be different times.';
+  const length = (minuteOfDay(win.to) - minuteOfDay(win.from) + 1440) % 1440;
+  if (intervalMin >= length) return `The interval must be shorter than the active time range (${length} min).`;
+  return null;
+}
+
+/** §5.1 — is instant `t` inside the window? from ≤ local < to; overnight: local ≥ from || local < to. */
+export function inside(t: string, win: TimerWindow): boolean {
+  const local = utcToLocal(t, win.tz).time;
+  return win.from < win.to ? local >= win.from && local < win.to : local >= win.from || local < win.to;
+}
+
+/** The first instant strictly after `t` at which the local clock reads `hhmm` (§4.1 DST rules). */
+function nextLocal(t: string, hhmm: string, tz: string): string {
+  const today = utcToLocal(t, tz).date;
+  for (let k = 0; ; k++) {
+    const at = localToUtc(addDays(today, k), hhmm, tz);
+    if (ms(at) > ms(t)) return at;
+  }
+}
+
+/** §5.1 — when a rolling timer next rings, counted from `base`; the countdown restarts when the window opens. */
+export function nextTimerDue(base: string, intervalMin: number, win?: TimerWindow): string {
+  const plain = addMinutes(base, intervalMin);
+  if (!win) return plain;
+  if (inside(base, win) && ms(plain) < ms(nextLocal(base, win.to, win.tz))) return plain;
+  return addMinutes(nextLocal(base, win.from, win.tz), intervalMin);
 }
 
 export interface ReminderEvent {
@@ -99,6 +142,16 @@ export function planReminderFires(ev: ReminderEvent, tz: string, fromUtc: string
 /** §5.3 — advance one open fire to `now`. */
 export function stepFire(fire: FireRow, cfg: AlertConfig, now: string): { fire: FireRow; alert: boolean } {
   const t = ms(now);
+  // Rule 0 (§5.3): a timer never rings outside its window — the snooze shape, no close, no alert.
+  if (
+    fire.kind === 'timer' && cfg.window && cfg.intervalMin && !inside(now, cfg.window) &&
+    (fire.state === 'ringing' || (fire.state === 'scheduled' && t >= ms(fire.due_at)))
+  ) {
+    return {
+      fire: { ...fire, state: 'scheduled', due_at: nextTimerDue(now, cfg.intervalMin, cfg.window), alert_count: 0, last_alerted_at: null },
+      alert: false,
+    };
+  }
   if (fire.state === 'scheduled') {
     if (t < ms(fire.due_at)) return { fire, alert: false };
     if (remindsLike(fire.kind) && t - ms(fire.due_at) > MISSED_AFTER_MIN * 60_000) {
@@ -137,7 +190,7 @@ export function applyAction(
   if (fire.kind === 'timer' && action === 'ack' && fire.state !== 'closed' && fire.timer_id && cfg.intervalMin) {
     return {
       fire: closeFire(fire, 'acked', memberId, now),
-      next: newTimerFire(fire.timer_id, addMinutes(now, cfg.intervalMin)),
+      next: newTimerFire(fire.timer_id, nextTimerDue(now, cfg.intervalMin, cfg.window)),
     };
   }
   return { error: 'invalid_action' };
@@ -146,9 +199,10 @@ export function applyAction(
 /** §5.5 — timer start/stop. */
 export function applyTimerCmd(
   timer: TimerState, openFire: FireRow | null, cmd: TimerCmd, intervalMin: number, memberId: string, now: string,
+  window?: TimerWindow,
 ): { timer: TimerState; closeFire?: FireRow; newFire?: NewFire } {
   if (cmd === 'start' && !timer.running) {
-    return { timer: { ...timer, running: true }, newFire: newTimerFire(timer.id, addMinutes(now, intervalMin)) };
+    return { timer: { ...timer, running: true }, newFire: newTimerFire(timer.id, nextTimerDue(now, intervalMin, window)) };
   }
   if (cmd === 'stop' && timer.running) {
     return { timer: { ...timer, running: false }, closeFire: openFire ? closeFire(openFire, 'stopped', memberId, now) : undefined };
