@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.38 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
+**Version:** 2.39 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4167,6 +4167,10 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Identify fix** (v1.18.1): SogoAI's qwen3.6 thinks even with ` /no_think`; at `max_tokens` 100 it was cut off
+with an empty answer every time, which silently sent every photo to the paid Claude fallback. Now 1024
+(`IDENTIFY_MAX_TOKENS`), and a cut-off empty answer is an honest `failed` ("ran out of room"). Verified through
+the tunnel with a real photo.
 **Verified by MojoSOGO 2026-10-03:** 📢 announcements spoken through the tunnel (Echos + Voice PE
 `ok`); John opted in to 🐐 Put the goats away (first real alert 2026-10-04 18:00, sunset 18:30).
 **Push fix** (v1.7.1): no `Topic` header — Apple refused pushes carrying one (BadWebPushTopic)
