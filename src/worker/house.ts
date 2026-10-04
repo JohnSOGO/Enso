@@ -3,6 +3,7 @@
 // POST /announce write the rows); every row it takes ends sent / partial or visibly failed.
 import type { Env } from './env';
 import { all, first } from './db';
+import { callThroughAccess } from './access';
 import type { DeliveryStatus, HouseState } from '../shared/vocab';
 
 export const HOUSE_NOT_CONFIGURED = 'house_not_configured';
@@ -13,7 +14,6 @@ export const ECHO_TIMEOUT_MS = 15_000;
 /** ⚑ Q37 — the relay waited 30 s; 25 s keeps one call inside the ~30 s waitUntil budget. */
 export const SATELLITE_TIMEOUT_MS = 25_000;
 export const EXHAUSTED = `house delivery never finished after ${MAX_ATTEMPTS} attempts`;
-const BODY_MAX = 200;
 
 export interface HouseConfig {
   haUrl: string; echoTargets: string[]; echoType: string; satelliteEntity: string;
@@ -42,24 +42,11 @@ export function classifyHouse(echoOk: boolean, satOk: boolean): HouseResult {
 
 /** One POST to HA → "ok" (a 2xx only), "HTTP <status>: <body>" or "error: <message>". Never names a token. */
 async function ha(cfg: HouseConfig, path: string, payload: unknown, timeoutMs: number): Promise<string> {
-  try {
-    const res = await fetch(`${cfg.haUrl}${path}`, {
-      method: 'POST',
-      redirect: 'manual', // Access answers a bad service token with a 302 to its login page — a failure
-      headers: {
-        'CF-Access-Client-Id': cfg.accessId,
-        'CF-Access-Client-Secret': cfg.accessSecret,
-        Authorization: `Bearer ${cfg.haToken}`,
-        'Content-Type': 'application/json; charset=utf-8',
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    const text = await res.text().catch(() => '');
-    return res.status >= 200 && res.status < 300 ? 'ok' : `HTTP ${res.status}: ${text.slice(0, BODY_MAX)}`;
-  } catch (e) {
-    return `error: ${(e as Error).message}`;
-  }
+  const r = await callThroughAccess(cfg, `${cfg.haUrl}${path}`, {
+    method: 'POST', timeoutMs, body: JSON.stringify(payload),
+    headers: { Authorization: `Bearer ${cfg.haToken}`, 'Content-Type': 'application/json; charset=utf-8' },
+  });
+  return r.ok ? 'ok' : r.reason;
 }
 
 async function speak(cfg: HouseConfig, message: string): Promise<{ status: HouseResult; detail: string }> {
