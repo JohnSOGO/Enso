@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth**: §14 holds status and deviatio
 MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-04, v1.18.1, main = production.*
+*Last updated 2026-10-04, v1.19.0, main = production.*
 
 ## Running where
 
@@ -41,8 +41,8 @@ the working agreement in `CLAUDE.md`.
 - Prune about 25 old merged topic branches.
 - Look into the intermittent test-runner crash.
 - README has mis-encoded characters (`Â§`) in older sections.
-- A per-person "reach me on" speaker list for house deliveries (today every house delivery goes to all speakers).
-  It needs a spec and MojoSOGO's answers first.
+- Each person's speakers (v1.19.0, §9.2a) is live: check Home Assistant's real list in Settings → Me, and have each
+  person tick theirs. Q125–Q129 are ⚑ defaults awaiting MojoSOGO.
 - Dishwasher (deferred by MojoSOGO). Phase C kitchen display (needs an AREC).
 - Real-phone checks still owed per SPEC §14 (Android push, Done/Snooze, the laundry and goat reminders in practice).
 - A code-steward pass at this milestone.

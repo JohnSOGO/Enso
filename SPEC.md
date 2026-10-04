@@ -4296,7 +4296,7 @@ captions (5 ingredients, 6 steps — it had been "watch it").
 (the union; anyone not chosen, or nobody at all, → the default speakers, as before) and spoken only there; a surface
 with no speaker is not called. Built as: `classifyHouse` takes the called surfaces' results and is `failed` when none
 was called (never a quiet `sent`); the screen shows "not chosen" with every box unticked and names the defaults.
-Migration 0024 is applied only in tests so far. **Still owed:** apply 0024 in production; the real speaker list seen
+Migration 0024 applied in production and v1.19.0 deployed 2026-10-04. **Still owed:** the real speaker list seen
 on the iPhone (the template's `integration_entities('alexa_media')` may list more than the four Echos); each person's
 ticks; a reminder for one person heard only on their speakers.
 **Identify fix** (v1.18.1): SogoAI's qwen3.6 thinks even with ` /no_think`; at `max_tokens` 100 it was cut off
