@@ -1,7 +1,7 @@
 // SPEC §7C — the pure thing rules (src/shared/things.ts). D2 and D11 are rows of §7C.5.
 import { describe, expect, it } from 'vitest';
 import {
-  TITLE_MAX, canPlanOn, cleanPhotoReading, isStartReminder, openOrder, parseThingInput, planThingFires, plannedEventNotes,
+  ADDRESS_MAX, COST_MAX, PHONE_MAX, TITLE_MAX, canPlanOn, cleanPhotoReading, isStartReminder, openOrder, parseThingInput, planThingFires, plannedEventNotes,
   remindersFor, type ThingReminderSource,
 } from '../src/shared/things';
 import { localToUtc } from '../src/shared/time';
@@ -14,7 +14,7 @@ describe('parseThingInput (§7C.1)', () => {
 
   it('normalizes a thing: trimmed title, empty → null, push by default', () => {
     expect(parseThingInput({ ...ok, title: '  Fall fair ', note: '', place: null })).toEqual({
-      title: 'Fall fair', note: null, place: null, url: null, window_start: '2026-10-10', window_end: '2026-10-20',
+      title: 'Fall fair', note: null, place: null, address: null, phone: null, cost: null, url: null, window_start: '2026-10-10', window_end: '2026-10-20',
       remind_start: false, remind_on: null, channels: ['push'],
     });
   });
@@ -29,6 +29,14 @@ describe('parseThingInput (§7C.1)', () => {
   it('limits, dates, reminders and channels', () => {
     expect(parseThingInput({ ...ok, note: 'x'.repeat(2001) })).toMatch(/note/);
     expect(parseThingInput({ ...ok, place: 'x'.repeat(201) })).toMatch(/place/);
+    expect(parseThingInput({ ...ok, address: 'x'.repeat(ADDRESS_MAX + 1) })).toMatch(/^address/);
+    expect(parseThingInput({ ...ok, phone: 'x'.repeat(PHONE_MAX + 1) })).toMatch(/^phone/);
+    expect(parseThingInput({ ...ok, cost: 'x'.repeat(COST_MAX + 1) })).toMatch(/^cost/);
+    expect(parseThingInput({ ...ok, address: 'x'.repeat(ADDRESS_MAX), phone: 'x'.repeat(PHONE_MAX), cost: 'x'.repeat(COST_MAX) }))
+      .toMatchObject({ address: 'x'.repeat(ADDRESS_MAX), phone: 'x'.repeat(PHONE_MAX), cost: 'x'.repeat(COST_MAX) });
+    // Free text, kept as written — only trimmed (§7C.1).
+    expect(parseThingInput({ ...ok, address: ' 1 Fair Way, Del Mar ', phone: '(619) 555-0134', cost: '$15 adults · kids under 3 free' }))
+      .toMatchObject({ address: '1 Fair Way, Del Mar', phone: '(619) 555-0134', cost: '$15 adults · kids under 3 free' });
     expect(parseThingInput({ ...ok, url: `https://x.com/${'x'.repeat(500)}` })).toMatch(/url/);
     expect(parseThingInput({ ...ok, remindOn: '2026-02-30' })).toMatch(/remindOn/);
     expect(parseThingInput({ title: 'Any time', remindStart: true })).toMatch(/remindStart/);
@@ -87,13 +95,19 @@ describe('Plan it and order (§7C.2, §10)', () => {
     expect(canPlanOn({ window_start: null, window_end: null }, '2026-02-30')).toBe(false);
   });
 
-  it('plannedEventNotes: note, place, link — the note is cut so place and link fit', () => {
-    expect(plannedEventNotes({ note: 'Bring cash', place: 'Fairgrounds', url: 'https://fair.example' }))
+  it('plannedEventNotes: note, place, address, phone, cost, link — the note is cut so the rest fits', () => {
+    const none = { address: null, phone: null, cost: null };
+    expect(plannedEventNotes({ note: 'Bring cash', place: 'Fairgrounds', url: 'https://fair.example', ...none }))
       .toBe('Bring cash\nFairgrounds\nhttps://fair.example');
-    expect(plannedEventNotes({ note: null, place: null, url: null })).toBeNull();
-    const long = plannedEventNotes({ note: 'n'.repeat(2000), place: 'P', url: 'https://u' })!;
+    expect(plannedEventNotes({
+      note: 'Bring cash', place: 'Fairgrounds', address: '2260 Jimmy Durante Blvd', phone: '(619) 555-0134', cost: '$15 adults',
+      url: 'https://fair.example',
+    })).toBe('Bring cash\nFairgrounds\n2260 Jimmy Durante Blvd\n(619) 555-0134\n$15 adults\nhttps://fair.example');
+    expect(plannedEventNotes({ note: null, place: null, url: null, ...none })).toBeNull();
+    expect(plannedEventNotes({ note: null, place: null, url: null, ...none, cost: 'Free' })).toBe('Free');
+    const long = plannedEventNotes({ note: 'n'.repeat(2000), place: 'P', address: 'A', phone: '1', cost: 'C', url: 'https://u' })!;
     expect(long).toHaveLength(2000);
-    expect(long.endsWith('\nP\nhttps://u')).toBe(true);
+    expect(long.endsWith('\nP\nA\n1\nC\nhttps://u')).toBe(true);
   });
 
   it('openOrder: soonest window end first; open-ended and any-time last', () => {
@@ -107,14 +121,23 @@ describe('cleanPhotoReading (§7C.4)', () => {
   it('D11 invalid date dropped, dates swapped, javascript: link dropped, title cut to 120', () => {
     const today = '2026-10-03';
     expect(cleanPhotoReading({ title: 'T'.repeat(300), startDate: '2026-02-30', endDate: '2026-10-12', url: 'javascript:alert(1)', place: ' ', note: null }, today))
-      .toEqual({ title: 'T'.repeat(120), startDate: null, endDate: '2026-10-12', place: null, url: null, note: null });
+      .toEqual({ title: 'T'.repeat(120), startDate: null, endDate: '2026-10-12', place: null, address: null, phone: null, cost: null, url: null, note: null });
     expect(cleanPhotoReading({ title: 'Fair', startDate: '2026-10-20', endDate: '2026-10-10', url: 'https://fair.example', place: 'Fairgrounds', note: 'Cash only' }, today))
-      .toEqual({ title: 'Fair', startDate: '2026-10-10', endDate: '2026-10-20', place: 'Fairgrounds', url: 'https://fair.example', note: 'Cash only' });
+      .toEqual({ title: 'Fair', startDate: '2026-10-10', endDate: '2026-10-20', place: 'Fairgrounds', address: null, phone: null, cost: null, url: 'https://fair.example', note: 'Cash only' });
+  });
+
+  it('address, phone and cost: trimmed, cut to their limits, empty → null, kept as written', () => {
+    expect(cleanPhotoReading({ address: '  2260 Jimmy Durante Blvd, Del Mar ', phone: ' (619) 555-0134 ', cost: ' $15 adults · kids under 3 free ' }, '2026-10-03'))
+      .toMatchObject({ address: '2260 Jimmy Durante Blvd, Del Mar', phone: '(619) 555-0134', cost: '$15 adults · kids under 3 free' });
+    expect(cleanPhotoReading({ address: 'a'.repeat(400), phone: '1'.repeat(80), cost: 'c'.repeat(300) }, '2026-10-03'))
+      .toMatchObject({ address: 'a'.repeat(ADDRESS_MAX), phone: '1'.repeat(PHONE_MAX), cost: 'c'.repeat(COST_MAX) });
+    expect(cleanPhotoReading({ address: '   ', phone: '', cost: 7 }, '2026-10-03')).toMatchObject({ address: null, phone: null, cost: null });
   });
 
   it('anything not a string is null; a missing answer is all nulls', () => {
     expect(cleanPhotoReading({ title: 42, startDate: 'Oct 12', url: ['x'] }, '2026-10-03'))
-      .toEqual({ title: null, startDate: null, endDate: null, place: null, url: null, note: null });
-    expect(cleanPhotoReading(null, '2026-10-03')).toEqual({ title: null, startDate: null, endDate: null, place: null, url: null, note: null });
+      .toEqual({ title: null, startDate: null, endDate: null, place: null, address: null, phone: null, cost: null, url: null, note: null });
+    expect(cleanPhotoReading(null, '2026-10-03'))
+      .toEqual({ title: null, startDate: null, endDate: null, place: null, address: null, phone: null, cost: null, url: null, note: null });
   });
 });

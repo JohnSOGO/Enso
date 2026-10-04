@@ -63,7 +63,7 @@ describe('timer replayed through the database (T1–T10)', () => {
     const [fire] = await ringing();
     expect(fire.alertCount).toBe(4);
 
-    // Deliveries: one push per member (visibly failed — sender is M5) + one house per alert (queued for the relay).
+    // Deliveries: one push per member (visibly failed — no subscription in this test) + one house per alert (queued for the relay).
     const d = await env.DB.prepare(`SELECT channel, status, detail FROM deliveries WHERE fire_id = ?`).bind(fire.id).all<any>();
     expect(d.results.filter((x) => x.channel === 'house')).toHaveLength(4);
     expect(d.results.filter((x) => x.channel === 'house').every((x) => x.status === 'queued')).toBe(true);

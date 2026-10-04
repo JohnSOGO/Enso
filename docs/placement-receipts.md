@@ -7,6 +7,13 @@ carry its result.
 
 ---
 
+## 2026-10-03 — Re-pin after M5 (coordinator)
+
+- `Settings.tsx` ceiling 187 + 40 → **167 + 40**: M5 replaced the placeholder PhoneAlerts with
+  `PhoneAlerts.tsx` (a refinement that deleted 20 lines).
+
+---
+
 ## 2026-10-03 — M5 Web Push (placement-advisor)
 
 - **Verdict:** NEW `src/worker/web-push.ts` (only importer of `@block65/webcrypto-web-push`;

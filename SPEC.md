@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.19-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.20-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -754,6 +754,15 @@ ALTER TABLE member_prefs DROP COLUMN show_school_holidays;
 ALTER TABLE events ADD COLUMN emoji TEXT;
 ```
 
+### 4.2j Schema change — `migrations/0011_thing_details.sql`
+
+```sql
+-- §7C.1 — things gain address, phone and cost (free text, as written).
+ALTER TABLE things ADD COLUMN address TEXT;
+ALTER TABLE things ADD COLUMN phone TEXT;
+ALTER TABLE things ADD COLUMN cost TEXT;
+```
+
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
 
@@ -1459,6 +1468,9 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
 
 - **Title** 1–120 (required). **Note** ≤ 2000, **place** ≤ 200, **link** ≤ 500 (`http(s)://`
   only, else 400).
+- **Address** ≤ 300, **phone** ≤ 50, **cost** ≤ 200 — free text, kept exactly as written
+  ("$15 adults · kids under 3 free", "(619) 555-0134"); optional (decided by MojoSOGO
+  2026-10-03). **Place** is the venue's name; **address** its street address.
 - **When:** an optional window — `window_start` and/or `window_end` (local dates,
   end ≥ start). No dates = **any time**. Only an end = **until** that date.
 - **Status:** `idea` → `planned` (Plan it) → `done`; or `dropped` ("let it go"). A done or
@@ -1480,7 +1492,8 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
   reminders — planned, done and let-go things never re-plan.
 - **Plan it** (decided by MojoSOGO): pick a date (inside the window when there is one ⚑ —
   outside it is refused with a message) and optionally a time → a normal **calendar event**
-  is created (title; notes = the thing's note + place + link; `thing_id` set), the thing
+  is created (title; notes = the thing's note + place + address + phone + cost + link,
+  one per line; `thing_id` set), the thing
   becomes `planned` with `planned_event_id`, and its scheduled reminders close `removed`
   (the event has its own). The event form shows **"From Things to do"** with the photo.
 - `things.ts` owns: limits, window validation, `remindersFor(thing, tz)` → the reminder
@@ -1498,7 +1511,10 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
 ### 7C.4 Reading a photo (fills the fields)
 
 - `POST /things/read-photo` with the (already shrunk) image → `{ title, startDate,
-  endDate, place, url, note }` — each a string or `null`, dates `YYYY-MM-DD`. **Nothing is
+  endDate, place, address, phone, cost, url, note }` — each a string or `null`, dates
+  `YYYY-MM-DD`. The prompt asks for **every** detail the photo shows, copied as written —
+  the venue name as place, the street address separately, a phone number, prices/cost as
+  one line, and anything else useful in the note. **Nothing is
   saved**: the form fills only **empty** fields, marks each filled one "from photo — check
   it", and the person reviews and taps Save.
 - Implementation: the official `@anthropic-ai/sdk` in the Worker, model `claude-opus-5-5`,
@@ -1879,7 +1895,12 @@ Pumpkin patch        📅 Sat Oct 12
 - **＋ Add a thing to do** and tapping a row open the **thing form** (modal):
   - **📷 Add photo** (camera or library) → a thumbnail; then "Reading the photo…" and the
     empty fields fill in, each marked *from photo — check it*. Remove / replace photo.
-  - Title · From / To dates (both optional) · Place · Link · Note.
+  - Title · From / To dates (both optional) · Place · Address · Phone · Cost · Link · Note.
+  - **Every text field grows to fit its text** (auto-sizing, no inner scrolling), so all of a
+    long title, address, cost or note is visible at once (decided by MojoSOGO). Phone is a
+    single line (`type="tel"`); the others wrap. In **Title** and **Link** Enter does nothing
+    and a pasted line break becomes a space (they are single values) ⚑; in Place, Address,
+    Cost and Note Enter adds a line.
   - **Reminders:** ☐ When it starts · ☐ On [date] · Phone / House.
   - **Plan it** → a date (+ optional time) → creates the calendar event (§7C.2).
   - **Done** / **Let it go** / **Put back** (by status) · Save / Cancel / Delete (asks).
@@ -2171,12 +2192,12 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | GET | `/chores/today` | member | → `{ date, runs: Run[] }`; `Run = { id, choreId, title, doneMeans, timing, time, step, steps, assigneeId, personId, doneAt, doneBy, nextDueAt, ringing }` (`personId` = the current step's person) |
 | POST | `/chore-runs/{id}/done` | member | advances one step (§7B.3) → run; 409 `already_done` when finished |
 | POST | `/chore-runs/{id}/undo` | member | → run; 409 `nothing_to_undo` at step 0 |
-| GET | `/things` | member | → `{ open: Thing[], closed: Thing[] }` (closed = done/dropped, last 60 days); `Thing = { id, title, note, place, url, windowStart, windowEnd, remindStart, remindOn, channels, hasPhoto, status, plannedEventId, plannedDate, createdBy, updatedAt }` |
+| GET | `/things` | member | → `{ open: Thing[], closed: Thing[] }` (closed = done/dropped, last 60 days); `Thing = { id, title, note, place, address, phone, cost, url, windowStart, windowEnd, remindStart, remindOn, channels, hasPhoto, status, plannedEventId, plannedDate, createdBy, updatedAt }` |
 | POST | `/things` | member | thing fields → thing (201) |
 | GET/PATCH/DELETE | `/things/{id}` | member | GET → thing; PATCH fields, all optional, incl. `status` → thing; DELETE → 204 (and its photo) |
 | POST | `/things/{id}/plan` | member | `{ date, time? }` → `{ thing, eventId }`; 400 outside the window |
 | PUT/GET/DELETE | `/things/{id}/photo` | member | PUT raw image body (≤ 4 MB) → 204; GET → the image; DELETE → 204 |
-| POST | `/things/read-photo` | member | raw image body → `{ title, startDate, endDate, place, url, note }` (each nullable); 503 / 502 / 422 / 429 per §7C.4 |
+| POST | `/things/read-photo` | member | raw image body → `{ title, startDate, endDate, place, address, phone, cost, url, note }` (each nullable); 503 / 502 / 422 / 429 per §7C.4 |
 | GET | `/lists` | member | → `{ id, name, createdBy, openCount }[]`, by name (§7A) |
 | POST | `/lists` | member | `{ name }` → list (201); 409 `duplicate`; 400 at `LISTS_MAX` |
 | PATCH/DELETE | `/lists/{id}` | creator or admin (seeded lists: admin) | PATCH `{ name }` → list; DELETE → 204 |
@@ -2314,6 +2335,12 @@ checks.
 - ✅ Production: Street sweeping gets 🧹; a new optional **🗑️ Take out trash**, every Sunday
   at **18:00**, ringing at 18:00 by phone, on for MojoSOGO (decided by MojoSOGO).
 
+**M4j — Thing details** (v1.3.0)
+- Migration 0011; address / phone / cost on things (input, wire shape, Plan-it notes);
+  photo reading returns them; the thing form's text fields auto-size (§7C.1, §7C.4, §8.11).
+- ✅ Tests: the three fields round-trip, their limits 400 with a message, `cleanPhotoReading`
+  trims them, Plan-it notes include them.
+
 **M4d — Invites**
 - `/auth/invite-preview`, the invites list states, the invite card (QR, Share, Copy),
   the join page at `/join`, the welcome card (§6.2a, §8.9).
@@ -2330,7 +2357,7 @@ checks.
 - ✅ Manual at 320 px: create the Laundry loop; on Today tick step 1, see "rings …";
   undo it; the four tabs still fit.
 
-**M5 — Web Push** (v1.3.0)
+**M5 — Web Push** (v1.4.0)
 - Spike done 2026-10-03 (library chosen, encryption round-trips under workerd, §2.1).
 - VAPID keys generated and set (`VAPID_PUBLIC_KEY`/`VAPID_SUBJECT` as vars,
   `VAPID_PRIVATE_KEY` as a secret — piped, never typed through `!`), `sw.js`, Phone alerts row
@@ -2483,6 +2510,13 @@ home-screen tags, `AppRefresh` (reload on resume unless a dialog is open; pull t
 — verified with real touch events in an emulated phone; its on-iPhone check is still to do.
 The ensō mark (scripts/draw-enso.mjs) and the opening screen are built; the 7 iPhone launch
 images are rendered from it. Its on-iPhone check is still to do.
+**M5 Web Push** is built (v1.4.0; 253 tests incl. P1–P9 with a test-side RFC 8291 decryptor;
+`/sw.js` served `no-cache` via `_headers`). **Deviation:** §10's "refetch when a push arrives"
+is not built — an open app picks the alert up on its 30 s poll, and a reopened app reloads
+(§8.10). Still to check on real phones: Turn on → Send a test (iPhone home-screen app and
+Android), a reminder on the lock screen, Android Done/Snooze.
+**M4j thing details** are built (v1.3.0; 245 tests): address / phone / cost, photo reading
+fills them, the form's text fields grow to fit. Title and Link stay one line.
 **M4i calendar tidy** is built (v1.2.0; 243 tests; 0010 applied locally with nothing but the
 school table lost; no "school" left in code). Checked at 320 and 440 px: day icons sit on the
 date's line inside the cell (15🧹, 16📈, 18🗑️). Known limit: on the **1st** of a month the

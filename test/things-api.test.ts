@@ -6,7 +6,7 @@
 import { SELF, env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { BASE, Client, member, owner, tickAt } from './helpers';
-import { READS_PER_DAY } from '../src/shared/things';
+import { ADDRESS_MAX, COST_MAX, PHONE_MAX, READS_PER_DAY } from '../src/shared/things';
 import { readPhoto } from '../src/worker/photo-reader';
 
 let o: Client, A: string, B: string;
@@ -48,6 +48,7 @@ describe('M4g things — create, list, validate (D1, D2)', () => {
     expect(t).toMatchObject({
       title: 'Fall fair', windowStart: '2026-10-10', windowEnd: '2026-10-20', status: 'idea', remindStart: false, remindOn: null,
       channels: ['push'], hasPhoto: false, plannedEventId: null, plannedDate: null, createdBy: A,
+      address: null, phone: null, cost: null,
     });
     const list = (await o.get('/things')).json;
     expect(list.open.find((x: any) => x.id === t.id)).toMatchObject({ title: 'Fall fair', status: 'idea' });
@@ -66,6 +67,29 @@ describe('M4g things — create, list, validate (D1, D2)', () => {
       expect(r.status).toBe(400);
       expect(r.json.error).toBe('invalid_input');
       expect(r.json.message).toMatch(field);
+    }
+  });
+
+  it('address, phone and cost (§7C.1): round-trip as written; PATCH without them keeps them, null clears; over the limit → 400 naming the field', async () => {
+    const details = { address: '2260 Jimmy Durante Blvd, Del Mar', phone: '(619) 555-0134', cost: '$15 adults · kids under 3 free' };
+    const t = await createThing(fairBody({ title: 'County fair', ...details }));
+    expect(t).toMatchObject(details);
+    expect((await o.get(`/things/${t.id}`)).json).toMatchObject(details);
+    const kept = await o.patch(`/things/${t.id}`, { note: 'Bring cash' });
+    expect(kept.json).toMatchObject({ ...details, note: 'Bring cash' });
+    const cleared = await o.patch(`/things/${t.id}`, { phone: null, cost: '' });
+    expect(cleared.json).toMatchObject({ address: details.address, phone: null, cost: null });
+    const row = await env.DB.prepare('SELECT address, phone, cost FROM things WHERE id = ?').bind(t.id).first<any>();
+    expect(row).toEqual({ address: details.address, phone: null, cost: null });
+
+    for (const [field, max] of [['address', ADDRESS_MAX], ['phone', PHONE_MAX], ['cost', COST_MAX]] as const) {
+      const r = await o.post('/things', fairBody({ [field]: 'x'.repeat(max + 1) }));
+      expect(r.status).toBe(400);
+      expect(r.json).toMatchObject({ error: 'invalid_input' });
+      expect(r.json.message).toMatch(new RegExp(`^${field}`));
+      const p = await o.patch(`/things/${t.id}`, { [field]: 'x'.repeat(max + 1) });
+      expect(p.status).toBe(400);
+      expect(p.json.message).toMatch(new RegExp(`^${field}`));
     }
   });
 
@@ -142,7 +166,8 @@ describe('M4g things — reminders (D3, D4, D5)', () => {
 describe('M4g things — Plan it (D6, D7)', () => {
   it('D6 Plan it on 10-14 → an event on 10-14 with thing_id; thing planned; scheduled thing fires removed', async () => {
     const t = await createThing(fairBody({
-      title: 'Pumpkin patch', remindStart: true, note: 'Bring boots', place: 'Old farm', url: 'https://patch.example',
+      title: 'Pumpkin patch', remindStart: true, note: 'Bring boots', place: 'Old farm', address: '12 Farm Rd', phone: '555-0101',
+      cost: '$5 a pumpkin', url: 'https://patch.example',
     }));
     await tickAt(o, '2026-10-09T12:00:00.000Z');
     expect((await firesOf(t.id)).filter((f) => f.state === 'scheduled')).toHaveLength(1);
@@ -153,7 +178,7 @@ describe('M4g things — Plan it (D6, D7)', () => {
     const ev = (await o.get(`/events/${p.json.eventId}`)).json;
     expect(ev).toMatchObject({
       title: 'Pumpkin patch', startDate: '2026-10-14', startTime: '10:00', thingId: t.id, reminder: null,
-      notes: 'Bring boots\nOld farm\nhttps://patch.example',
+      notes: 'Bring boots\nOld farm\n12 Farm Rd\n555-0101\n$5 a pumpkin\nhttps://patch.example',
     });
     expect((await firesOf(t.id)).every((f) => f.state === 'closed' && f.close_reason === 'removed')).toBe(true);
 
@@ -264,7 +289,10 @@ describe('photo-reader (§7C.4) — the SDK request, over a fake transport', () 
 
   it('sends one structured-output request: opus 5.5, default refusal fallback, base64 image + dated prompt', async () => {
     const seen: any[] = [];
-    const answer = { title: 'Fall fair', startDate: '2026-10-10', endDate: '2026-10-20', place: null, url: null, note: null };
+    const answer = {
+      title: 'Fall fair', startDate: '2026-10-10', endDate: '2026-10-20', place: 'Fairgrounds', address: '2260 Jimmy Durante Blvd',
+      phone: '(619) 555-0134', cost: '$15 adults', url: null, note: null,
+    };
     const r = await readPhoto(input, { fetch: fake(200, message({ content: [{ type: 'text', text: JSON.stringify(answer) }], stop_reason: 'end_turn' }), seen) });
     expect(r).toEqual({ ok: true, raw: answer });
     expect(seen).toHaveLength(1);
@@ -278,6 +306,16 @@ describe('photo-reader (§7C.4) — the SDK request, over a fake transport', () 
     expect(image).toMatchObject({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg' } });
     expect(text.text).toContain('2026-10-03');
     expect(text.text).toContain('America/Los_Angeles');
+    // §7C.4 — the schema asks for address, phone and cost too, each a nullable string; the prompt names them.
+    const schema = body.output_config.format.schema;
+    for (const k of ['title', 'startDate', 'endDate', 'place', 'address', 'phone', 'cost', 'url', 'note']) {
+      expect(schema.properties, k).toHaveProperty(k);
+      expect(schema.required, k).toContain(k);
+    }
+    for (const k of ['address', 'phone', 'cost']) expect(JSON.stringify(schema.properties[k]), k).toMatch(/null/);
+    expect(text.text).toMatch(/address/);
+    expect(text.text).toMatch(/phone/);
+    expect(text.text).toMatch(/cost/);
   });
 
   it('a refusal → refused (stop_reason checked before the output); an API error → failed with the reason', async () => {
