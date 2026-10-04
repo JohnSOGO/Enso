@@ -2,8 +2,8 @@
 // screenshotted (§7E.2b; screenshots are read, never stored). Every rule (limits, the link → id,
 // whose comments are the creator's, when to ask Claude, cleaning the answer, found, the clash) is src/shared/recipes.ts or,
 // for reading a video, src/shared/recipe-reading.ts; the fetching is
-// youtube.ts, youtube-captions.ts and recipe-reader.ts. This route keeps the §7E.2 / §7E.2b check orders, counts
-// reads, and persists. Any member may do anything; delete is soft (⚑ Q66). Each person sets only their own
+// youtube.ts, youtube-captions.ts and recipe-reader.ts; the re-read itself (re-fetch, count, Claude, clean,
+// UPDATE) is recipe-reread.ts. This route keeps the §7E.2 / §7E.2b check orders, counts reads, and persists. Any member may do anything; delete is soft (⚑ Q66). Each person sets only their own
 // emoji (§7E.5), and every recipe answered carries everyone's through toRecipes.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
@@ -23,6 +23,7 @@ import { requireMember } from '../session';
 import { lookUpComments, lookUpVideo } from '../youtube';
 import { readCaptions } from '../youtube-captions';
 import { readRecipe } from '../recipe-reader';
+import { rereadRecipe } from '../recipe-reread';
 
 const LIVE = 'SELECT * FROM recipes WHERE deleted_at IS NULL';
 const loadRow = (db: D1Database, id: string) => first<RecipeRow>(db, `${LIVE} AND id = ?`, id);
@@ -160,27 +161,16 @@ recipes.post('/recipes/:id/transcript', requireMember, async (c) => {
   const { YOUTUBE_API_KEY: ytKey, ANTHROPIC_API_KEY: aiKey } = c.env;
   if (!ytKey || !aiKey) return readingOff(c);
 
-  const [video, comments] = await Promise.all([lookUpVideo(r.video_id, ytKey), lookUpComments(r.video_id, ytKey, COMMENTS_LOOKED_AT)]);
-  if (!video.ok && video.kind === 'not_found') return fail(c, 404, 'video_unavailable', `Couldn't find that video. ${video.reason}`);
-  if (!video.ok) return fail(c, 502, 'youtube_failed', `Couldn't look the video up: ${video.reason}`);
-  const db = c.env.DB;
-  await run(db, 'INSERT INTO recipe_reads (at, member_id) VALUES (?, ?)', now, c.get('member').id);
-
-  const read = {
-    description: video.description, transcript: null, pasted, screenshots,
-    comments: comments.ok ? creatorComments(comments.comments, video.channelId) : null,
-  };
-  const res = await readRecipe({ apiKey: aiKey, title: video.title, channel: video.channel, ...read, transcript: pasted });
-  if (!res.ok && res.kind === 'refused') return fail(c, 422, 'recipe_refused', "Couldn't read a recipe from that transcript.");
-  if (!res.ok) return fail(c, 502, 'recipe_reading_failed', `Couldn't read the recipe: ${res.reason}`);
-  const reading = cleanRecipeReading(res.raw, video.title);
-  if (!reading.found) return fail(c, 422, 'no_recipe', 'No recipe in that transcript — nothing was changed.');
-  await run(db,
-    `UPDATE recipes SET title = ?, ingredients = ?, steps = ?, servings = ?, time_text = ?, found = 1, source = ?,
-       captions_error = NULL, comments_error = ?, updated_at = ? WHERE id = ?`,
-    reading.title, JSON.stringify(reading.ingredients), JSON.stringify(reading.steps), reading.servings, reading.time,
-    JSON.stringify(sourcesOf(read)), comments.ok || comments.kind === 'none' ? null : comments.reason, nowIso(), r.id);
-  return answer(c, r.id);
+  const out = await rereadRecipe(c.env.DB, { yt: ytKey, ai: aiKey }, r, { transcript: null, pasted, screenshots },
+    c.get('member').id, now);
+  if (out.ok) return answer(c, r.id);
+  switch (out.kind) {
+    case 'video_unavailable': return fail(c, 404, 'video_unavailable', `Couldn't find that video. ${out.reason}`);
+    case 'youtube_failed': return fail(c, 502, 'youtube_failed', `Couldn't look the video up: ${out.reason}`);
+    case 'recipe_refused': return fail(c, 422, 'recipe_refused', "Couldn't read a recipe from that transcript.");
+    case 'recipe_reading_failed': return fail(c, 502, 'recipe_reading_failed', `Couldn't read the recipe: ${out.reason}`);
+    case 'no_recipe': return fail(c, 422, 'no_recipe', 'No recipe in that transcript — nothing was changed.');
+  }
 });
 
 recipes.get('/recipes/:id', requireMember, async (c) => {
