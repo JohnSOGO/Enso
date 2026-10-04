@@ -46,6 +46,9 @@ button:disabled { opacity: .5; cursor: default; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 button.danger { border-color: var(--bad); color: #FCA5A5; background: transparent; }
 button.plain { background: none; border: 0; padding: 4px; min-height: 0; }
+/* §8.11 — a field's open button (↗ link, 🗺️ maps, 📞 call), a link that looks like a button. */
+a.go { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 44px; min-height: 44px;
+  border: 1px solid var(--border); background: var(--surface-2); border-radius: 10px; text-decoration: none; color: inherit; }
 
 input, select, textarea {
   /* SPEC §8 iPhone rules: below 16px, iOS Safari zooms the page on focus and leaves it zoomed. */

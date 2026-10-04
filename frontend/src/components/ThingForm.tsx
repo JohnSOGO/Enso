@@ -1,8 +1,8 @@
 // SPEC §8.11 — the thing form (modal): photo, title, From / To, place, address, phone, cost, link, note,
-// reminders and channels; every text field but phone grows to fit its text; Plan it / Done / Let it go / Put back by status; Save / Cancel / Delete. A photo reading
+// reminders and channels; ↗ / 🗺️ / 📞 beside Link / Address / Phone open them; every text field but phone grows to fit its text; Plan it / Done / Let it go / Put back by status; Save / Cancel / Delete. A photo reading
 // fills only empty fields, each marked "from photo — check it". The photo (new, replaced or removed)
 // goes to the server on Save, after the thing itself. Rules and validation are the server's (§7C).
-import { useEffect, useLayoutEffect, useRef, useState, type TextareaHTMLAttributes } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type TextareaHTMLAttributes } from 'react';
 import { Modal } from './Modal';
 import { ChannelChecks } from './AlertFields';
 import { ThingPhoto, photoSrc } from './ThingPhoto';
@@ -11,7 +11,7 @@ import { del, errorText, get, patch, post, upload } from '../api';
 import { useApp } from '../state';
 import type { Channel, ThingStatus } from '../../../src/shared/vocab';
 import {
-  ADDRESS_MAX, COST_MAX, NOTE_MAX, PHONE_MAX, PLACE_MAX, THING_REMIND_TIME, TITLE_MAX, URL_MAX, type PhotoReading, type Thing,
+  ADDRESS_MAX, COST_MAX, NOTE_MAX, PHONE_MAX, PLACE_MAX, THING_REMIND_TIME, TITLE_MAX, URL_MAX, webLink, type PhotoReading, type Thing,
 } from '../../../src/shared/things';
 
 /** "Oct 10", or "Sat Oct 12" with the weekday — a local YYYY-MM-DD date as Things to do shows it. */
@@ -49,6 +49,28 @@ function Grow({ value, oneLine, onChange, ...rest }: TextareaHTMLAttributes<HTML
   return <textarea ref={ref} rows={1} value={value} style={{ overflow: 'hidden', resize: 'none' }} {...rest}
     onKeyDown={oneLine ? (e) => { if (e.key === 'Enter') e.preventDefault(); } : rest.onKeyDown}
     onChange={(e) => { if (oneLine && /[\r\n]/.test(e.target.value)) e.target.value = e.target.value.replace(/\s*[\r\n]+\s*/g, ' '); onChange?.(e); }} />;
+}
+
+const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+/** §8.11 — the address in the maps app: Apple Maps on iPhone/iPad, Google Maps elsewhere ⚑. */
+const mapsHref = (a: string) => a.trim()
+  ? (IOS ? 'https://maps.apple.com/?q=' : 'https://www.google.com/maps/search/?api=1&query=') + encodeURIComponent(a.trim().replace(/\s+/g, ' '))
+  : null;
+/** §8.11 — `tel:` with digits and a leading + only; none under 3 digits. */
+const telHref = (p: string) => {
+  const digits = p.replace(/\D/g, '');
+  return digits.length >= 3 ? `tel:${p.trim().startsWith('+') ? '+' : ''}${digits}` : null;
+};
+
+/** §8.11 — a field with its open button (↗ / 🗺️ / 📞) to the right ⚑, shown only when `href` is usable. */
+function WithGo({ href, icon, label, children }: { href: string | null; icon: string; label: string; children: ReactNode }) {
+  return (
+    <div className="row" style={{ alignItems: 'flex-start' }}>
+      <div style={{ flex: 1 }}>{children}</div>
+      {href && <a className="go" href={href} target={href.startsWith('tel:') ? undefined : '_blank'} rel="noopener noreferrer"
+        aria-label={label} title={label}>{icon}</a>}
+    </div>
+  );
 }
 
 const formOf = (t: Thing | null) => ({
@@ -161,17 +183,23 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
             <Grow value={f.place} maxLength={PLACE_MAX} onChange={(e) => set('place', e.target.value)} />
           </label>
           <label className="field"><span>Address{mark('address')}</span>
-            <Grow value={f.address} maxLength={ADDRESS_MAX} autoComplete="off" onChange={(e) => set('address', e.target.value)} />
+            <WithGo href={mapsHref(f.address)} icon="🗺️" label="Open in maps">
+              <Grow value={f.address} maxLength={ADDRESS_MAX} autoComplete="off" onChange={(e) => set('address', e.target.value)} />
+            </WithGo>
           </label>
           <label className="field"><span>Phone{mark('phone')}</span>
-            <input type="tel" value={f.phone} maxLength={PHONE_MAX} autoComplete="off" onChange={(e) => set('phone', e.target.value)} />
+            <WithGo href={telHref(f.phone)} icon="📞" label="Call">
+              <input type="tel" value={f.phone} maxLength={PHONE_MAX} autoComplete="off" onChange={(e) => set('phone', e.target.value)} />
+            </WithGo>
           </label>
           <label className="field"><span>Cost{mark('cost')}</span>
             <Grow value={f.cost} maxLength={COST_MAX} onChange={(e) => set('cost', e.target.value)} />
           </label>
           <label className="field"><span>Link{mark('url')}</span>
-            <Grow oneLine inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="https://…" value={f.url}
-              maxLength={URL_MAX} onChange={(e) => set('url', e.target.value)} />
+            <WithGo href={webLink(f.url)} icon="↗" label="Open link">
+              <Grow oneLine inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="https://…" value={f.url}
+                maxLength={URL_MAX} onChange={(e) => set('url', e.target.value)} />
+            </WithGo>
           </label>
           <label className="field"><span>Note{mark('note')}</span>
             <Grow value={f.note} maxLength={NOTE_MAX} onChange={(e) => set('note', e.target.value)} />
