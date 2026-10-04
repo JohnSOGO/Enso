@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.28-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.28 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2995,9 +2995,16 @@ nullable (applied only in tests so far); the push payload gains `tag`. Built as:
 nobody else to push to → 409 `no_recipients` rather than a quiet success. **Still to check:**
 the box at 320 px and on the iPhone, an announcement spoken on the Echos + Voice PE, and one
 arriving on another member's phone.
-**Timer active time range** (v1.9.0, being built): migration 0015, `TimerWindow` /
-`nextTimerDue` / `stepFire` rule 0 in `engine.ts`, the window on `/timers`, the form's
-Active from / to, TW1–TW12.
+**Timer active time range** (v1.9.0; 308 tests incl. TW1–TW12, the `/timers` window rows, a
+tick across close and open, and TW-M): migration 0015 (`timers.active_from` / `active_to`, no
+CHECK), `TimerWindow` / `timerWindow` / `timerWindowError` / `inside` / `nextTimerDue` and
+`stepFire` rule 0 in `engine.ts` (the snooze shape — no new close reason, no new fire),
+`householdTz` exported once from `db.ts`, `sourceOf`'s timer branch builds `cfg.window`, and the
+timer form's Active from / to with the row's `· 08:00–21:00` and a day-naming Next. Built as: a
+time that is not `HH:MM`, or only one end set, is 400 "Active from and to must both be HH:MM
+times, or both empty."; the form adds a dim "Both empty = always." line under the two inputs.
+Migration 0015 is applied only in tests so far. **Still owed (manual):** the form and row at
+320 px, and a real timer going quiet at its window's end and ringing after it opens.
 **Machine card fix** (v1.8.1): whose load and "done ~20:35" sit on the button line, wrapping —
 at 320 px the old one-line layout cut the time off. Two-tap start checked at 320 px.
 **M4l The laundry loop** (v1.8.0; 290 tests incl. L1–L13): migration 0014 (`machines`, seeded

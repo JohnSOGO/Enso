@@ -7,6 +7,29 @@ carry its result.
 
 ---
 
+## 2026-10-03 — Rolling timer active time range (placement-advisor)
+
+- **Ask:** MojoSOGO decided that a rolling timer may have an optional "Active from HH:MM to
+  HH:MM" (household tz): it never rings outside it, its countdown restarts when the window opens
+  (60 min on 08:00–21:00 first rings at 09:00), a fire ringing at the close goes quiet and
+  resumes after the opening, and no window keeps today's behavior.
+- **Verdict:** no new owner. The rule lives in the EXISTING `src/shared/engine.ts` — `TimerWindow`,
+  `timerWindow`, `timerWindowError`, `inside`, `nextTimerDue`, `AlertConfig.window`, and a trailing
+  optional `window` on `applyTimerCmd`; ack and start both use `nextTimerDue`. The engine stays
+  pure and uses only `localToUtc` / `utcToLocal` / `addDays` from `time.ts` (§4.1 DST rules).
+- **One guard:** `stepFire` gets a new first rule for timers with a window, so every path that
+  could ring — first ring, renotify, a stale fire after an outage, a window edited under a
+  planned fire — is stopped in one place. The route does not re-plan the open fire on PATCH.
+- **The snooze shape, not a close reason:** the same fire goes back to `scheduled`, due at the
+  next opening + interval, `alert_count` 0. No new CLOSE_REASON, no vocab change, no fires
+  rebuild, no new fire row.
+- **One `householdTz`:** exported from `src/worker/db.ts` for the timer routes; the private copies
+  in `routes/alarms.ts`, `routes/chores.ts` and `routes/thing-photos.ts` are left alone (folding
+  them in is a separate tidy). `tick.ts` changes only `sourceOf`'s timer branch, reading the tz in
+  the same SELECT. Migration 0015 adds two nullable columns with no CHECK; the route validates.
+
+---
+
 ## 2026-10-03 — M4l The laundry loop (placement-advisor)
 
 - **Ask:** MojoSOGO decided the laundry loop (the dishwasher deferred): Washer and Dryer on the
