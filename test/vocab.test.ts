@@ -18,6 +18,7 @@ const EXPECTED: Record<string, readonly string[]> = {
   'chores.timing': vocab.CHORE_TIMING,
   'things.status': vocab.THING_STATUS,
   'events.start_sun': vocab.SUN_EVENT,
+  'recipes.captions_job': vocab.CAPTIONS_JOB,
 };
 
 it('every CHECK IN-list in the migrated schema matches vocab.ts', async () => {

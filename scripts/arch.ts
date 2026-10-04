@@ -24,15 +24,19 @@ export const CEILINGS: Record<string, number> = {
 
 /** Layering bans: files under `from` must not import anything matching `banned`. */
 export const LAYERS: Layer[] = [
-  { from: 'src/shared/', banned: ['src/worker/', 'frontend/', 'scripts/', 'package:'], why: 'shared is pure and dependency-free (§0.3)' },
-  { from: 'src/worker/', banned: ['frontend/', 'scripts/'], why: 'the Worker stands alone' },
-  { from: 'frontend/src/', banned: ['src/worker/', 'scripts/'], why: 'the PWA talks to the Worker over HTTP only' },
+  { from: 'src/shared/', banned: ['src/worker/', 'frontend/', 'scripts/', 'home/', 'package:'], why: 'shared is pure and dependency-free (§0.3)' },
+  { from: 'src/worker/', banned: ['frontend/', 'scripts/', 'home/'], why: 'the Worker stands alone' },
+  { from: 'frontend/src/', banned: ['src/worker/', 'scripts/', 'home/'], why: 'the PWA talks to the Worker over HTTP only' },
+  {
+    from: 'home/', banned: ['src/', 'frontend/', 'scripts/', 'package:'], allowed: ['src/worker/youtube-captions.ts'],
+    why: 'the home helper bundles youtube-captions.ts and Node globals only (§7E.2c)',
+  },
 ];
 
 /** Forbidden inside src/shared/ (§0.3): the engine never reads the clock or does I/O. */
 export const IMPURE = ['Date.now(', 'new Date()', 'fetch(', 'D1Database'];
 
-export const SOURCE_ROOTS = ['src', 'frontend/src', 'scripts'];
+export const SOURCE_ROOTS = ['src', 'frontend/src', 'scripts', 'home'];
 export const SOURCE_EXT = ['.ts', '.tsx', '.mjs', '.css'];
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.wrangler']);
 

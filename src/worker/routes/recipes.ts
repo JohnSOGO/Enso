@@ -4,7 +4,8 @@
 // for reading a video, src/shared/recipe-reading.ts; the fetching is
 // youtube.ts, youtube-captions.ts and recipe-reader.ts; the re-read itself (re-fetch, count, Claude, clean,
 // UPDATE) is recipe-reread.ts. This route keeps the §7E.2 / §7E.2b check orders, counts reads, and persists. Any member may do anything; delete is soft (⚑ Q66). Each person sets only their own
-// emoji (§7E.5), and every recipe answered carries everyone's through toRecipes.
+// emoji (§7E.5), and every recipe answered carries everyone's through toRecipes. From-video is the one place a
+// captions-from-home job is queued (§7E.2c: wantsHomeCaptions and CAPTIONS_TOKEN set; captions-jobs.ts writes it).
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import {
@@ -12,7 +13,7 @@ import {
 } from '../../shared/recipes';
 import {
   COMMENTS_LOOKED_AT, PASTED_MAX, RECIPE_READS_PER_DAY, cleanRecipeReading, cleanTranscript, creatorComments, hasRecipeText,
-  parseScreenshots, sourcesOf,
+  parseScreenshots, sourcesOf, wantsHomeCaptions,
 } from '../../shared/recipe-reading';
 import { emojiError } from '../../shared/emoji';
 import type { RecipeSource } from '../../shared/vocab';
@@ -24,6 +25,7 @@ import { lookUpComments, lookUpVideo } from '../youtube';
 import { readCaptions } from '../youtube-captions';
 import { readRecipe } from '../recipe-reader';
 import { rereadRecipe } from '../recipe-reread';
+import { queueCaptionsJob } from '../captions-jobs';
 
 const LIVE = 'SELECT * FROM recipes WHERE deleted_at IS NULL';
 const loadRow = (db: D1Database, id: string) => first<RecipeRow>(db, `${LIVE} AND id = ?`, id);
@@ -138,6 +140,7 @@ recipes.post('/recipes/from-video', requireMember, async (c) => {
     if (won) return duplicate(c, won); // another paste of the same link saved first (uq_recipe_video)
     throw err;
   }
+  if (wantsHomeCaptions(captions.ok ? null : captions) && c.env.CAPTIONS_TOKEN) await queueCaptionsJob(db, id, now);
   return answer(c, id, 201);
 });
 

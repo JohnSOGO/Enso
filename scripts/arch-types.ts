@@ -1,7 +1,8 @@
 // Shapes of the architecture scan (SPEC §2.5). No Node imports, so the workerd-side
 // test can type its ARCH binding from here without pulling in node:fs.
 
-export interface Layer { from: string; banned: string[]; why: string }
+/** `allowed`: exact repo paths a file under `from` may import even though a ban matches them. */
+export interface Layer { from: string; banned: string[]; allowed?: string[]; why: string }
 
 export interface ScannedFile {
   path: string;          // repo-relative, forward slashes

@@ -42,6 +42,7 @@ describe('layering (LAYERS in scripts/arch.ts)', () => {
     for (const f of files) {
       for (const layer of layers.filter((l) => f.path.startsWith(l.from))) {
         for (const imp of f.imports) {
+          if (layer.allowed?.includes(imp)) continue;
           if (layer.banned.some((b) => imp.startsWith(b))) violations.push(`${f.path} → ${imp} (${layer.why})`);
         }
       }

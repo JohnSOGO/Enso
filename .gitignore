@@ -1,5 +1,8 @@
 node_modules/
 frontend/dist/
+home/dist/
+# the SogoAI helper's secrets (§7E.2c) live only on SogoAI, never here
+captions-helper.env
 .wrangler/
 .dev.vars
 # the retired relay's local files (v1.7.0) may still sit in an old checkout; never commit them
