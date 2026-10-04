@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.21 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.22 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1906,6 +1906,13 @@ Pumpkin patch        📅 Sat Oct 12
     single line (`type="tel"`); the others wrap. In **Title** and **Link** Enter does nothing
     and a pasted line break becomes a space (they are single values) ⚑; in Place, Address,
     Cost and Note Enter adds a line.
+  - **Open from the form** (asked by MojoSOGO 2026-10-03): the fields stay editable, and
+    beside **Link**, **Address** and **Phone** sits a 44 px button, shown only when the field
+    has something usable — **↗** opens the link in the browser (only when `webLink` accepts it,
+    so a half-typed link shows none), **🗺️** opens the address in the maps app (Apple Maps on
+    iPhone/iPad, Google Maps elsewhere ⚑), **📞** calls the number (`tel:`, digits and a
+    leading + only; shown when it has at least 3 digits). They use what is in the field now,
+    saved or not. Placement to the right of the field ⚑ DEFAULT.
   - **Reminders:** ☐ When it starts · ☐ On [date] · Phone / House.
   - **Plan it** → a date (+ optional time) → creates the calendar event (§7C.2).
   - **Done** / **Let it go** / **Put back** (by status) · Save / Cancel / Delete (asks).
@@ -2481,6 +2488,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q33 | School holidays | **Decided 2026-10-03:** removed; the 5 Fall break days deleted |
 | Q34 | Take out trash | **Decided:** optional, every Sunday 18:00, rings at 18:00, 🗑️ |
 | Q30 | Reading photos | **Decided:** Claude reads them (`claude-opus-5-5`); ≤ 40 reads a day ⚑ |
+| Q35 | Where do the thing form's Open / Map / Call buttons sit, and which maps app? | ⚑ To the right of Link, Address, Phone; Apple Maps on iPhone/iPad, Google Maps elsewhere |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -2520,6 +2528,8 @@ images are rendered from it. Its on-iPhone check is still to do.
 is not built — an open app picks the alert up on its 30 s poll, and a reopened app reloads
 (§8.10). Still to check on real phones: Turn on → Send a test (iPhone home-screen app and
 Android), a reminder on the lock screen, Android Done/Snooze.
+**Open from the thing form** (v1.5.0): ↗ link, 🗺️ maps, 📞 call beside the fields, checked at
+320 px (44 px buttons, no sideways scroll). Still to check on the iPhone: Maps and the call sheet open.
 **Link fix** (v1.4.1; 260 tests): one `webLink` rule — a bare `www.….com` from a flyer or typed
 is kept with `https://` added; other schemes are refused (§7C.1).
 **M4j thing details** are built (v1.3.0; 245 tests): address / phone / cost, photo reading
