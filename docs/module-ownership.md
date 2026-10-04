@@ -64,7 +64,8 @@ receipt in `docs/placement-receipts.md`, then the code.
 | Module | Owns (one concern) |
 |---|---|
 | `frontend/src/components/AppRefresh.tsx` | Always-fresh (§8.10): reload on resume unless a `dialog[open]` exists, pull-to-refresh gesture on the active scroll area + its pill — no app state, no data fetching |
-| `frontend/src/main.tsx` | React root mount |
+| `frontend/src/main.tsx` | React root mount; starts the service worker registration (push-client.ts) |
+| `frontend/src/push-client.ts` | Browser push plumbing (§9.1): registers `/sw.js` (scope `/`, updateViaCache none), this browser's facts (supported, iOS-not-standalone, permission, current subscription), Turn on (permission → subscribe → POST /push/subscriptions) and Turn off (unsubscribe → DELETE) via api.ts — no React, no app state |
 | `frontend/src/App.tsx` | The frame (§8.1): Ringing bar, badges, tabs, ＋ button |
 | `frontend/src/api.ts` | HTTP transport to the Worker; every failure an `ApiError` with a message |
 | `frontend/src/state.tsx` | App-wide state context + freshness polling (§10) — the home for cross-cutting client state |
@@ -92,6 +93,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/shrink-photo.ts` | Shrinks a picked image on the phone to PHOTO_LONG_SIDE px, JPEG PHOTO_QUALITY, via canvas (§7C.3) — no app state |
 | `frontend/src/components/RingingBar.tsx` | Ringing bar (§8.2) |
 | `frontend/src/components/Settings.tsx` | Settings: Me, Household, Status (§8.6) |
+| `frontend/src/components/PhoneAlerts.tsx` | Settings → Me → Phone alerts row (§9.1): this phone's state (on / off / blocked / iPhone: add to Home Screen first / not supported / not set up), Turn on from the tap, Turn off, Send a test; calls refresh() so the 📵 badge follows |
 | `frontend/src/components/useAction.tsx` | Runs an async action, tracks busy, renders its failure in place (`role="alert"`) — the Settings sections' action hook |
 | `frontend/src/components/Invites.tsx` | Settings → Household → Invites: create, list with states, revoke (§8.9) |
 | `frontend/src/components/InviteCard.tsx` | The one-time invite card modal: lazy `uqr` QR, Share, Copy link, the code (§8.9) — the only importer of `uqr` |
