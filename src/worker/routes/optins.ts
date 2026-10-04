@@ -10,12 +10,12 @@ import { onEventIds, optInStatement, optOutStatement } from '../event-rows';
 export const optins = new Hono<AppEnv>();
 
 optins.get('/optional-events', requireMember, async (c) => {
-  const rows = await all<{ id: string; title: string; recurrence: string | null; start_date: string }>(c.env.DB,
-    `SELECT id, title, recurrence, start_date FROM events
+  const rows = await all<{ id: string; title: string; recurrence: string | null; start_date: string; emoji: string | null }>(c.env.DB,
+    `SELECT id, title, recurrence, start_date, emoji FROM events
       WHERE optional = 1 AND deleted_at IS NULL AND is_alarm = 0 ORDER BY title COLLATE NOCASE, start_date`);
   const on = await onEventIds(c.env.DB, c.get('member').id);
   return c.json(rows.map((e) => ({
-    id: e.id, title: e.title, recurrence: parseJson<Recurrence | null>(e.recurrence, null), startDate: e.start_date, on: on.has(e.id),
+    id: e.id, title: e.title, recurrence: parseJson<Recurrence | null>(e.recurrence, null), startDate: e.start_date, emoji: e.emoji, on: on.has(e.id),
   })));
 });
 

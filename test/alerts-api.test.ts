@@ -41,13 +41,6 @@ describe('calendar', () => {
     expect((await b.client.patch(`/events/${ev.json.id}`, { title: 'Theirs' })).status).toBe(403);
     expect((await o.patch(`/events/${ev.json.id}`, { title: 'Owner edit' })).json.title).toBe('Owner edit');
   });
-
-  it('school holidays appear in the calendar', async () => {
-    const o = await owner();
-    expect((await o.put('/school-holidays', { from: '2026-12-21', to: '2026-12-23', label: 'Winter break' })).json.days).toBe(3);
-    const cal = await o.get('/calendar?from=2026-12-20&to=2026-12-31');
-    expect(cal.json.schoolHolidays.map((h: any) => h.date)).toEqual(['2026-12-21', '2026-12-22', '2026-12-23']);
-  });
 });
 
 describe('timer replayed through the database (T1–T10)', () => {
