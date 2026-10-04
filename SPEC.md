@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.23 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.24-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -163,7 +163,9 @@ Enso/
 │   ├── 0002_alarms.sql     # §4.2a
 │   ├── 0003_days_off.sql   # §4.2b
 │   ├── 0004_options_expiration.sql   # §4.2c
-│   └── 0005_lists.sql      # §4.2d
+│   ├── 0005_lists.sql      # §4.2d
+│   ├── …                   # 0006–0011, §4.2e–§4.2j
+│   └── 0012_announcements.sql   # §4.2k
 ├── src/
 │   ├── shared/             # pure TS, no I/O — imported by worker, frontend, relay
 │   │   ├── vocab.ts        # §3
@@ -763,6 +765,25 @@ ALTER TABLE things ADD COLUMN phone TEXT;
 ALTER TABLE things ADD COLUMN cost TEXT;
 ```
 
+### 4.2k Schema change — `migrations/0012_announcements.sql`
+
+```sql
+-- §9.3 — an announcement is a delivery with no fire: deliveries.fire_id becomes nullable.
+-- SQLite cannot drop a NOT NULL, so deliveries is rebuilt and its rows copied. No table
+-- references deliveries, so nothing has to be stashed. Every other column and both CHECKs
+-- are unchanged (M1-VOCAB reads them from sqlite_master).
+CREATE TABLE deliveries_new ( …the §4.2 columns, except: fire_id TEXT REFERENCES fires(id) … );
+INSERT INTO deliveries_new (…every column…) SELECT …every column… FROM deliveries;
+DROP TABLE deliveries;
+ALTER TABLE deliveries_new RENAME TO deliveries;
+CREATE INDEX idx_deliveries_queue ON deliveries(channel, status);
+```
+
+`alert_number` stays `NOT NULL`; an announcement's deliveries carry `1`.
+**Migration check (AN8):** like C13 — deliveries written under 0001–0011 survive 0012
+unchanged, `PRAGMA foreign_key_check` is empty, and afterwards a delivery with
+`fire_id NULL` is accepted.
+
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
 
@@ -917,6 +938,9 @@ For one alert of one fire:
     `"Chore: {title}"`. Naming the person is what lets Shelly (and everyone) hear whose
     turn it is without a phone.
   - from the second alert on, append `" (alert {n})"`
+
+A delivery with **no fire** is an announcement (§9.3); it is written by `POST /announce`,
+never by `tick`.
 
 ### 5.8 Engine acceptance tables (M1 — each row is a test)
 
@@ -1670,7 +1694,15 @@ Actions:
 
 ### 8.5 Alarms screen
 
-Two sections, each a single-line list (per the table rules), each with a **＋ Add**
+At the very top, under the "Alarms" heading: a **📢 Announce** button. It opens the
+**announce box** (modal, titled "📢 Announce"): a one-line **Message** input (16 px,
+`maxLength` = `ANNOUNCE_MAX`), the channel checkboxes (☐ 📱 Phone ☐ 🔊 House — the same
+`ChannelChecks` as the alarm form, chosen each time; the box opens with **House ticked,
+Phone unticked** ⚑ Q36) and **Send** / **Cancel**. Send is disabled while the message is
+blank or neither channel is ticked. A refusal from the server shows inside the box; on
+success the box closes (there is no toast in the app). What happens is §9.3.
+
+Then three sections, each a single-line list (per the table rules), each with a **＋ Add**
 button in its header.
 
 **Scheduled** — one row per alarm, sorted by time of day, then title:
@@ -2057,20 +2089,26 @@ Each person turns phone alerts on **once per phone**, in Settings → Me (decide
 - **No `fetch` listener at all** → it never caches or serves the app (§8.10 always-fresh).
   Not `vite-plugin-pwa`/Workbox, which precaches the shell by default.
 - `push` → **always** `showNotification` (iOS revokes permission for a push that shows
-  nothing): `title`, `body`, `tag: fireId` (a re-alert replaces the old one), `icon:
+  nothing): `title`, `body`, `tag: p.tag || p.fireId || 'enso-test'` (a re-alert replaces
+  the old one; the `fireId` fallback keeps a payload from before `tag` working), `icon:
   /icon-192.png`, `data: { fireId }`, `actions` (ignored on iOS).
 - `notificationclick` → with an action: `POST /api/v1/fires/{id}/actions {action}` (same-origin
   cookie) and close; without: focus the open app or open `/`.
 
-**Payload** (JSON, encrypted): `{ fireId, kind, title, body, actions }`, under Apple's 4 KB:
+**Payload** (JSON, encrypted): `{ fireId, kind, tag, title, body, actions }`, under Apple's 4 KB:
 `title` **"Ensō"**, `body` = the delivery's `message` (already "Reminder: …", "Chore for
 Sam: …"), `kind` from the delivery's fire, `actions` from the engine's `pushActions(kind)` —
 the same table the Ringing bar's buttons follow. ⚑
+**`tag`** — what the phone collapses notifications by, and the push `topic`: a fire's push →
+its `fireId` (a re-alert replaces the last one); a delivery with no fire (an announcement,
+§9.3) → its **delivery id**, so two announcements never replace each other; the test push →
+`'enso-test'`. A delivery with no fire has `fireId: null`, `kind: null`, `actions: []` and the
+title **"📢 Announcement"** (`ANNOUNCE_TITLE`, §9.3).
 Actions: reminder and thing `done` + `snooze`; timer `ack`; chore `done`. iPhone shows no
 buttons — tapping opens the app, where the Ringing bar has them; expected, not a bug.
 
 **Sending** (`tick` step 3, and `POST /push/test`):
-- `buildPushPayload` with `ttl: 3600`, `urgency: 'high'`, `topic: fireId`.
+- `buildPushPayload` with `ttl: 3600`, `urgency: 'high'`, `topic: tag` (above).
 - **VAPID header cached per push-service origin for ~1 hour** — Apple: don't refresh the JWT
   more often than hourly. (The library signs per send by default; use its `vapidHeaders`.)
   The cache lives in the Worker instance's memory, so a cold start signs afresh — still well
@@ -2083,7 +2121,7 @@ buttons — tapping opens the app, where the Ringing bar has them; expected, not
   `detail` and the subscription's `last_error`; **no subscriptions** → `failed`,
   `no_subscription` — never skipped silently. Several subscriptions: `sent` if any succeeded.
 - **Send a test** (`POST /push/test`): one push to *my* subscriptions now — body "Ensō test —
-  phone alerts work", a fixed tag, no actions — so a person can check a phone without waiting
+  phone alerts work", the tag `'enso-test'`, no actions — so a person can check a phone without waiting
   for a reminder. → `{ sent: n }`; 409 with a message when I have no subscriptions.
 
 **Acceptance (M5):**
@@ -2160,6 +2198,53 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 **Latency budget:** cron granularity (≤ 60 s) + poll interval (≤ 10 s) + Voice PE
 (~8 s). Up to about 80 s from due time to spoken is acceptable.
 
+### 9.3 Announcements — `src/shared/announce.ts`, `POST /announce`
+
+A member sends a house announcement **now** from the Alarms tab (§8.5; decided by MojoSOGO
+2026-10-03). An announcement is a **delivery with no fire** (§4.2k): it rides the relay queue
+(§9.2) and push sending (§9.1) that alerts already use. Nothing rings, nothing is done or
+acked, nothing is scheduled — **now only**.
+
+**Rules** (`src/shared/announce.ts`, pure, imports only `vocab`):
+- `ANNOUNCE_MAX = 200` ⚑ characters, counted after trimming.
+- `announceError({ text, channels })` → a message, or `null`: `text` a string, trimmed
+  length 1…`ANNOUNCE_MAX`; `channels` a non-empty array of distinct `CHANNEL` values (at least
+  one of Phone / House).
+- `announceMessage(name, text)` → **`"{name} says: {text}"`** (text trimmed), e.g.
+  "Shelly says: Dinner is ready". This one string is what the house speaks and the push shows.
+- `ANNOUNCE_TITLE = "📢 Announcement"` — the push title.
+
+**`POST /announce { text, channels }`** (member):
+- The sender's name is the **session member's** `display_name` — never taken from the body.
+- One `db.batch`:
+  - **House** ticked → one `house` delivery: `fire_id NULL`, `member_id NULL`,
+    `alert_number 1`, `message` = `announceMessage(…)`, `queued`. The relay claims it and speaks
+    it on the four Echos and the Voice PE exactly like a House alert (§9.2).
+  - **Phone** ticked → one `push` delivery per member of `audience(…).push` (§7.5 — with no
+    assignment, every active member) **except the sender** ⚑, same `message`, `queued`.
+- Then the push deliveries are sent at once with `sendPushDeliveries` (§9.1): each ends `sent`
+  or visibly `failed` (`no_subscription`, `push_not_configured`, a push-service error) — a
+  member without a phone gets the honest failed row, as alerts do.
+- → **201** `{ deliveries: { id, channel, memberId, status }[] }`, read after sending (push
+  rows final, the house row `queued`). Every row also shows in Settings → Status.
+- 400 `invalid_input` with `announceError`'s message.
+
+**The push:** `{ fireId: null, kind: null, tag: <delivery id>, title: "📢 Announcement", body:
+"Shelly says: Dinner is ready", actions: [] }`; tapping it opens the app.
+
+**Acceptance (M4k — each row is a test):**
+
+| # | Check | Expected |
+|---|---|---|
+| AN1 | `announceError` / `announceMessage` | `"  hi "` ok; `""`, blanks, 201 chars, a non-string → message; channels `[]`, `["sms"]`, `["house","house"]`, not an array → message; `announceMessage("Shelly", " Dinner ")` = `"Shelly says: Dinner"` |
+| AN2 | `POST /announce { text: " Dinner is ready ", channels: ["house"] }` | 201; one `house` delivery: `fire_id` NULL, `member_id` NULL, `alert_number` 1, `"MojoSOGO says: Dinner is ready"`, `queued`; no push rows |
+| AN3 | then `/relay/claim`, `/relay/report sent` | the claim returns it `{ id, message }`; the report makes it `sent` |
+| AN4 | Phone, with the sender, a member with a phone, one without, one disabled | one push row each for the other two active members; the sender and the disabled member get none; with a phone → `sent`, without → `failed`, `no_subscription` |
+| AN5 | the push to that phone | decrypts to the payload above with `tag` = the delivery id; the `topic` header is the delivery id |
+| AN6 | blank text, 201 chars, no channels, an unknown channel; no session; a `name` in the body | 400 with a message ×4; 401; the name in the body is ignored |
+| AN7 | tag rules | a fire's push: `tag` = `topic` = `fireId`; the test push: `tag` = `topic` = `"enso-test"` |
+| AN8 | migration 0012 | rows survive unchanged; `foreign_key_check` empty; a fire-less delivery is accepted (§4.2k) |
+
 ---
 
 ## 10. API — `/api/v1`
@@ -2202,6 +2287,7 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | GET | `/push/vapid-key` | public | → `{ key }` |
 | GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff }`; PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
 | GET | `/status` | member | → `{ relayLastSeen, mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[] }` |
+| POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
 | POST | `/relay/claim` | bearer `RELAY_TOKEN` | → deliveries |
 | POST | `/relay/report` | bearer `RELAY_TOKEN` | `{ id, status, detail }` |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek }` (`thisWeek`/`nextWeek` = member id or null) |
@@ -2359,6 +2445,13 @@ checks.
 - ✅ Tests: the three fields round-trip, their limits 400 with a message, `cleanPhotoReading`
   trims them, Plan-it notes include them.
 
+**M4k — Announcements** (v1.6.0)
+- Migration 0012 (`deliveries.fire_id` nullable), `announce.ts`, `POST /announce`, the push
+  `tag`, the 📢 Announce box on the Alarms tab (§4.2k, §8.5, §9.1, §9.3).
+- ✅ Tests AN1–AN8.
+- ✅ Manual: an announcement with House ticked is spoken on the Echos and the Voice PE as
+  "{name} says: …"; with Phone ticked it arrives on another member's phone.
+
 **M4d — Invites**
 - `/auth/invite-preview`, the invites list states, the invite card (QR, Share, Copy),
   the join page at `/join`, the welcome card (§6.2a, §8.9).
@@ -2495,6 +2588,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q34 | Take out trash | **Decided:** optional, every Sunday 18:00, rings at 18:00, 🗑️ |
 | Q30 | Reading photos | **Decided:** Claude reads them (`claude-opus-5-5`); ≤ 40 reads a day ⚑ |
 | Q35 | Where do the thing form's Open / Map / Call buttons sit, and which maps app? | ⚑ To the right of Link, Address, Phone; Apple Maps on iPhone/iPad, Google Maps elsewhere |
+| Q36 | Announcements (§9.3): defaults of the box, length, who is pushed | ⚑ The box opens with House ticked, Phone unticked; at most 200 characters; at least one of Phone / House; the sender gets no push of their own; push goes to every active member (optins `audience`), and one without a phone gets the honest `failed: no_subscription` row; the push is titled "📢 Announcement" with "{name} says: {text}" as its body |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
