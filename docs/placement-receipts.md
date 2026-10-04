@@ -7,6 +7,29 @@ carry its result.
 
 ---
 
+## 2026-10-04 — photoBody to http.ts, the photo-read budget to its own owner (reorganizer; refactor/access-photo-reads-seams, 2 of 2)
+
+REORG RECEIPT
+- Trigger:      the "📷 snap an item" feature adds a second photo reader; it needs the same photo-body check and the
+  same household daily photo-read budget, both of which were file-local to routes/thing-photos.ts.
+- Seam moved:   (a) photoBody (type / size / empty → 400) from `src/worker/routes/thing-photos.ts` to
+  `src/worker/http.ts` [EXISTING owner, row widened]; (b) the photo_reads daily cap — householdToday (today in the
+  household zone, via db.ts's householdTz, replacing thing-photos' file-local copy of the same query),
+  photoReadsUsedUp, recordPhotoRead — from `src/worker/routes/thing-photos.ts` to `src/worker/photo-reads.ts`
+  [NEW owner row].
+- Room opened:  thing-photos.ts 83 → 64 lines; http.ts 25 → 41; photo-reads.ts new at 24; no CEILINGS entry (all
+  under GLOBAL_FILE_CAP 300).
+- Behavior:     PRESERVED — `npm run typecheck && npm test` all green, things-api tests unchanged. The §7C.4 order
+  (signed in → size/type → daily cap → key present → count the read → call the model) and every status, error
+  code and message are identical; same SQL (settings timezone, COUNT over [local midnight, next local midnight),
+  INSERT INTO photo_reads), the same `now` for the day and the recorded read.
+- Sources read: docs/module-ownership.md, docs/placement-receipts.md, scripts/arch.ts, routes/thing-photos.ts,
+  http.ts, db.ts, SPEC.md §7C.4 (by grep).
+- Restraint:    the 429 message and READS_PER_DAY's meaning stay in the route; claude.ts, photo-reader.ts, lists,
+  the frontend and home/ untouched; recipe_reads' own cap not merged in.
+- New owner row: | `src/worker/photo-reads.ts` | The household's daily photo-read budget (§7C.4, §7A.3): today in
+  the household zone, used-up check over photo_reads, record one read |
+
 ## 2026-10-04 — The Access fetch gets its own owner (reorganizer; refactor/access-photo-reads-seams, 1 of 2)
 
 REORG RECEIPT
