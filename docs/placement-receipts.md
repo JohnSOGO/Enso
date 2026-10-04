@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-03 — M4k Announcements (placement-advisor)
+
+- **Ask:** Send a house announcement now from the Alarms tab: "<sender> says: <msg>" on Echos +
+  Voice PE via the relay, optional push to members.
+- **Verdict:** `src/shared/announce.ts`, `src/worker/routes/announce.ts`,
+  `frontend/src/components/Announce.tsx` [NEW owner rows]; `src/worker/push.ts`,
+  `src/worker/index.ts`, `frontend/src/components/Alarms.tsx` [EXISTING];
+  `migrations/0012_announcements.sql` (deliveries.fire_id nullable).
+- **Considerations:** an announcement is a delivery with no fire (deliveries is already the relay
+  queue; push already has a fire-less payload). Rejected a fire kind 'announce' (widens
+  ALERT_KIND, born-closed fire with made-up close_reason) and a new table (second queue). Parity
+  fix: PushPayload gains tag so fire-less pushes don't collapse into each other. No reorganizer
+  needed. Follow-up for code-steward: delivery INSERT SQL now in tick.ts and routes/announce.ts.
+
+---
+
 ## 2026-10-03 — Re-pin after M5 (coordinator)
 
 - `Settings.tsx` ceiling 187 + 40 → **167 + 40**: M5 replaced the placeholder PhoneAlerts with

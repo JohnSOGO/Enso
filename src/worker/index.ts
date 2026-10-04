@@ -15,6 +15,7 @@ import { lists } from './routes/lists';
 import { chores } from './routes/chores';
 import { things } from './routes/things';
 import { thingPhotos } from './routes/thing-photos';
+import { announce } from './routes/announce';
 
 const api = new Hono<AppEnv>();
 
@@ -43,6 +44,7 @@ api.route('/', lists);
 api.route('/', chores);
 api.route('/', thingPhotos); // before things: /things/read-photo must not match /things/:id
 api.route('/', things);
+api.route('/', announce);
 
 api.post('/dev/tick', async (c) => {
   if (c.env.DEV_ENDPOINTS !== '1') return fail(c, 404, 'not_found', 'Not found.');
