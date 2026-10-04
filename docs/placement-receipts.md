@@ -7,6 +7,34 @@ carry its result.
 
 ---
 
+## 2026-10-04 — Recipe re-read seam (reorganizer; prepares the SogoAI captions helper)
+
+REORG RECEIPT
+- Trigger:      placement-advisor: the re-read path gains a second caller, the SogoAI home captions helper with
+  its own routes file; a route file can't import another route's handler body, so the re-read leaves
+  `POST /recipes/:id/transcript` first.
+- Seam moved:   everything after the keys check — the video + creator's comments re-fetch side by side, counting
+  the read, readRecipe, cleanRecipeReading, the found false refusal and the §7E.2b UPDATE — from
+  `src/worker/routes/recipes.ts` to `src/worker/recipe-reread.ts` as `rereadRecipe(db, keys, row, given,
+  countFor, now)` → `{ ok: true } | { ok: false, kind, reason }` [NEW owner row].
+- Room opened:  src/worker/routes/recipes.ts: 234 → 224 lines; ceiling none (global 300) → none (global 300).
+  recipe-reread.ts: 43 lines under the global cap. No CEILINGS entry added.
+- Behavior:     PRESERVED — verified via `npm run typecheck && npm test && npm run build && npm run arch:audit`
+  (444 tests, all green, tests unchanged; R16–R18 included). The route keeps steps 1–6 (recipe, video, text,
+  readsUsedUp, keys / readingOff) and maps each kind to today's status, code and message. The read is counted
+  only when countFor is set (the route passes the member id, as before), after YouTube answered and before
+  Claude. Claude's captions slot still gets the pasted text (`given.transcript ?? given.pasted`; the route
+  passes transcript null), and source still comes from sourcesOf with transcript null. updated_at is still a
+  fresh nowIso() at the UPDATE, recipe_reads.at still the route's `now`.
+- Sources read: CLAUDE.md, docs/module-ownership.md, scripts/arch.ts, src/worker/routes/recipes.ts,
+  src/worker/recipe-reader.ts, src/shared/recipe-reading.ts, this file.
+- Restraint:    /recipes/from-video, readsUsedUp, readingOff and the body checks stay in the route; youtube*.ts,
+  recipe-reader.ts, claude.ts, the shared files, frontend and tests are untouched; no captions-helper job code.
+- New owner row: `src/worker/recipe-reread.ts` — re-reading a video recipe in place (§7E.2b, §7E.2c); returns an
+  outcome kind + reason, never HTTP; no Hono.
+
+---
+
 ## 2026-10-04 — Recipe reading seam (reorganizer; prepares the SogoAI home-PC captions helper)
 
 REORG RECEIPT
