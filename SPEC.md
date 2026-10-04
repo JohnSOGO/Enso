@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.22 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.23 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1093,6 +1093,11 @@ excluded because they mean holidays:
     creator's color, truncated with an ellipsis. Beyond 3, a `+N` badge.
   - Below 480px, **colored dots only** (max 4, then `+`); titles appear in the day
     sheet. At 320px a cell is about 44px wide, and titles do not fit.
+  - **An event with an emoji gets no dot** when its emoji shows beside the date (§7.6): the
+    emoji is its mark, so a household reminder like 🧹 street sweeping is not painted in its
+    creator's color as if it were that person's. Tapping the day opens the day sheet as
+    always. If the two-icon limit (§7.2) hides its emoji, it keeps its dot so it is never
+    unmarked. (Decided by MojoSOGO 2026-10-03.)
 - **Multi-day (all-day) events are grouped:** one continuous bar in the event's
   color spans the days, and those day cells get a faint tint of the same color so
   the stay reads as one block. The title is written **once**, at the start of the
@@ -1251,7 +1256,8 @@ MojoSOGO 2026-10-03); then **each member decides for themselves** whether it is 
 An event may carry **one emoji** (`events.emoji`, optional; decided by MojoSOGO): street
 sweeping 🧹, taking out the trash 🗑️. It must be a single emoji (one grapheme of emoji
 presentation, ≤ 16 bytes) — anything else is 400 with a message. Where it shows:
-- beside the date number on each day the event occurs (§7.2 day icons);
+- beside the date number on each day the event occurs (§7.2 day icons) — on phones in place
+  of its dot (§7.1);
 - before the title in the day sheet, on wide-screen chips, and in Optional calendar items;
 - in the Ringing bar and alert text it is **not** added (messages stay plain text).
 
@@ -2528,6 +2534,8 @@ images are rendered from it. Its on-iPhone check is still to do.
 is not built — an open app picks the alert up on its 30 s poll, and a reopened app reloads
 (§8.10). Still to check on real phones: Turn on → Send a test (iPhone home-screen app and
 Android), a reminder on the lock screen, Android Done/Snooze.
+**Emoji instead of a dot** (v1.5.1): on phones an event whose emoji shows beside the date has no
+dot (§7.1); checked at 320 px.
 **Open from the thing form** (v1.5.0): ↗ link, 🗺️ maps, 📞 call beside the fields, checked at
 320 px (44 px buttons, no sideways scroll). Still to check on the iPhone: Maps and the call sheet open.
 **Link fix** (v1.4.1; 260 tests): one `webLink` rule — a bare `www.….com` from a flyer or typed
