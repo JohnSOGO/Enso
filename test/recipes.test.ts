@@ -1,9 +1,9 @@
 // M4o acceptance (SPEC §7E) — the pure recipe rules: R1 (youtubeVideoId), R9 (cleanRecipeReading),
-// parseRecipeInput, hasRecipeText / sourcesOf, the clash, recipeFromRow; M4p (§7E.5) RE8 byMyEmoji, RE9 usedEmojis.
+// parseRecipeInput, hasRecipeText / sourcesOf, R15 creatorComments, the clash, recipeFromRow; M4p (§7E.5) RE8 byMyEmoji, RE9 usedEmojis.
 import { describe, expect, it } from 'vitest';
 import {
-  INGREDIENTS_MAX, INGREDIENT_MAX, RECIPE_TITLE_MAX, STEPS_MAX, UNTITLED_VIDEO, cleanRecipeReading,
-  hasRecipeText, parseRecipeInput, recipeFromRow, recipeVideoClash, sourcesOf, thumbnailUrl, watchUrl,
+  CREATOR_COMMENTS_MAX, INGREDIENTS_MAX, INGREDIENT_MAX, RECIPE_TITLE_MAX, STEPS_MAX, UNTITLED_VIDEO, cleanRecipeReading,
+  creatorComments, hasRecipeText, parseRecipeInput, recipeFromRow, recipeVideoClash, sourcesOf, thumbnailUrl, watchUrl,
   youtubeVideoId, type Recipe, type RecipeRow,
 } from '../src/shared/recipes';
 import { USED_EMOJIS_MAX, byMyEmoji, myEmoji, usedEmojis } from '../src/shared/recipe-emoji';
@@ -62,16 +62,42 @@ describe('R1 youtubeVideoId', () => {
 });
 
 describe('hasRecipeText / sourcesOf', () => {
-  it('no description and no captions → nothing to read', () => {
-    expect(hasRecipeText({ description: null, transcript: null })).toBe(false);
-    expect(hasRecipeText({ description: '  \n ', transcript: '' })).toBe(false);
-    expect(sourcesOf({ description: ' ', transcript: null })).toEqual([]);
+  it('no description, no captions and no creator comment → nothing to read', () => {
+    expect(hasRecipeText({ description: null, transcript: null, comments: null })).toBe(false);
+    expect(hasRecipeText({ description: '  \n ', transcript: '', comments: ' ' })).toBe(false);
+    expect(sourcesOf({ description: ' ', transcript: null, comments: null })).toEqual([]);
   });
-  it('either one is enough; the sources say which', () => {
-    expect(hasRecipeText({ description: 'flour', transcript: null })).toBe(true);
-    expect(hasRecipeText({ description: null, transcript: 'add salt' })).toBe(true);
-    expect(sourcesOf({ description: 'flour', transcript: 'add salt' })).toEqual(['description', 'captions']);
-    expect(sourcesOf({ description: null, transcript: 'add salt' })).toEqual(['captions']);
+  it('any one is enough; the sources say which', () => {
+    expect(hasRecipeText({ description: 'flour', transcript: null, comments: null })).toBe(true);
+    expect(hasRecipeText({ description: null, transcript: 'add salt', comments: null })).toBe(true);
+    expect(hasRecipeText({ description: null, transcript: null, comments: '2 eggs' })).toBe(true);
+    expect(sourcesOf({ description: 'flour', transcript: 'add salt', comments: '2 eggs' })).toEqual(['description', 'captions', 'comments']);
+    expect(sourcesOf({ description: 'flour', transcript: 'add salt', comments: null })).toEqual(['description', 'captions']);
+    expect(sourcesOf({ description: null, transcript: 'add salt', comments: null })).toEqual(['captions']);
+    expect(sourcesOf({ description: null, transcript: null, comments: '2 eggs' })).toEqual(['comments']);
+  });
+});
+
+describe("R15 creatorComments — only the video's own channel", () => {
+  const CH = 'UC_creator';
+  const c = (authorChannelId: string | null, text: string) => ({ authorChannelId, text });
+  it("keeps only the creator's top-level comments, in order; viewers are dropped", () => {
+    expect(creatorComments([c('UC_viewer', 'Looks great!'), c(CH, ' Recipe: 2 eggs '), c(null, 'anon'), c(CH, 'Bake 20 min')], CH))
+      .toBe('Recipe: 2 eggs\n\nBake 20 min');
+    expect(creatorComments([c('UC_viewer', '2 eggs, 1 cup flour')], CH)).toBeNull();
+    expect(creatorComments([c(CH, '   ')], CH)).toBeNull();
+    expect(creatorComments([], CH)).toBeNull();
+  });
+  it('an unknown channel → null, never anyone else\'s comment', () => {
+    for (const ch of [null, '']) {
+      expect(creatorComments([c(null, 'x'), c('', 'y'), c('UC_viewer', 'z')], ch)).toBeNull();
+    }
+  });
+  it('cut to CREATOR_COMMENTS_MAX, never inside an emoji', () => {
+    expect(creatorComments([c(CH, 'x'.repeat(CREATOR_COMMENTS_MAX + 50))], CH)).toHaveLength(CREATOR_COMMENTS_MAX);
+    const cut = creatorComments([c(CH, `a${'🍅'.repeat(CREATOR_COMMENTS_MAX)}`)], CH)!;
+    expect(cut.length).toBeLessThanOrEqual(CREATOR_COMMENTS_MAX);
+    expect(/[\uD800-\uDBFF]$/.test(cut)).toBe(false);
   });
 });
 
@@ -129,7 +155,7 @@ describe('parseRecipeInput', () => {
 describe('the clash and the wire shape', () => {
   const row = (over: Partial<RecipeRow> = {}): RecipeRow => ({
     id: 'rcp_1', title: 'Soup', video_id: ID, video_title: 'Soup video', channel: 'Chef', ingredients: '["1 onion"]', steps: '["Chop"]',
-    servings: '2', time_text: '1 h', found: 1, source: '["description","captions"]', captions_error: null, created_by: 'mem_1',
+    servings: '2', time_text: '1 h', found: 1, source: '["description","captions"]', captions_error: null, comments_error: null, created_by: 'mem_1',
     created_at: 't', updated_at: 't', deleted_at: null, ...over,
   });
   it('recipeVideoClash finds the live recipe holding the video', () => {
@@ -144,6 +170,9 @@ describe('the clash and the wire shape', () => {
     expect(recipeFromRow(row({ video_id: null, source: '["typed"]', ingredients: 'not json' }))).toMatchObject({
       watchUrl: null, thumbnailUrl: null, ingredients: [], source: ['typed'],
     });
+    expect(recipeFromRow(row({ source: '["comments"]', comments_error: 'quota' }))).toMatchObject({
+      source: ['comments'], commentsError: 'quota', captionsError: null,
+    });
   });
 });
 
@@ -151,13 +180,13 @@ describe("M4p each person's emoji (§7E.5)", () => {
   const ME = 'mem_me', YOU = 'mem_you';
   const rec = (id: string, createdAt: string, mine: string | null, yours: string | null = null): Recipe => ({
     id, title: id, videoId: null, videoTitle: null, channel: null, watchUrl: null, thumbnailUrl: null, ingredients: [], steps: [],
-    servings: null, time: null, found: false, source: ['typed'], captionsError: null, createdBy: ME, createdAt, updatedAt: createdAt,
+    servings: null, time: null, found: false, source: ['typed'], captionsError: null, commentsError: null, createdBy: ME, createdAt, updatedAt: createdAt,
     emojis: [...(mine ? [{ memberId: ME, emoji: mine }] : []), ...(yours ? [{ memberId: YOU, emoji: yours }] : [])],
   });
 
   it("recipeFromRow keeps only its own recipe's emojis; none by default", () => {
     const row = { id: 'rcp_1', title: 'Soup', video_id: null, video_title: null, channel: null, ingredients: '[]', steps: '[]',
-      servings: null, time_text: null, found: 0, source: '["typed"]', captions_error: null, created_by: ME, created_at: 't',
+      servings: null, time_text: null, found: 0, source: '["typed"]', captions_error: null, comments_error: null, created_by: ME, created_at: 't',
       updated_at: 't', deleted_at: null } satisfies RecipeRow;
     expect(recipeFromRow(row).emojis).toEqual([]);
     expect(recipeFromRow(row, [

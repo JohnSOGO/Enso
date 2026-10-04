@@ -1,5 +1,5 @@
 // SPEC §8.12 — one recipe (modal): the thumbnail and ▶ link to the video, servings and time, the source
-// note with any "captions couldn't be read" marker, ingredients with pick boxes → Add to Shopping (one
+// note with any "captions / comments couldn't be read" marker, ingredients with pick boxes → Add to Shopping (one
 // POST /lists/{SHOPPING_LIST_ID}/items per ingredient, in order; the summary inside ⚑ Q69), the steps, ✎;
 // under the title everyone's emoji ("Shelly 🌶 · John ⭐", ⚑ Q73) and RecipeEmoji, mine (§7E.5).
 import { useState } from 'react';
@@ -9,13 +9,25 @@ import { useApp, type Member } from '../state';
 import { errorText, post } from '../api';
 import { SHOPPING_LIST_ID } from '../../../src/shared/lists';
 import type { Recipe } from '../../../src/shared/recipes';
+import type { RecipeSource } from '../../../src/shared/vocab';
 import s from './Recipes.module.css';
 
-/** ⚑ Q64 — what the recipe was read from, plus why the captions couldn't be read when they couldn't. */
+/** How the source note names each thing a recipe was read from (⚑ Q81). */
+const READ_FROM: Record<Exclude<RecipeSource, 'typed'>, string> = {
+  description: 'description', captions: 'captions', comments: "the creator's comment",
+};
+
+/** "A", "A and B", "A, B and C". */
+const andList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+
+/** ⚑ Q64 — what the recipe was read from, plus why the captions or comments couldn't be read when they couldn't. */
 function sourceNote(r: Recipe): string {
   if (r.source.includes('typed')) return 'Typed by hand';
-  const read = r.source.length ? `From the ${r.source.join(' and ')}` : "Nothing in the video's text to read";
-  return r.captionsError ? `${read} · captions couldn't be read: ${r.captionsError}` : read;
+  const read = r.source.length
+    ? `From the ${andList(r.source.filter((x): x is keyof typeof READ_FROM => x !== 'typed').map((x) => READ_FROM[x]))}`
+    : "Nothing in the video's text to read";
+  return [read, r.captionsError && `captions couldn't be read: ${r.captionsError}`,
+    r.commentsError && `comments couldn't be read: ${r.commentsError}`].filter(Boolean).join(' · ');
 }
 
 /** Everyone's emoji in the household's member order; a member the PWA doesn't know reads "Someone" ⚑ Q73. */

@@ -1,12 +1,12 @@
 // SPEC §7E, §10 — recipes: CRUD, and reading one from a YouTube video. Every rule (limits, the link → id,
-// when to ask Claude, cleaning the answer, found, the clash) is src/shared/recipes.ts; the fetching is
+// whose comments are the creator's, when to ask Claude, cleaning the answer, found, the clash) is src/shared/recipes.ts; the fetching is
 // youtube.ts, youtube-captions.ts and recipe-reader.ts. This route keeps the §7E.2 check order, counts
 // reads, and persists. Any member may do anything; delete is soft (⚑ Q66). Each person sets only their own
 // emoji (§7E.5), and every recipe answered carries everyone's through toRecipes.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import {
-  RECIPE_READS_PER_DAY, cleanRecipeReading, hasRecipeText, isFound, parseRecipeInput, recipeFromRow, recipeVideoClash,
+  COMMENTS_LOOKED_AT, RECIPE_READS_PER_DAY, cleanRecipeReading, creatorComments, hasRecipeText, isFound, parseRecipeInput, recipeFromRow, recipeVideoClash,
   sourcesOf, youtubeVideoId, type Recipe, type RecipeEmojiRow, type RecipeInput, type RecipeRow,
 } from '../../shared/recipes';
 import { emojiError } from '../../shared/emoji';
@@ -15,7 +15,7 @@ import { addDays, localToUtc, utcToLocal } from '../../shared/time';
 import { all, first, householdTz, newId, nowIso, run } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
-import { lookUpVideo } from '../youtube';
+import { lookUpComments, lookUpVideo } from '../youtube';
 import { readCaptions } from '../youtube-captions';
 import { readRecipe } from '../recipe-reader';
 
@@ -46,13 +46,17 @@ const duplicate = (c: Context<AppEnv>, r: RecipeRow) =>
 
 interface Video { id: string; title: string | null; channel: string | null }
 
+/** Why the captions and the creator's comments couldn't be read (NULL when they were, or weren't tried). */
+interface ReadErrors { captions: string | null; comments: string | null }
+
 function insert(db: D1Database, id: string, f: RecipeInput, video: Video | null, source: RecipeSource[],
-  captionsError: string | null, me: string, now: string) {
+  errors: ReadErrors, me: string, now: string) {
   return run(db,
     `INSERT INTO recipes (id, title, video_id, video_title, channel, ingredients, steps, servings, time_text, found, source,
-       captions_error, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       captions_error, comments_error, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id, f.title, video?.id ?? null, video?.title ?? null, video?.channel ?? null, JSON.stringify(f.ingredients),
-    JSON.stringify(f.steps), f.servings, f.time, isFound(f) ? 1 : 0, JSON.stringify(source), captionsError, me, now, now);
+    JSON.stringify(f.steps), f.servings, f.time, isFound(f) ? 1 : 0, JSON.stringify(source), errors.captions, errors.comments,
+    me, now, now);
 }
 
 export const recipes = new Hono<AppEnv>();
@@ -66,12 +70,13 @@ recipes.post('/recipes', requireMember, async (c) => {
   const input = parseRecipeInput(await body(c));
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   const id = newId('rcp');
-  await insert(c.env.DB, id, input, null, ['typed'], null, c.get('member').id, nowIso());
+  await insert(c.env.DB, id, input, null, ['typed'], { captions: null, comments: null }, c.get('member').id, nowIso());
   return answer(c, id, 201);
 });
 
 recipes.post('/recipes/from-video', requireMember, async (c) => {
-  // §7E.2 check order: link → duplicate → daily cap → keys → YouTube → captions → count → Claude → clean → save.
+  // §7E.2 check order: link → duplicate → daily cap → keys → YouTube → captions + the creator's comments → count →
+  // Claude → clean → save.
   const videoId = youtubeVideoId((await body(c)).url);
   if (!videoId) return fail(c, 400, 'invalid_input', "That isn't a YouTube video link.");
   const db = c.env.DB;
@@ -90,11 +95,19 @@ recipes.post('/recipes/from-video', requireMember, async (c) => {
   const video = await lookUpVideo(videoId, ytKey);
   if (!video.ok && video.kind === 'not_found') return fail(c, 404, 'video_unavailable', `Couldn't find that video. ${video.reason}`);
   if (!video.ok) return fail(c, 502, 'youtube_failed', `Couldn't look the video up: ${video.reason}`);
-  const captions = await readCaptions(videoId);
+  // Steps 7 and 8 side by side; neither is ever fatal.
+  const [captions, comments] = await Promise.all([readCaptions(videoId), lookUpComments(videoId, ytKey, COMMENTS_LOOKED_AT)]);
   const me = c.get('member').id;
   await run(db, 'INSERT INTO recipe_reads (at, member_id) VALUES (?, ?)', now, me);
 
-  const text = { description: video.description, transcript: captions.ok ? captions.text : null };
+  const text = {
+    description: video.description, transcript: captions.ok ? captions.text : null,
+    comments: comments.ok ? creatorComments(comments.comments, video.channelId) : null,
+  };
+  const errors: ReadErrors = {
+    captions: captions.ok ? null : captions.reason,
+    comments: comments.ok || comments.kind === 'none' ? null : comments.reason, // turned off is not an error ⚑ Q78
+  };
   let raw: Record<string, unknown> | null = null;
   if (hasRecipeText(text)) {
     const r = await readRecipe({ apiKey: aiKey, title: video.title, channel: video.channel, ...text });
@@ -105,8 +118,7 @@ recipes.post('/recipes/from-video', requireMember, async (c) => {
   const reading = cleanRecipeReading(raw, video.title);
   const id = newId('rcp');
   try {
-    await insert(db, id, reading, { id: videoId, title: video.title, channel: video.channel }, sourcesOf(text),
-      captions.ok ? null : captions.reason, me, now);
+    await insert(db, id, reading, { id: videoId, title: video.title, channel: video.channel }, sourcesOf(text), errors, me, now);
   } catch (err) {
     const won = recipeVideoClash(videoId, await all<RecipeRow>(db, `${LIVE} AND video_id = ?`, videoId));
     if (won) return duplicate(c, won); // another paste of the same link saved first (uq_recipe_video)
