@@ -2097,7 +2097,7 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
 | DELETE | `/invites/{id}` | owner | revoke |
 | GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[] }` (each occurrence carries `emoji`); recurring events expanded server-side with `recurrence.ts`; alarms excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
-| GET | `/optional-events` | member | → `{ id, title, recurrence, startDate, on }[]` — every optional event, with this member's switch |
+| GET | `/optional-events` | member | → `{ id, title, emoji, recurrence, startDate, on }[]` — every optional event, with this member's switch |
 | PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |
 | GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6) |
@@ -2427,6 +2427,10 @@ home-screen tags, `AppRefresh` (reload on resume unless a dialog is open; pull t
 — verified with real touch events in an emulated phone; its on-iPhone check is still to do.
 The ensō mark (scripts/draw-enso.mjs) and the opening screen are built; the 7 iPhone launch
 images are rendered from it. Its on-iPhone check is still to do.
+**M4i calendar tidy** is built (v1.2.0; 243 tests; 0010 applied locally with nothing but the
+school table lost; no "school" left in code). Checked at 320 and 440 px: day icons sit on the
+date's line inside the cell (15🧹, 16📈, 18🗑️). Known limit: on the **1st** of a month the
+month tag ("OCT") fills the line, so that day's icon is clipped (still in the day sheet).
 **M4h optional events + certain weeks** is built (O1–O9 + §4.3 rows green, 225 tests; 0009
 applied locally with nothing lost; v1.1.0). Built as: reminders of optional events are planned
 for everyone and only deliveries and /fires are filtered; a non-optional event's House rule is

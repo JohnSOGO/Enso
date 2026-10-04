@@ -7,6 +7,13 @@ carry its result.
 
 ---
 
+## 2026-10-03 — Re-pin after M4i (coordinator)
+
+- `Settings.tsx` ceiling 219 + 40 → **187 + 40**: M4i deleted the holiday checkboxes and the
+  school-holidays section (refinement deletes). Bless-and-raise not needed; nothing extracted.
+
+---
+
 ## 2026-10-03 — M4i calendar tidy (placement-advisor)
 
 - **Verdict:** NEW `src/shared/emoji.ts` (the one-emoji rule: one grapheme, Extended_Pictographic
