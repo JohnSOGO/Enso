@@ -7,6 +7,9 @@ import { newThingFire, type NewFire } from './engine';
 export const TITLE_MAX = 120;
 export const NOTE_MAX = 2000;
 export const PLACE_MAX = 200;
+export const ADDRESS_MAX = 300;
+export const PHONE_MAX = 50;
+export const COST_MAX = 200;
 export const URL_MAX = 500;
 
 /** Photos (§7C.3): the server's limits and the phone's shrink settings. */
@@ -28,6 +31,9 @@ export interface ThingRow {
   title: string;
   note: string | null;
   place: string | null;
+  address: string | null;
+  phone: string | null;
+  cost: string | null;
   url: string | null;
   window_start: string | null;
   window_end: string | null;
@@ -49,6 +55,9 @@ export interface Thing {
   title: string;
   note: string | null;
   place: string | null;
+  address: string | null;
+  phone: string | null;
+  cost: string | null;
   url: string | null;
   windowStart: string | null;
   windowEnd: string | null;
@@ -69,6 +78,9 @@ export interface PhotoReading {
   startDate: string | null;
   endDate: string | null;
   place: string | null;
+  address: string | null;
+  phone: string | null;
+  cost: string | null;
   url: string | null;
   note: string | null;
 }
@@ -80,6 +92,9 @@ export interface ThingInput {
   title: string;
   note: string | null;
   place: string | null;
+  address: string | null;
+  phone: string | null;
+  cost: string | null;
   url: string | null;
   window_start: string | null;
   window_end: string | null;
@@ -107,6 +122,12 @@ export function parseThingInput(b: Record<string, unknown>): ThingInput | string
   if (note && typeof note === 'object') return note.error;
   const place = optText(b.place, 'place', PLACE_MAX);
   if (place && typeof place === 'object') return place.error;
+  const address = optText(b.address, 'address', ADDRESS_MAX);
+  if (address && typeof address === 'object') return address.error;
+  const phone = optText(b.phone, 'phone', PHONE_MAX);
+  if (phone && typeof phone === 'object') return phone.error;
+  const cost = optText(b.cost, 'cost', COST_MAX);
+  if (cost && typeof cost === 'object') return cost.error;
   const url = optText(b.url, 'url', URL_MAX);
   if (url && typeof url === 'object') return url.error;
   if (url && !isWebLink(url)) return 'url must be a web link starting with http:// or https://.';
@@ -126,7 +147,7 @@ export function parseThingInput(b: Record<string, unknown>): ThingInput | string
   if (channels.length === 0 && (remind_start || remind_on)) return 'channels: choose at least one for a thing with a reminder.';
   if (b.status !== undefined && !isOneOf(THING_STATUS, b.status)) return `status must be one of: ${THING_STATUS.join(', ')}.`;
   return {
-    title, note, place, url, window_start, window_end, remind_start, remind_on, channels,
+    title, note, place, address, phone, cost, url, window_start, window_end, remind_start, remind_on, channels,
     ...(b.status !== undefined ? { status: b.status as ThingStatus } : {}),
   };
 }
@@ -136,7 +157,7 @@ export function thingFromRow(r: ThingRow, plannedDate: string | null): Thing {
   let listed: unknown = [];
   try { listed = JSON.parse(r.channels); } catch { listed = []; }
   return {
-    id: r.id, title: r.title, note: r.note, place: r.place, url: r.url,
+    id: r.id, title: r.title, note: r.note, place: r.place, address: r.address, phone: r.phone, cost: r.cost, url: r.url,
     windowStart: r.window_start, windowEnd: r.window_end, remindStart: r.remind_start === 1, remindOn: r.remind_on,
     channels: CHANNEL.filter((c) => Array.isArray(listed) && listed.includes(c)),
     hasPhoto: r.photo_key !== null, status: r.status, plannedEventId: r.planned_event_id, plannedDate,
@@ -179,9 +200,9 @@ export function canPlanOn(t: Pick<ThingRow, 'window_start' | 'window_end'>, date
   return isDate(date) && (!t.window_start || date >= t.window_start) && (!t.window_end || date <= t.window_end);
 }
 
-/** The planned event's notes: note, then place, then link (one per line); the note is cut so place and link fit. */
-export function plannedEventNotes(t: Pick<ThingRow, 'note' | 'place' | 'url'>, max = NOTE_MAX): string | null {
-  const tail = [t.place, t.url].filter((x): x is string => !!x).join('\n');
+/** The planned event's notes: note, then place, address, phone, cost, link (one per line); the note is cut so the rest fits. */
+export function plannedEventNotes(t: Pick<ThingRow, 'note' | 'place' | 'address' | 'phone' | 'cost' | 'url'>, max = NOTE_MAX): string | null {
+  const tail = [t.place, t.address, t.phone, t.cost, t.url].filter((x): x is string => !!x).join('\n');
   const room = max - (tail ? tail.length + 1 : 0);
   const note = t.note ? t.note.slice(0, Math.max(0, room)).trim() : '';
   return [note, tail].filter(Boolean).join('\n') || null;
@@ -212,6 +233,7 @@ export function cleanPhotoReading(raw: Partial<Record<keyof PhotoReading, unknow
   const url = cleanText(r.url, URL_MAX);
   return {
     title: cleanText(r.title, TITLE_MAX), startDate, endDate, place: cleanText(r.place, PLACE_MAX),
+    address: cleanText(r.address, ADDRESS_MAX), phone: cleanText(r.phone, PHONE_MAX), cost: cleanText(r.cost, COST_MAX),
     url: url && isWebLink(url) ? url : null, note: cleanText(r.note, NOTE_MAX),
   };
 }

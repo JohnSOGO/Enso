@@ -49,9 +49,9 @@ things.post('/things', requireMember, async (c) => {
   const id = newId('thg'), now = nowIso();
   // A new thing is always an idea; it is planned only through Plan it.
   await c.env.DB.prepare(
-    `INSERT INTO things (id, title, note, place, url, window_start, window_end, remind_start, remind_on, channels, status,
-       created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'idea', ?, ?, ?)`,
-  ).bind(id, input.title, input.note, input.place, input.url, input.window_start, input.window_end, input.remind_start ? 1 : 0,
+    `INSERT INTO things (id, title, note, place, address, phone, cost, url, window_start, window_end, remind_start, remind_on,
+       channels, status, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'idea', ?, ?, ?)`,
+  ).bind(id, input.title, input.note, input.place, input.address, input.phone, input.cost, input.url, input.window_start, input.window_end, input.remind_start ? 1 : 0,
     input.remind_on, JSON.stringify(input.channels), c.get('member').id, now, now).run();
   return c.json(view((await loadRow(c.env.DB, id))!), 201);
 });
@@ -74,10 +74,10 @@ things.patch('/things/:id', requireMember, async (c) => {
   const db = c.env.DB, now = nowIso();
   await db.batch([
     db.prepare(
-      `UPDATE things SET title = ?, note = ?, place = ?, url = ?, window_start = ?, window_end = ?, remind_start = ?, remind_on = ?,
+      `UPDATE things SET title = ?, note = ?, place = ?, address = ?, phone = ?, cost = ?, url = ?, window_start = ?, window_end = ?, remind_start = ?, remind_on = ?,
          channels = ?, status = ?, planned_event_id = ?, updated_at = ? WHERE id = ?`,
-    ).bind(input.title, input.note, input.place, input.url, input.window_start, input.window_end, input.remind_start ? 1 : 0,
-      input.remind_on, JSON.stringify(input.channels), status, plannedEventId, now, t.id),
+    ).bind(input.title, input.note, input.place, input.address, input.phone, input.cost, input.url, input.window_start,
+      input.window_end, input.remind_start ? 1 : 0, input.remind_on, JSON.stringify(input.channels), status, plannedEventId, now, t.id),
     removeFutureFires(db, t.id, now),
   ]);
   return c.json(view((await loadRow(db, t.id))!));

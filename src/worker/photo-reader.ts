@@ -32,8 +32,10 @@ const prompt = (today: string, tz: string) =>
   `This is a photo of a flyer, poster, ticket or screenshot about something a household might want to do. ` +
   `Today is ${today} in the household's time zone, ${tz}. Read it and fill in: title (short name of the thing), ` +
   `startDate and endDate (YYYY-MM-DD; turn dates like "Sat Oct 12" into full dates, choosing the next such date ` +
-  `on or after today; a single day has the same start and end), place (venue or address), url (a web link printed ` +
-  `on it), note (useful details such as times, prices or what to bring). Use null for anything not shown.`;
+  `on or after today; a single day has the same start and end), place (the venue's name), address (its street ` +
+  `address), phone (a phone number), cost (prices or cost, as one line), url (a web link printed on it), note (anything ` +
+  `else useful, such as times or what to bring). Give every detail the photo shows, copied exactly as written. ` +
+  `Use null for anything not shown.`;
 
 /**
  * One structured-output request: `client.beta.messages.parse` (the beta path, because the server-side
@@ -49,7 +51,8 @@ export async function readPhoto(input: ReadPhotoInput, opts: { fetch?: typeof fe
   ]);
   const Reading = z.object({
     title: z.string().nullable(), startDate: z.string().nullable(), endDate: z.string().nullable(),
-    place: z.string().nullable(), url: z.string().nullable(), note: z.string().nullable(),
+    place: z.string().nullable(), address: z.string().nullable(), phone: z.string().nullable(), cost: z.string().nullable(),
+    url: z.string().nullable(), note: z.string().nullable(),
   });
   // A parse failure becomes null instead of throwing, so stop_reason (a refusal's partial text) is checked first.
   const strict = betaZodOutputFormat(Reading);
