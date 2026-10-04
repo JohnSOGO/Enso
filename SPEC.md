@@ -2459,9 +2459,17 @@ Built: M0–M4 and M4a fully (alarms, with their API tests), plus the later §7 
 household days off (§7.3), grouped multi-day bars (§7.1), monthly-by-weekday repeat
 (§4.3) and the 📈 options-expiration marker (§7.4). M6 code is built (relay + API +
 contract test + logon launcher); its manual checks on real speakers are not yet
-recorded. M5 is server side only (subscriptions stored; **no sender** — every push
-delivery is recorded `failed` with `push_sender_not_built (M5)` or `no_subscription`,
-shown in Settings → Status). M7 not started: `wrangler.toml` still carries the
+recorded. **M5 Web Push** is built (v1.3.0, §9.1): `web-push.ts` sends (VAPID header per
+origin, reused for 1 h; parallel sends to one origin share one signing), `push.ts` records
+results, `POST /push/test`, `sw.js` (no fetch listener; `_headers` serves it `no-cache` —
+checked under `wrangler dev`), the Phone alerts row in Settings → Me. P1–P9 green against a fake
+push service, with the payload decrypted by an independent RFC 8291 decryptor (253 tests).
+Built as: keys missing → every push delivery `push_not_configured` (checked before
+subscriptions); a test push whose every phone fails → 502 with the failure, not `{ sent: 0 }`;
+missing keys on `/push/test` → 503; a failed notification action shows a second notification
+saying so. **Needs a real phone:** Turn on → Send a test on the iPhone home-screen app and on
+Android, the lock-screen reminder, Android Done/Snooze buttons, the Blocked and
+add-to-Home-Screen states, and a revoked subscription showing `failed` in Status. M7 not started: `wrangler.toml` still carries the
 placeholder `database_id`. The §2.5 architecture guard is in place (map, test, `arch:audit`). M4b Lists is built
 with its API tests (L1–L12) and its 320 px manual check passed on 2026-10-03. M4c
 Chores is built (C1–C14 green; migration 0006 applied to the local dev database with
