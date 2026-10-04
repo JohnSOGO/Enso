@@ -2,12 +2,19 @@ export interface Env {
   DB: D1Database;
   PHOTOS: R2Bucket;
   SETUP_TOKEN?: string;
-  RELAY_TOKEN?: string;
   DEV_ENDPOINTS?: string;
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
   ANTHROPIC_API_KEY?: string;
+  // §9.2 House delivery — vars in wrangler.toml, the three secrets via `wrangler secret put`.
+  HA_URL?: string;
+  ECHO_TARGETS?: string[];
+  ECHO_TYPE?: string;
+  SATELLITE_ENTITY?: string;
+  HA_TOKEN?: string;
+  CF_ACCESS_CLIENT_ID?: string;
+  CF_ACCESS_CLIENT_SECRET?: string;
 }
 
 export interface SessionMember {
@@ -26,7 +33,6 @@ declare global {
       DB: D1Database;
       PHOTOS: R2Bucket;
       SETUP_TOKEN: string;
-      RELAY_TOKEN: string;
       TEST_MIGRATIONS: { name: string; queries: string[] }[];
     }
   }

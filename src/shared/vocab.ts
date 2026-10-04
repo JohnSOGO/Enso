@@ -26,9 +26,9 @@ export type Weekday = (typeof WEEKDAY)[number];
 export type ChoreTiming = (typeof CHORE_TIMING)[number];
 export type ThingStatus = (typeof THING_STATUS)[number];
 
-/** Statuses the relay may report (§9.2). The server's /relay/report accepts exactly these. */
-export const RELAY_REPORT_STATUS = ['sent', 'partial', 'failed'] as const satisfies readonly DeliveryStatus[];
-export type RelayReportStatus = (typeof RELAY_REPORT_STATUS)[number];
+/** /status `house.state` (§9.2) — derived from the deliveries table, never stored. */
+export const HOUSE_STATE = ['ok', 'failing', 'not_configured', 'untried'] as const;
+export type HouseState = (typeof HOUSE_STATE)[number];
 
 export function isOneOf<T extends string>(list: readonly T[], v: unknown): v is T {
   return typeof v === 'string' && (list as readonly string[]).includes(v);

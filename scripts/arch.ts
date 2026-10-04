@@ -24,16 +24,15 @@ export const CEILINGS: Record<string, number> = {
 
 /** Layering bans: files under `from` must not import anything matching `banned`. */
 export const LAYERS: Layer[] = [
-  { from: 'src/shared/', banned: ['src/worker/', 'frontend/', 'relay/', 'scripts/', 'package:'], why: 'shared is pure and dependency-free (§0.3)' },
-  { from: 'src/worker/', banned: ['frontend/', 'relay/', 'scripts/'], why: 'the Worker stands alone' },
-  { from: 'frontend/src/', banned: ['src/worker/', 'relay/', 'scripts/'], why: 'the PWA talks to the Worker over HTTP only' },
-  { from: 'relay/', banned: ['src/worker/', 'frontend/', 'scripts/'], why: 'the relay talks to the Worker over HTTP only' },
+  { from: 'src/shared/', banned: ['src/worker/', 'frontend/', 'scripts/', 'package:'], why: 'shared is pure and dependency-free (§0.3)' },
+  { from: 'src/worker/', banned: ['frontend/', 'scripts/'], why: 'the Worker stands alone' },
+  { from: 'frontend/src/', banned: ['src/worker/', 'scripts/'], why: 'the PWA talks to the Worker over HTTP only' },
 ];
 
 /** Forbidden inside src/shared/ (§0.3): the engine never reads the clock or does I/O. */
 export const IMPURE = ['Date.now(', 'new Date()', 'fetch(', 'D1Database'];
 
-export const SOURCE_ROOTS = ['src', 'frontend/src', 'relay', 'scripts'];
+export const SOURCE_ROOTS = ['src', 'frontend/src', 'scripts'];
 export const SOURCE_EXT = ['.ts', '.tsx', '.mjs', '.css'];
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.wrangler']);
 

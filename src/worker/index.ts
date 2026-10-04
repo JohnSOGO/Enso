@@ -10,7 +10,6 @@ import { optins } from './routes/optins';
 import { alerts } from './routes/alerts';
 import { alarms } from './routes/alarms';
 import { household } from './routes/household';
-import { relay } from './routes/relay';
 import { lists } from './routes/lists';
 import { chores } from './routes/chores';
 import { things } from './routes/things';
@@ -39,7 +38,6 @@ api.route('/', optins);
 api.route('/', alerts);
 api.route('/', alarms);
 api.route('/', household);
-api.route('/', relay);
 api.route('/', lists);
 api.route('/', chores);
 api.route('/', thingPhotos); // before things: /things/read-photo must not match /things/:id

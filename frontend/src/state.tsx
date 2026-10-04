@@ -1,9 +1,9 @@
-// App-wide data: who I am, household members/settings, ringing fires, relay/push status.
+// App-wide data: who I am, household members/settings, ringing fires, house/push status.
 // Refreshed on a 30 s poll while visible (SPEC §10 "Freshness"), on focus/visibility, and after any write.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { get } from './api';
 import { utcToLocal } from '../../src/shared/time';
-import type { AlertKind, Role } from '../../src/shared/vocab';
+import type { AlertKind, HouseState, Role } from '../../src/shared/vocab';
 
 export interface Me {
   id: string; email: string; displayName: string; color: string; role: Role;
@@ -18,7 +18,8 @@ export interface Fire {
   choreRunId?: string | null; stepTitle?: string | null; personId?: string | null;
 }
 export interface Status {
-  relayLastSeen: string | null; relayOnline: boolean;
+  /** §9.2 — the server's verdict; shown as given, never re-derived here. */
+  house: { state: HouseState; lastOkAt: string | null; lastFailedAt: string | null; lastError: string | null };
   mySubscriptions: { id: string; endpoint: string; userAgent: string | null; createdAt: string; lastOkAt: string | null; lastError: string | null }[];
   recentDeliveries: { id: string; channel: string; message: string; status: string; detail: string | null; createdAt: string; member: string | null }[];
 }

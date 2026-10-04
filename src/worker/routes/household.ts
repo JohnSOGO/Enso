@@ -1,4 +1,4 @@
-// SPEC §10 — settings, status, /push/* (vapid-key, subscriptions, test).
+// SPEC §10 — settings, status (incl. the derived House state, §9.2), /push/* (vapid-key, subscriptions, test).
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { isValidTimeZone } from '../../shared/time';
@@ -7,8 +7,7 @@ import { all, first, newId, nowIso, parseJson, run } from '../db';
 import { body, fail, str } from '../http';
 import { requireMember, requireOwner } from '../session';
 import { NO_SUBSCRIPTION, PUSH_NOT_CONFIGURED, sendTestPush } from '../push';
-
-export const RELAY_STALE_MS = 2 * 60_000;
+import { houseState } from '../house';
 
 export const household = new Hono<AppEnv>();
 
@@ -50,11 +49,8 @@ household.patch('/settings', requireMember, requireOwner, async (c) => {
 
 household.get('/status', requireMember, async (c) => {
   const me = c.get('member').id;
-  const s = await first<{ relay_last_seen: string | null }>(c.env.DB, 'SELECT relay_last_seen FROM settings WHERE id = 1');
-  const lastSeen = s?.relay_last_seen ?? null;
   return c.json({
-    relayLastSeen: lastSeen,
-    relayOnline: lastSeen !== null && Date.now() - Date.parse(lastSeen) < RELAY_STALE_MS,
+    house: await houseState(c.env),
     mySubscriptions: await all(c.env.DB,
       'SELECT id, endpoint, user_agent AS userAgent, created_at AS createdAt, last_ok_at AS lastOkAt, last_error AS lastError FROM push_subscriptions WHERE member_id = ?', me),
     recentDeliveries: await all(c.env.DB,

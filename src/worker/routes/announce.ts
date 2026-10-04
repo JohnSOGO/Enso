@@ -1,5 +1,6 @@
 // SPEC §9.3 — POST /announce: a house announcement, now. A delivery with no fire: one `house` row the
-// relay speaks, and one `push` row per other member, sent at once. The sender's name comes from the session.
+// Worker speaks right after answering (§9.2), and one `push` row per other member, sent at once. The
+// sender's name comes from the session.
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { announceError, announceMessage } from '../../shared/announce';
@@ -10,6 +11,7 @@ import { body, fail } from '../http';
 import { requireMember } from '../session';
 import { activeMemberIds } from '../tick';
 import { sendPushDeliveries } from '../push';
+import { sendHouseDeliveries } from '../house';
 
 export const announce = new Hono<AppEnv>();
 
@@ -25,9 +27,10 @@ announce.post('/announce', requireMember, async (c) => {
 
   const ids: string[] = [];
   const pushIds: string[] = [];
+  let houseId: string | null = null;
   const stmts: D1PreparedStatement[] = [];
   if (channels.includes('house')) {
-    const id = newId('dlv');
+    const id = houseId = newId('dlv');
     ids.push(id);
     stmts.push(db.prepare(
       `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, status, created_at, updated_at)
@@ -52,5 +55,7 @@ announce.post('/announce', requireMember, async (c) => {
   const deliveries = await all<{ id: string; channel: Channel; memberId: string | null; status: string }>(db,
     `SELECT id, channel, member_id AS memberId, status FROM deliveries WHERE id IN (${ids.map(() => '?').join(',')}) ORDER BY channel, member_id`,
     ...ids);
+  // Read above while the house row is still `queued`; now speak it without waiting for the next tick.
+  if (houseId) c.executionCtx.waitUntil(sendHouseDeliveries(c.env, now, [houseId]));
   return c.json({ deliveries }, 201);
 });

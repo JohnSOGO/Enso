@@ -7,6 +7,35 @@ carry its result.
 
 ---
 
+## 2026-10-03 — House delivery direct, the relay retired (placement-advisor)
+
+- **Ask:** MojoSOGO retired the LAN relay. The Worker calls Home Assistant itself at
+  `https://ha.sogodojo.com` — a Cloudflare Tunnel (HA's Cloudflared add-on) behind Cloudflare
+  Access — with `CF-Access-Client-Id`, `CF-Access-Client-Secret` and `Authorization: Bearer <HA token>`.
+- **Verdict:** NEW `src/worker/house.ts`, the sibling of `push.ts`: houseConfigOf (all seven
+  settings or null → `house_not_configured`), the drain (exhausted rows fail; up to 5 queued or
+  stale-claimed rows, each claimed conditionally just before speaking and spoken only if
+  `meta.changes === 1`), speak (the relay's two payloads, 15 s / 25 s ⚑, `redirect: 'manual'`,
+  only a 2xx is ok), classifyHouse (`Exclude<DeliveryStatus,'queued'|'claimed'>`), houseState
+  (derived from deliveries, never stored; HOUSE_STATE in vocab.ts). EXISTING: tick.ts (step 4),
+  routes/announce.ts (read the 201 first, then waitUntil an id-restricted drain),
+  routes/household.ts (`/status` `house`), index.ts (relay route removed), env.ts, vocab.ts
+  (RELAY_REPORT_STATUS out), the PWA badge/Status (never re-derived), wrangler.toml [vars],
+  vitest.config.ts (HA_URL pinned to `https://ha.test`, secrets pinned empty),
+  `migrations/0013_retire_relay.sql`, scripts/arch.ts (relay root and bans out; CEILINGS untouched).
+  DELETED: `relay/`, `routes/relay.ts`, `test/relay-contract.test.ts`.
+- **Threats it avoids:** **double speech** (a tick and an announcement draining one row — the
+  conditional per-row claim); **an Access 302 read as ok** (`redirect: 'manual'` + 2xx-only);
+  **missing config succeeding quietly** (`house_not_configured`, visibly failed, zero fetches,
+  and a "House not set up" badge); **tests reaching the real house** (HA_URL pinned to a fake
+  host with empty secrets; tests set fake secrets per call over a fetch spy that refuses every
+  other host).
+- **Considerations:** a classified `failed` is final (HA or the tunnel down) — retries cover only
+  stale claims, as with the relay. No reorganizer needed: house.ts is new, and every touched
+  owner had room.
+
+---
+
 ## 2026-10-03 — M4k Announcements (placement-advisor)
 
 - **Ask:** Send a house announcement now from the Alarms tab: "<sender> says: <msg>" on Echos +

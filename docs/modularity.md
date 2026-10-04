@@ -13,11 +13,11 @@ agent shipping the feature.
 ## The flow — which stage owns a concern
 
 ```
-input (PWA form / push action / relay / cron)
+input (PWA form / push action / cron)
   → route: authenticate, validate against vocab.ts            src/worker/routes/*
   → rules: pure decision — engine, recurrence, time, holidays  src/shared/*
   → persist: write rows, D1 batch per fire                     routes/*, tick.ts
-  → deliver: push sender, relay queue                          push.ts, routes/relay.ts, relay/
+  → deliver: push sender, house speaker (HA via Tunnel+Access)  push.ts, house.ts
   → render: prepared state on screen, capture intent           frontend/src/*
 ```
 
@@ -27,12 +27,12 @@ input (PWA form / push action / relay / cron)
   alert behavior is putting a rule in the wrong stage.
 - **The PWA renders and captures intent.** It never re-derives what the server decides
   (it may call the same shared module, e.g. `recurrence.ts`, so the two cannot disagree).
-- **Delivery moves messages.** The relay classifies and reports; it never decides
-  whether to alert.
+- **Delivery moves messages.** `push.ts` and `house.ts` send, classify and record; they
+  never decide whether to alert.
 - **Cross-cutting client state** lives in `frontend/src/state.tsx`, never in a module
   global (the test bans top-level `let`/`var`).
 
-Changes that touch rules, schema, the relay contract or the push contract are always
+Changes that touch rules, schema, the House (Home Assistant) contract or the push contract are always
 the **full path** (placement-advisor first).
 
 ## Ceilings, the warning band, and the two verdicts

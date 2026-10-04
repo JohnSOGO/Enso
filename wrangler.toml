@@ -31,6 +31,12 @@ custom_domain = true
 [vars]
 VAPID_PUBLIC_KEY = "BLeE3RZBJqymlMQlw2Bz7xG-63079wak81SCusCtd17wUA0lOLV-Bb-YDNYek7Ht6Ozrb7y0A0JAcc8e7k-rI-U"
 VAPID_SUBJECT = "https://enso.sogodojo.com"
+# SPEC §9.2 — House delivery through Cloudflare Tunnel + Access. The secrets HA_TOKEN,
+# CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET are set with `wrangler secret put` (never here).
+HA_URL = "https://ha.sogodojo.com"
+ECHO_TARGETS = ["Game Room", "Kid's Room - Echo", "Sogo", "Toasty"]
+ECHO_TYPE = "announce"
+SATELLITE_ENTITY = "assist_satellite.home_assistant_voice_09eb97_assist_satellite"
 
 [triggers]
 crons = ["* * * * *"]
