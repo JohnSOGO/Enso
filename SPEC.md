@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.32 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.33-draft · **Date:** 2026-10-04 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -151,7 +151,7 @@ Cloudflare Tunnel + Access**.
 | House delivery | The Worker calls Home Assistant's REST API through **Cloudflare Tunnel + Access** (§9.2) | `src/worker/house.ts`; no process at home besides HA itself. |
 | Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Private: photos are served only through the API to signed-in members (§7C.3). |
 | Reading photos and recipes | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4, §7E) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). One caller of the SDK: `src/worker/claude.ts`. |
-| Recipes from videos | **YouTube Data API v3** `videos.list?part=snippet&id=…` (§7E) | Secret `YOUTUBE_API_KEY`; 1 quota unit per lookup. Plus an **unofficial, keyless** captions attempt (YouTube's player endpoint asked as its Android app), which may be blocked — a failure is recorded and shown, never faked. |
+| Recipes from videos | **YouTube Data API v3** `videos.list?part=snippet&id=…` and `commentThreads.list?part=snippet&videoId=…&order=relevance&maxResults=20&textFormat=plainText` (§7E) | Secret `YOUTUBE_API_KEY`; 1 quota unit per call, so 2 per read ⚑ Q82. Plus an **unofficial, keyless** captions attempt (YouTube's player endpoint asked as its Android app), which may be blocked — a failure is recorded and shown, never faked. |
 | QR codes | `uqr` (MIT, zero dependencies, renders SVG) | **Loaded lazily** (dynamic `import()`) only when an invite card opens — never in the main bundle. |
 | Tests | **Vitest**; `@cloudflare/vitest-pool-workers` for API tests | API tests apply `migrations/` via `readD1Migrations` / `applyD1Migrations` |
 | Passwords | PBKDF2-SHA256 via WebCrypto, 100 000 iterations, 16-byte salt | 100k is the Workers cap. Not bcrypt. |
@@ -178,7 +178,8 @@ Enso/
 │   ├── 0015_timer_window.sql    # §4.2n
 │   ├── 0016_sun_alerts.sql      # §4.2o
 │   ├── 0017_recipes.sql         # §4.2p
-│   └── 0018_recipe_emojis.sql   # §4.2q
+│   ├── 0018_recipe_emojis.sql   # §4.2q
+│   └── 0019_recipe_comments.sql # §4.2r
 ├── src/
 │   ├── shared/             # pure TS, no I/O — imported by worker and frontend
 │   │   ├── vocab.ts        # §3
@@ -203,7 +204,7 @@ Enso/
 │       │                   # lists.ts (§7A) · machines.ts (§7D) · recipes.ts (§7E)
 │       ├── claude.ts       # the one Claude API call (§7C.4, §7E)
 │       ├── recipe-reader.ts # §7E the recipe prompt + schema
-│       ├── youtube.ts      # §7E YouTube Data API videos.list
+│       ├── youtube.ts      # §7E YouTube Data API videos.list + commentThreads.list
 │       ├── youtube-captions.ts # §7E the unofficial captions attempt
 │       ├── tick.ts         # loads rows, calls engine, writes results
 │       ├── push.ts         # Web Push sending
@@ -304,7 +305,7 @@ export const HOUSE_STATE  = ['ok', 'failing', 'not_configured', 'untried'] as co
 export const MACHINE      = ['washer', 'dryer'] as const;                        // §7D, in load order
 export const MACHINE_STATE = ['free', 'running', 'done'] as const;               // §7D, derived, never stored
 export const SUN_EVENT    = ['sunset'] as const;                                 // §7.7 events.start_sun
-export const RECIPE_SOURCE = ['description', 'captions', 'typed'] as const;      // §7E what a recipe was read from
+export const RECIPE_SOURCE = ['description', 'captions', 'comments', 'typed'] as const; // §7E what a recipe was read from
 export const CAPTIONS_FAILURE = ['blocked', 'none', 'failed'] as const;         // §7E why captions couldn't be read
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
@@ -960,6 +961,21 @@ rows; they are never returned, because only live recipes are ⚑ Q75. Nothing ex
 altered.
 **Migration check (RE-M):** rows written under 0001–0017 (members, things, list items, recipes)
 survive 0018 unchanged; the primary key refuses a second row for the same member and recipe.
+
+### 4.2r Schema change — `migrations/0019_recipe_comments.sql`
+
+```sql
+-- §7E.2 — why the video creator's comments couldn't be read. Additive only.
+ALTER TABLE recipes ADD COLUMN comments_error TEXT; -- NULL = read, none to read, or not tried
+```
+
+Set only by `POST /recipes/from-video` (§7E.2 step 8) when the comments lookup failed by quota or
+otherwise; comments turned off, or no comment by the creator among them, leave it NULL ⚑ Q78. PATCH
+never touches it. `source` holds a JSON list, so the new `comments` value needs no CHECK and nothing
+is rebuilt.
+**Migration check (CM-M):** rows written under 0001–0018 (members, things, list items, recipes,
+recipe reads, recipe emojis) survive 0019 unchanged, and every existing recipe has `comments_error`
+NULL.
 
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
@@ -1988,9 +2004,11 @@ may add, edit or delete any recipe ⚑ Q66. Their own tab, 🍳 Recipes (§8.12)
   empty: a video whose text holds no recipe is saved with the video's title, no ingredients, no
   steps, and reads **"Recipe not in the video's text — watch it"** with the ▶ link. Every save
   recomputes it, so a hand edit that adds ingredients or steps sets it `true` ⚑ Q67.
-- **source** — what the recipe was read from, a set of `RECIPE_SOURCE` (§3): `description`
-  and/or `captions` for a video (empty when the video's text held nothing to read), `typed` for
-  one typed by hand. **captions_error** — when the captions attempt failed, its reason.
+- **source** — what the recipe was read from, a set of `RECIPE_SOURCE` (§3): `description`,
+  `captions` and/or `comments` (the creator's own comments) for a video (empty when the video's
+  text held nothing to read), `typed` for one typed by hand. **captions_error** — when the
+  captions attempt failed, its reason. **comments_error** — when reading the comments failed (quota
+  or otherwise), its reason (§4.2r).
 - **One live recipe per video** (`uq_recipe_video`). A typed recipe has no video and cannot be
   given one in v1 ⚑ Q68. Delete is soft (`deleted_at`).
 - `youtubeVideoId(text)` → the id or null. It accepts `https://`, `http://` or no scheme, and
@@ -2012,30 +2030,49 @@ may add, edit or delete any recipe ⚑ Q66. Their own tab, 🍳 Recipes (§8.12)
    "Reading recipes from videos isn't set up yet." — **before any fetch**, the captions attempt
    included;
 6. YouTube lookup (`src/worker/youtube.ts`, `videos.list?part=snippet&id={id}`) → `{ title,
-   channel, description }`; no such video (or private) → 404 `video_unavailable`; quota used up
-   or any other failure → 502 `youtube_failed` with the reason (never the key);
+   channel, channelId, description }` (`channelId` from `snippet.channelId`, null when absent); no
+   such video (or private) → 404 `video_unavailable`; quota used up or any other failure → 502
+   `youtube_failed` with the reason (never the key);
 7. the captions attempt (`src/worker/youtube-captions.ts`) → transcript text, or a failure
    `{ kind: CAPTIONS_FAILURE, reason }` that is **kept**, never fatal;
-8. count the read (`INSERT INTO recipe_reads`) — every read from here on counts, failed or not;
-9. `hasRecipeText({ description, transcript })` false (no description and no captions) → **Claude
-   is not asked**: a `found: false` reading. Otherwise Claude (`src/worker/recipe-reader.ts` via
-   `claude.ts`): refusal → 422 `recipe_refused` "Couldn't read a recipe from that video."; failure
-   → 502 `recipe_reading_failed` with the reason;
-10. `cleanRecipeReading(raw, videoTitle)` (pure; the answer is input, never trusted);
-11. INSERT (a unique-index race → 409 `duplicate`);
-12. → **201** the recipe.
+8. **the creator's comments** (`lookUpComments` in `youtube.ts`,
+   `commentThreads.list?part=snippet&videoId={id}&order=relevance&maxResults=20&textFormat=plainText`,
+   1 quota unit) → each thread's top-level comment `{ authorChannelId, text }`, or a failure
+   `{ kind: 'none' | 'quota' | 'failed', reason }` that is **never fatal** (a 403 `commentsDisabled`
+   is `none`). `creatorComments(comments, channelId)` keeps only the comments whose author **is** the
+   video's channel ⚑ Q76 (§7E.2 below). Steps 7 and 8 may run at the same time;
+9. count the read (`INSERT INTO recipe_reads`) — every read from here on counts, failed or not;
+10. `hasRecipeText({ description, transcript, comments })` false (no description, no captions and
+   no creator's comment) → **Claude is not asked**: a `found: false` reading. Otherwise Claude
+   (`src/worker/recipe-reader.ts` via `claude.ts`): refusal → 422 `recipe_refused` "Couldn't read a
+   recipe from that video."; failure → 502 `recipe_reading_failed` with the reason;
+11. `cleanRecipeReading(raw, videoTitle)` (pure; the answer is input, never trusted);
+12. INSERT (a unique-index race → 409 `duplicate`);
+13. → **201** the recipe.
 
-- **The prompt** gives the video's title, channel, description and captions (cut to
-  `TRANSCRIPT_MAX` = 20 000 characters), and asks for `found`, `title` (the dish), `ingredients`,
-  `steps`, `servings` and `time` (null unless stated). **Claude must never invent a recipe from the
-  title** or from general knowledge: only what the text says; when it holds no recipe, `found` is
-  false and the lists are empty.
+- **The prompt** gives the video's title, channel, description, captions (cut to
+  `TRANSCRIPT_MAX` = 20 000 characters) and the creator's comments ("(none)" when there are none),
+  and asks for `found`, `title` (the dish), `ingredients`, `steps`, `servings` and `time` (null
+  unless stated). **Claude must never invent a recipe from the title** or from general knowledge:
+  only what the description, captions and the creator's comments say; when they hold no recipe,
+  `found` is false and the lists are empty.
+- **The creator's comments** — recipes are often in the creator's first comment, usually pinned
+  (decided by MojoSOGO 2026-10-04). `COMMENTS_LOOKED_AT` = 20 threads are asked for, by relevance
+  ⚑ Q77. `creatorComments(comments, channelId)` (pure): an unknown (null or empty) `channelId` →
+  null, never a fallback to anyone's comment ⚑ Q80; otherwise the top-level comments whose
+  `authorChannelId` equals it exactly, in order, joined with a blank line, cut to
+  `CREATOR_COMMENTS_MAX` = 5 000 characters (never inside a surrogate pair); nothing kept → null.
+  Viewers' comments and replies inside threads are never read ⚑ Q76. Comments turned off, or no
+  creator's comment, is not an error: `comments_error` stays NULL and no marker shows ⚑ Q78. A quota
+  or other failure still saves the recipe, with `comments_error` = the reason, shown as "comments
+  couldn't be read: {reason}" ⚑ Q79 (§8.12). The key is never in a reason.
 - **`cleanRecipeReading`**: `found` not `true` → no ingredients, no steps; every string trimmed,
   inner whitespace collapsed to one space, cut to its limit; empty ones dropped; lists cut to their
   counts; `found` is then "has ingredients or steps". The title is the dish's name when found, else
   the video's title (cut to the limit; "Recipe from YouTube" when YouTube gave none).
 - **source** = `description` when the description was non-empty, plus `captions` when a transcript
-  was read — what Claude was given, whatever it found there.
+  was read, plus `comments` when a creator's comment was kept — what Claude was given, whatever it
+  found there.
 - **Captions** are unofficial: no key; YouTube's player endpoint (`/youtubei/v1/player`) asked as
   its Android app lists the caption tracks (English preferred), and that track is parsed to plain
   text. (The website's own caption files come back empty without a proof-of-origin token — found
@@ -2044,16 +2081,17 @@ may add, edit or delete any recipe ⚑ Q66. Their own tab, 🍳 Recipes (§8.12)
   may fail otherwise (`failed`); the recipe is still read from the description and its
   `captions_error` keeps the reason, shown as "captions couldn't be read: {reason}" (§8.12). The
   captions module never throws and can be deleted alone.
-- **Privacy** ⚑ Q70: the video's text goes to Anthropic to be read; the thumbnail loads from
-  `i.ytimg.com` in the phone's browser (no referrer sent). Accepted by MojoSOGO.
+- **Privacy** ⚑ Q70: the video's text goes to Anthropic to be read — the creator's kept comments
+  too ⚑ Q83; the thumbnail loads from `i.ytimg.com` in the phone's browser (no referrer sent).
+  Accepted by MojoSOGO.
 
 ### 7E.3 Typing and editing
 
 - `POST /recipes` and `PATCH /recipes/{id}` take `{ title, ingredients: string[], steps:
   string[], servings, time }` through `parseRecipeInput` (each line trimmed with inner whitespace
   collapsed, empty lines dropped, each length and count checked → 400 naming the field). PATCH
-  merges over the stored recipe; the video fields, `source` and `captions_error` never change by
-  hand. A typed recipe has `source` `["typed"]`.
+  merges over the stored recipe; the video fields, `source`, `captions_error` and `comments_error`
+  never change by hand. A typed recipe has `source` `["typed"]`.
 - **Add ingredients to Shopping** is the PWA calling the existing `POST
   /lists/{SHOPPING_LIST_ID}/items { text }` once per picked ingredient, in order (§8.12). There is
   no server bulk route. Every ingredient `cleanRecipeReading` or `parseRecipeInput` can produce is
@@ -2076,6 +2114,10 @@ may add, edit or delete any recipe ⚑ Q66. Their own tab, 🍳 Recipes (§8.12)
 | R11 | every ingredient `cleanRecipeReading` / `parseRecipeInput` produce from hostile input | each accepted by the real `POST /lists/{shopping}/items` |
 | R12 | YouTube: not found / quota / network; captions: blocked / none / failed | the honest failure kinds, the key never in a reason |
 | RC-M | migration check (§4.2p) | earlier rows intact; the unique index refuses a second live recipe per video |
+| R13 | fake YouTube with a creator's comment (its author is the video's channel) and a viewer's comment | 201; source includes `comments`; Claude's text holds the creator's comment and not the viewer's; with no description and no captions, the creator's comment alone is enough to ask Claude |
+| R14 | comments turned off (403 `commentsDisabled`); comments 500 | saved both times; `commentsError` null when turned off, the reason when it failed |
+| R15 | `creatorComments`: viewers' comments; a null `channelId`; past `CREATOR_COMMENTS_MAX`; a cut at an emoji; `lookUpComments` ok / disabled / quota / network | only the creator's, in order; null; cut to the max; never half an emoji; the honest kinds, the key never in a reason |
+| CM-M | migration check (§4.2r) | earlier rows intact; existing recipes have `comments_error` NULL |
 
 ### 7E.5 Each person's emoji — decided by MojoSOGO 2026-10-03
 
@@ -2583,9 +2625,11 @@ Pumpkin patch        📅 Sat Oct 12
     server's message; the updated recipe goes back to the view and the row;
   - the thumbnail, full width, and **▶ Watch on YouTube** (opens the video, a new tab);
     the channel; servings and time when stated;
-  - the **source note** ⚑ Q64, muted: "From the description and captions" / "From the
-    description" / "From the captions" / "Typed by hand" / "Nothing in the video's text to read",
-    plus "· captions couldn't be read: {reason}" when that happened;
+  - the **source note** ⚑ Q64 ⚑ Q81, muted: "From the " + what was read, each named — description,
+    captions, "the creator's comment" — joined as "A, B and C" ("From the description, captions and
+    the creator's comment", "From the description", "From the creator's comment") / "Typed by
+    hand" / "Nothing in the video's text to read", plus "· captions couldn't be read: {reason}" and
+    "· comments couldn't be read: {reason}" when those happened;
   - `found` false: **"Recipe not in the video's text — watch it"** above the ▶ link;
   - **Ingredients**, each with a pick box; a **Pick all** chip; **Add to Shopping (n)**. Nothing
     is picked at first ⚑ Q69. Adding calls `POST /lists/{SHOPPING_LIST_ID}/items` once per picked
@@ -2986,7 +3030,7 @@ acked, nothing is scheduled — **now only**.
 | POST | `/things/{id}/plan` | member | `{ date, time? }` → `{ thing, eventId }`; 400 outside the window |
 | PUT/GET/DELETE | `/things/{id}/photo` | member | PUT raw image body (≤ 4 MB) → 204; GET → the image; DELETE → 204 |
 | POST | `/things/read-photo` | member | raw image body → `{ title, startDate, endDate, place, address, phone, cost, url, note }` (each nullable); 503 / 502 / 422 / 429 per §7C.4 |
-| GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, createdBy, createdAt, updatedAt, emojis: RecipeEmoji[] }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed; `RecipeEmoji = { memberId, emoji }`, §7E.5) (§7E) |
+| GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, commentsError, createdBy, createdAt, updatedAt, emojis: RecipeEmoji[] }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed; `RecipeEmoji = { memberId, emoji }`, §7E.5) (§7E) |
 | POST | `/recipes` | member | `{ title, ingredients, steps, servings?, time? }` → recipe (201), typed by hand; 400 `invalid_input` |
 | GET/PATCH/DELETE | `/recipes/{id}` | member | GET → recipe; PATCH the POST fields, all optional, merged → recipe (found recomputed); DELETE → 204 (soft); 404 when gone |
 | PUT/DELETE | `/recipes/{id}/emoji` | member (their own) | PUT `{ emoji }` → recipe (200), my emoji set (upsert); DELETE → recipe (200), mine cleared; 400 `invalid_input` (`emojiError`); 404 when the recipe is gone; `updatedAt` untouched (§7E.5) |
@@ -3164,6 +3208,14 @@ checks.
   (§4.2q, §7E.5, §8.12, §10).
 - ✅ Tests RE1–RE9, RE-M.
 - ✅ Manual: the chips, the picker and the rows at 320 px; Shelly's and John's emojis both show.
+
+**M4q — The creator's comments** (v1.13.0)
+- Migration 0019 (`recipes.comments_error`), `comments` in `RECIPE_SOURCE`, `lookUpComments`,
+  `creatorComments`, the comments step in from-video, the prompt's comments section, the source
+  note (§4.2r, §7E.2, §8.12, §10).
+- ✅ Tests R13–R15, CM-M.
+- ✅ Manual: a real video whose recipe is only in the creator's pinned comment, read on the
+  deployed URL.
 
 **M4l — The laundry loop** (v1.8.0)
 - Migration 0014 (`machines` + the `fires` rebuild), `MACHINE` / `MACHINE_STATE` + the
@@ -3355,6 +3407,14 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q73 | Everyone's emoji names a member the PWA doesn't know | ⚑ "Someone" |
 | Q74 | Newest \| By emoji | ⚑ Remembered per phone (`localStorage`), not per person on the server |
 | Q75 | A soft-deleted recipe's emojis | ⚑ Kept in `recipe_emojis` but never shown — only live recipes are returned |
+| Q76 | Whose comments are read (§7E.2) | ⚑ Only top-level comments by the video's own channel; viewers' text and the creator's replies inside threads are ignored |
+| Q77 | How many comments | ⚑ 20 threads, relevance order (1 quota unit); the kept text is capped at 5 000 characters |
+| Q78 | Comments turned off, or no creator's comment | ⚑ Not an error; no marker |
+| Q79 | Comments quota used up or failed | ⚑ The recipe is still saved, with "comments couldn't be read: {reason}" |
+| Q80 | The video's channel id is unknown | ⚑ No comments are read (never anyone else's) |
+| Q81 | The source note with comments | ⚑ "From the description, captions and the creator's comment" — what was read, joined "A, B and C" |
+| Q82 | Quota per read | ⚑ Two YouTube API units per read (video + comments); the 20-a-day cap is unchanged |
+| Q83 | Privacy of the creator's comments | ⚑ The creator's kept comment text goes to Anthropic too, like the description |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -3490,6 +3550,12 @@ VALUES ('evt_<16 base32>', 'Put the goats away', NULL, '2026-10-03', NULL, '2026
 
 No `event_optins` row is inserted: it is off for everyone until each person turns it on in
 Optional calendar items (Shelly and John will).
+**M4q The creator's comments** (v1.13.0): migration 0019 (`recipes.comments_error`), `comments`
+in `RECIPE_SOURCE`, `lookUpComments` in `youtube.ts` (one shared failure mapping with `lookUpVideo`),
+`creatorComments` in `src/shared/recipes.ts`, the comments step run beside the captions attempt, the
+prompt's "Creator's comments" section and the source note. Tests reach only fakes (every from-video
+world answers `commentThreads`). Migration 0019 is applied only in tests so far. **Still owed:** apply
+0019 in production; a real video whose recipe is only in the creator's comment read on the deployed URL.
 **Captions fix** (v1.12.1): captions are read through YouTube's player endpoint as its Android app;
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
