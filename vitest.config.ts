@@ -20,6 +20,11 @@ export default defineConfig(async () => {
             DEV_ENDPOINTS: '1',
             // §7C.4 — pinned empty so a local .dev.vars key can never reach the real Anthropic API from a test.
             ANTHROPIC_API_KEY: '',
+            // §9.1 — a TEST-ONLY VAPID keypair (generated once for the suite, signs nothing real), so the
+            // production key never signs in a test. test/push.test.ts never lets a push leave the isolate.
+            VAPID_PUBLIC_KEY: 'BLGCPcQjOX27VgoqsiHeYtez_W8_HKCafPsFXE5T6QR57UKLYhGF-6BlOWhEzHJSabBTOuhbU-vwJz_lkh3JyY8',
+            VAPID_PRIVATE_KEY: 'oHFJb1nU31AUYrn6RZYi_221HJDr_1-9RDnb5QgP348',
+            VAPID_SUBJECT: 'https://enso.test',
           },
           // C13 (SPEC §4.2e): an UNMIGRATED database the migration test applies step by step.
           d1Databases: { MIGRATION_DB: 'migration-db' },
