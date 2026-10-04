@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.39 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
+**Version:** 2.41 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -211,7 +211,8 @@ Enso/
 │   ├── 0020_recipe_captions_job.sql # §4.2s
 │   ├── 0021_drop_captions_job.sql   # §4.2t
 │   ├── 0022_delivery_title.sql      # §4.2u
-│   └── 0023_list_item_photo.sql     # §4.2v
+│   ├── 0023_list_item_photo.sql     # §4.2v
+│   └── 0025_phone_login.sql         # §4.2x
 ├── src/
 │   ├── shared/             # pure TS, no I/O — imported by worker and frontend
 │   │   ├── vocab.ts        # §3
@@ -225,6 +226,7 @@ Enso/
 │   │   ├── sun.ts          # §7.7 sunset per local date and place (NOAA)
 │   │   ├── recipes.ts      # §7E recipe rules: limits, YouTube link → video id, typed input, the wire
 │   │   ├── recipe-reading.ts # §7E.2, §7E.2b, §7E.2c reading a video: sources, creator's comments, transcript, cleaning a reading, captions from home
+│   │   ├── phone-login.ts  # §6.6 sign in with my phone: limits, number matching, request transitions, notice texts
 │   │   └── engine.ts       # §5
 │   └── worker/
 │       ├── index.ts        # Hono app + scheduled() handler
@@ -236,7 +238,7 @@ Enso/
 │       │                   # alerts.ts (timers, fires + actions) · household.ts (settings,
 │       │                   # days off, /push/*, /status) · announce.ts ·
 │       │                   # lists.ts (§7A) · item-photos.ts (§7A.3) · machines.ts (§7D) ·
-│       │                   # recipes.ts (§7E)
+│       │                   # recipes.ts (§7E) · phone-login.ts (§6.6)
 │       ├── recipe-reread.ts # §7E.2b re-reading a recipe in place
 │       ├── claude.ts       # the one Claude API call (§7C.4, §7E)
 │       ├── recipe-reader.ts # §7E the recipe prompt + schema
@@ -360,6 +362,9 @@ export const RECIPE_SOURCE = ['description', 'captions', 'transcript', 'comments
 export const CAPTIONS_FAILURE = ['blocked', 'none', 'failed'] as const;         // §7E why captions couldn't be read
 export const IDENTIFY_FAILURE = ['off', 'failed'] as const;                     // §7A.3 why SogoAI gave no reading
 export const ITEM_READ_VIA = ['sogoai', 'claude'] as const;                     // §7A.3 who named a snapped item
+export const LOGIN_REQUEST_STATUS = ['pending', 'approved', 'denied', 'used'] as const; // §6.6 login_requests.status
+export const LOGIN_VIEW   = ['pending', 'approved', 'denied', 'expired'] as const; // §6.6 what the waiting browser / the phone is told — derived, never stored
+export const NOTICE_KIND  = ['login', 'new_sign_in'] as const;                    // §6.6 deliveries.notice — a sign-in notice push, never an alert
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
 ```
@@ -383,6 +388,9 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `typed` | A recipe typed by hand, with no video (§7E) |
 | `blocked` / `none` / `failed` | Why a video's captions couldn't be read (§7E): YouTube refused the keyless request / the video has no captions / anything else (network, an unreadable answer) |
 | `off` / `failed` (identify) | Why SogoAI gave no reading of a snapped item (§7A.3): `IDENTIFY_MODEL` isn't set on SogoAI / LM Studio failed or answered something unreadable |
+| `pending` / `approved` / `denied` / `used` (login request) | A "Sign in with my phone" request (§6.6): waiting for the phone / the member picked the right number / refused (a wrong number, "This wasn't me", or replaced by a newer request) / the waiting browser collected its session — spent |
+| `expired` (login view) | A login request past its `expires_at` while still `pending` or `approved`, or one already `used`, as the waiting browser is told — derived from `now`, never stored |
+| `login` / `new_sign_in` | A sign-in notice push (§6.6): a phone-approval request / "New sign-in on …" after a password sign-in. Not an `ALERT_KIND`: no fire, no actions |
 | `sogoai` / `claude` | Who named a snapped item (§7A.3): SogoAI's local vision model (free) / the Claude API (the fallback) |
 | `at` | Chore rings at its time, like an alarm |
 | `by` | Chore is quiet: due by its time, optionally one nudge then |
@@ -1103,6 +1111,42 @@ ALTER TABLE list_items ADD COLUMN photo_key TEXT;
 wire: an item carries `hasPhoto` instead. **Migration check (SN-M):** rows written under 0001–0022 survive 0023
 unchanged with `photo_key` NULL; `PRAGMA foreign_key_check` is empty.
 
+### 4.2x Schema change — `migrations/0025_phone_login.sql`
+
+Decided by MojoSOGO 2026-10-04: a browser can be signed in by approving it on the member's phone (§6.6).
+(0024 / §4.2w belong to another branch in flight; the gap is expected.)
+
+```sql
+-- §6.6 — one row per "Sign in with my phone" request. Rows are never deleted: they are the rate-limit count.
+CREATE TABLE login_requests (
+  id                 TEXT PRIMARY KEY,                -- 'lgn_' + 16 base32
+  member_id          TEXT REFERENCES members(id),     -- NULL = a decoy: no usable member, or over the limit (§6.6)
+  email              TEXT NOT NULL COLLATE NOCASE,    -- as asked, trimmed; what the limit counts by
+  waiting_token_hash TEXT NOT NULL UNIQUE,            -- SHA-256 hex of the waiting browser's cookie
+  match_number       INTEGER NOT NULL,                -- the 2-digit number the browser shows
+  choices            TEXT NOT NULL,                   -- JSON [n, n, n]: the match and two decoys, shuffled
+  status             TEXT NOT NULL CHECK (status IN ('pending','approved','denied','used')),
+  user_agent         TEXT,                            -- the waiting browser's, ≤ 300 chars
+  place              TEXT,                            -- "City, CC" from Cloudflare's request.cf; NULL = unknown
+  created_at         TEXT NOT NULL,
+  expires_at         TEXT NOT NULL,                   -- created_at + 2 min
+  decided_at         TEXT,                            -- approved or denied
+  used_at            TEXT                             -- the session was minted
+);
+CREATE INDEX idx_login_requests_email ON login_requests(email, created_at);
+CREATE INDEX idx_login_requests_member ON login_requests(member_id, status);
+
+-- §6.6 — a push that is a sign-in notice (no fire), and where tapping it goes.
+ALTER TABLE deliveries ADD COLUMN notice TEXT CHECK (notice IN ('login','new_sign_in'));
+ALTER TABLE deliveries ADD COLUMN url TEXT;
+```
+
+Additive only. The column is `match_number`, not `match` (`MATCH` is an SQLite operator). `notice` and `url` are
+NULL on every existing row and on every fire, announcement, ping and house delivery; only §6.6 writes them. M1-VOCAB
+covers `login_requests.status` (`LOGIN_REQUEST_STATUS`) and `deliveries.notice` (`NOTICE_KIND`). **Migration check
+(PL-M):** rows written under 0001–0023 survive 0025 unchanged with `notice` and `url` NULL; `login_requests` exists
+empty; `PRAGMA foreign_key_check` is empty.
+
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
 
@@ -1475,6 +1519,121 @@ excluded because they mean holidays:
 #FF6B35 orange   #10B981 green   #8B5CF6 purple   #EC4899 pink
 #F59E0B amber    #06B6D4 cyan    #84CC16 lime     #A16207 brown
 ```
+
+### 6.6 Sign in with my phone — `src/shared/phone-login.ts`, `/auth/phone-login`
+
+Decided by MojoSOGO 2026-10-04. On the sign-in page a browser (typically the PC) enters an email and taps
+**Sign in with my phone**. The member's phones get a push; tapping it opens Ensō on an approve screen that
+shows the browser, a rough place and the time, and three numbers. The member taps the number the PC shows
+(**number matching**), and the waiting PC is signed in with no password. Passwords stay exactly as they are
+(§6.4 untouched).
+
+**Rules** (`src/shared/phone-login.ts`, pure, imports only `vocab`):
+- `APPROVE_LOGIN_PATH = '/approve-login'`; `approveLoginUrl(id)` → `/approve-login#{id}` (the id rides in the
+  fragment, like an invite code, §6.2a).
+- `LOGIN_REQUEST_TTL_MIN = 2` — a request lives 2 minutes. `loginRequestExpiry(now)` → now + 2 min.
+- `LOGIN_REQUESTS_PER_WINDOW = 3` per email per `LOGIN_REQUEST_WINDOW_MIN = 15` minutes;
+  `loginWindowStart(now)` → now − 15 min. ⚑
+- `USER_AGENT_MAX = 300` characters kept.
+- `matchNumbers(bytes)` — randomness passed in (`MATCH_RANDOM_BYTES = 4` bytes from `crypto.getRandomValues`) →
+  `{ match, choices }`: `match` a 2-digit number (10–99); `choices` three **distinct** 2-digit numbers, one of
+  them the match, its position chosen by the bytes too.
+- `pollView(row, now)` → the `LOGIN_VIEW` the waiting browser is told: `denied` → `denied`; `used` → `expired`
+  (spent); `pending` / `approved` at or after `expires_at` → `expired`; otherwise the stored status. **Expired
+  is derived, never stored.**
+- `approveView(row, now)` → what the phone is told: as `pollView`, except `used` → `approved` (the member's
+  approval did sign the browser in).
+- `decide(row, memberId, choice, now)` — `choice` a number, or `null` for "This wasn't me" →
+  `{ ok: true, status: 'approved' | 'denied' }` or a refusal, checked in this order: `not_yours` (the row has
+  no member, or another member's), `not_pending` (already decided or used), `expired`. The right number →
+  `approved`; a wrong number or `null` → `denied`.
+- `claim(row, now)` → `{ ok: true }` (the row becomes `used`) or a refusal `not_approved` / `expired`.
+- `browserSummary(userAgent)` → "Chrome on Windows", "Safari on iPhone", … (Edge, Opera, Samsung Internet,
+  Firefox, Chrome, Safari; Windows, iPhone, iPad, Android, Mac, ChromeOS, Linux); an unrecognised browser is
+  **"Unknown browser"**, an unrecognised system is left off — never a guess.
+- `placeText(city, country)` → "Oceanside, US", "US", or `null` when neither is known; the screen then says
+  **"Place unknown"** (`PLACE_UNKNOWN`).
+- `loginRequestMessage(browser)` → "Sign-in request from {browser} — tap to check"; `newSignInMessage(browser)`
+  → "New sign-in on {browser}"; `NOTICE_TITLE = "🔑 Ensō sign-in"` ⚑ — the push title of both.
+
+**`POST /auth/phone-login { email }`** (public):
+1. `email` not a valid address → 400 `invalid_input` (the format only, never whether it exists).
+2. The member is looked up by email (case-insensitive). **Usable** = exists and not disabled.
+3. The requests for that email created at or after `loginWindowStart(now)` are counted (every row, decoys too).
+4. One `db.batch`: (a) `UPDATE login_requests SET status='denied', decided_at=? WHERE member_id=? AND
+   status='pending'` — **at most one pending request per member**: a new one moves the old one to `denied`,
+   never deleted (the rows are the rate-limit count) ⚑; (b) the INSERT of the new row with a fresh
+   `matchNumbers`, `expires_at` = now + 2 min, the hash of a fresh waiting token, the user agent (≤ 300) and
+   the place from `request.cf`. For no usable member, or at or over the limit, the row is a **decoy**:
+   `member_id` NULL (step (a) then matches nothing), so nobody can ever approve it and it can only expire.
+5. The browser gets the **waiting cookie** `hrc_phone_login` (the token; `HttpOnly`, `Secure` on https,
+   `SameSite=Lax`, `Path=/api/v1/auth/phone-login`, 10 min) and **202 `{ match, expiresAt }`**.
+6. Only for a usable member under the limit, and only after the response (`c.executionCtx.waitUntil`): one
+   fire-less `push` delivery to the member — `notice 'login'`, `url` = `approveLoginUrl(id)`, `title`
+   `NOTICE_TITLE`, `message` = `loginRequestMessage(browserSummary(ua))` — sent with `sendPushDeliveries`. A
+   member with no phone gets the honest `failed`, `no_subscription` row (§9.1). Never a house row.
+
+**`GET /auth/phone-login`** (the waiting cookie, no session) — the waiting browser polls every ~2 s:
+- No cookie, or one that matches no row → 404 `not_found`.
+- → `{ status: pollView(row, now) }`. When the row is `approved` and not expired, the poll **claims** it:
+  `UPDATE login_requests SET status='used', used_at=? WHERE id=? AND status='approved' AND expires_at > ?`; only
+  when that changed exactly one row is a session started (`startSession`, §2.1) and the waiting cookie cleared,
+  → `{ status: 'approved' }`. A poll that loses the claim answers its `pollView` (`expired`) and mints nothing.
+
+**`GET /auth/phone-login/{id}`** (member) → `{ id, browser, place, createdAt, expiresAt, status:
+approveView(row, now), choices }` — never the match as such. Another member's request, a decoy, or an unknown
+id → **404 `not_found`**, all alike.
+
+**`POST /auth/phone-login/{id}/approve { number }`** (member): `number` not an integer → 400 `invalid_input`;
+then `decide`: `not_yours` → 404 `not_found`; `not_pending` → 409 `not_pending`; `expired` → 409 `expired`;
+otherwise the guarded `UPDATE … SET status=?, decided_at=? WHERE id=? AND status='pending'` (a lost race → 409
+`not_pending`) → 200 `{ status: 'approved' | 'denied' }`. **A wrong number denies the request** — there is no
+second try; the PC starts again.
+
+**`POST /auth/phone-login/{id}/deny`** (member) — "This wasn't me": `decide` with `null`, the same refusals →
+200 `{ status: 'denied' }`.
+
+**New sign-in notice** ⚑: after a successful **password** sign-in (`POST /auth/login`), the member gets one
+push, "New sign-in on {browser}" (`notice 'new_sign_in'`, `title` `NOTICE_TITLE`, `url` NULL), sent with
+`sendPushDeliveries` before the login answers — only when the member has at least one phone subscribed (with
+none there is nobody to tell, so no row ⚑), and a failure to send never fails the sign-in. Not after a phone
+approval (they just approved it), not after signup or setup. Push only, never house.
+`sendSignInNotice(env, memberId, userAgent, now)` in `routes/phone-login.ts` is the one place it is written.
+
+**Security properties:**
+- **No enumeration:** a real, unknown, disabled, phoneless or rate-limited email gets the identical 202 shape,
+  the identical waiting cookie, the same batch of statements, and a row that polls `pending` then `expired`;
+  the push happens after the response, inside `waitUntil`.
+- **Bound to the waiting browser:** only the cookie set by the POST collects the session; the request id in the
+  push cannot collect anything, and the waiting token is stored hashed.
+- **One-time:** the guarded claim changes exactly one row, so an approved request mints exactly one session.
+- **Same member only:** only the requested member's own session can see, approve or deny a request (others
+  get 404).
+- **Number matching:** the phone shows three numbers; only the one on the PC's screen approves. A tap-through
+  on a push someone else triggered picks right one time in three at best, and a wrong pick denies.
+- **The number is never in the push** — not in its body, title or the delivery's `message` (deliveries show in
+  Settings → Status).
+
+**Acceptance (M4v — each row is a test):**
+
+| # | Check | Expected |
+|---|---|---|
+| PL1 | `matchNumbers` over many byte strings | `match` 10–99; three distinct 2-digit choices containing the match; every position reachable; deterministic for the same bytes |
+| PL2 | `pollView` / `approveView` / `decide` / `claim` with injected `now` | pending → pending, at `expires_at` → expired; denied stays denied; used → expired (poll) / approved (phone); decide: another member or a decoy → `not_yours`, decided → `not_pending`, past expiry → `expired`, right number → approved, wrong or null → denied; claim: approved in time → ok, pending → `not_approved`, past expiry → `expired` |
+| PL3 | `browserSummary` / `placeText` / messages | Chrome/Edge/Firefox/Safari on Windows/Mac/iPhone/Android named; garbage → "Unknown browser"; `placeText(null, null)` = null; the two messages as above |
+| PL4 | POST for a real member with a phone, an unknown email, a disabled member, a member without a phone | each 202 with exactly the keys `{ match, expiresAt }`, a 2-digit match and a waiting cookie; only the real ones get a `push` delivery (the phoneless one `failed`, `no_subscription`); unknown / disabled → a decoy row, no delivery |
+| PL5 | four requests for one email within 15 min | the 4th: the same 202, no new push delivery, a decoy row; a request older than 15 min does not count |
+| PL6 | a second request while the first is pending | the first becomes `denied` (row kept); the first browser's poll says `denied` |
+| PL7 | the phone picks a wrong number; "This wasn't me" | 200 `{ status: 'denied' }`; the poll says `denied`; a second approve → 409 `not_pending` |
+| PL8 | another member GETs, approves or denies; anyone GETs a decoy | 404 `not_found` each; the request stays `pending` |
+| PL9 | a poll with no cookie, and with another browser's cookie | 404 / that browser's own request's status — never this request's session |
+| PL10 | right number → poll | `approved`, exactly one new `sessions` row, the waiting cookie cleared, `/me` works with the new cookie; the same waiting cookie polled again → `expired`, still one session |
+| PL11 | a request past `expires_at` (time moved by rewriting the row) | poll `expired`; approve → 409 `expired`; nothing minted |
+| PL12 | the login push | one delivery: `notice 'login'`, `url` = `/approve-login#{id}`, `title` "🔑 Ensō sign-in", `fire_id` NULL; the message and the decrypted push never contain the match number; the push carries `url` |
+| PL13 | `POST /auth/login` (password) for a member with a phone; without one | one `new_sign_in` push delivery "New sign-in on …", `url` NULL; no row without a phone; a phone approval writes no `new_sign_in` |
+| PL14 | `/ops/notify` hourly count | notice rows never count toward `OPS_NOTIFY_PER_HOUR` |
+| PL15 | vocabulary, producer against consumer | every `NOTICE_KIND` value the routes write is accepted by the migrated `deliveries.notice` CHECK; every `LOGIN_REQUEST_STATUS` by `login_requests.status` (inserted for real, not compared as text) |
+| PL-M | migration 0025 | §4.2x's check |
 
 ---
 
@@ -3151,6 +3310,50 @@ Sam        expired
             [ Got it ]
 ```
 
+### 8.13 Sign in with my phone — the two screens (§6.6)
+
+**On the sign-in page** (`SignIn.tsx` hosts `PhoneSignIn.tsx`; sign-in mode only): under **Sign in**, a second
+button **📱 Sign in with my phone**. It uses the same Email field (the password is not needed); with no email it
+says "Enter your email first." in the form's alert. Tapping it replaces the form's body with the waiting view:
+
+```
+            Ensō
+   Check your phone
+            42                 ← the match, very large
+  Tap 42 on your phone to sign in here.
+  Waiting… (until 10:44)
+          [ Cancel ]
+```
+
+- It polls `GET /auth/phone-login` every 2 s. `approved` → signed in (`onSignedIn(await get('/me'))`).
+  `denied` → "Refused on your phone — nobody was signed in." `expired` → "No answer in 2 minutes." Both
+  with **Try again** (a new request) and **Back** (the password form). A failed poll shows its message in place
+  with **Try again**. **Cancel** stops polling and goes back; the request just expires.
+
+**The approve screen** (`ApproveLogin.tsx`, the page the push opens: `/approve-login#{id}`, a **full page** ⚑,
+not a modal, signed in only):
+
+```
+            Ensō
+   Signing in somewhere?
+   Chrome on Windows
+   Oceanside, US · 10:42
+  Tap the number shown on that screen:
+     [ 17 ]  [ 42 ]  [ 88 ]
+       [ This wasn't me ]
+```
+
+- The id is read from the fragment and kept in `sessionStorage` (`enso.approveLogin`), and the address loses
+  the fragment at once. If this phone's session has expired the sign-in form shows first ⚑; the kept id brings
+  the approve screen back right after signing in.
+- Three number buttons (44 px tall at least) and **This wasn't me**. After a tap the screen says, in place:
+  approved → "Done — that screen is signing in now."; denied by a wrong number → "That wasn't the number on the
+  screen, so the sign-in was refused. If it was you, start again there."; "This wasn't me" → "Refused — nobody
+  was signed in."; already answered → "This request was already answered."; expired → "This request has
+  expired."; not found → "This sign-in request isn't for you, or it is gone." Each with **Done**, which forgets
+  the id, sets the address to `/` and shows the app.
+- Opened when the request is no longer pending, it says so at once (the same texts) without the buttons.
+
 ### 8.7 Theme
 
 Dark by default. Colors are defined as tokens on `:root`:
@@ -3201,11 +3404,13 @@ Each person turns phone alerts on **once per phone**, in Settings → Me (decide
 - `push` → **always** `showNotification` (iOS revokes permission for a push that shows
   nothing): `title`, `body`, `tag: p.tag || p.fireId || 'enso-test'` (a re-alert replaces
   the old one; the `fireId` fallback keeps a payload from before `tag` working), `icon:
-  /icon-192.png`, `data: { fireId }`, `actions` (ignored on iOS).
+  /icon-192.png`, `data: { fireId, url }`, `actions` (ignored on iOS).
 - `notificationclick` → with an action: `POST /api/v1/fires/{id}/actions {action}` (same-origin
-  cookie) and close; without: focus the open app or open `/`.
+  cookie) and close; without an action but with `data.url` (a sign-in request, §6.6): focus an open app window
+  and `navigate(url)` it, or — when there is none, or it cannot be navigated — `openWindow(url)`; otherwise
+  focus the open app or open `/`.
 
-**Payload** (JSON, encrypted): `{ fireId, kind, tag, title, body, actions }`, under Apple's 4 KB:
+**Payload** (JSON, encrypted): `{ fireId, kind, tag, title, body, actions, url }`, under Apple's 4 KB:
 `title` **"Ensō"**, `body` = the delivery's `message` (already "Reminder: …", "Chore for
 Sam: …"), `kind` from the delivery's fire, `actions` from the engine's `pushActions(kind)` —
 the same table the Ringing bar's buttons follow. ⚑
@@ -3215,6 +3420,10 @@ its `fireId` (a re-alert replaces the last one); a delivery with no fire (an ann
 `'enso-test'`. A delivery with no fire has `fireId: null`, `kind: null`, `actions: []` and the
 title of the row (`deliveries.title`, written only by `/ops/notify`, §9.4), or else
 **"📢 Announcement"** (`ANNOUNCE_TITLE`, §9.3).
+**`url`** — where tapping the notification goes: the delivery's `deliveries.url` (written only by a sign-in
+request, §6.6: `/approve-login#{id}`); `null` on every other push (a fire's, an announcement's, a ping's, the
+test push, a `new_sign_in` notice). A sign-in notice is a fire-less delivery with its own `title`
+(`NOTICE_TITLE`) and `notice` set; its `message` never contains the match number.
 Actions: reminder and thing `done` + `snooze`; timer `ack`; chore `done`. iPhone shows no
 buttons — tapping opens the app, where the Ringing bar has them; expected, not a bug.
 
@@ -3423,9 +3632,9 @@ announcement, §9.3) that carries its own title (§4.2u). No session, no house r
 3. `opsNotifyError` → **400 `invalid_input`** with its message.
 4. The recipient is the founder. A `member` (or any other) field in the body is ignored. Before setup
    there is no founder → **409 `no_recipients`**, nothing written (never a row with no member).
-5. **Hourly limit:** the push deliveries with no fire and a non-NULL `title` created at or after
+5. **Hourly limit:** the push deliveries with no fire, a non-NULL `title` and **no `notice`** created at or after
    `opsWindowStart(now)` are counted; at `OPS_NOTIFY_PER_HOUR` or more → **429 `rate_limited`**, and no
-   row is written. Announcements (title NULL) never count.
+   row is written. Announcements (title NULL) and sign-in notices (§6.6, `notice` set) never count.
 6. One delivery: `id` = `newId('dlv')`, `fire_id` NULL, `alert_number` 1, `channel` `push`, `member_id` =
    the founder, `message` = the trimmed text, `title` = `opsTitle(title)`, `queued`.
 7. Sent at once with `sendPushDeliveries` (§9.1); then **201 `{ deliveries: [{ id, status, detail }] }`**.
@@ -3467,7 +3676,12 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | POST | `/setup` | public + `SETUP_TOKEN` | `{ setupToken, email, password, displayName }` → member; sets cookie |
 | POST | `/auth/invite-preview` | public | `{ code }` → `{ displayName, householdName, invitedBy, expiresAt }`; 400 `invalid_code` otherwise (§6.2a). Never uses the invite. |
 | POST | `/auth/signup` | public | `{ code, email, password, displayName }` → member; sets cookie |
-| POST | `/auth/login` | public | `{ email, password }` → member; sets cookie |
+| POST | `/auth/login` | public | `{ email, password }` → member; sets cookie; a member with a phone gets a "New sign-in on …" push (§6.6) |
+| POST | `/auth/phone-login` | public | `{ email }` → **202** `{ match, expiresAt }` for every well-formed email (real, unknown, disabled, rate-limited alike); sets the waiting cookie; 400 `invalid_input` for a malformed email (§6.6) |
+| GET | `/auth/phone-login` | the waiting cookie | → `{ status: 'pending' \| 'approved' \| 'denied' \| 'expired' }`; on `approved` the session cookie is set (once) and the waiting cookie cleared; 404 `not_found` with no matching cookie (§6.6) |
+| GET | `/auth/phone-login/{id}` | member (the requested one) | → `{ id, browser, place, createdAt, expiresAt, status, choices: number[3] }`; 404 `not_found` for anyone else's, a decoy or an unknown id (§6.6) |
+| POST | `/auth/phone-login/{id}/approve` | member (the requested one) | `{ number }` → `{ status: 'approved' \| 'denied' }` (a wrong number denies); 400 `invalid_input` / 404 `not_found` / 409 `not_pending` / 409 `expired` (§6.6) |
+| POST | `/auth/phone-login/{id}/deny` | member (the requested one) | "This wasn't me" → `{ status: 'denied' }`; 404 / 409 as approve (§6.6) |
 | POST | `/auth/logout` | member | → 204; clears cookie |
 | GET | `/me` | member | → member + prefs |
 | PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration? }` |
@@ -3974,6 +4188,13 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q122 | Adding a photo in the item form | ⚑ It is not read — the form only keeps it |
 | Q123 | Bought items' photos | ⚑ Kept indefinitely; adding the item again re-opens it and brings its photo back |
 | Q124 | Names for the SogoAI pieces | ⚑ No renames: `CAPTIONS_TOKEN`, `HOME_CAPTIONS_URL` and the `captions-helper` files keep their names though they now carry `/identify` too |
+| Q125 | Sign in with my phone (§6.6): limits | ⚑ A request lives 2 minutes; at most 3 per email per 15 minutes (over that: the same 202, no push); at most one pending per member — a new request turns the old one `denied` (the row is kept, it is the rate-limit count) |
+| Q126 | A wrong number on the phone | ⚑ Denies the request; no second try on the same request — the PC starts again |
+| Q127 | The "New sign-in on …" push | ⚑ After a **password** sign-in only (not after a phone approval, signup or setup); push only, never house; only to a member with a phone subscribed (none → no row); sent before the login answers |
+| Q128 | The approve screen | ⚑ A full page at `/approve-login#{id}`, not a modal; with the phone signed out, the sign-in form shows first and the approve screen follows sign-in (the id kept in `sessionStorage`) |
+| Q129 | The notice push title | ⚑ "🔑 Ensō sign-in" for both the request and the new-sign-in notice; the request's body "Sign-in request from Chrome on Windows — tap to check" |
+| Q130 | Where the approve screen says the browser is | ⚑ Cloudflare's rough city and country for the waiting browser ("Oceanside, US"), or "Place unknown" |
+| Q131 | A request that was approved but not collected in time | ⚑ Expires with the request (2 minutes from creation); the PC says "No answer in 2 minutes." |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -4124,6 +4345,8 @@ nothing past 4 MB) before `handle()` checks the path, method and bearer, so the 
 **Still owed (coordinator):** deploy, then apply 0023 in production; update the helper on SogoAI (the new `.mjs`,
 `IDENTIFY_MODEL=qwen-uncensored` in its env file, restart; README); a real item snapped on the iPhone and named by
 SogoAI; the add row, thumbnail and ✎ form photo checked at 320 px (not checked in a browser in this build).
+**M4v Sign in with my phone** (§6.6, §8.13; decided by MojoSOGO 2026-10-04): in progress on `feature/phone-login`
+— this entry is completed when it is built.
 **M4t Ping the founder's phone** (v1.17.0, §9.4): decided by MojoSOGO 2026-10-04. `POST /ops/notify` (`routes/ops.ts`,
 rules in `src/shared/ops.ts`) — Bearer `OPS_NOTIFY_TOKEN` in constant time (unset → 503 `ops_notify_off`), one
 fire-less `push` delivery to the founder (`FOUNDER_SQL`, now exported from `routes/members.ts`) carrying its own
