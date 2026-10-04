@@ -2,8 +2,9 @@
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { ACTION, CHANNEL, TIMER_CMD, isOneOf, type Channel } from '../../shared/vocab';
-import { applyAction, applyTimerCmd, type FireRow } from '../../shared/engine';
-import { all, first, newId, nowIso, parseJson, run } from '../db';
+import { applyAction, applyTimerCmd, timerWindow, timerWindowError, type FireRow } from '../../shared/engine';
+import { all, first, householdTz, newId, nowIso, parseJson, run } from '../db';
+import { isTime } from '../../shared/time';
 import { body, fail, intIn, str } from '../http';
 import { requireMember } from '../session';
 import { choreFireContext } from '../../shared/chores';
@@ -16,6 +17,7 @@ import { onEventIds } from '../event-rows';
 interface TimerRow {
   id: string; title: string; interval_min: number; channels: string; renotify_min: number | null; max_alerts: number;
   assigned_to: string; running: number; created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
+  active_from: string | null; active_to: string | null;
 }
 
 async function timerView(db: D1Database, t: TimerRow) {
@@ -24,7 +26,7 @@ async function timerView(db: D1Database, t: TimerRow) {
   return {
     id: t.id, title: t.title, intervalMin: t.interval_min, channels: parseJson<Channel[]>(t.channels, []),
     renotifyMin: t.renotify_min, maxAlerts: t.max_alerts, assignedTo: parseJson<string[]>(t.assigned_to, []),
-    running: t.running === 1, createdBy: t.created_by, openFire: open ?? null,
+    running: t.running === 1, createdBy: t.created_by, activeFrom: t.active_from, activeTo: t.active_to, openFire: open ?? null,
   };
 }
 
@@ -42,7 +44,17 @@ function parseTimerInput(b: Record<string, unknown>) {
   if (maxAlerts === null) return 'maxAlerts must be 1–20.';
   const assigned = b.assignedTo ?? [];
   if (!Array.isArray(assigned) || !assigned.every((x) => typeof x === 'string')) return 'assignedTo must be a list of member ids.';
-  return { title, interval_min: interval, channels: JSON.stringify([...new Set(b.channels)]), renotify_min: renotify, max_alerts: maxAlerts, assigned_to: JSON.stringify(assigned) };
+  // §4.2n: the active time range — both empty (no window), or both HH:MM that timerWindowError accepts.
+  const from = b.activeFrom ?? null, to = b.activeTo ?? null;
+  if (from !== null || to !== null) {
+    if (!isTime(from) || !isTime(to)) return 'Active from and to must both be HH:MM times, or both empty.';
+    const err = timerWindowError({ from, to }, interval);
+    if (err) return err;
+  }
+  return {
+    title, interval_min: interval, channels: JSON.stringify([...new Set(b.channels)]), renotify_min: renotify, max_alerts: maxAlerts,
+    assigned_to: JSON.stringify(assigned), active_from: from as string | null, active_to: to as string | null,
+  };
 }
 
 async function loadTimer(c: Context<AppEnv>, forWrite: boolean): Promise<TimerRow | Response> {
@@ -65,9 +77,10 @@ alerts.post('/timers', requireMember, async (c) => {
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   const id = newId('tmr'), now = nowIso();
   await run(c.env.DB,
-    `INSERT INTO timers (id, title, interval_min, channels, renotify_min, max_alerts, assigned_to, running, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
-    id, input.title, input.interval_min, input.channels, input.renotify_min, input.max_alerts, input.assigned_to, c.get('member').id, now, now);
+    `INSERT INTO timers (id, title, interval_min, channels, renotify_min, max_alerts, assigned_to, active_from, active_to, running, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+    id, input.title, input.interval_min, input.channels, input.renotify_min, input.max_alerts, input.assigned_to,
+    input.active_from, input.active_to, c.get('member').id, now, now);
   return c.json(await timerView(c.env.DB, (await first<TimerRow>(c.env.DB, 'SELECT * FROM timers WHERE id = ?', id))!), 201);
 });
 
@@ -78,8 +91,10 @@ alerts.patch('/timers/:id', requireMember, async (c) => {
   const input = parseTimerInput({ ...current, ...(await body(c)) });
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   await run(c.env.DB,
-    `UPDATE timers SET title = ?, interval_min = ?, channels = ?, renotify_min = ?, max_alerts = ?, assigned_to = ?, updated_at = ? WHERE id = ?`,
-    input.title, input.interval_min, input.channels, input.renotify_min, input.max_alerts, input.assigned_to, nowIso(), t.id);
+    `UPDATE timers SET title = ?, interval_min = ?, channels = ?, renotify_min = ?, max_alerts = ?, assigned_to = ?, active_from = ?, active_to = ?,
+       updated_at = ? WHERE id = ?`,
+    input.title, input.interval_min, input.channels, input.renotify_min, input.max_alerts, input.assigned_to,
+    input.active_from, input.active_to, nowIso(), t.id);
   return c.json(await timerView(c.env.DB, (await first<TimerRow>(c.env.DB, 'SELECT * FROM timers WHERE id = ?', t.id))!));
 });
 
@@ -101,7 +116,8 @@ alerts.post('/timers/:id/commands', requireMember, async (c) => {
   if (!isOneOf(TIMER_CMD, b.cmd)) return fail(c, 400, 'invalid_input', `cmd must be one of: ${TIMER_CMD.join(', ')}.`);
   const now = nowIso();
   const open = await first<FireRow>(c.env.DB, `SELECT * FROM fires WHERE timer_id = ? AND state != 'closed'`, t.id);
-  const r = applyTimerCmd({ id: t.id, running: t.running === 1 }, open, b.cmd, t.interval_min, c.get('member').id, now);
+  const window = timerWindow(t.active_from, t.active_to, await householdTz(c.env.DB));
+  const r = applyTimerCmd({ id: t.id, running: t.running === 1 }, open, b.cmd, t.interval_min, c.get('member').id, now, window);
   const stmts = [c.env.DB.prepare('UPDATE timers SET running = ?, updated_at = ? WHERE id = ?').bind(r.timer.running ? 1 : 0, now, t.id)];
   if (r.closeFire) stmts.push(updateFire(c.env.DB, r.closeFire));
   if (r.newFire) stmts.push(insertFire(c.env.DB, r.newFire));

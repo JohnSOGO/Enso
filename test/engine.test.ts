@@ -1,8 +1,8 @@
 // SPEC §5.8 — every row is a test.
 import { describe, expect, it } from 'vitest';
 import {
-  alertMessage, applyAction, applyTimerCmd, newChoreFire, newThingFire, planReminderFires, stepFire,
-  type AlertConfig, type FireRow, type NewFire, type ReminderEvent,
+  alertMessage, applyAction, applyTimerCmd, inside, newChoreFire, newThingFire, newTimerFire, nextTimerDue, planReminderFires,
+  stepFire, timerWindow, timerWindowError, type AlertConfig, type FireRow, type NewFire, type ReminderEvent,
 } from '../src/shared/engine';
 import { localToUtc } from '../src/shared/time';
 
@@ -280,5 +280,98 @@ describe('time conversion', () => {
   });
   it('R14 ambiguous 01:30 → earlier (PDT)', () => {
     expect(localToUtc('2026-11-01', '01:30', TZ)).toBe('2026-11-01T08:30:00.000Z');
+  });
+});
+
+describe('timer with an active time range (TW) — LA, 08:00–21:00, interval 60', () => {
+  const L = (time: string, date = '2026-10-06') => localToUtc(date, time, TZ);
+  const win = timerWindow('08:00', '21:00', TZ)!;
+  const cfg: AlertConfig = { channels: ['push'], renotifyMin: 15, maxAlerts: 4, intervalMin: 60, window: win };
+  const ackNext = (f: FireRow, c: AlertConfig, now: string) => {
+    const r = applyAction(f, 'ack', c, 'mem_a', now);
+    if ('error' in r) throw new Error(r.error);
+    return r.next!.due_at;
+  };
+  const scheduledAt = (due: string) => withId(newTimerFire('tmr_1', due));
+  const ringingSince = (due: string, count = 1, last = due): FireRow => ({ ...scheduledAt(due), state: 'ringing', alert_count: count, last_alerted_at: last });
+
+  it('timerWindow is undefined unless both ends are set', () => {
+    expect(timerWindow(null, null, TZ)).toBeUndefined();
+    expect(timerWindow('08:00', null, TZ)).toBeUndefined();
+    expect(win).toEqual({ from: '08:00', to: '21:00', tz: TZ });
+  });
+
+  it('TW1 start at 06:00 → due 09:00', () => {
+    const r = applyTimerCmd({ id: 'tmr_1', running: false }, null, 'start', 60, 'mem_a', L('06:00'), win);
+    expect(r.timer.running).toBe(true);
+    expect(r.newFire!.due_at).toBe(L('09:00'));
+  });
+
+  it('TW2 ack at 20:30 → next day 09:00', () => {
+    expect(ackNext(ringingSince(L('20:00')), cfg, L('20:30'))).toBe(L('09:00', '2026-10-07'));
+  });
+
+  it('TW3 ack at 19:30 → 20:30', () => {
+    expect(ackNext(ringingSince(L('19:00')), cfg, L('19:30'))).toBe(L('20:30'));
+  });
+
+  it('TW4 ringing at 21:00 → scheduled, due next day 09:00, alert_count 0, no alert', () => {
+    const r = stepFire(ringingSince(L('20:00'), 4, L('20:45')), cfg, L('21:00'));
+    expect(r.alert).toBe(false);
+    expect(r.fire).toMatchObject({ state: 'scheduled', due_at: L('09:00', '2026-10-07'), alert_count: 0, last_alerted_at: null, close_reason: null });
+  });
+
+  it('TW5 a renotify that would fall after 21:00 → no alert, deferred', () => {
+    const f = ringingSince(L('20:50'));
+    expect(stepFire(f, cfg, L('20:59')).alert).toBe(false); // not yet 15 min
+    const r = stepFire(f, cfg, L('21:05'));
+    expect(r.alert).toBe(false);
+    expect(r.fire).toMatchObject({ state: 'scheduled', due_at: L('09:00', '2026-10-07'), alert_count: 0 });
+  });
+
+  it('TW6 a stale scheduled fire due 22:00 seen at 22:00 → deferred, no alert', () => {
+    const r = stepFire(scheduledAt(L('22:00')), cfg, L('22:00'));
+    expect(r.alert).toBe(false);
+    expect(r.fire).toMatchObject({ state: 'scheduled', due_at: L('09:00', '2026-10-07') });
+    // Not yet due outside the window → left alone until it comes due.
+    const early = scheduledAt(L('22:00'));
+    expect(stepFire(early, cfg, L('21:30')).fire).toBe(early);
+  });
+
+  it('TW7 due 09:00 inside the window rings as before', () => {
+    const r = stepFire(scheduledAt(L('09:00')), cfg, L('09:00'));
+    expect(r.alert).toBe(true);
+    expect(r.fire).toMatchObject({ state: 'ringing', alert_count: 1 });
+  });
+
+  it('TW8 overnight 22:00–06:00: ack at 05:30 → 23:00 the same day', () => {
+    const night: AlertConfig = { ...cfg, window: timerWindow('22:00', '06:00', TZ)! };
+    expect(ackNext(ringingSince(L('05:00')), night, L('05:30'))).toBe(L('23:00'));
+    expect(ackNext(ringingSince(L('22:30')), night, L('23:00'))).toBe(L('00:00', '2026-10-07'));
+  });
+
+  it('TW9 no window → base + interval, and a timer still rings at any hour', () => {
+    expect(nextTimerDue(L('20:30'), 60)).toBe(L('21:30'));
+    const plain: AlertConfig = { ...cfg, window: undefined };
+    expect(stepFire(scheduledAt(L('23:00')), plain, L('23:00')).alert).toBe(true);
+    expect(ackNext(ringingSince(L('20:00')), plain, L('20:30'))).toBe(L('21:30'));
+  });
+
+  it('TW10 timerWindowError: from = to, and interval ≥ window', () => {
+    expect(timerWindowError({ from: '08:00', to: '08:00' }, 60)).toMatch(/different/);
+    expect(timerWindowError({ from: '08:00', to: '09:00' }, 60)).toMatch(/shorter/);
+    expect(timerWindowError({ from: '08:00', to: '09:00' }, 59)).toBeNull();
+    expect(timerWindowError({ from: '22:00', to: '06:00' }, 60)).toBeNull();
+    expect(timerWindowError({ from: '22:00', to: '06:00' }, 480)).toMatch(/480 min/);
+  });
+
+  it('TW11 DST ends 2026-11-01: ack Sat 20:30 PDT → Sun 09:00 PST', () => {
+    expect(ackNext(ringingSince(L('20:00', '2026-10-31')), cfg, L('20:30', '2026-10-31'))).toBe('2026-11-01T17:00:00.000Z');
+  });
+
+  it('TW12 inside: from ≤ local < to; overnight wraps midnight', () => {
+    expect([L('08:00'), L('20:59'), L('21:00'), L('07:59')].map((t) => inside(t, win))).toEqual([true, true, false, false]);
+    const night = timerWindow('22:00', '06:00', TZ)!;
+    expect([L('23:00'), L('05:59'), L('06:00'), L('21:59')].map((t) => inside(t, night))).toEqual([true, true, false, false]);
   });
 });
