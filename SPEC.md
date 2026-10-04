@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.30-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.30 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
