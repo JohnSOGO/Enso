@@ -6,6 +6,7 @@
 import { SELF, env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { BASE, Client, member, owner, tickAt } from './helpers';
+import { warmClaude } from './recipe-fakes';
 import { ADDRESS_MAX, COST_MAX, PHONE_MAX, READS_PER_DAY } from '../src/shared/things';
 import { readPhoto } from '../src/worker/photo-reader';
 
@@ -15,7 +16,10 @@ beforeAll(async () => {
   o = await owner();
   A = (await o.get('/me')).json.id;
   B = (await member(o)).id;
-});
+  // Warm the lazily imported SDK (as the recipe tests do): under the full parallel run its first import
+  // alone can outlast the 5 s test timeout of the photo-reader request test below.
+  await warmClaude();
+}, 60_000);
 
 const fairBody = (over: object = {}) => ({ title: 'Fall fair', windowStart: '2026-10-10', windowEnd: '2026-10-20', ...over });
 async function createThing(body: object) {
