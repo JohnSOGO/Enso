@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.27 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.28-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -853,6 +853,20 @@ its owner is set and `now ≥ done_at`.
 0014, `PRAGMA foreign_key_check` is empty, both machines are seeded free, and a `machine` fire
 without `machine_id` is refused by the CHECK.
 
+### 4.2n Schema change — `migrations/0015_timer_window.sql`
+
+```sql
+-- §5.3 rule 0 — a rolling timer's optional active time range, local wall time HH:MM in the
+-- household timezone (§4.1). Both NULL = no window (rings at any hour, as before).
+ALTER TABLE timers ADD COLUMN active_from TEXT;
+ALTER TABLE timers ADD COLUMN active_to TEXT;
+```
+
+There is no CHECK: the route validates (both null, or both `HH:MM` and `timerWindowError` is
+null). `from > to` is an overnight window (22:00–06:00).
+**Migration check (TW-M):** timers that exist before 0015 survive it unchanged, with
+`active_from` and `active_to` NULL — they keep today's behavior.
+
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
 
@@ -911,13 +925,32 @@ stepFire(fire: FireRow, cfg: AlertConfig, now: string): { fire: FireRow; alert: 
 applyAction(fire: FireRow, action: Action, cfg: AlertConfig, memberId: string, now: string):
   { fire: FireRow; next?: NewFire } | { error: 'invalid_action' }
 
-// Timer start/stop.
-applyTimerCmd(timer: TimerRow, openFire: FireRow | null, cmd: TimerCmd, intervalMin: number, memberId: string, now: string):
-  { timer: TimerRow; closeFire?: FireRow; newFire?: NewFire }
+// Timer start/stop. `window`: the timer's active time range, if it has one.
+applyTimerCmd(timer: TimerRow, openFire: FireRow | null, cmd: TimerCmd, intervalMin: number, memberId: string, now: string,
+  window?: TimerWindow): { timer: TimerRow; closeFire?: FireRow; newFire?: NewFire }
+
+// A rolling timer's active time range (local HH:MM in the household tz; from > to = overnight).
+interface TimerWindow { from: string; to: string; tz: string }
+timerWindow(from: string | null, to: string | null, tz: string): TimerWindow | undefined  // undefined unless both set
+timerWindowError(win: { from; to }, intervalMin: number): string | null  // from = to, or interval ≥ window length
+inside(t: string, win: TimerWindow): boolean     // from ≤ local < to; overnight: local ≥ from || local < to
+nextTimerDue(base: string, intervalMin: number, win?: TimerWindow): string
 ```
 
-`AlertConfig` = `{ channels, renotifyMin, maxAlerts, intervalMin? }`, taken from
-the event or timer row.
+`AlertConfig` = `{ channels, renotifyMin, maxAlerts, intervalMin?, window? }`, taken from
+the event or timer row (`window` only for a timer that has one).
+
+**`nextTimerDue`** — when a rolling timer next rings, counted from `base`:
+- no window → `base + intervalMin`;
+- `base` is inside the window and `base + intervalMin` is **before** the end of that open
+  window → `base + intervalMin`;
+- otherwise → the first window opening **strictly after** `base`, `+ intervalMin`. The
+  countdown restarts when the window opens: a 60-min timer on 08:00–21:00 first rings at 09:00.
+
+Openings and closings are local wall times converted with `localToUtc` (§4.1 DST rules: a
+time in the spring-forward gap opens at the first valid instant after it; an ambiguous time
+takes the earlier instant). The engine stays pure and uses only `localToUtc`, `utcToLocal`
+and `addDays` from `time.ts`.
 
 ### 5.2 Constants
 
@@ -931,6 +964,7 @@ export const SNOOZE_MIN         = 10;    // ⚑ DEFAULT
 
 | # | Fire state | Condition | Result |
 |---|------------|-----------|--------|
+| 0 | kind `timer` with a window | `ringing` and `now` outside the window, **or** `scheduled`, `now ≥ due_at` and `now` outside the window | `scheduled`, `due_at = nextTimerDue(now, intervalMin, window)` (= the next window opening + interval), `alert_count = 0`, `last_alerted_at = null`, **no alert** |
 | 1 | `scheduled` | `now < due_at` | no change |
 | 2 | `scheduled`, kind `reminder` | `now − due_at > MISSED_AFTER_MIN` (strictly — exactly 60 min still rings) | `closed`, reason `missed`, **no alert** |
 | 3 | `scheduled` | `now ≥ due_at` | `ringing`, `alert_count = 1`, `last_alerted_at = now`, **alert** |
@@ -939,6 +973,14 @@ export const SNOOZE_MIN         = 10;    // ⚑ DEFAULT
 
 Timers, chores and machines are never `missed`. An overdue timer or chore still rings, even
 after an outage — a chore does not stop needing doing.
+
+**Rule 0 — a timer never rings outside its active time range** (§4.2n). It is the snooze
+shape, not a close: the same fire goes back to `scheduled`, leaves the Ringing bar quietly,
+and rings again at the next window opening + interval. There is no new close reason and no
+new fire. It also catches a renotify that would fall after the window closes, and a stale
+`scheduled` fire seen outside the window (an outage, or a window edited after the fire was
+planned — a PATCH does not re-plan the open fire). A `scheduled` fire not yet due is left
+alone even outside the window; it is judged when it comes due.
 
 After `maxAlerts` a fire stays `ringing` **silently**. It remains visible in the
 app's Ringing bar (§8.2) until someone acts.
@@ -950,7 +992,7 @@ app's Ringing bar (§8.2) until someone acts.
 | `done` | reminder, `ringing` | `closed`, reason `done`, `closed_by` |
 | `snooze` | reminder, `ringing` | `scheduled`, `due_at = now + SNOOZE_MIN`, `alert_count = 0` |
 | `done` | chore, `ringing` | advances the run one step (§7B.3) — the route calls `advanceRun`; the fire closes `done` |
-| `ack` | timer, `ringing` **or** `scheduled` | `closed`, reason `acked`; **next** = new timer fire `due_at = now + intervalMin` |
+| `ack` | timer, `ringing` **or** `scheduled` | `closed`, reason `acked`; **next** = new timer fire `due_at = nextTimerDue(now, intervalMin, window)` (= `now + intervalMin` without a window) |
 | any | machine | `invalid_action` — a machine fire is closed only by the `/machines` routes (§7D) |
 | anything else | — | `{ error: 'invalid_action' }` → HTTP 409 |
 
@@ -960,7 +1002,7 @@ Any member may act on any fire. ⚑ DEFAULT
 
 | Cmd | Timer | Result |
 |-----|-------|--------|
-| `start` | not running | `running = 1`; new fire `due_at = now + intervalMin` |
+| `start` | not running | `running = 1`; new fire `due_at = nextTimerDue(now, intervalMin, window)` (= `now + intervalMin` without a window; started outside the window → the next opening + interval) |
 | `start` | running | no change (idempotent) |
 | `stop` | running | `running = 0`; open fire (if any) → `closed`, reason `stopped` |
 | `stop` | not running | no change |
@@ -1038,6 +1080,25 @@ never by `tick`.
 
 **The user's own example (renotify NULL):** start 12:00 → rings 13:00, one alert →
 ack 13:45 → next due 14:45.
+
+**Timer with an active time range (§4.2n, rule 0)** — tz `America/Los_Angeles`, window
+08:00–21:00, interval 60, renotify 15, maxAlerts 4; times are household local on Tue
+2026-10-06 (PDT) unless a date is given:
+
+| # | Call | now | Expected |
+|---|------|-----|----------|
+| TW1 | `applyTimerCmd start` | 06:00 | running; fire due **09:00** (opening + 60) |
+| TW2 | `applyAction ack` | 20:30 | next due **Wed 09:00** (20:30 + 60 is past 21:00) |
+| TW3 | `applyAction ack` | 19:30 | next due **20:30** |
+| TW4 | `stepFire` on a `ringing` fire | 21:00 | `scheduled`, due **Wed 09:00**, `alert_count 0`, `last_alerted_at` null, **no alert** |
+| TW5 | `stepFire` on a fire ringing since 20:50, alert 1 — the 15-min renotify would be 21:05 | 21:05 | `scheduled`, due Wed 09:00, **no alert** |
+| TW6 | `stepFire` on a stale `scheduled` fire due 22:00 | 22:00 | deferred: `scheduled`, due Wed 09:00, **no alert** |
+| TW7 | `stepFire` on a `scheduled` fire due 09:00 | 09:00 | `ringing`, alert 1, **alert** (inside: rule 3 as before) |
+| TW8 | overnight window 22:00–06:00, `applyAction ack` | 05:30 | next due **23:00** the same day |
+| TW9 | no window | — | T1–T11 unchanged; `nextTimerDue(base, 60)` = base + 60 |
+| TW10 | `timerWindowError` | — | `08:00–08:00` → an error; 60 min on `08:00–09:00` → an error (interval ≥ window); 59 min on it → null; 60 min on `22:00–06:00` → null |
+| TW11 | DST ends 2026-11-01: `applyAction ack` | Sat 2026-10-31 20:30 PDT | next due Sun **09:00 PST** = `2026-11-01T17:00:00.000Z` |
+| TW12 | `inside` | 08:00 / 20:59 / 21:00 / 07:59 | true / true / false / false; overnight 22:00–06:00: 23:00 and 05:59 true, 06:00 and 21:59 false |
 
 **Reminder, household tz `America/Los_Angeles`:**
 
@@ -1899,10 +1960,20 @@ Time   Alarm                    Days            Next
   (§5.6 event edits); nothing has to be deleted and re-created.
 - At least one day must be chosen; the form says so in the dialog if not.
 
-**Rolling timers** — as before: `⏱ Check on the dog · every 60 min · next 14:45`, a
-status badge (running / ringing / stopped) and **[Start]/[Stop]**; tapping a row
-opens the timer form (title, interval 1–1440 min, channels, repeat alert every,
-assigned to, Delete).
+**Rolling timers** — as before: `⏱ Check on the dog · 60 min · 08:00–21:00`, a
+status badge (running / ringing / stopped), **Next** and **[Start]/[Stop]**; tapping a row
+opens the timer form (title, interval 1–1440 min, **Active from / to**, channels, repeat
+alert every, assigned to, Delete).
+
+- The row shows `· 08:00–21:00` after the interval only when the timer has an active time
+  range (§4.2n).
+- **Next** is the open fire's `due_at` from the server, in household local time; it names the
+  day when that is not today ("Sun 09:00"), and shows just the time when it is. The app never
+  re-derives a due time.
+- **Active from / to** ⚑ Q50: two plain `<input type="time">` fields side by side on one
+  line (16 px, fits 320 px), labelled "Active from" and "to". Both empty = always (no window).
+  Filling only one, `from = to`, or an interval not shorter than the range is refused by the
+  server; the message shows inside the form.
 
 **Machines** — the laundry loop (§7D), right after Rolling timers. One card per machine, in
 load order. Each card: the machine (🫧 Washer, 🌀 Dryer ⚑), a state badge (**free** neutral ·
@@ -2522,9 +2593,9 @@ acked, nothing is scheduled — **now only**.
 | POST | `/events` | member | event fields → event |
 | GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6) |
 | POST | `/events/{id}/exdates` | creator or owner | `{ date }` |
-| GET/POST | `/timers` | member | |
-| PATCH/DELETE | `/timers/{id}` | creator or owner | |
-| POST | `/timers/{id}/commands` | member | `{ cmd: TimerCmd }` |
+| GET/POST | `/timers` | member | → `Timer[]` / POST `{ title, intervalMin, channels, renotifyMin?, maxAlerts?, assignedTo?, activeFrom?, activeTo? }` → timer (201). `Timer = { id, title, intervalMin, channels, renotifyMin, maxAlerts, assignedTo, running, createdBy, activeFrom, activeTo, openFire }`; `activeFrom`/`activeTo` are `"HH:MM"` or both `null` (no window). 400 `invalid_input` when only one is set, either is not `HH:MM`, or `timerWindowError` refuses them (§5.1) |
+| PATCH/DELETE | `/timers/{id}` | creator or owner | PATCH: the POST fields, all optional, merged over the timer; `activeFrom: null, activeTo: null` clears the window. A PATCH never re-plans the open fire (rule 0 defers it when it comes due) |
+| POST | `/timers/{id}/commands` | member | `{ cmd: TimerCmd }`; start plans the fire with `nextTimerDue` and the timer's window |
 | GET | `/alarms` | member | → alarms: `{ id, title, time, days: Weekday[], channels, renotifyMin, assignedTo, createdBy, nextDueAt, ringing }` |
 | POST | `/alarms` | member | `{ title, time: "HH:MM", days: Weekday[], channels, renotifyMin?, assignedTo? }` → alarm |
 | PATCH/DELETE | `/alarms/{id}` | creator or owner | same fields as POST, all optional; closes future scheduled fires like an event edit |
@@ -2787,7 +2858,8 @@ Captured from v1.0-draft so nothing is lost:
 - Event templates
 - Week-strip view
 - Editing a single occurrence of a series
-- Quiet hours ⚑ — see Q2
+- Household-wide quiet hours ⚑ — see Q2. (Rolling timers have their own active time range
+  since v2.28, §4.2n; quiet hours for everything else stay here.)
 - Escalation ladders: channel changes per alert number, light blinking, notifying
   the owner on escalation
 - HA entity/automation generation; HA events creating reminders (door/motion)
@@ -2818,7 +2890,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | # | Question | Built as (⚑ DEFAULT) |
 |---|----------|----------------------|
 | Q1 | Name for the restart-on-ack alert? | "Rolling timer" in docs; **Timer** in the UI |
-| Q2 | Timers can ring overnight. Quiet hours in v1, or rely on Stop? | Rely on Stop; quiet hours in Later |
+| Q2 | Timers can ring overnight. Quiet hours in v1, or rely on Stop? | **Decided by MojoSOGO 2026-10-03 for timers:** each rolling timer may have an active time range ("Active from HH:MM to HH:MM"); it never rings outside it and its countdown restarts when the range opens (§4.2n, §5.3 rule 0). Household-wide quiet hours stay in Later (§12) |
 | Q3 | While a timer rings unacknowledged, re-alert or ring once? | Re-alert every 15 min, 4 alerts max, then silent in the Ringing bar |
 | Q4 | Should normal reminders nag too? | Off by default; per-event "repeat alert every" option |
 | Q5 | House announcements go to **all four** Echos (incl. Toasty and Kid's Room) and the Voice PE — also at night? | Yes, all surfaces, always; per-alert speaker choice is Later |
@@ -2859,6 +2931,13 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q41 | Move to dryer while the dryer is still full (§7D.2) | ⚑ Refused in place: "The dryer still has Sam's load." The washer stays DONE — waiting and its reminders run out at 4; every later dryer alert adds " — Kai's load is waiting". Nothing moves automatically |
 | Q42 | The done message (§7D.3) | ⚑ "Sam, your laundry in the washer is done" / "… in the dryer is done", plus the waiting suffix; with no active owner "The laundry in the washer is done" |
 | Q43 | Undoing a mistaken start (§7D.2, §8.5) | ⚑ A running or done machine offers **Clear**: its fire closes `removed`, nothing rings, the machine is free. A free dryer also offers **Start** with the same chips |
+| Q44 | Overnight timer windows (§4.2n) | ⚑ Allowed (22:00–06:00 runs across midnight); only `from = to` is refused |
+| Q45 | Is the window's end inside it? | ⚑ Active from `from` up to but not including `to` (08:00–21:00: 20:59 rings, 21:00 does not) |
+| Q46 | An interval as long as the window or longer | ⚑ Refused, 400 — the timer could never ring inside it |
+| Q47 | Ringing when the window closes | ⚑ The fire goes back to `scheduled`, due at the next window start + interval: it leaves the Ringing bar, goes quiet, and the timer still shows running with its next time (§5.3 rule 0) |
+| Q48 | Starting a timer outside its window | ⚑ Allowed; the first ring is the next window start + interval |
+| Q49 | Editing the window of a running timer | ⚑ The open fire is not re-planned; rule 0 defers it when it comes due outside the new window |
+| Q50 | The timer form and row (§8.5) | ⚑ Two time inputs, "Active from / to", empty = always; the row shows the window; Next names the day when it isn't today |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -2916,6 +2995,9 @@ nullable (applied only in tests so far); the push payload gains `tag`. Built as:
 nobody else to push to → 409 `no_recipients` rather than a quiet success. **Still to check:**
 the box at 320 px and on the iPhone, an announcement spoken on the Echos + Voice PE, and one
 arriving on another member's phone.
+**Timer active time range** (v1.9.0, being built): migration 0015, `TimerWindow` /
+`nextTimerDue` / `stepFire` rule 0 in `engine.ts`, the window on `/timers`, the form's
+Active from / to, TW1–TW12.
 **Machine card fix** (v1.8.1): whose load and "done ~20:35" sit on the button line, wrapping —
 at 320 px the old one-line layout cut the time off. Two-tap start checked at 320 px.
 **M4l The laundry loop** (v1.8.0; 290 tests incl. L1–L13): migration 0014 (`machines`, seeded
