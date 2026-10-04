@@ -7,6 +7,20 @@ carry its result.
 
 ---
 
+## 2026-10-03 — M5 Web Push (placement-advisor)
+
+- **Verdict:** NEW `src/worker/web-push.ts` (only importer of `@block65/webcrypto-web-push`;
+  per-origin VAPID header cache against a passed-in `now`), NEW `frontend/src/push-client.ts`
+  (SW registration + subscribe/unsubscribe, no React), NEW `PhoneAlerts.tsx` (replaces the
+  placeholder in Settings). EXISTING `push.ts` (delivery + results + test send), engine.ts
+  (`pushActions`), routes/household.ts (`/push/*`), main.tsx (registration call), App.tsx
+  (badge text). Static, no row: `frontend/public/sw.js`, `frontend/public/_headers`.
+- **Next seam:** `/push/*` → `src/worker/routes/push.ts` when another push route arrives or
+  household.ts passes ~200. RingingBar should read `pushActions` (code-steward follow-up).
+- **Reorganizer:** none; Settings only shrinks — coordinator re-pins it down after merge.
+
+---
+
 ## 2026-10-03 — M4h optional events + certain weeks (placement-advisor)
 
 - **Verdict:** NEW `src/shared/optins.ts` (the one opt-in rule: isOnFor + audience incl. House;

@@ -1804,8 +1804,9 @@ least 0.8 s so it never flickers:
 
 **Always fresh** (decided by MojoSOGO 2026-10-03: "always force refresh on open and app pull
 down"). Fresh means the newest build *and* the newest data, i.e. a full page reload.
-- **Opening** from the home screen loads fresh by construction: there is no service worker
-  (§14) and the page is served `must-revalidate`, so nothing stale can be shown.
+- **Opening** from the home screen loads fresh by construction: the page is served
+  `must-revalidate`, and the service worker (§9.1, push only) has **no fetch handler**, so it
+  never serves or caches the app; `sw.js` itself is served `Cache-Control: no-cache`.
 - **Coming back** to the app (it was in the background — another app, the lock screen) →
   the page reloads. **Except while a dialog is open**: a half-filled form, or an invite
   card that can never be shown again (§8.9), is never thrown away. The reload then happens
@@ -1967,7 +1968,10 @@ Each person turns phone alerts on **once per phone**, in Settings → Me (decide
 - **Turn on** runs from the tap itself (iOS requires a user gesture):
   `Notification.requestPermission()` → `registration.pushManager.subscribe({ userVisibleOnly:
   true, applicationServerKey: VAPID public key })` → `POST /push/subscriptions`.
-- **Turn off** unsubscribes and `DELETE`s the subscription.
+- **Turn off** unsubscribes and `DELETE`s the subscription by its id. To know which of my
+  subscriptions is **this phone**, `POST /push/subscriptions` returns `{ id }` (the upserted
+  row) and `/status` `mySubscriptions[]` carries each `endpoint`; the row matches this
+  browser's current `pushManager` subscription endpoint against that list.
 - The "📵 Phone alerts off" badge (§8.1) stays until this member has at least one subscription.
 
 **Service worker** — `frontend/public/sw.js`, plain static JS, registered on app start with
@@ -1980,7 +1984,10 @@ Each person turns phone alerts on **once per phone**, in Settings → Me (decide
 - `notificationclick` → with an action: `POST /api/v1/fires/{id}/actions {action}` (same-origin
   cookie) and close; without: focus the open app or open `/`.
 
-**Payload** (JSON, encrypted): `{ fireId, kind, title, body, actions }`, under Apple's 4 KB.
+**Payload** (JSON, encrypted): `{ fireId, kind, title, body, actions }`, under Apple's 4 KB:
+`title` **"Ensō"**, `body` = the delivery's `message` (already "Reminder: …", "Chore for
+Sam: …"), `kind` from the delivery's fire, `actions` from the engine's `pushActions(kind)` —
+the same table the Ringing bar's buttons follow. ⚑
 Actions: reminder and thing `done` + `snooze`; timer `ack`; chore `done`. iPhone shows no
 buttons — tapping opens the app, where the Ringing bar has them; expected, not a bug.
 
@@ -1988,13 +1995,18 @@ buttons — tapping opens the app, where the Ringing bar has them; expected, not
 - `buildPushPayload` with `ttl: 3600`, `urgency: 'high'`, `topic: fireId`.
 - **VAPID header cached per push-service origin for ~1 hour** — Apple: don't refresh the JWT
   more often than hourly. (The library signs per send by default; use its `vapidHeaders`.)
+  The cache lives in the Worker instance's memory, so a cold start signs afresh — still well
+  within Apple's rule; persisting it would need a table and nothing asks for that.
+- **Keys missing** (no `VAPID_PRIVATE_KEY` or subject) → each push delivery `failed` with
+  detail `push_not_configured` — never a quiet success.
 - One delivery row per recipient as today; each of that member's subscriptions is sent to.
 - **Results:** 201 → delivery `sent`, subscription `last_ok_at`; **404/410** → delete that
   subscription (it is gone); any other status → delivery `failed` with status + body in
   `detail` and the subscription's `last_error`; **no subscriptions** → `failed`,
   `no_subscription` — never skipped silently. Several subscriptions: `sent` if any succeeded.
-- **Send a test** (`POST /push/test`): one push to *my* subscriptions now — "Ensō test —
-  phone alerts work" — so a person can check a phone without waiting for a reminder.
+- **Send a test** (`POST /push/test`): one push to *my* subscriptions now — body "Ensō test —
+  phone alerts work", a fixed tag, no actions — so a person can check a phone without waiting
+  for a reminder. → `{ sent: n }`; 409 with a message when I have no subscriptions.
 
 **Acceptance (M5):**
 
@@ -2106,13 +2118,14 @@ accepts every status it returns, and rejects `queued` and `claimed`.
 | PATCH/DELETE | `/alarms/{id}` | creator or owner | same fields as POST, all optional; closes future scheduled fires like an event edit |
 | GET | `/fires?state=ringing` | member | → open fires with titles; chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person) |
 | POST | `/fires/{id}/actions` | member | `{ action: Action }` → fire (+ next); 409 on `invalid_action` |
-| POST | `/push/subscriptions` | member | `PushSubscriptionJSON` + userAgent |
+| POST | `/push/subscriptions` | member | `PushSubscriptionJSON` + userAgent → `{ id }` (upserted by endpoint) |
+| POST | `/push/test` | member | one test push to my subscriptions → `{ sent }`; 409 when I have none (§9.1) |
 | DELETE | `/push/subscriptions/{id}` | owner of the subscription | |
 | GET | `/push/vapid-key` | public | → `{ key }` |
 | GET/PUT | `/school-holidays` | GET member / PUT owner | PUT `{ from, to, label }` (a single date: `from = to`) |
 | DELETE | `/school-holidays/{date}` | owner | removes that one date |
 | GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff }`; PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
-| GET | `/status` | member | → `{ relayLastSeen, mySubscriptions[], recentDeliveries[] }` |
+| GET | `/status` | member | → `{ relayLastSeen, mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[] }` |
 | POST | `/relay/claim` | bearer `RELAY_TOKEN` | → deliveries |
 | POST | `/relay/report` | bearer `RELAY_TOKEN` | `{ id, status, detail }` |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek }` (`thisWeek`/`nextWeek` = member id or null) |
@@ -2437,10 +2450,8 @@ members-list controls — the next addition there is a placement decision.
 
 Deviations from this spec, deliberately:
 
-- **No service worker / `vite-plugin-pwa` yet.** It arrives with M5, where the push
-  handlers need it; installing a caching SW earlier only adds stale-deploy bugs. The app
-  is still installable (§8.10) — iOS and current Chrome do not require one — and when M5
-  adds a service worker it must **not** cache the app shell, or §8.10's always-fresh breaks.
+- **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
+  fetch handler, no caching — so §8.10's always-fresh holds.
 - `compatibility_date` is `2026-08-20` — the bundled workerd rejects later dates.
 - §10 "Freshness" polls every 30 s. The `phone-ui` skill says *never poll*; polling
   was kept because a ringing timer must appear without a user action. Revisit when
