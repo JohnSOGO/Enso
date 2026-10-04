@@ -1,6 +1,6 @@
 // SPEC §7E — recipe rules (pure): limits, a YouTube link → its video id and the derived watch /
 // thumbnail links, when a video's text is worth reading, cleaning Claude's reading, typed input,
-// the one-live-recipe-per-video clash, and the wire shape. Imports lists + vocab only.
+// the one-live-recipe-per-video clash, the wire shape, and each person's emoji (§7E.5). Imports lists + vocab only.
 import { TEXT_MAX } from './lists';
 import { RECIPE_SOURCE, type RecipeSource } from './vocab';
 
@@ -190,13 +190,21 @@ export interface Recipe {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  /** Each person's own emoji (§7E.5), by member id. */
+  emojis: RecipeEmoji[];
 }
+
+/** One `recipe_emojis` row as the routes select it (§4.2q). */
+export interface RecipeEmojiRow { recipe_id: string; member_id: string; emoji: string }
+/** One person's emoji on a recipe, on the wire (§7E.5). */
+export interface RecipeEmoji { memberId: string; emoji: string }
 
 function jsonList(text: string): unknown[] {
   try { const v: unknown = JSON.parse(text); return Array.isArray(v) ? v : []; } catch { return []; }
 }
 
-export function recipeFromRow(r: RecipeRow): Recipe {
+/** `emojis` may hold other recipes' rows too; only this recipe's are kept. */
+export function recipeFromRow(r: RecipeRow, emojis: readonly RecipeEmojiRow[] = []): Recipe {
   const strings = (text: string) => jsonList(text).filter((x): x is string => typeof x === 'string');
   const listed = jsonList(r.source);
   return {
@@ -205,5 +213,41 @@ export function recipeFromRow(r: RecipeRow): Recipe {
     ingredients: strings(r.ingredients), steps: strings(r.steps), servings: r.servings, time: r.time_text,
     found: r.found === 1, source: RECIPE_SOURCE.filter((s) => listed.includes(s)),
     captionsError: r.captions_error, createdBy: r.created_by, createdAt: r.created_at, updatedAt: r.updated_at,
+    emojis: emojis.filter((e) => e.recipe_id === r.id).map((e) => ({ memberId: e.member_id, emoji: e.emoji })),
   };
+}
+
+// ---- §7E.5 each person's emoji ----
+
+/** The picker's household chips, at most. ⚑ Q72 */
+export const USED_EMOJIS_MAX = 12;
+
+export const myEmoji = (r: Pick<Recipe, 'emojis'>, memberId: string): string | null =>
+  r.emojis.find((e) => e.memberId === memberId)?.emoji ?? null;
+
+const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+/** Newest first: createdAt, then id, both descending — the server's list order. */
+const newestFirst = (a: Recipe, b: Recipe) => byText(b.createdAt, a.createdAt) || byText(b.id, a.id);
+
+/**
+ * By emoji ⚑ Q71: grouped by MY emoji — the biggest group first; equal groups by their newest recipe's createdAt,
+ * then the emoji string; newest first within a group; recipes I haven't given an emoji last, newest first.
+ */
+export function byMyEmoji(recipes: readonly Recipe[], memberId: string): Recipe[] {
+  const groups = new Map<string, Recipe[]>();
+  const unrated: Recipe[] = [];
+  for (const r of [...recipes].sort(newestFirst)) {
+    const e = myEmoji(r, memberId);
+    if (e === null) unrated.push(r);
+    else groups.set(e, [...(groups.get(e) ?? []), r]);
+  }
+  const ordered = [...groups].sort(([ea, a], [eb, b]) => b.length - a.length || byText(b[0].createdAt, a[0].createdAt) || byText(ea, eb));
+  return [...ordered.flatMap(([, rs]) => rs), ...unrated];
+}
+
+/** The household's emojis on these recipes, most used first (ties by the string), at most USED_EMOJIS_MAX. */
+export function usedEmojis(recipes: readonly Pick<Recipe, 'emojis'>[]): string[] {
+  const counts = new Map<string, number>();
+  for (const r of recipes) for (const { emoji } of r.emojis) counts.set(emoji, (counts.get(emoji) ?? 0) + 1);
+  return [...counts].sort(([ea, a], [eb, b]) => b - a || byText(ea, eb)).slice(0, USED_EMOJIS_MAX).map(([e]) => e);
 }

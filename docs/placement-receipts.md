@@ -7,6 +7,27 @@ carry its result.
 
 ---
 
+## 2026-10-03 — Each person's emoji on a recipe (placement-advisor)
+
+- **Ask:** MojoSOGO decided each person can give a recipe their own single emoji (or none, changeable);
+  the row shows mine, the view shows everyone's with names, and a Newest | By emoji toggle (remembered
+  on the phone) groups the rows by my emoji with unrated ones last.
+- **Verdict:** extend the existing owners. A new additive table `recipe_emojis` (migration 0018,
+  §4.2q, PK (recipe_id, member_id), written by upsert); `PUT/DELETE /recipes/{id}/emoji` in the
+  existing `src/worker/routes/recipes.ts`, the member from the session, validated by the existing
+  `emojiError`, never touching `recipes.updated_at`, every recipe answered carrying `emojis` through
+  one helper; `RecipeEmoji` / `RecipeEmojiRow`, `recipeFromRow(row, emojis = [])`, `myEmoji`,
+  `byMyEmoji` and `usedEmojis` in the existing `src/shared/recipes.ts` (still pure, lists + vocab
+  only); one NEW owner, `frontend/src/components/RecipeEmoji.tsx` (the picker); small edits to
+  `RecipeView.tsx`, `Recipes.tsx` and `Recipes.module.css`.
+- **Why not reuse the event emoji column or optins:** an event's emoji is one per event, shared;
+  this is one per person per recipe, so it is its own table. `emoji.ts`, `vocab.ts`, `lists.ts`,
+  `routes/optins.ts`, `event-rows.ts`, `state.tsx`, `api.ts`, `App.tsx`, `RecipeForm.tsx` and
+  `scripts/arch.ts` are untouched. No ceilings moved; `src/shared/recipes.ts` stays under the global
+  cap (253 / 300 lines).
+
+---
+
 ## 2026-10-03 — Recipes, a fifth tab (placement-advisor)
 
 - **Ask:** MojoSOGO decided a new 🍳 Recipes tab: paste a YouTube link and the Worker reads the
