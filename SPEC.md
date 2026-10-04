@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.31-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.31 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3432,11 +3432,14 @@ modal; Clear asks once; a disabled owner's load alerts everyone with "The laundr
 done". Migration 0014 is applied only in tests so far. **Still owed (manual):** the cards and
 the chooser at 320 px, a two-tap start on the iPhone, and a real done reminder spoken in the
 house.
-**M4p Each person's recipe emoji** (v1.12.0; TESTCOUNT tests incl. RE1–RE9 and RE-M): migration 0018
+**M4p Each person's recipe emoji** (v1.12.0; 415 tests incl. RE1–RE9 and RE-M): migration 0018
 (`recipe_emojis`), `PUT/DELETE /recipes/{id}/emoji` (the member from the session; `emojiError`; the
 recipe's `updatedAt` untouched), `emojis` on every recipe through one route helper (the list in one
 joined query), `myEmoji` / `byMyEmoji` / `usedEmojis` in `src/shared/recipes.ts`, `RecipeEmoji.tsx` in
-the view, my emoji on each row and the Newest | By emoji chips (`enso.recipeSort`). Migration 0018 is
+the view, my emoji on each row and the Newest | By emoji chips (`enso.recipeSort`). Built as: equal
+By emoji groups compare their newest recipe's `createdAt` alone (with the id too, the emoji string could
+never decide); `things-api.test.ts` now warms the SDK in `beforeAll` like the recipe tests (its request test
+timed out at 5 s under the full parallel run, on main too). Migration 0018 is
 applied only in tests so far. **Still owed:** apply 0018 in production; the chips, the picker and the
 rows checked at 320 px and on the iPhone.
 **M4o Recipes** (v1.11.0; 394 tests incl. R1–R12 and RC-M): migration 0017 (`recipes`,
