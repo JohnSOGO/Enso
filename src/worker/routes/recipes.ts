@@ -1,13 +1,14 @@
-// SPEC §7E, §10 — recipes: CRUD, and reading one from a YouTube video. Every rule (limits, the link → id,
+// SPEC §7E, §10 — recipes: CRUD, reading one from a YouTube video, and re-reading one from its transcript, pasted or
+// screenshotted (§7E.2b; screenshots are read, never stored). Every rule (limits, the link → id,
 // whose comments are the creator's, when to ask Claude, cleaning the answer, found, the clash) is src/shared/recipes.ts; the fetching is
-// youtube.ts, youtube-captions.ts and recipe-reader.ts. This route keeps the §7E.2 check order, counts
+// youtube.ts, youtube-captions.ts and recipe-reader.ts. This route keeps the §7E.2 / §7E.2b check orders, counts
 // reads, and persists. Any member may do anything; delete is soft (⚑ Q66). Each person sets only their own
 // emoji (§7E.5), and every recipe answered carries everyone's through toRecipes.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import {
-  COMMENTS_LOOKED_AT, RECIPE_READS_PER_DAY, cleanRecipeReading, creatorComments, hasRecipeText, isFound, parseRecipeInput, recipeFromRow, recipeVideoClash,
-  sourcesOf, youtubeVideoId, type Recipe, type RecipeEmojiRow, type RecipeInput, type RecipeRow,
+  COMMENTS_LOOKED_AT, PASTED_MAX, RECIPE_READS_PER_DAY, cleanRecipeReading, cleanTranscript, creatorComments, hasRecipeText, isFound, parseRecipeInput,
+  parseScreenshots, recipeFromRow, recipeVideoClash, sourcesOf, youtubeVideoId, type Recipe, type RecipeEmojiRow, type RecipeInput, type RecipeRow,
 } from '../../shared/recipes';
 import { emojiError } from '../../shared/emoji';
 import type { RecipeSource } from '../../shared/vocab';
@@ -46,6 +47,17 @@ const duplicate = (c: Context<AppEnv>, r: RecipeRow) =>
 
 interface Video { id: string; title: string | null; channel: string | null }
 
+/** The daily cap (§7E.2 step 4, §7E.2b step 5): today's video reads, in the household's day, are used up → 429. */
+async function readsUsedUp(c: Context<AppEnv>, now: string): Promise<Response | null> {
+  const db = c.env.DB, tz = await householdTz(db), today = utcToLocal(now, tz).date;
+  const reads = await first<{ n: number }>(db, 'SELECT COUNT(*) AS n FROM recipe_reads WHERE at >= ? AND at < ?',
+    localToUtc(today, '00:00', tz), localToUtc(addDays(today, 1), '00:00', tz));
+  if ((reads?.n ?? 0) < RECIPE_READS_PER_DAY) return null;
+  return fail(c, 429, 'rate_limited', `Videos can be read ${RECIPE_READS_PER_DAY} times a day, and today's are used up. Try again tomorrow, or type the recipe in.`);
+}
+
+const readingOff = (c: Context<AppEnv>) => fail(c, 503, 'recipe_reading_off', "Reading recipes from videos isn't set up yet.");
+
 /** Why the captions and the creator's comments couldn't be read (NULL when they were, or weren't tried). */
 interface ReadErrors { captions: string | null; comments: string | null }
 
@@ -83,14 +95,11 @@ recipes.post('/recipes/from-video', requireMember, async (c) => {
   const clash = recipeVideoClash(videoId, await all<RecipeRow>(db, `${LIVE} AND video_id IS NOT NULL`));
   if (clash) return duplicate(c, clash);
 
-  const now = nowIso(), tz = await householdTz(db), today = utcToLocal(now, tz).date;
-  const reads = await first<{ n: number }>(db, 'SELECT COUNT(*) AS n FROM recipe_reads WHERE at >= ? AND at < ?',
-    localToUtc(today, '00:00', tz), localToUtc(addDays(today, 1), '00:00', tz));
-  if ((reads?.n ?? 0) >= RECIPE_READS_PER_DAY) {
-    return fail(c, 429, 'rate_limited', `Videos can be read ${RECIPE_READS_PER_DAY} times a day, and today's are used up. Try again tomorrow, or type the recipe in.`);
-  }
+  const now = nowIso();
+  const usedUp = await readsUsedUp(c, now);
+  if (usedUp) return usedUp;
   const { YOUTUBE_API_KEY: ytKey, ANTHROPIC_API_KEY: aiKey } = c.env;
-  if (!ytKey || !aiKey) return fail(c, 503, 'recipe_reading_off', "Reading recipes from videos isn't set up yet.");
+  if (!ytKey || !aiKey) return readingOff(c);
 
   const video = await lookUpVideo(videoId, ytKey);
   if (!video.ok && video.kind === 'not_found') return fail(c, 404, 'video_unavailable', `Couldn't find that video. ${video.reason}`);
@@ -125,6 +134,49 @@ recipes.post('/recipes/from-video', requireMember, async (c) => {
     throw err;
   }
   return answer(c, id, 201);
+});
+
+recipes.post('/recipes/:id/transcript', requireMember, async (c) => {
+  // §7E.2b check order: recipe → a video → the text → daily cap → keys → YouTube + the creator's comments (no
+  // captions attempt) → count → Claude → clean → found, else nothing changes → save.
+  const r = await loadRecipe(c);
+  if (r instanceof Response) return r;
+  if (!r.video_id) return fail(c, 400, 'invalid_input', 'Only a recipe read from a video takes a transcript.');
+  const { text, screenshots: shots } = await body(c);
+  const screenshots = parseScreenshots(shots);
+  if (typeof screenshots === 'string') return fail(c, 400, 'invalid_input', screenshots);
+  if (text !== undefined && text !== null && (typeof text !== 'string' || text.length > PASTED_MAX)) {
+    return fail(c, 400, 'invalid_input', `The pasted transcript must be text of at most ${PASTED_MAX} characters.`);
+  }
+  const pasted = typeof text === 'string' ? cleanTranscript(text) : null;
+  if (!pasted && !screenshots.length) return fail(c, 400, 'invalid_input', 'Add a screenshot of the transcript, or paste its text.');
+  const now = nowIso();
+  const usedUp = await readsUsedUp(c, now);
+  if (usedUp) return usedUp;
+  const { YOUTUBE_API_KEY: ytKey, ANTHROPIC_API_KEY: aiKey } = c.env;
+  if (!ytKey || !aiKey) return readingOff(c);
+
+  const [video, comments] = await Promise.all([lookUpVideo(r.video_id, ytKey), lookUpComments(r.video_id, ytKey, COMMENTS_LOOKED_AT)]);
+  if (!video.ok && video.kind === 'not_found') return fail(c, 404, 'video_unavailable', `Couldn't find that video. ${video.reason}`);
+  if (!video.ok) return fail(c, 502, 'youtube_failed', `Couldn't look the video up: ${video.reason}`);
+  const db = c.env.DB;
+  await run(db, 'INSERT INTO recipe_reads (at, member_id) VALUES (?, ?)', now, c.get('member').id);
+
+  const read = {
+    description: video.description, transcript: null, pasted, screenshots,
+    comments: comments.ok ? creatorComments(comments.comments, video.channelId) : null,
+  };
+  const res = await readRecipe({ apiKey: aiKey, title: video.title, channel: video.channel, ...read, transcript: pasted });
+  if (!res.ok && res.kind === 'refused') return fail(c, 422, 'recipe_refused', "Couldn't read a recipe from that transcript.");
+  if (!res.ok) return fail(c, 502, 'recipe_reading_failed', `Couldn't read the recipe: ${res.reason}`);
+  const reading = cleanRecipeReading(res.raw, video.title);
+  if (!reading.found) return fail(c, 422, 'no_recipe', 'No recipe in that transcript — nothing was changed.');
+  await run(db,
+    `UPDATE recipes SET title = ?, ingredients = ?, steps = ?, servings = ?, time_text = ?, found = 1, source = ?,
+       captions_error = NULL, comments_error = ?, updated_at = ? WHERE id = ?`,
+    reading.title, JSON.stringify(reading.ingredients), JSON.stringify(reading.steps), reading.servings, reading.time,
+    JSON.stringify(sourcesOf(read)), comments.ok || comments.kind === 'none' ? null : comments.reason, nowIso(), r.id);
+  return answer(c, r.id);
 });
 
 recipes.get('/recipes/:id', requireMember, async (c) => {

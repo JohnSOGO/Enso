@@ -1,10 +1,12 @@
 // SPEC §8.12 — one recipe (modal): the thumbnail and ▶ link to the video, servings and time, the source
 // note with any "captions / comments couldn't be read" marker, ingredients with pick boxes → Add to Shopping (one
 // POST /lists/{SHOPPING_LIST_ID}/items per ingredient, in order; the summary inside ⚑ Q69), the steps, ✎;
-// under the title everyone's emoji ("Shelly 🌶 · John ⭐", ⚑ Q73) and RecipeEmoji, mine (§7E.5).
+// under the title everyone's emoji ("Shelly 🌶 · John ⭐", ⚑ Q73) and RecipeEmoji, mine (§7E.5); under the source note
+// RecipeTranscript on a "watch it" video recipe or one whose captions couldn't be read (§7E.2b ⚑ Q87).
 import { useState } from 'react';
 import { Modal } from './Modal';
 import { RecipeEmoji } from './RecipeEmoji';
+import { RecipeTranscript } from './RecipeTranscript';
 import { useApp, type Member } from '../state';
 import { errorText, post } from '../api';
 import { SHOPPING_LIST_ID } from '../../../src/shared/lists';
@@ -13,8 +15,8 @@ import type { RecipeSource } from '../../../src/shared/vocab';
 import s from './Recipes.module.css';
 
 /** How the source note names each thing a recipe was read from (⚑ Q81). */
-const READ_FROM: Record<Exclude<RecipeSource, 'typed'>, string> = {
-  description: 'description', captions: 'captions', comments: "the creator's comment",
+export const READ_FROM: Record<Exclude<RecipeSource, 'typed'>, string> = {
+  description: 'description', captions: 'captions', transcript: 'pasted transcript', comments: "the creator's comment",
 };
 
 /** "A", "A and B", "A, B and C". */
@@ -95,6 +97,7 @@ export function RecipeView({ recipe: r, recipes, onChange, onEdit, onClose }: Pr
       )}
       {(r.servings || r.time) && <p>{[r.servings && `Serves: ${r.servings}`, r.time && `Time: ${r.time}`].filter(Boolean).join(' · ')}</p>}
       <p className={`muted ${s.note}`}>{sourceNote(r)}</p>
+      {r.videoId && (!r.found || r.captionsError) && <RecipeTranscript recipe={r} onChange={onChange} />}
 
       {r.ingredients.length > 0 && (
         <>
