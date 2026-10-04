@@ -1,4 +1,4 @@
-// SPEC §4.2 events, §7 calendar, §7.5 optional events, §10 /calendar + /events.
+// SPEC §4.2 events, §7 calendar, §7.5 optional events, §10 /calendar + /events. Sun events (§7.7) are never here.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { addDays, diffDays, isDate } from '../../shared/time';
@@ -15,7 +15,7 @@ import { daysOff } from './household';
 const MAX_RANGE_DAYS = 120;
 
 async function loadEditable(c: Context<AppEnv>): Promise<EventRow | Response> {
-  const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND is_alarm = 0', c.req.param('id'));
+  const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND is_alarm = 0 AND start_sun IS NULL', c.req.param('id'));
   if (!e) return fail(c, 404, 'not_found', 'That event no longer exists.');
   const me = c.get('member');
   if (e.created_by !== me.id && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this event.');
@@ -30,7 +30,7 @@ events.get('/calendar', requireMember, async (c) => {
   if (diffDays(to, from) > MAX_RANGE_DAYS) return fail(c, 400, 'invalid_input', `The range can be at most ${MAX_RANGE_DAYS} days.`);
   const rows = await all<EventRow & { color: string; creator_name: string }>(c.env.DB,
     `SELECT e.*, m.color, m.display_name AS creator_name FROM events e JOIN members m ON m.id = e.created_by
-      WHERE e.deleted_at IS NULL AND e.is_alarm = 0 AND e.start_date <= ? AND (e.recurrence IS NOT NULL OR e.end_date >= ?)`, to, from);
+      WHERE e.deleted_at IS NULL AND e.is_alarm = 0 AND e.start_sun IS NULL AND e.start_date <= ? AND (e.recurrence IS NOT NULL OR e.end_date >= ?)`, to, from);
   const me = c.get('member').id, on = await onEventIds(c.env.DB, me);
   const occ = [];
   for (const e of rows) {
@@ -59,7 +59,7 @@ events.post('/events', requireMember, async (c) => {
 });
 
 events.get('/events/:id', requireMember, async (c) => {
-  const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND is_alarm = 0', c.req.param('id'));
+  const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND is_alarm = 0 AND start_sun IS NULL', c.req.param('id'));
   if (!e) return fail(c, 404, 'not_found', 'That event no longer exists.');
   return c.json({ ...eventView(e), on: (await onEventIds(c.env.DB, c.get('member').id)).has(e.id) });
 });

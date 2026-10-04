@@ -26,7 +26,7 @@ it('H9 the settings row survives 0013 and relay_last_seen is gone', async () => 
   expect(relay_last_seen).toBe(t);
   const deliveriesBefore = (await db.prepare('SELECT * FROM deliveries ORDER BY id').all()).results;
 
-  await applyD1Migrations(db, env.TEST_MIGRATIONS);
+  await applyD1Migrations(db, env.TEST_MIGRATIONS.slice(0, at + 1)); // only through 0013: later migrations may add settings columns
 
   expect(await columns()).not.toContain('relay_last_seen');
   expect((await db.prepare('SELECT * FROM settings').all()).results).toEqual([settingsBefore]);

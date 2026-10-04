@@ -41,7 +41,7 @@ export function RingingBar() {
   const minsAgo = (iso: string) => Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
   const person = (id: string | null | undefined) => (id ? memberById(id)?.displayName ?? 'unknown member' : 'anyone');
   const sub = (f: Fire) => {
-    if (f.kind === 'reminder') return f.startTime ? ` · ${f.startTime}` : ' · all day';
+    if (f.kind === 'reminder') return f.startSun ? ' · sunset' : f.startTime ? ` · ${f.startTime}` : ' · all day'; // §7.7
     if (f.kind === 'chore' || f.kind === 'machine') return ` · ${person(f.personId)}`;
     if (f.kind === 'thing') return ' · to do'; // ⚑ (§8.2)
     return ` · ringing ${minsAgo(f.dueAt)} min`;
