@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.36 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
+**Version:** 2.37 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -282,6 +282,7 @@ against the deployed Worker. On iPhone, push works only after
 | `YOUTUBE_API_KEY` (secret) | Worker | A Google Cloud API key with the YouTube Data API v3 enabled, for reading a recipe video's title and description (§7E). Set it with `npx wrangler secret put YOUTUBE_API_KEY` **in a real PowerShell window**. Never logged, never in an error message. Reading recipes also needs `ANTHROPIC_API_KEY`; without either, `POST /recipes/from-video` is 503 `recipe_reading_off` and typed recipes still work. Tests pin it empty. |
 | `CAPTIONS_TOKEN` (secret) | Worker **and** SogoAI's `C:\Enso\captions-helper.env` | The bearer the Worker sends to the SogoAI helper (`Authorization: Bearer …`, §7E.2c), checked by the helper in constant time — a second lock behind Access. A long random string, set with `npx wrangler secret put CAPTIONS_TOKEN` in a real PowerShell window and the same value in the helper's env file (never in the repo). Unset or empty on the Worker → captions from home are not set up (§7E.2c); unset on SogoAI → the helper does not start. Never logged, by the Worker or the helper. Tests pin a test-only value. |
 | `HOME_CAPTIONS_URL` (var, `wrangler.toml`) | Worker | Where the SogoAI helper is reached: `https://sogoai.sogodojo.com` (§7E.2c). Tests pin `https://sogoai.test`, which only a fetch spy answers. |
+| `OPS_NOTIFY_TOKEN` (secret) | Worker **and** MojoSOGO's machines (`%USERPROFILE%\.enso\ops-notify-token`) | The bearer a Claude Code session sends to `POST /ops/notify` to push a message to the founder's phone (§9.4), checked in constant time. A long random string, set with `npx wrangler secret put OPS_NOTIFY_TOKEN` in a real PowerShell window and the same value in the token file (never in the repo). Unset or empty → `/ops/notify` is 503 `ops_notify_off` (never open). Never logged, never in a message or a delivery's detail. Tests pin a test-only value. |
 
 Dev secrets go in `.dev.vars` (gitignored); production uses `wrangler secret put`, typed
 in a real PowerShell window (never through a `!` shell, which saves an empty value).
@@ -1050,6 +1051,21 @@ The index goes first (SQLite refuses to drop an indexed column). 0020's CHECK is
 **Migration check (CJ-D):** rows written under 0001–0020 survive 0021; the four columns are gone from
 `PRAGMA table_info(recipes)`; `idx_recipes_captions_job` is gone; `PRAGMA foreign_key_check` is empty;
 `recipe_emojis` is intact.
+
+### 4.2u Schema change — `migrations/0022_delivery_title.sql`
+
+Decided by MojoSOGO 2026-10-04: a Claude Code session can ping the founder's phone (§9.4). Its push
+carries the caller's title, so a fire-less delivery may now carry its own title.
+
+```sql
+-- §9.4 — a fire-less push delivery may carry its own push title (ops/notify); NULL elsewhere.
+ALTER TABLE deliveries ADD COLUMN title TEXT;
+```
+
+`title` is NULL on every existing row and on every fire, announcement and house delivery; only
+`POST /ops/notify` writes it. `sendPushDeliveries` shows a fire-less delivery as `title ?? ANNOUNCE_TITLE`
+(§9.1). The column is also what the hourly limit counts by (§9.4). **Migration check (ON-M):** rows
+written under 0001–0021 survive 0022 unchanged with `title` NULL; `PRAGMA foreign_key_check` is empty.
 
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
@@ -3034,7 +3050,8 @@ the same table the Ringing bar's buttons follow. ⚑
 its `fireId` (a re-alert replaces the last one); a delivery with no fire (an announcement,
 §9.3) → its **delivery id**, so two announcements never replace each other; the test push →
 `'enso-test'`. A delivery with no fire has `fireId: null`, `kind: null`, `actions: []` and the
-title **"📢 Announcement"** (`ANNOUNCE_TITLE`, §9.3).
+title of the row (`deliveries.title`, written only by `/ops/notify`, §9.4), or else
+**"📢 Announcement"** (`ANNOUNCE_TITLE`, §9.3).
 Actions: reminder and thing `done` + `snooze`; timer `ack`; chore `done`. iPhone shows no
 buttons — tapping opens the app, where the Ringing bar has them; expected, not a bug.
 
@@ -3217,6 +3234,62 @@ acked, nothing is scheduled — **now only**.
 | AN7 | tag rules | a fire's push: `tag` = `fireId`; the test push: `tag` = `"enso-test"`; no push carries a `topic` header |
 | AN8 | migration 0012 | rows survive unchanged; `foreign_key_check` empty; a fire-less delivery is accepted (§4.2k) |
 
+### 9.4 Pinging the founder from outside — `src/shared/ops.ts`, `POST /ops/notify`
+
+Decided by MojoSOGO 2026-10-04: a Claude Code session on his machines can push a message to **his own
+phone** from the command line — "ping me when it's live", a question, a blocker. It sits beside the
+FunHouse desk device and the house voice. The recipient is always the **founder** (§6.3, the member
+setup created — derived by `FOUNDER_SQL`, never stored). It is a **fire-less push delivery** (like an
+announcement, §9.3) that carries its own title (§4.2u). No session, no house row, ever.
+
+**Rules** (`src/shared/ops.ts`, pure, imports nothing):
+- `OPS_TEXT_MAX = 200` characters, `OPS_TITLE_MAX = 60` ⚑, both counted after trimming.
+- `OPS_TITLE_DEFAULT = "🤖 Claude"` ⚑.
+- `OPS_NOTIFY_PER_HOUR = 30` ⚑.
+- `opsNotifyError({ text, title })` → a message, or `null`: `text` a string, trimmed length
+  1…`OPS_TEXT_MAX`; `title` absent (`undefined` / `null`), or a string trimmed to at most `OPS_TITLE_MAX`.
+- `opsTitle(title?)` → the trimmed title, or `OPS_TITLE_DEFAULT` when it is absent or blank.
+- `opsWindowStart(now)` → the ISO instant one hour before `now`.
+
+**`POST /ops/notify { text, title? }`**, `Authorization: Bearer <OPS_NOTIFY_TOKEN>` (§2.4), in this order:
+1. `OPS_NOTIFY_TOKEN` unset or empty → **503 `ops_notify_off`** — even when a Bearer header is sent.
+   The door is never open.
+2. The Bearer value compared with the token in **constant time** (SHA-256 of each, every byte compared;
+   written inside `routes/ops.ts`) → a mismatch or no header is **401 `unauthorized`**. The token and
+   the header are never logged, and never put in a message or a detail.
+3. `opsNotifyError` → **400 `invalid_input`** with its message.
+4. The recipient is the founder. A `member` (or any other) field in the body is ignored. Before setup
+   there is no founder → **409 `no_recipients`**, nothing written (never a row with no member).
+5. **Hourly limit:** the push deliveries with no fire and a non-NULL `title` created at or after
+   `opsWindowStart(now)` are counted; at `OPS_NOTIFY_PER_HOUR` or more → **429 `rate_limited`**, and no
+   row is written. Announcements (title NULL) never count.
+6. One delivery: `id` = `newId('dlv')`, `fire_id` NULL, `alert_number` 1, `channel` `push`, `member_id` =
+   the founder, `message` = the trimmed text, `title` = `opsTitle(title)`, `queued`.
+7. Sent at once with `sendPushDeliveries` (§9.1); then **201 `{ deliveries: [{ id, status, detail }] }`**.
+   `failed` with `no_subscription` (the founder has no phone) or `push_not_configured` is the honest
+   answer, not an error status. **The ping reached the phone only when `deliveries[0].status` is
+   `sent`**; a caller otherwise reports the `detail`.
+
+**The push:** `{ fireId: null, kind: null, tag: <delivery id>, title: <the title>, body: <the text>,
+actions: [] }` — like an announcement's, with its own title. Like any delivery it shows in
+Settings → Status' recent deliveries ⚑ (Q111).
+
+**Acceptance (M4t — each row is a test):**
+
+| # | Check | Expected |
+|---|---|---|
+| ON1 | `opsNotifyError` / `opsTitle` / `opsWindowStart` | `" hi "` ok; `""`, blanks, 201 chars, a non-string → message; a title of 61 chars or a non-string → message; `opsTitle(" 🤖 Claude ⭕🔁🏠 ")` = `"🤖 Claude ⭕🔁🏠"`, `opsTitle()` and `opsTitle("  ")` = `"🤖 Claude"`; `opsWindowStart("2026-10-04T12:00:00.000Z")` = `"2026-10-04T11:00:00.000Z"` |
+| ON2 | `OPS_NOTIFY_TOKEN` empty, with and without a Bearer header | 503 `ops_notify_off`; no row |
+| ON3 | a wrong token; no header | 401 `unauthorized`; no row; the response never contains the token |
+| ON4 | blank text, 201 chars, a 61-char title | 400 `invalid_input` ×3; no row |
+| ON4b | before setup (no members) | 409 `no_recipients`; no row |
+| ON5 | the founder with a phone; a `member` naming another member in the body | 201, one `push` row for the founder (`fire_id` NULL, `alert_number` 1, `title` set), `sent`; the other member gets nothing; the push decrypts to `{ fireId: null, kind: null, tag: <delivery id>, title, body: text, actions: [] }`; no `topic` header |
+| ON6 | the founder without a phone | 201, `failed`, `no_subscription` |
+| ON7 | 30 pings in the last hour, then a 31st | 429 `rate_limited`, no row written; announcements in the same hour do not count; a ping older than an hour does not count |
+| ON8 | any ping | no `house` row |
+| ON9 | the titles of other pushes | an announcement's push is still "📢 Announcement"; a fire's push keeps "Ensō" and `tag` = its `fireId` |
+| ON-M | migration 0022 | §4.2u's check |
+
 ---
 
 ## 10. API — `/api/v1`
@@ -3265,6 +3338,7 @@ acked, nothing is scheduled — **now only**.
 | GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff }`; PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
 | GET | `/status` | member | → `{ house: { state: HouseState, lastOkAt, lastFailedAt, lastError } (§9.2, derived, never stored), mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[] }` |
 | POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `no_recipients` (§9.3); spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
+| POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 409 `no_recipients` (no founder yet) / 429 `rate_limited`, in that order |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek }` (`thisWeek`/`nextWeek` = member id or null) |
 | POST | `/chores` | member | `{ title, doneMeans?, days, timing, time, nudge?, people, steps, channels, renotifyMin? }` → chore (201) |
 | PATCH/DELETE | `/chores/{id}` | creator or owner | same fields, all optional; re-plans unstarted runs (§7B.3) |
@@ -3481,6 +3555,13 @@ checks.
 - ✅ Tests H-C1–H-C9, CJ-M, CJ-D.
 - ✅ Manual: the helper running on SogoAI as a startup task behind the tunnel; a video blocked from
   Cloudflare read on the deployed URL, saved complete with `captions` in its source.
+
+**M4t — Ping the founder's phone** (v1.17.0)
+- Migration 0022 (`deliveries.title`), `src/shared/ops.ts`, `POST /ops/notify`, the title passthrough
+  in `push.ts`, `OPS_NOTIFY_TOKEN`, the README's one-liners (§2.4, §4.2u, §9.1, §9.4, §10).
+- ✅ Tests ON1–ON9, ON-M.
+- ✅ Manual: the secret and the token file set; a ping from a Claude session arrives on the founder's
+  iPhone with its title.
 
 **M4l — The laundry loop** (v1.8.0)
 - Migration 0014 (`machines` + the `fires` rebuild), `MACHINE` / `MACHINE_STATE` + the
@@ -3699,6 +3780,11 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q104 | Limits on what the helper answers | ⚑ Text cut to `TRANSCRIPT_MAX` (20 000), a failure reason to 300 characters |
 | Q105 | Where the helper listens | ⚑ `127.0.0.1:8790` on SogoAI, loopback only, reached only through the `sogoai` Cloudflare Tunnel behind Access |
 | Q106 | Captions blocked and captions from home not set up | ⚑ `captions_error` = "from home: captions from home aren't set up." — shown "captions couldn't be read: from home: …" (the YouTube reason is not kept) |
+| Q107 | Who a ping from a Claude session goes to (§9.4) | ⚑ Always the founder; there is no `member` field (one sent is ignored) |
+| Q108 | The ping's title | ⚑ The caller's title (e.g. "🤖 Claude ⭕🔁🏠"), or "🤖 Claude"; at most 60 characters |
+| Q109 | A `level` for pings (like the FunHouse's) | ⚑ None — an emoji in the title does that job |
+| Q110 | How many pings | ⚑ 30 an hour, then 429 `rate_limited` |
+| Q111 | Are pings visible to the household? | ⚑ Yes — they show in Settings → Status' last 20 deliveries like any other delivery. His call later |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -3834,6 +3920,14 @@ VALUES ('evt_<16 base32>', 'Put the goats away', NULL, '2026-10-03', NULL, '2026
 
 No `event_optins` row is inserted: it is off for everyone until each person turns it on in
 Optional calendar items (Shelly and John will).
+**M4t Ping the founder's phone** (v1.17.0, §9.4): decided by MojoSOGO 2026-10-04. `POST /ops/notify` (`routes/ops.ts`,
+rules in `src/shared/ops.ts`) — Bearer `OPS_NOTIFY_TOKEN` in constant time (unset → 503 `ops_notify_off`), one
+fire-less `push` delivery to the founder (`FOUNDER_SQL`, now exported from `routes/members.ts`) carrying its own
+`title` (migration 0022, §4.2u), sent at once; 30 an hour, counted from deliveries rows. `push.ts` shows a fire-less
+delivery as `title ?? "📢 Announcement"`. README: the token file and the PowerShell / curl one-liners. Tests
+ON1–ON9 and ON-M reach only a fake push service. Built as (a guard the brief did not name): before setup there is no
+founder → 409 `no_recipients`, nothing written. **Still owed (coordinator):** deploy, apply 0022 in production,
+`wrangler secret put OPS_NOTIFY_TOKEN` and the token file, then a real ping arriving on his iPhone with its title.
 **Captions from home, in-line** (v1.16.0, §7E.2c): decided by MojoSOGO 2026-10-04 — no polling. When
 YouTube blocks the Worker's captions request, from-video asks SogoAI in-line (`home-captions.ts`: one GET
 through Cloudflare Access and the `sogoai` tunnel to `HOME_CAPTIONS_URL`, the `enso-worker` service

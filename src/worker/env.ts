@@ -10,6 +10,7 @@ export interface Env {
   YOUTUBE_API_KEY?: string; // §7E recipes from videos
   CAPTIONS_TOKEN?: string; // §7E.2c the bearer the Worker sends to the SogoAI helper
   HOME_CAPTIONS_URL?: string; // §7E.2c where the SogoAI helper is reached (through Access + the sogoai tunnel)
+  OPS_NOTIFY_TOKEN?: string; // §9.4 the bearer a Claude Code session sends to POST /ops/notify
   // §9.2 House delivery — vars in wrangler.toml, the three secrets via `wrangler secret put`.
   HA_URL?: string;
   ECHO_TARGETS?: string[];

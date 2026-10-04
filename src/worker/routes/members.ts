@@ -11,7 +11,7 @@ const INVITE_DAYS = 7;
 
 export const members = new Hono<AppEnv>();
 /** §6.3 — the founder is the member setup created: the earliest created_at. Derived, never stored. */
-const FOUNDER_SQL = 'SELECT id FROM members ORDER BY created_at, id LIMIT 1';
+export const FOUNDER_SQL = 'SELECT id FROM members ORDER BY created_at, id LIMIT 1';
 
 members.get('/members', requireMember, async (c) => {
   const isOwner = c.get('member').role === 'owner';
