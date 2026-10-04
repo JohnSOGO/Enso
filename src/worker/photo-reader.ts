@@ -1,9 +1,8 @@
-// SPEC §7C.4 — reads one photo with the Claude API. The ONLY importer of `@anthropic-ai/sdk`, and only
-// lazily (inside readPhoto), so the cron tick and every other route never load it. It returns the raw
-// fields or an honest failure; it never decides what is saved — the route cleans the answer with
-// cleanPhotoReading (src/shared/things.ts) and the person reviews it.
-
-export const PHOTO_MODEL = 'claude-opus-5-5';
+// SPEC §7C.4 — reads one photo via claude.ts (the only importer of the Anthropic SDK, and only lazily).
+// This file owns the photo prompt, its schema and its image block. It returns the raw fields or an
+// honest failure; it never decides what is saved — the route cleans the answer with cleanPhotoReading
+// (src/shared/things.ts) and the person reviews it.
+import { askClaude } from './claude';
 
 /** Media types the Claude API reads as an image block. The phone sends JPEG (§7C.3). */
 const READABLE = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
@@ -37,52 +36,23 @@ const prompt = (today: string, tz: string) =>
   `else useful, such as times or what to bring). Give every detail the photo shows, copied exactly as written. ` +
   `Use null for anything not shown.`;
 
-/**
- * One structured-output request: `client.beta.messages.parse` (the beta path, because the server-side
- * refusal fallback is a beta parameter) with `output_config.format` from the SDK's zod helper.
- * `fetch` is for tests only, so no test ever reaches the real API.
- */
+/** One photo, one structured-output request through askClaude. `fetch` is for tests only. */
 export async function readPhoto(input: ReadPhotoInput, opts: { fetch?: typeof fetch } = {}): Promise<ReadPhotoResult> {
   if (!(READABLE as readonly string[]).includes(input.mediaType)) {
     return { ok: false, kind: 'failed', reason: `Claude can't read ${input.mediaType} pictures; send a JPEG.` };
   }
-  const [{ default: Anthropic }, { betaZodOutputFormat }, { z }] = await Promise.all([
-    import('@anthropic-ai/sdk'), import('@anthropic-ai/sdk/helpers/beta/zod'), import('zod'),
-  ]);
-  const Reading = z.object({
-    title: z.string().nullable(), startDate: z.string().nullable(), endDate: z.string().nullable(),
-    place: z.string().nullable(), address: z.string().nullable(), phone: z.string().nullable(), cost: z.string().nullable(),
-    url: z.string().nullable(), note: z.string().nullable(),
+  const res = await askClaude({
+    apiKey: input.apiKey,
+    fetch: opts.fetch,
+    content: [
+      { type: 'image', source: { type: 'base64', media_type: input.mediaType as Readable, data: base64(input.bytes) } },
+    ],
+    prompt: prompt(input.today, input.tz),
+    schema: (z) => z.object({
+      title: z.string().nullable(), startDate: z.string().nullable(), endDate: z.string().nullable(),
+      place: z.string().nullable(), address: z.string().nullable(), phone: z.string().nullable(), cost: z.string().nullable(),
+      url: z.string().nullable(), note: z.string().nullable(),
+    }),
   });
-  // A parse failure becomes null instead of throwing, so stop_reason (a refusal's partial text) is checked first.
-  const strict = betaZodOutputFormat(Reading);
-  const format = { ...strict, parse: (text: string) => { try { return strict.parse(text); } catch { return null; } } };
-  const client = new Anthropic({ apiKey: input.apiKey, ...(opts.fetch ? { fetch: opts.fetch } : {}) });
-  try {
-    const res = await client.beta.messages.parse({
-      model: PHOTO_MODEL,
-      max_tokens: 16000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      output_config: { effort: 'medium', format },
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: input.mediaType as Readable, data: base64(input.bytes) } },
-          { type: 'text', text: prompt(input.today, input.tz) },
-        ],
-      }],
-    });
-    if (res.stop_reason === 'refusal') {
-      return { ok: false, kind: 'refused', reason: res.stop_details?.explanation || res.stop_details?.category || 'refused' };
-    }
-    if (res.stop_reason === 'max_tokens') return { ok: false, kind: 'failed', reason: 'The reading was cut off before it finished.' };
-    if (!res.parsed_output) return { ok: false, kind: 'failed', reason: 'The reading came back in an unexpected shape.' };
-    return { ok: true, raw: res.parsed_output };
-  } catch (err) {
-    if (err instanceof Anthropic.APIError) {
-      return { ok: false, kind: 'failed', reason: `Claude API error${err.status ? ` ${err.status}` : ''}: ${err.message}` };
-    }
-    return { ok: false, kind: 'failed', reason: err instanceof Error && err.message ? err.message : String(err) };
-  }
+  return res.ok ? { ok: true, raw: res.value } : res;
 }

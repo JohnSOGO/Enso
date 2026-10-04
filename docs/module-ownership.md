@@ -62,7 +62,8 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/routes/machines.ts` | `GET /machines`, `POST /machines/{id}/start\|move\|finish\|clear` (§7D, §10): validate, call the machines.ts transition, save it in one batch (machine rows guarded by their `started_at` as read + updateFire close + insertFire) → 409 `conflict` when another tap won; the only closer of machine fires |
 | `src/worker/routes/things.ts` | `/things`, `/things/{id}`, `/things/{id}/plan` — thing CRUD, Plan it (event + thing + fire closes in one batch), closing a thing's scheduled fires on edit/delete (§7C, §10) |
 | `src/worker/routes/thing-photos.ts` | `/things/{id}/photo` (R2 put/get/delete, private) and `/things/read-photo` (size/type check, daily cap via photo_reads, error mapping) (§7C.3–7C.4) |
-| `src/worker/photo-reader.ts` | Reads one photo with the Claude API — the only importer of `@anthropic-ai/sdk` (lazy import); returns raw fields or an honest failure (off / refused / failed + reason); never decides what is saved (§7C.4) |
+| `src/worker/claude.ts` | The one Claude API call — the only importer of `@anthropic-ai/sdk` and zod (lazy import): model CLAUDE_MODEL, structured output from a caller-given schema builder, refusal fallback beta, maps refusal / cut off / unexpected shape / API error to an honest failure; `fetch` injectable for tests; no prompts, never decides what is saved |
+| `src/worker/photo-reader.ts` | Reads one photo via claude.ts: the photo prompt, schema and image block; returns raw fields or an honest failure; never decides what is saved (§7C.4) |
 
 ## PWA (flow stage: render + capture intent)
 
