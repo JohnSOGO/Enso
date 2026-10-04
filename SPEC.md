@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.28 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.29-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -173,7 +173,9 @@ Enso/
 │   ├── …                   # 0006–0011, §4.2e–§4.2j
 │   ├── 0012_announcements.sql   # §4.2k
 │   ├── 0013_retire_relay.sql    # §4.2l
-│   └── 0014_machines.sql        # §4.2m
+│   ├── 0014_machines.sql        # §4.2m
+│   ├── 0015_timer_window.sql    # §4.2n
+│   └── 0016_sun_alerts.sql      # §4.2o
 ├── src/
 │   ├── shared/             # pure TS, no I/O — imported by worker and frontend
 │   │   ├── vocab.ts        # §3
@@ -183,6 +185,7 @@ Enso/
 │   │   ├── markets.ts      # §7.4
 │   │   ├── lists.ts        # §7A.1 item rules: itemKey, add/reopen decision, limits, 30-day window
 │   │   ├── machines.ts     # §7D the laundry loop: state, transitions, done message
+│   │   ├── sun.ts          # §7.7 sunset per local date and place (NOAA)
 │   │   └── engine.ts       # §5
 │   └── worker/
 │       ├── index.ts        # Hono app + scheduled() handler
@@ -291,6 +294,7 @@ export const THING_STATUS = ['idea', 'planned', 'done', 'dropped'] as const;    
 export const HOUSE_STATE  = ['ok', 'failing', 'not_configured', 'untried'] as const; // /status `house.state` (§9.2)
 export const MACHINE      = ['washer', 'dryer'] as const;                        // §7D, in load order
 export const MACHINE_STATE = ['free', 'running', 'done'] as const;               // §7D, derived, never stored
+export const SUN_EVENT    = ['sunset'] as const;                                 // §7.7 events.start_sun
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
 ```
@@ -309,6 +313,7 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `machine` | A fire for one load in one machine, due when the machine is done (§7D) |
 | `washer` / `dryer` | The two laundry machines (§7D); the washer's load moves on to the dryer |
 | `free` / `running` / `done` | A machine's state (§7D): no load / a load, before done-at / a load, done-at passed — derived from the row and `now` |
+| `sunset` | An event whose start is the day's local sunset (§7.7, `events.start_sun`); there is no sunrise |
 | `at` | Chore rings at its time, like an alarm |
 | `by` | Chore is quiet: due by its time, optionally one nudge then |
 | `superseded` | A newer occurrence of the same event started ringing while this one still was |
@@ -867,6 +872,26 @@ null). `from > to` is an overnight window (22:00–06:00).
 **Migration check (TW-M):** timers that exist before 0015 survive it unchanged, with
 `active_from` and `active_to` NULL — they keep today's behavior.
 
+### 4.2o Schema change — `migrations/0016_sun_alerts.sql`
+
+```sql
+-- §7.7 — sun-timed alerts: the household's place, and an event whose start is the sunset.
+ALTER TABLE settings ADD COLUMN latitude REAL;
+ALTER TABLE settings ADD COLUMN longitude REAL;
+UPDATE settings SET latitude = 33.20, longitude = -117.29 WHERE id = 1;  -- ZIP 92056, Oceanside
+ALTER TABLE events ADD COLUMN start_sun TEXT CHECK (start_sun IN ('sunset'));
+```
+
+`settings.latitude` / `longitude` are degrees (north / east positive); both NULL = no place, and
+then no sun-timed reminder is planned (§7.7). There is no edit UI ⚑ Q57. `events.start_sun`
+NULL = an ordinary event; `'sunset'` (`SUN_EVENT`, §3) = the event starts at that day's local
+sunset. A sun row has `start_time` NULL, `end_time` NULL and `end_date = start_date`;
+`remind_offset_min` is reused as "minutes before sunset". The migration inserts **no** event:
+the goat item is created in production by SQL (§14).
+**Migration check (SA-M):** settings and events that exist before 0016 survive it, the settings
+row gains 33.20 / −117.29, every existing event has `start_sun` NULL, and `start_sun = 'sunrise'`
+is refused by the CHECK.
+
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
 
@@ -916,7 +941,8 @@ interface Recurrence {
 ```ts
 // Which reminder fires should exist in [from, to)? Returns candidates; tick() inserts
 // them with INSERT OR IGNORE (the unique index makes this idempotent).
-planReminderFires(event: EventRow, tz: string, fromUtc: string, toUtc: string): NewFire[]
+// `place`: the household's place (§4.2o), needed only by a sun-timed event (§7.7).
+planReminderFires(event: EventRow, tz: string, fromUtc: string, toUtc: string, place: Place | null = null): NewFire[]
 
 // Advance one open fire to `now`. Returns the new fire row and any alerts to send.
 stepFire(fire: FireRow, cfg: AlertConfig, now: string): { fire: FireRow; alert: boolean }
@@ -936,6 +962,12 @@ timerWindowError(win: { from; to }, intervalMin: number): string | null  // from
 inside(t: string, win: TimerWindow): boolean     // from ≤ local < to; overnight: local ≥ from || local < to
 nextTimerDue(base: string, intervalMin: number, win?: TimerWindow): string
 ```
+
+**`planReminderFires` and the sun (§7.7):** an occurrence's start is `start_time` (or
+`ALL_DAY_REMIND_TIME` for an all-day event) in `tz` — except when `start_sun` is `'sunset'`:
+then it is `sunsetUtc(date, place)`. An occurrence whose sunset cannot be computed (no place,
+or the sun does not set that day) is **skipped** — never planned at 09:00 or any other
+substitute time. `due = start − remind_offset_min` as for every reminder.
 
 `AlertConfig` = `{ channels, renotifyMin, maxAlerts, intervalMin?, window? }`, taken from
 the event or timer row (`window` only for a timer that has one).
@@ -1055,6 +1087,11 @@ For one alert of one fire:
     `"The laundry in the {machine} is done"`; plus `" — {name}'s load is waiting"` while the
     machine before it holds a done load (§7D.3). Built by `machines.ts` `doneMessage`;
     recipients are the owner, or every active member when the owner is disabled.
+  - sun-timed reminder (§7.7): `"{title} — sunset at {h:mm}"` — the occurrence's sunset in
+    the household tz, 12-hour with no am/pm ("18:42" → "6:42") ⚑ Q52; when that sunset cannot
+    be computed at alert time, `"{title} — before sunset"`. `alertMessage(kind, title, n,
+    chore?, startsToday?, sunsetAt?)` takes it as a trailing `sunsetAt` (local `HH:MM`, or
+    `null` = could not be computed; absent = not a sun event). No emoji in the text.
   - from the second alert on, append `" (alert {n})"`
 
 A delivery with **no fire** is an announcement (§9.3); it is written by `POST /announce`,
@@ -1424,6 +1461,56 @@ presentation, ≤ 16 bytes) — anything else is 400 with a message. Where it sh
 
 **Acceptance:** E1 an event with emoji 🧹 round-trips through POST/GET; E2 `"ab"`, `"🧹🧹"`
 or 17 bytes → 400; E3 `/calendar` occurrences carry `emoji`.
+
+### 7.7 Sun-timed alerts — `src/shared/sun.ts` (pure)
+
+Decided by MojoSOGO 2026-10-03: **the goat alert.** Every day, 30 minutes before local sunset,
+an alert says **"Put the goats away — sunset at 6:42"**. Each person opts in; it is off by
+default (Shelly and John will opt in). Phone + House. It is **not on the calendar**: it is only
+findable in **Optional calendar items** (§7.5), where people turn it on.
+
+**The model:** an ordinary **optional event** (§7.5) whose start is the sunset —
+`events.start_sun = 'sunset'` (§4.2o). Everything optional events already do applies
+unchanged: the opt-in switch, the audience (push to the opted-in members, House only when that
+audience is not empty), Done / Snooze, renotify, `missed`. What is new:
+
+- **Sunset** is computed locally from the household place (`settings.latitude` /
+  `longitude`, §4.2o; ZIP 92056, Oceanside, 33.20 / −117.29) with the **NOAA general solar
+  position algorithm**: fractional year γ, equation of time, declination, and the hour angle
+  at zenith 90.833°; evaluated at the date's local solar noon, then refined once at the
+  sunset that gives. Rounded to the nearest minute ⚑ Q53.
+- **`sun.ts`** exports `interface Place { lat: number; lon: number }` and
+  `sunsetUtc(date: string, place: Place): string | null` → the UTC ISO instant of sunset on that
+  local date, or **null** when the sun does not set (polar day or night). Never a substitute
+  time. Pure: no clock, no fetch; imports nothing but `time.ts`.
+- **Planning** (§5.1): start = `sunsetUtc(date, place)`; no place or no sunset → that
+  occurrence is skipped (never 09:00).
+- **Text** (§5.7): `"{title} — sunset at {h:mm}"`; sunset not computable at alert time →
+  `"{title} — before sunset"`.
+- **Never on the calendar, by rule** ⚑ Q54: `/calendar` (and so the day sheet), and
+  `GET/PATCH/DELETE /events/{id}` and `/events/{id}/exdates`, treat a `start_sun` event as absent
+  (404 for the event routes). `/optional-events` and `PUT/DELETE /events/{id}/optin` list and
+  switch it like any optional event. It is created, edited and deleted only by coordinator SQL
+  ⚑ Q58; the label stays "Optional calendar items" ⚑ Q55.
+- **Ringing bar** (§8.2): its row reads `🔔 Put the goats away · sunset` ⚑ Q56.
+- **Repeats** ⚑ Q51: the goat row carries `renotify_min = 15`, `max_alerts = 3` — alerts at
+  −30, −15 and at sunset, until someone taps Done.
+- **Sunset only** ⚑ Q59: there is no sunrise.
+
+**Acceptance (M4n — each row is a test):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| S1 | `sunsetUtc` for Oceanside (33.20, −117.29) on 2026-03-07, 03-08, 06-21, 10-31, 11-01, 12-21 | each within ±1 min of the NOAA solar calculator spreadsheet's sunset (an independent implementation of the spreadsheet formulas in the test): 17:51 PST, 18:52 PDT, 20:02 PDT, 17:58 PDT, 16:57 PST, 16:46 PST |
+| S2 | DST continuity: 03-07 → 03-08 and 10-31 → 11-01 | the UTC instants are 24 h ± 2 min apart; the local clock jumps by about +1 h / −1 h |
+| S3 | `sunsetUtc('2026-12-21', { lat: 78, lon: 15 })` | `null` (polar night) — no substitute time |
+| G1 | the goat event (DAILY, offset 30) planned for a day | one fire per day, `due_at` = sunset − 30 min; planning twice gives the same fires (idempotent) |
+| G2 | the same event planned with `place = null` | `[]` — nothing at 09:00 |
+| G3 | `/calendar` for the month, as a member who has it on | no goat occurrences |
+| G4 | `GET /optional-events` | lists the goat item, `on: false` for a member who has not opted in |
+| G5 | one member opted in; tick at sunset − 30 | that member gets one push and the house one row, both with the text `"Put the goats away — sunset at h:mm"` (that day's sunset) |
+| G6 | nobody opted in; tick | the fire steps, no deliveries |
+| G7 | `GET /fires` carries `startSun: 'sunset'` for its fire; `GET /events/{id}` → 404 | |
 
 ---
 
@@ -1867,7 +1954,8 @@ only the grey backdrop):
 
 A stack at the top of every screen, one row per `ringing` fire, newest first:
 
-- Reminder row: `🔔 Take out trash · 19:00` with **[Snooze 10m] [Done]**
+- Reminder row: `🔔 Take out trash · 19:00` with **[Snooze 10m] [Done]** (an all-day event:
+  `· all day`; a sun-timed one, §7.7: `🔔 Put the goats away · sunset` ⚑ Q56)
 - Timer row: `⏱ Check on the dog · ringing 45 min` with **[Ack]**
 - Chore row: `🧹 Laundry — Move to dryer · Sam` with **[Done]** (no snooze)
 - Thing row: `📌 Fall fair · to do` with **[Snooze 10m] [Done]** ⚑ glyph
@@ -2587,11 +2675,11 @@ acked, nothing is scheduled — **now only**.
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
 | DELETE | `/invites/{id}` | owner | revoke |
-| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[] }` (each occurrence carries `emoji`); recurring events expanded server-side with `recurrence.ts`; alarms excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
+| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[] }` (each occurrence carries `emoji`); recurring events expanded server-side with `recurrence.ts`; alarms and sun-timed events (§7.7) excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
 | GET | `/optional-events` | member | → `{ id, title, emoji, recurrence, startDate, on }[]` — every optional event, with this member's switch |
 | PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |
-| GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6) |
+| GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6). A sun-timed event (§7.7) is 404 here and on `/exdates` |
 | POST | `/events/{id}/exdates` | creator or owner | `{ date }` |
 | GET/POST | `/timers` | member | → `Timer[]` / POST `{ title, intervalMin, channels, renotifyMin?, maxAlerts?, assignedTo?, activeFrom?, activeTo? }` → timer (201). `Timer = { id, title, intervalMin, channels, renotifyMin, maxAlerts, assignedTo, running, createdBy, activeFrom, activeTo, openFire }`; `activeFrom`/`activeTo` are `"HH:MM"` or both `null` (no window). 400 `invalid_input` when only one is set, either is not `HH:MM`, or `timerWindowError` refuses them (§5.1) |
 | PATCH/DELETE | `/timers/{id}` | creator or owner | PATCH: the POST fields, all optional, merged over the timer; `activeFrom: null, activeTo: null` clears the window. A PATCH never re-plans the open fire (rule 0 defers it when it comes due) |
@@ -2599,7 +2687,7 @@ acked, nothing is scheduled — **now only**.
 | GET | `/alarms` | member | → alarms: `{ id, title, time, days: Weekday[], channels, renotifyMin, assignedTo, createdBy, nextDueAt, ringing }` |
 | POST | `/alarms` | member | `{ title, time: "HH:MM", days: Weekday[], channels, renotifyMin?, assignedTo? }` → alarm |
 | PATCH/DELETE | `/alarms/{id}` | creator or owner | same fields as POST, all optional; closes future scheduled fires like an event edit |
-| GET | `/fires?state=ringing` | member | → open fires with titles; chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Washer") and `personId` = the load's owner |
+| GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Washer") and `personId` = the load's owner |
 | GET | `/machines` | member | → `Machine[]` in load order: `{ id, label, state: MachineState, ownerId, minutes, startedAt, doneAt, startedBy, next }` (`state` derived by the server, §7D.1; `next` = the next machine's id or null) |
 | POST | `/machines/{id}/start` | member | `{ ownerId, minutes }` → `Machine[]`; 409 `busy` when not free (§7D.2) |
 | POST | `/machines/{id}/move` | member | `{ minutes }` → `Machine[]`; 409 `busy` / `not_done` / `invalid_state` |
@@ -2775,6 +2863,15 @@ checks.
 - ✅ Manual: an announcement with House ticked is spoken on the Echos and the Voice PE as
   "{name} says: …"; with Phone ticked it arrives on another member's phone.
 
+**M4n — Sun-timed alerts: the goat alert** (v1.10.0)
+- Migration 0016 (`settings.latitude` / `longitude`, `events.start_sun`), `SUN_EVENT`,
+  `src/shared/sun.ts`, sunset planning in `planReminderFires`, the sunset text, sun events off
+  `/calendar` and the event routes, `startSun` on `/fires` and `· sunset` in the Ringing bar
+  (§4.2o, §5.1, §5.7, §7.7, §8.2, §10).
+- ✅ Tests S1–S3, G1–G7, SA-M; M1-VOCAB passes with `events.start_sun`.
+- ✅ Manual: after the production insert (§14), Shelly and John turn it on in Optional
+  calendar items; a real goat alert arrives on their phones and is spoken in the house.
+
 **M4l — The laundry loop** (v1.8.0)
 - Migration 0014 (`machines` + the `fires` rebuild), `MACHINE` / `MACHINE_STATE` + the
   `machine` kind, `src/shared/machines.ts`, the `/machines` routes, machine rows in the
@@ -2938,6 +3035,15 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q48 | Starting a timer outside its window | ⚑ Allowed; the first ring is the next window start + interval |
 | Q49 | Editing the window of a running timer | ⚑ The open fire is not re-planned; rule 0 defers it when it comes due outside the new window |
 | Q50 | The timer form and row (§8.5) | ⚑ Two time inputs, "Active from / to", empty = always; the row shows the window; Next names the day when it isn't today |
+| Q51 | How often does the goat alert repeat (§7.7)? | ⚑ Every 15 min, up to 3 alerts (−30, −15, at sunset) until Done: the row has `renotify_min` 15, `max_alerts` 3 (the placement-advisor suggested one alert; the coordinator chose repeats so the goats are not forgotten) |
+| Q52 | How the sunset time reads | ⚑ "6:42" — 12-hour, no am/pm |
+| Q53 | Sunset precision | ⚑ Rounded to the nearest minute |
+| Q54 | Sun items on the calendar? | ⚑ Never, by rule: not in `/calendar`, the day sheet or the event routes |
+| Q55 | The Settings label for sun items | ⚑ Unchanged: "Optional calendar items" |
+| Q56 | The Ringing bar row of a sun item | ⚑ `· sunset` where an all-day reminder shows `· all day` |
+| Q57 | The household place | ⚑ 33.20 / −117.29 (ZIP 92056, Oceanside), set by migration 0016; no edit UI |
+| Q58 | Who edits or deletes the goat item | ⚑ Only coordinator SQL; the event routes give 404 |
+| Q59 | Sunrise too? | ⚑ No — sunset only |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -3018,6 +3124,23 @@ modal; Clear asks once; a disabled owner's load alerts everyone with "The laundr
 done". Migration 0014 is applied only in tests so far. **Still owed (manual):** the cards and
 the chooser at 320 px, a two-tap start on the iPhone, and a real done reminder spoken in the
 house.
+**M4n Sun-timed alerts — the goat alert** (§7.7, migration 0016): spec written, being built.
+**Production insert (coordinator only, after 0016 is applied; never a migration or a seed).** Run
+it from a **UTF-8 file** (`wrangler d1 execute enso --remote --file goat.sql`) so the 🐐 survives —
+never typed into a console. Replace `evt_<16 base32>` with a fresh id (`evt_` + 16 lower-case Crockford
+base32 characters, `0123456789abcdefghjkmnpqrstvwxyz`, as `newId` makes) and both `<now>` with the current UTC ISO instant:
+
+```sql
+INSERT INTO events (id, title, notes, start_date, start_time, end_date, end_time, recurrence, assigned_to,
+  remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at,
+  is_alarm, optional, emoji, start_sun)
+VALUES ('evt_<16 base32>', 'Put the goats away', NULL, '2026-10-03', NULL, '2026-10-03', NULL, '{"freq":"DAILY"}', '[]',
+  30, '["push","house"]', 15, 3, (SELECT id FROM members WHERE role = 'owner' ORDER BY created_at LIMIT 1),
+  '<now>', '<now>', 0, 1, '🐐', 'sunset');
+```
+
+No `event_optins` row is inserted: it is off for everyone until each person turns it on in
+Optional calendar items (Shelly and John will).
 **Push fix** (v1.7.1): no `Topic` header — Apple refused pushes carrying one (BadWebPushTopic)
 since v1.6.0. Verified 2026-10-03: a test push arrived on MojoSOGO's iPhone home-screen app.
 **Emoji instead of a dot** (v1.5.1): on phones an event whose emoji shows beside the date has no
