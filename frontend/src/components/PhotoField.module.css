@@ -1,0 +1,7 @@
+/* SPEC §8.8, §8.11 — a photo inside a form. Column box whose height comes from content: children
+   keep flex none / 1 1 auto, never basis 0 (§8 iPhone rules). */
+.photo { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 12px; }
+.photo > * { flex: none; max-width: 100%; }
+.thumbButton { display: block; min-height: 44px; min-width: 44px; padding: 0; }
+.thumb { display: block; max-width: 100%; max-height: 120px; border-radius: 8px; }
+.full { display: block; width: 100%; height: auto; border-radius: 8px; }
