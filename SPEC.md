@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.27-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.27 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2916,6 +2916,17 @@ nullable (applied only in tests so far); the push payload gains `tag`. Built as:
 nobody else to push to → 409 `no_recipients` rather than a quiet success. **Still to check:**
 the box at 320 px and on the iPhone, an announcement spoken on the Echos + Voice PE, and one
 arriving on another member's phone.
+**M4l The laundry loop** (v1.8.0; 290 tests incl. L1–L13): migration 0014 (`machines`, seeded
+free; `fires` rebuilt with kind `machine` + `machine_id`, `uq_machine_open`), `machines.ts`, the
+`/machines` routes, the Machines cards + chooser on the Alarms tab, machine rows in the Ringing
+bar (Move to dryer / Fold & out). Built as: each transition's machine-row writes are guarded by
+the row's `started_at` as read inside the same batch as the fire writes, so a stale tap rolls
+the whole batch back (tested with the second of two rows stale) → 409 `conflict`; `sourceOf`
+now takes `now` (the dryer's "load is waiting" is derived at alert time); the chooser is a
+modal; Clear asks once; a disabled owner's load alerts everyone with "The laundry in the … is
+done". Migration 0014 is applied only in tests so far. **Still owed (manual):** the cards and
+the chooser at 320 px, a two-tap start on the iPhone, and a real done reminder spoken in the
+house.
 **Push fix** (v1.7.1): no `Topic` header — Apple refused pushes carrying one (BadWebPushTopic)
 since v1.6.0. Verified 2026-10-03: a test push arrived on MojoSOGO's iPhone home-screen app.
 **Emoji instead of a dot** (v1.5.1): on phones an event whose emoji shows beside the date has no
