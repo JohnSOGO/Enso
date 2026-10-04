@@ -1,7 +1,7 @@
 // SN14 (SPEC §7A.3) — home/identify.ts over a fake LM Studio (never a real network): the one request's shape, and
 // every failure honest — a timeout, a non-2xx, an unexpected shape, IDENTIFY_MODEL unset (off, nothing called).
 import { describe, expect, it } from 'vitest';
-import { IDENTIFY_TIMEOUT_MS, LM_STUDIO_URL, NO_THINK, identify } from '../home/identify';
+import { IDENTIFY_MAX_TOKENS, IDENTIFY_TIMEOUT_MS, LM_STUDIO_URL, NO_THINK, identify } from '../home/identify';
 import { IDENTIFY_PROMPT } from '../src/shared/item-reading';
 
 const PHOTO = new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3, 250]);
@@ -42,12 +42,19 @@ describe('SN14 identify', () => {
         ],
       }],
       temperature: 0,
-      max_tokens: 100,
+      max_tokens: IDENTIFY_MAX_TOKENS,
       stream: false,
     });
     expect(NO_THINK).toBe(' /no_think');
     expect(signal).toBeInstanceOf(AbortSignal);
     expect(IDENTIFY_TIMEOUT_MS).toBe(15_000);
+  });
+
+  it('room for the thinking qwen3.6 does anyway; cut off with an empty answer → an honest failure, never an empty ok', async () => {
+    expect(IDENTIFY_MAX_TOKENS).toBeGreaterThanOrEqual(600); // measured 2026-10-04: ~400 tokens of thinking before the name
+    const cut = () => new Response(JSON.stringify({ choices: [{ finish_reason: 'length', message: { role: 'assistant', content: '' } }] }));
+    expect(await identify(PHOTO, 'image/jpeg', { model: 'm', fetch: lmStudio(cut).f }))
+      .toEqual({ ok: false, kind: 'failed', reason: 'The local model ran out of room before it answered.' });
   });
 
   it('IDENTIFY_MODEL unset or empty → off, and LM Studio is never called', async () => {
