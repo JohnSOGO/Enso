@@ -1,7 +1,9 @@
 // SPEC §7E — recipe rules (pure): limits, a YouTube link → its video id and the derived watch /
-// thumbnail links, the video creator's own comments, when a video's text is worth reading, cleaning Claude's reading, typed input,
-// the one-live-recipe-per-video clash, and the wire shape (each person's emoji rules: recipe-emoji.ts). Imports lists + vocab only.
+// thumbnail links, the video creator's own comments, a transcript pasted or screenshotted, when a video's text is worth reading, cleaning
+// Claude's reading, typed input, the one-live-recipe-per-video clash, and the wire shape (each person's emoji rules: recipe-emoji.ts).
+// Imports lists, things (the photo limits) and vocab only.
 import { TEXT_MAX } from './lists';
+import { PHOTO_MAX_BYTES, PHOTO_TYPES } from './things';
 import { RECIPE_SOURCE, type RecipeSource } from './vocab';
 
 export const RECIPE_TITLE_MAX = 120;
@@ -14,6 +16,10 @@ export const SERVINGS_MAX = 60;
 export const TIME_MAX = 60;
 /** Captions are cut to this many characters before they go to Claude (§7E.2). */
 export const TRANSCRIPT_MAX = 20_000;
+/** The longest pasted transcript taken, before cleaning (§7E.2b). ⚑ Q89 */
+export const PASTED_MAX = 100_000;
+/** The most transcript screenshots one read takes (§7E.2b). ⚑ Q92 */
+export const SCREENSHOTS_MAX = 4;
 /** Comment threads asked for per read (§7E.2 step 8, one quota unit). ⚑ Q77 */
 export const COMMENTS_LOOKED_AT = 20;
 /** The creator's kept comments are cut to this many characters before they go to Claude (§7E.2). ⚑ Q77 */
@@ -54,15 +60,41 @@ export const thumbnailUrl = (videoId: string) => `https://i.ytimg.com/vi/${video
 
 // ---- §7E.2 reading a video ----
 
-/** What a video offered to be read; `comments` is the creator's own (creatorComments). */
-export interface VideoText { description: string | null; transcript: string | null; comments: string | null }
+/** What a video offered to be read; `comments` is the creator's own (creatorComments); `pasted` and `screenshots`
+ *  are a transcript given by hand (cleanTranscript, parseScreenshots, §7E.2b). */
+export interface VideoText {
+  description: string | null; transcript: string | null; comments: string | null; pasted?: string | null; screenshots?: readonly Screenshot[];
+}
 
-const OFFERED: Partial<Record<RecipeSource, keyof VideoText>> = { description: 'description', captions: 'transcript', comments: 'comments' };
+const has = (v: string | null | undefined) => !!v?.trim();
+const OFFERED: Partial<Record<RecipeSource, (t: VideoText) => boolean>> = {
+  description: (t) => has(t.description), captions: (t) => has(t.transcript),
+  transcript: (t) => has(t.pasted) || !!t.screenshots?.length, comments: (t) => has(t.comments),
+};
 
-/** What a reading was given: the description when it had text, the captions when a transcript was read, the
- *  creator's comments when one was kept. */
+/** What a reading was given: the description when it had text, the captions when a transcript was read, a
+ *  transcript pasted or screenshotted, the creator's comments when one was kept. */
 export function sourcesOf(t: VideoText): RecipeSource[] {
-  return RECIPE_SOURCE.filter((s) => { const k = OFFERED[s]; return !!k && !!t[k]?.trim(); });
+  return RECIPE_SOURCE.filter((s) => !!OFFERED[s]?.(t));
+}
+
+/** The photo types Claude reads as an image block: the photo limits' own list, less HEIC (§7C.3–7C.4). */
+export const SCREENSHOT_TYPES = PHOTO_TYPES.filter((t): t is Exclude<typeof t, 'image/heic'> => t !== 'image/heic');
+/** One screenshot as the PWA sends it (§7E.2b): its media type and its bytes in base64. Never stored. */
+export interface Screenshot { type: (typeof SCREENSHOT_TYPES)[number]; data: string }
+
+/** The body's `screenshots` → 0–SCREENSHOTS_MAX checked screenshots, or a message naming what is wrong. */
+export function parseScreenshots(v: unknown): Screenshot[] | string {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) return 'screenshots must be a list.';
+  if (v.length > SCREENSHOTS_MAX) return `At most ${SCREENSHOTS_MAX} screenshots at a time.`;
+  for (const x of v) {
+    const { type, data } = (x ?? {}) as Record<string, unknown>;
+    if (!SCREENSHOT_TYPES.includes(type as Screenshot['type'])) return `Each screenshot must be one of: ${SCREENSHOT_TYPES.join(', ')}.`;
+    if (typeof data !== 'string' || !data || data.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) return 'A screenshot came through empty or damaged.';
+    if ((data.length / 4) * 3 - data.match(/=*$/)![0].length > PHOTO_MAX_BYTES) return `A screenshot is too large: at most ${PHOTO_MAX_BYTES / (1024 * 1024)} MB.`;
+  }
+  return v as Screenshot[];
 }
 
 /** No description, no captions and no creator's comment: nothing to ask Claude about (it would only have the title). */
@@ -96,6 +128,26 @@ export function creatorComments(comments: readonly { authorChannelId: string | n
   if (!channelId) return null;
   const kept = comments.filter((c) => c.authorChannelId === channelId).map((c) => c.text.trim()).filter(Boolean);
   return cut(kept.join('\n\n'), CREATOR_COMMENTS_MAX);
+}
+
+const TIMESTAMP = /^\s*\d{1,2}(:\d{2}){1,2}\s*$/;
+const LEADING_TIMESTAMP = /^\s*\d{1,2}(:\d{2}){1,2}\s+/;
+const DURATION = /^\s*\d+ (hours?|minutes?|seconds?)(,\s*\d+ (hours?|minutes?|seconds?))*\s*$/i;
+
+/**
+ * A transcript copied from YouTube's panel → the text Claude reads (§7E.2b ⚑ Q88): timestamp-only lines and
+ * spoken durations ("1 minute, 5 seconds") dropped, a leading timestamp stripped, chapter titles kept, each
+ * line's whitespace collapsed, empty lines dropped, cut to TRANSCRIPT_MAX (never inside a surrogate pair).
+ * Nothing left → null.
+ */
+export function cleanTranscript(text: string): string | null {
+  const kept = text.split(/\r?\n/)
+    .filter((l) => !TIMESTAMP.test(l))
+    .map((l) => l.replace(LEADING_TIMESTAMP, ''))
+    .filter((l) => !DURATION.test(l))
+    .map((l) => l.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  return cut(kept.join('\n'), TRANSCRIPT_MAX);
 }
 
 /**

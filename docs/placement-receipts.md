@@ -7,6 +7,34 @@ carry its result.
 
 ---
 
+## 2026-10-04 — Paste (or screenshot) the transcript (placement-advisor; course change from MojoSOGO)
+
+- **Ask:** production captions are refused from Cloudflare ("LOGIN_REQUIRED: Sign in to confirm you're not a
+  bot"). MojoSOGO copies YouTube's transcript himself and Claude re-reads the recipe from it. Mid-build he
+  added: he can't copy text on his phone, only screenshot — so 1–4 screenshots, with pasted text kept as the
+  secondary way (a computer).
+- **Verdict:** extend the existing owners plus ONE new UI file. `vocab.ts` RECIPE_SOURCE gains `transcript`
+  after `captions`. `src/shared/recipes.ts` (pure) gains PASTED_MAX, cleanTranscript, and for screenshots
+  SCREENSHOTS_MAX / SCREENSHOT_TYPES / parseScreenshots, reusing things.ts PHOTO_TYPES (less HEIC) and
+  PHOTO_MAX_BYTES, never restated; VideoText gains `pasted` / `screenshots` so sourcesOf derives the source.
+  `routes/recipes.ts` gains `POST /recipes/{id}/transcript` and ONE file-local `readsUsedUp` helper that
+  from-video now shares. `recipe-reader.ts` (added to the boundary by the course change) takes optional
+  screenshots as image blocks plus one prompt line; it stays the only home of the prompt. NEW
+  `frontend/src/components/RecipeTranscript.tsx`, hosted by RecipeView.
+- **Wire choice:** screenshots travel as base64 inside the JSON body (`{ text?, screenshots?: [{ type, data }] }`),
+  not multipart and not the raw-body `upload` helper: one request carries up to four images and the text,
+  and the base64 goes to Claude's image block as it came, so photo-reader.ts's private base64 helper was
+  neither copied nor extracted. The phone shrinks each picture to JPEG with shrink-photo (which also turns
+  an Apple HEIC into a JPEG, or says it can't); HEIC reaching the server is refused before any read.
+- **Storage:** screenshots are read, never stored — no R2, no migration (§12 keeps photos to Things to do).
+- **Deferred:** a retry of the captions attempt as YouTube's iOS client. LOGIN_REQUIRED is IP reputation,
+  and nothing in the test suite can reach YouTube from Cloudflare's addresses, so it was not built.
+- **Untouched:** youtube.ts, youtube-captions.ts, claude.ts, photo-reader.ts, Recipes.tsx, RecipeForm.tsx,
+  Grow.tsx, scripts/arch.ts, migrations/. No ceilings moved. recipes.ts lands at 292 / 300 — in the
+  warning band; that is the coordinator's next decision, not this change's.
+
+---
+
 ## 2026-10-04 — The video creator's comments as a recipe source (placement-advisor)
 
 - **Ask:** MojoSOGO decided recipes are often in the creator's first (usually pinned) comment, so the

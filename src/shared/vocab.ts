@@ -15,7 +15,7 @@ export const THING_STATUS = ['idea', 'planned', 'done', 'dropped'] as const; // 
 export const MACHINE = ['washer', 'dryer'] as const; // §7D, in load order
 export const MACHINE_STATE = ['free', 'running', 'done'] as const; // §7D, derived, never stored
 export const SUN_EVENT = ['sunset'] as const; // §7.7 events.start_sun — there is no sunrise
-export const RECIPE_SOURCE = ['description', 'captions', 'comments', 'typed'] as const; // §7E what a recipe was read from
+export const RECIPE_SOURCE = ['description', 'captions', 'transcript', 'comments', 'typed'] as const; // §7E what a recipe was read from ('transcript': pasted, §7E.2b)
 export const CAPTIONS_FAILURE = ['blocked', 'none', 'failed'] as const; // §7E why captions couldn't be read
 
 export type AlertKind = (typeof ALERT_KIND)[number];
