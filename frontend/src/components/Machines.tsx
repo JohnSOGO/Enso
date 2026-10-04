@@ -92,7 +92,7 @@ export function MachinesSection() {
   }
 
   const load = (m: Machine) => m.state === 'free' ? ''
-    : `${m.ownerId ? memberById(m.ownerId)?.displayName ?? 'unknown member' : 'nobody'} · ${m.doneAt ? localTime(m.doneAt) : '—'}`;
+    : `${m.ownerId ? memberById(m.ownerId)?.displayName ?? 'unknown member' : 'nobody'} · ${m.doneAt ? `done ${m.state === 'running' ? '~' : ''}${localTime(m.doneAt)}` : '—'}`;
 
   return (
     <section className={s.section} aria-label="Machines">
@@ -109,12 +109,10 @@ export function MachinesSection() {
               <div className="row">
                 <b style={{ flex: 'none' }}>{GLYPH[m.id]} {m.label}</b>
                 <span className={`badge ${BADGE[m.state].mood}`} style={{ flex: 'none' }}>{BADGE[m.state].text}</span>
-                <span className="spacer" />
-                <span className="muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                  {load(m)}
-                </span>
               </div>
-              <div className="row" style={{ justifyContent: 'flex-end', marginTop: 6 }}>
+              <div className="row" style={{ marginTop: 6 }}>
+                {/* whose load and when it's done: its own line, wrapping, so 320 px never cuts the time off */}
+                <span className="muted" style={{ flex: 1, fontVariantNumeric: 'tabular-nums' }}>{load(m)}</span>
                 {m.state === 'free' && (
                   <button className="primary" onClick={() => setChooser({ from: m.id, mode: 'start', ownerId: null })}
                     aria-label={`Start the ${lower(m.id)}`}>Start</button>
