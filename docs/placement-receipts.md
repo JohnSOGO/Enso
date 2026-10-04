@@ -7,6 +7,38 @@ carry its result.
 
 ---
 
+## 2026-10-04 — The photo field gets its own owner, ready for list-item photos (reorganizer; refactor/photo-field-seam)
+
+REORG RECEIPT
+- Trigger:      the "📷 snap an item" feature puts a list item's photo in the list item's ✎ form, which needs the
+  same photo field the thing form uses; that field was file-local to ThingPhoto.tsx, tied to the read-photo call.
+  This is preparation for list-item photos.
+- Seam moved:   the generic photo field — Thumb (tap for full size inside the dialog), the hidden file input
+  (camera/library), lazy shrinkPhoto, the waiting photo's object URL lifecycle, Add / Replace / Remove, the
+  step/said/error display, the live ref — from `frontend/src/components/ThingPhoto.tsx` to
+  `frontend/src/components/PhotoField.tsx` [NEW owner row], with its styles (.photo, .thumbButton, .thumb, .full)
+  from ThingPhoto.module.css to PhotoField.module.css. PhotoField takes an optional
+  `read?: (photo: Blob) => Promise<string>` (resolves to the status text, rejects with the refusal) and has no API
+  path of its own. ThingPhoto keeps the /things/read-photo call, the "Filled n empty fields…" wording, photoSrc and
+  FromThing, and passes the read into PhotoField.
+- Room opened:  ThingPhoto.tsx 109 → 48 lines; PhotoField.tsx new at 89; ThingPhoto.module.css 16 → 10,
+  PhotoField.module.css new at 7; no CEILINGS entry (all under GLOBAL_FILE_CAP 300).
+- Behavior:     PRESERVED — `npm run typecheck && npm test` all green (46 files, 483 tests), `npm run build` ok
+  (shrink-photo still its own lazy chunk), `npm run arch:audit` quiet. Verified by reading: every visible text, aria
+  name, alt text ("The thing's photo", "Photo for …"), the " The photo is still attached." suffix, the step order
+  (Getting the photo ready… → onPick → Reading the photo… → said / refusal) and the class names' rules are
+  unchanged; ThingForm.tsx and EventForm.tsx untouched; ThingPhoto's exports (ThingPhoto, photoSrc, FromThing)
+  unchanged. One unobservable difference: if the form closes while the read is in flight, onReading now runs
+  inside the read before the live check (setState on an unmounted ThingForm, a no-op in React).
+- Sources read: CLAUDE.md, docs/modularity.md, docs/module-ownership.md, docs/placement-receipts.md, scripts/arch.ts,
+  test/architecture.test.ts (rows), ThingPhoto.tsx + .module.css, ThingForm.tsx (fill, the ThingPhoto call),
+  EventForm.tsx (import).
+- Restraint:    no list-item photo, no new API path, no change to ThingForm, shrink-photo or FromThing's markup;
+  Thumb exported from PhotoField only because FromThing already used it.
+- New owner row: | `frontend/src/components/PhotoField.tsx` | A photo inside a form (§8.8, §8.11): hidden file input
+  (camera/library), lazy shrink-photo, the waiting photo's object URL, Thumb (tap for full size inside the dialog),
+  Add / Replace / Remove, an optional read step with its status and refusal — no API path of its own |
+
 ## 2026-10-04 — photoBody to http.ts, the photo-read budget to its own owner (reorganizer; refactor/access-photo-reads-seams, 2 of 2)
 
 REORG RECEIPT
