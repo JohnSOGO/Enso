@@ -39,7 +39,10 @@ export function splitSpeakers(ids: readonly string[]): Record<SpeakerKind, strin
   return { echo: ids.filter((id) => speakerKind(id) === 'echo'), satellite: ids.filter((id) => speakerKind(id) === 'satellite') };
 }
 
-/** Home Assistant's template answer → its speakers, Echos first then by name; not a JSON array → null. */
+/** §9.2a Q130 — Alexa Media Player lists the Alexa apps too; these names are not speakers. */
+const notASpeaker = (name: string) => /^this device$/i.test(name) || /alexa app/i.test(name);
+
+/** Home Assistant's template answer → its speakers (apps dropped), Echos first then by name; not a JSON array → null. */
 export function speakerList(text: string): Speaker[] | null {
   let raw: unknown;
   try { raw = JSON.parse(text); } catch { return null; }
@@ -51,6 +54,7 @@ export function speakerList(text: string): Speaker[] | null {
     if (!kind || seen.has(e.id as string)) continue;
     seen.add(e.id as string);
     const name = typeof e.name === 'string' && e.name.trim() ? e.name.trim() : (e.id as string);
+    if (notASpeaker(name)) continue;
     out.push({ id: e.id as string, name, kind });
   }
   return out.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'echo' ? -1 : 1));

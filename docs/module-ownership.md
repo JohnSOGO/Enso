@@ -127,7 +127,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/RingingBar.tsx` | Ringing bar (§8.2) |
 | `frontend/src/components/Settings.tsx` | Settings: Me, Household, Status (§8.6) |
 | `frontend/src/components/PhoneAlerts.tsx` | Settings → Me → Phone alerts row (§9.1): this phone's state (on / off / blocked / iPhone: add to Home Screen first / not supported / not set up), Turn on from the tap, Turn off, Send a test; calls refresh() so the 📵 badge follows |
-| `frontend/src/components/HouseSpeakers.tsx` | Settings → Me → 🔊 Speak my alerts on (§9.2a): GET /house/speakers, one checkbox line per speaker (name + dim Echo / Voice PE), a chosen id HA no longer lists shown ticked "not in the house any more", the not-chosen and no-speaker lines, Use the defaults, tick/untick → PATCH /me with the whole list, 503 / 502 in place with Try again |
+| `frontend/src/components/HouseSpeakers.tsx` | Settings → Me → 🔊 Speak my alerts on (§9.2a): GET /house/speakers, one checkbox line per speaker (name + dim Alexa / Voice PE; the Alexa apps hidden by speakerList), a chosen id HA no longer lists shown ticked "not in the house any more", the not-chosen and no-speaker lines, Use the defaults, tick/untick → PATCH /me with the whole list, 503 / 502 in place with Try again |
 | `frontend/src/components/useAction.tsx` | Runs an async action, tracks busy, renders its failure in place (`role="alert"`) — the Settings sections' action hook |
 | `frontend/src/components/Invites.tsx` | Settings → Household → Invites: create, list with states, revoke (§8.9) |
 | `frontend/src/components/InviteCard.tsx` | The one-time invite card modal: lazy `uqr` QR, Share, Copy link, the code (§8.9) — the only importer of `uqr` |

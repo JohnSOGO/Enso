@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.40 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
+**Version:** 2.41 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3394,6 +3394,9 @@ for someone who is never in that room.
 - `speakerList(text)` → `Speaker[]` (`{ id, name, kind }`) or `null`: parses Home Assistant's answer
   (below), keeps the entries whose `id` has a kind and whose `name` is a non-empty string (else the id),
   drops duplicate ids, orders Echos first, then by name. Not a JSON array → `null`.
+  **Not speakers** (decided by MojoSOGO 2026-10-04): Alexa Media Player also lists the Alexa apps, so an entry
+  named `This Device`, or whose name contains `Alexa App`, is dropped (case-insensitive) ⚑ Q130. Fire TVs, the
+  Echo Show and the `Everywhere` group stay.
 
 **Who a house delivery is for** is the audience tick already computes (`audience(…).push`, §7.5: active
 members, narrowed to the assigned ones, and for an optional event to those who have it on). An
@@ -3427,7 +3430,8 @@ steps and push still goes out. For an announcement with House alone ticked, that
 no longer lists is shown as such and fails visibly when spoken. `GET /me` carries `houseSpeakers`.
 
 **The screen** (`🔊 Speak my alerts on`, Settings → Me, below Phone alerts):
-- One line per speaker from `GET /house/speakers`: a checkbox, the name, and a dim `Echo` / `Voice PE`.
+- One line per speaker from `GET /house/speakers`: a checkbox, the name, and a dim `Alexa` / `Voice PE`
+  (an `echo` speaker may be a Fire TV or an Echo Show, so the screen says Alexa).
   Ticking or unticking saves at once (`PATCH /me` with the whole new list).
 - **Not chosen** (`mine` null): every box is unticked, and a dim line says "Not chosen: alerts for you
   are spoken on the default speakers ({defaults joined with ', '})." The first tick makes a list of one.
@@ -3444,7 +3448,7 @@ no longer lists is shown as such and fails visibly when spoken. `GET /me` carrie
 |---|---|---|
 | HS1 | `speakerKind`, `speakersError` | `media_player.game_room` echo; `assist_satellite.voice_pe` satellite; `light.x`, `media_player.Game Room`, `""` null; null ok, `[]` ok, 21 ids / a duplicate / a light / a non-array → message |
 | HS2 | `speakersFor` | `[null]` and `[['a'], null]` → null; `[['a','b'], ['b','c']]` → `['a','b','c']`; `[[], []]` → `[]`; `[]` → null |
-| HS3 | `speakerList` on an HA answer with two Echos, the Voice PE, a `light.*`, a duplicate, a blank name; on `"oops"` | Echos first by name, then the satellite; the light and duplicate gone; the blank name → the id; `null` |
+| HS3 | `speakerList` on an HA answer with two Echos, the Voice PE, a `light.*`, a duplicate, a blank name, `This Device`, `Tostig's Alexa App for PC`; on `"oops"` | Echos first by name, then the satellite; the light, duplicate and both app entries gone; the blank name → the id; `null` |
 | HS4 | `GET /house/speakers` against a fake HA | one POST to `/api/template` carrying the template and the three auth headers; 200 with the list, `mine` null, `defaults`; not configured → 503 and zero fetches; HA 500 / 302 / not JSON → 502 `house_unreachable` |
 | HS5 | `PATCH /me { houseSpeakers }` | a list saved and back on `GET /me`; `null` clears it; a bad list → 400 and nothing saved |
 | HS6 | tick: a fire for A (chose Game Room + Voice PE) and B (chose Sogo) | one house row, `speakers` = the union; the drain sends Echo `target` = [game_room, sogo] and Voice PE `entity_id` = [voice_pe]; `sent` |
@@ -4097,6 +4101,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q127 | Announcements | ⚑ For every active member: everyone's ticked speakers together |
 | Q128 | Nobody it is for has a speaker ticked | ⚑ Not spoken at all; push still goes out. An announcement with House alone is 409 `no_speakers` |
 | Q129 | Who sets a person's speakers | ⚑ Only that person, in Settings → Me; admins can't set anyone else's |
+| Q130 | Which Alexa entries are not speakers | **Decided by MojoSOGO 2026-10-04: tidy.** ⚑ Matched by name: `This Device` and any name containing `Alexa App` are hidden; everything else Alexa Media Player lists stays |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -4296,7 +4301,8 @@ captions (5 ingredients, 6 steps — it had been "watch it").
 (the union; anyone not chosen, or nobody at all, → the default speakers, as before) and spoken only there; a surface
 with no speaker is not called. Built as: `classifyHouse` takes the called surfaces' results and is `failed` when none
 was called (never a quiet `sent`); the screen shows "not chosen" with every box unticked and names the defaults.
-Migration 0024 applied in production and v1.19.0 deployed 2026-10-04. **Still owed:** the real speaker list seen
+Migration 0024 applied in production and v1.19.0 deployed 2026-10-04. The real list (15 Alexa entries + the
+Voice PE) seen on MojoSOGO's phone; v1.19.1 hides the Alexa apps and labels the rest Alexa (Q130). **Still owed:** the real speaker list seen
 on the iPhone (the template's `integration_entities('alexa_media')` may list more than the four Echos); each person's
 ticks; a reminder for one person heard only on their speakers.
 **Identify fix** (v1.18.1): SogoAI's qwen3.6 thinks even with ` /no_think`; at `max_tokens` 100 it was cut off

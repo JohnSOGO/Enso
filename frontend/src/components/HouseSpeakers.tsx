@@ -53,7 +53,7 @@ export function HouseSpeakers() {
       {list && <>
         <table className={s.table}>
           <tbody>
-            {list.speakers.map((sp) => line(sp.id, sp.name, sp.kind === 'echo' ? 'Echo' : 'Voice PE'))}
+            {list.speakers.map((sp) => line(sp.id, sp.name, sp.kind === 'echo' ? 'Alexa' : 'Voice PE'))}
             {gone.map((id) => line(id, id, 'not in the house any more'))}
           </tbody>
         </table>
