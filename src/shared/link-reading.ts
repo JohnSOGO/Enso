@@ -2,6 +2,7 @@
 // says (pageExtract), the limits, and the two prompts. Pure; imports things only. The Worker fetches
 // (page-fetch.ts) and asks Claude (link-reader.ts); the answer is cleaned by cleanPhotoReading, like a photo's.
 import { webLink } from './things';
+import type { Place } from './sun';
 
 export const PAGE_FETCH_TIMEOUT_MS = 8000;
 export const PAGE_BYTES_MAX = 1_500_000;
@@ -93,8 +94,16 @@ export function pageSection(page: PageResult): string {
   ].join('\n\n');
 }
 
+/** §7C.4b — several locations: the one closest to home (the household's own place), the others named in the note. */
+export function nearestClause(home: Place | null): string {
+  if (!home) return 'If it happens in more than one place, name every location in the notes.';
+  return `The household lives at latitude ${home.lat}, longitude ${home.lon}. If it happens in more than one place ` +
+    `(or on different dates in different places), choose the location closest to the household and give that ` +
+    `location's dates, address, phone and cost; mention the other locations only in the note.`;
+}
+
 /** §7C.4b — the look-up: plain notes from the page and what searches find, never guessed. */
-export const researchPrompt = (link: string, page: PageResult, today: string, tz: string) =>
+export const researchPrompt = (link: string, page: PageResult, today: string, tz: string, home: Place | null) =>
   `Someone in a household pasted this link while noting something they might want to do: ${link}\n` +
   `Today is ${today} in the household's time zone, ${tz}.\n\n` +
   `Here is what the page says:\n\n${pageSection(page)}\n\n` +
@@ -102,11 +111,11 @@ export const researchPrompt = (link: string, page: PageResult, today: string, tz
   `address, a phone number, the cost or ticket prices, and anything else useful (what to bring, age limits, how to ` +
   `get tickets). If the page above is missing or doesn't say, read the link with web fetch, and use web search for what ` +
   `is still missing. Use only what the page and the searches say; never guess or fill in from general knowledge, and ` +
-  `if something can't be found, say so. If the dates found are for a past year, say which year. Answer as short plain ` +
-  `notes, one fact per line.`;
+  `if something can't be found, say so. If the dates found are for a past year, say which year. ${nearestClause(home)} ` +
+  `Answer as short plain notes, one fact per line.`;
 
 /** §7C.4b — filling the fields from the page and the notes (the photo reader's schema). */
-export const fillPrompt = (link: string, page: PageResult, notes: string, today: string, tz: string) =>
+export const fillPrompt = (link: string, page: PageResult, notes: string, today: string, tz: string, home: Place | null) =>
   `This is about a link someone pasted while noting something a household might want to do: ${link}\n` +
   `Today is ${today} in the household's time zone, ${tz}.\n\n` +
   `What the page says:\n\n${pageSection(page)}\n\n` +
@@ -115,4 +124,4 @@ export const fillPrompt = (link: string, page: PageResult, notes: string, today:
   `full dates, choosing the next such date on or after today; a single day has the same start and end), place (the ` +
   `venue's name), address (its street address), phone (a phone number), cost (prices or cost, as one line), url (null), ` +
   `note (anything else useful, such as times, what to bring or where tickets are sold). Use only what the page and the ` +
-  `notes say, copied as written. Use null for anything not found.`;
+  `notes say, copied as written. ${nearestClause(home)} Use null for anything not found.`;

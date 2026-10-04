@@ -6,7 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import worker from '../src/worker/index';
 import type { Env } from '../src/worker/env';
 import { READS_PER_DAY } from '../src/shared/things';
-import { JSONLD_MAX, PAGE_TEXT_MAX, pageExtract, readableLink } from '../src/shared/link-reading';
+import { JSONLD_MAX, PAGE_TEXT_MAX, nearestClause, pageExtract, readableLink } from '../src/shared/link-reading';
 import { BASE, Client, owner } from './helpers';
 import { claudeMessage, keyedEnv, warmClaude } from './recipe-fakes';
 
@@ -75,7 +75,7 @@ describe('§7C.4b read-link through the Worker', () => {
     expect(await things()).toBe(before);
     const [research, filling] = claudeAsks(r.heard);
     expect(research.tools).toEqual([
-      { type: 'web_search_20260209', name: 'web_search', max_uses: 3 },
+      { type: 'web_search_20260209', name: 'web_search', max_uses: 3, user_location: { type: 'approximate', timezone: expect.any(String) } },
       { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 2 },
     ]);
     expect(research.model).toBe('claude-opus-5-5');
@@ -84,6 +84,11 @@ describe('§7C.4b read-link through the Worker', () => {
     expect(asked).toContain('"startDate":"2026-10-10"');
     expect(asked).toContain('Gates open 10am');
     expect(asked).not.toContain('hidden = 1');
+    const home = await env.DB.prepare('SELECT latitude AS lat, longitude AS lon FROM settings WHERE id = 1').first<any>();
+    expect(home.lat).not.toBeNull();
+    expect(asked).toContain(`latitude ${home.lat}, longitude ${home.lon}`);
+    expect(asked).toMatch(/choose the location closest to the household/);
+    expect(promptOf(filling)).toMatch(/choose the location closest to the household/);
     expect(filling.tools).toBeUndefined();
     expect(promptOf(filling)).toContain('Fall Fair, Oct 10–20, $15');
   });
@@ -156,6 +161,11 @@ describe('§7C.4b read-link through the Worker', () => {
 });
 
 describe('§7C.4b the rules (pure)', () => {
+  it('nearestClause: closest to home when the household has a place; otherwise every location named', () => {
+    expect(nearestClause({ lat: 33.2, lon: -117.29 })).toMatch(/latitude 33.2, longitude -117.29.*closest/);
+    expect(nearestClause(null)).toBe('If it happens in more than one place, name every location in the notes.');
+  });
+
   it('readableLink keeps public links and refuses private hosts', () => {
     expect(readableLink('pumpkinjunctionsd.com')).toBe('https://pumpkinjunctionsd.com');
     expect(readableLink('https://www.example.org/tickets?x=1')).toBe('https://www.example.org/tickets?x=1');

@@ -2330,6 +2330,12 @@ form the way a photo does (§7C.4): **nothing is saved**, only **empty** fields 
   the page and what the searches found, never guessed**. `pause_turn` is continued (the paused answer sent
   back unchanged) up to `RESEARCH_TURNS_MAX` = 4 requests; still paused after that is a failure (502), never
   half-finished notes passed off as the answer. The notes are the text after the last tool result.
+- **Several locations** (asked by MojoSOGO 2026-10-04: "pick the closest to San Diego"): both prompts give the
+  household's own place (`settings` latitude / longitude, §7.7 — Oceanside, in the San Diego area) and say: when it
+  happens in more than one place, or on different dates in different places, choose the location **closest to the
+  household** and give that location's dates, address, phone and cost; the other locations go only in the note
+  (`nearestClause`, link-reading.ts). No place set → every location is named in the note instead ⚑ Q143. Web search
+  is told the household's time zone as its approximate location.
 - **Filling the fields** (`askClaude`, the photo reader's schema): the page extract and the notes →
   `{ title, startDate, endDate, place, address, phone, cost, url, note }`, dates resolved as for a photo
   (the next such date on or after today). Two requests rather than one because web search always answers
@@ -2366,6 +2372,7 @@ form the way a photo does (§7C.4): **nothing is saved**, only **empty** fields 
 | D18 | read-link where research answers `pause_turn` once | the paused answer is sent back unchanged and the second answer's notes are used |
 | D19 | read-link where Claude's fill gives another link | the answer's `url` is the pasted link |
 | D20 | `pageExtract` on HTML with a script, a style, a comment, `&amp;`, meta og:title and two JSON-LD blocks | title and meta kept, both JSON-LD blocks kept, script/style/comment text gone, `&` decoded; a 50 000-char body cut to 12 000 |
+| D22 | read-link with the household's place set | both prompts carry its latitude / longitude and "choose the location closest to the household"; web search carries `user_location` with the zone |
 | D21 | refusal / failure from Claude | 422 `link_refused` / 502 `link_reading_failed` with the reason |
 
 ---
@@ -4391,6 +4398,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q139 | Which budget link readings use | ⚑ The same 40-a-day `photo_reads` budget as photos (one read per tap, counted before Claude is asked); no new table |
 | Q140 | How hard a link reading looks | ⚑ At most 3 web searches and 2 page fetches per tap |
 | Q141 | Sending a link to Anthropic | ⚑ The link, the page's text and the searches go to Anthropic, as photos do (Q30) |
+| Q143 | "Closest" for a link with several locations | ⚑ Closest to the household's own place (Oceanside, the sun-alerts location), which MojoSOGO named "San Diego"; with no place set, every location goes in the note |
 | Q142 | Where "Fill in from this link" sits | ⚑ A full-width button right under the Link field, only when the field holds a usable link; reading starts on the tap, never on paste |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
@@ -4604,7 +4612,7 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
-**Fill a thing from a link** (v1.21.0, §7C.4b, §8.11; asked by MojoSOGO 2026-10-04; D14–D21 green): under the thing
+**Fill a thing from a link** (v1.21.0, §7C.4b, §8.11; asked by MojoSOGO 2026-10-04; D14–D22 green; v1.21.1 picks the location closest to home): under the thing
 form's Link, **🔗 Fill in from this link** fetches the page from the Worker (title, meta, JSON-LD, text), has Claude
 look it up with web search (≤ 3) and web fetch (≤ 2), then fills the empty fields marked *from link — check it*.
 Counted in the 40-a-day `photo_reads` budget. No migration. Tests reach only a fake site and a fake Claude; the
