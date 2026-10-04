@@ -10,6 +10,7 @@ import { choreFireContext } from '../../shared/chores';
 import { insertFire, loadChoreRun, sourceOf, updateFire } from '../tick';
 import { completeStep } from './chores';
 import { isOnFor } from '../../shared/optins';
+import { MACHINE_LABEL, isMachineId } from '../../shared/machines';
 import { onEventIds } from '../event-rows';
 
 interface TimerRow {
@@ -111,19 +112,27 @@ alerts.post('/timers/:id/commands', requireMember, async (c) => {
 alerts.get('/fires', requireMember, async (c) => {
   const state = c.req.query('state') ?? 'ringing';
   if (state !== 'ringing' && state !== 'open') return fail(c, 400, 'invalid_input', 'state must be ringing or open.');
-  const rows = await all<Record<string, unknown> & { kind: string; choreRunId: string | null; optional: number | null }>(c.env.DB,
+  const rows = await all<Record<string, unknown> & {
+    kind: string; choreRunId: string | null; optional: number | null; machineId: string | null; machineOwner: string | null;
+  }>(c.env.DB,
     `SELECT f.id, f.kind, f.due_at AS dueAt, f.state, f.alert_count AS alertCount, f.occurrence_date AS occurrenceDate,
             f.event_id AS eventId, f.timer_id AS timerId, f.chore_run_id AS choreRunId, f.thing_id AS thingId,
+            f.machine_id AS machineId, m.owner_id AS machineOwner,
             COALESCE(e.title, t.title, th.title) AS title, e.start_time AS startTime, e.optional
        FROM fires f LEFT JOIN events e ON e.id = f.event_id LEFT JOIN timers t ON t.id = f.timer_id
-       LEFT JOIN things th ON th.id = f.thing_id
+       LEFT JOIN things th ON th.id = f.thing_id LEFT JOIN machines m ON m.id = f.machine_id
       WHERE ${state === 'ringing' ? "f.state = 'ringing'" : "f.state != 'closed'"}
       ORDER BY f.due_at DESC`);
   const me = c.get('member').id, on = await onEventIds(c.env.DB, me);
   const out = [];
-  for (const { choreRunId, optional, ...r } of rows) {
+  for (const { choreRunId, optional, machineId, machineOwner, ...r } of rows) {
     // §7.5: a reminder of an optional event is hidden from whoever doesn't have it on.
     if (r.kind === 'reminder' && !isOnFor({ optional: optional ?? 0 }, me, on.has(r.eventId as string) ? [me] : [])) continue;
+    // §10: machine fires carry the machine, its label as the title, and the load's owner.
+    if (r.kind === 'machine') {
+      out.push({ ...r, machineId, title: isMachineId(machineId) ? MACHINE_LABEL[machineId] : null, personId: machineOwner });
+      continue;
+    }
     if (r.kind !== 'chore') { out.push(r); continue; }
     // §10: chore fires carry their run, the current step's person, and the step title (multi-step only).
     const cr = await loadChoreRun(c.env.DB, choreRunId);
@@ -141,9 +150,9 @@ alerts.post('/fires/:id/actions', requireMember, async (c) => {
   if (!isOneOf(ACTION, b.action)) return fail(c, 400, 'invalid_input', `action must be one of: ${ACTION.join(', ')}.`);
   const fire = await first<FireRow>(c.env.DB, 'SELECT * FROM fires WHERE id = ?', c.req.param('id'));
   if (!fire) return fail(c, 404, 'not_found', 'That alert no longer exists.');
-  const src = await sourceOf(c.env.DB, fire);
-  if (!src) return fail(c, 404, 'not_found', 'That alert no longer has an event or timer.');
   const now = nowIso();
+  const src = await sourceOf(c.env.DB, fire, now);
+  if (!src) return fail(c, 404, 'not_found', 'That alert no longer has an event or timer.');
   const r = applyAction(fire, b.action, src.cfg, c.get('member').id, now);
   if ('error' in r) return fail(c, 409, 'invalid_action', `Cannot ${b.action} this ${fire.kind} right now (it is ${fire.state}).`);
   if (fire.kind === 'chore') {

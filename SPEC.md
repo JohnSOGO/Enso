@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.26 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.27 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -172,7 +172,8 @@ Enso/
 │   ├── 0005_lists.sql      # §4.2d
 │   ├── …                   # 0006–0011, §4.2e–§4.2j
 │   ├── 0012_announcements.sql   # §4.2k
-│   └── 0013_retire_relay.sql    # §4.2l
+│   ├── 0013_retire_relay.sql    # §4.2l
+│   └── 0014_machines.sql        # §4.2m
 ├── src/
 │   ├── shared/             # pure TS, no I/O — imported by worker and frontend
 │   │   ├── vocab.ts        # §3
@@ -181,6 +182,7 @@ Enso/
 │   │   ├── holidays.ts     # §7.3
 │   │   ├── markets.ts      # §7.4
 │   │   ├── lists.ts        # §7A.1 item rules: itemKey, add/reopen decision, limits, 30-day window
+│   │   ├── machines.ts     # §7D the laundry loop: state, transitions, done message
 │   │   └── engine.ts       # §5
 │   └── worker/
 │       ├── index.ts        # Hono app + scheduled() handler
@@ -191,7 +193,7 @@ Enso/
 │       │                   # invites) · events.ts (/calendar, events) · alarms.ts ·
 │       │                   # alerts.ts (timers, fires + actions) · household.ts (settings,
 │       │                   # days off, /push/*, /status) · announce.ts ·
-│       │                   # lists.ts (§7A)
+│       │                   # lists.ts (§7A) · machines.ts (§7D)
 │       ├── tick.ts         # loads rows, calls engine, writes results
 │       ├── push.ts         # Web Push sending
 │       ├── house.ts        # House delivery via HA through Cloudflare Tunnel + Access (§9.2)
@@ -274,7 +276,7 @@ These are the **only** definitions. Export each as a `const` tuple and derive th
 type from it:
 
 ```ts
-export const ALERT_KIND   = ['reminder', 'timer', 'chore', 'thing'] as const;
+export const ALERT_KIND   = ['reminder', 'timer', 'chore', 'thing', 'machine'] as const;
 export const CHANNEL      = ['push', 'house'] as const;
 export const FIRE_STATE   = ['scheduled', 'ringing', 'closed'] as const;
 export const CLOSE_REASON = ['done', 'acked', 'missed', 'superseded', 'stopped', 'removed'] as const;
@@ -287,6 +289,8 @@ export const WEEKDAY      = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;
 export const CHORE_TIMING = ['at', 'by'] as const;                               // §7B
 export const THING_STATUS = ['idea', 'planned', 'done', 'dropped'] as const;     // §7C
 export const HOUSE_STATE  = ['ok', 'failing', 'not_configured', 'untried'] as const; // /status `house.state` (§9.2)
+export const MACHINE      = ['washer', 'dryer'] as const;                        // §7D, in load order
+export const MACHINE_STATE = ['free', 'running', 'done'] as const;               // §7D, derived, never stored
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
 ```
@@ -302,6 +306,9 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `acked` | Someone tapped Ack on a timer (the timer restarts) |
 | `missed` | A reminder was more than 60 min overdue when the engine first saw it (outage) — closed without alerting |
 | `chore` | A fire for one step of one chore run (§7B) |
+| `machine` | A fire for one load in one machine, due when the machine is done (§7D) |
+| `washer` / `dryer` | The two laundry machines (§7D); the washer's load moves on to the dryer |
+| `free` / `running` / `done` | A machine's state (§7D): no load / a load, before done-at / a load, done-at passed — derived from the row and `now` |
 | `at` | Chore rings at its time, like an alarm |
 | `by` | Chore is quiet: due by its time, optionally one nudge then |
 | `superseded` | A newer occurrence of the same event started ringing while this one still was |
@@ -805,6 +812,47 @@ ALTER TABLE settings DROP COLUMN relay_last_seen;
 **Migration check (H9):** the `settings` row survives 0013 with its name, time zone and days
 off unchanged, and `relay_last_seen` is no longer a column.
 
+### 4.2m Schema change — `migrations/0014_machines.sql`
+
+```sql
+-- §7D — the laundry loop: two machines, and fires gain kind 'machine' (+ machine_id).
+-- fires is rebuilt exactly like 0006/0008, deliveries stashed and restored.
+PRAGMA defer_foreign_keys = true;
+
+CREATE TABLE machines (
+  id         TEXT PRIMARY KEY,                 -- MACHINE (vocab.ts); the route validates with isOneOf
+  owner_id   TEXT REFERENCES members(id),      -- whose load; NULL = free
+  minutes    INTEGER,                          -- the chip picked (MACHINE_MINUTES)
+  started_at TEXT,                             -- UTC ISO; NULL = free
+  done_at    TEXT,                             -- started_at + minutes
+  started_by TEXT REFERENCES members(id),
+  updated_at TEXT
+);
+INSERT INTO machines (id, updated_at) VALUES ('washer', '2026-10-03T00:00:00.000Z'), ('dryer', '2026-10-03T00:00:00.000Z');
+
+CREATE TABLE fires_new (
+  …every 0008 column…,
+  kind       TEXT NOT NULL CHECK (kind IN ('reminder','timer','chore','thing','machine')),
+  machine_id TEXT REFERENCES machines(id),
+  CHECK ((kind = 'reminder' AND … AND machine_id IS NULL)
+      OR (kind = 'timer'    AND … AND machine_id IS NULL)
+      OR (kind = 'chore'    AND … AND machine_id IS NULL)
+      OR (kind = 'thing'    AND … AND machine_id IS NULL)
+      OR (kind = 'machine'  AND machine_id IS NOT NULL AND event_id IS NULL AND timer_id IS NULL
+                            AND chore_run_id IS NULL AND thing_id IS NULL))
+);
+-- copy fires (machine_id NULL), stash deliveries, drop, rename, restore, recreate every
+-- 0008 index, and:
+CREATE UNIQUE INDEX uq_machine_open ON fires(machine_id) WHERE kind = 'machine' AND state != 'closed';
+```
+
+There is no CHECK on `machines.id` (the vocabulary lives in `vocab.ts`). Seeds carry literal
+timestamps, never `datetime('now')`. **Done-waiting is never stored:** a machine is `done` when
+its owner is set and `now ≥ done_at`.
+**Migration check (L13):** like C13 — fires of every earlier kind and their deliveries survive
+0014, `PRAGMA foreign_key_check` is empty, both machines are seeded free, and a `machine` fire
+without `machine_id` is refused by the CHECK.
+
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
 
@@ -889,7 +937,7 @@ export const SNOOZE_MIN         = 10;    // ⚑ DEFAULT
 | 4 | `ringing` | `renotifyMin` set, `alert_count < maxAlerts`, `now ≥ last_alerted_at + renotifyMin` | `alert_count + 1`, `last_alerted_at = now`, **alert** |
 | 5 | anything else | — | no change |
 
-Timers and chores are never `missed`. An overdue timer or chore still rings, even
+Timers, chores and machines are never `missed`. An overdue timer or chore still rings, even
 after an outage — a chore does not stop needing doing.
 
 After `maxAlerts` a fire stays `ringing` **silently**. It remains visible in the
@@ -903,6 +951,7 @@ app's Ringing bar (§8.2) until someone acts.
 | `snooze` | reminder, `ringing` | `scheduled`, `due_at = now + SNOOZE_MIN`, `alert_count = 0` |
 | `done` | chore, `ringing` | advances the run one step (§7B.3) — the route calls `advanceRun`; the fire closes `done` |
 | `ack` | timer, `ringing` **or** `scheduled` | `closed`, reason `acked`; **next** = new timer fire `due_at = now + intervalMin` |
+| any | machine | `invalid_action` — a machine fire is closed only by the `/machines` routes (§7D) |
 | anything else | — | `{ error: 'invalid_action' }` → HTTP 409 |
 
 Any member may act on any fire. ⚑ DEFAULT
@@ -960,6 +1009,10 @@ For one alert of one fire:
     more than one step. `{name}` is the step person's display name; with nobody,
     `"Chore: {title}"`. Naming the person is what lets Shelly (and everyone) hear whose
     turn it is without a phone.
+  - machine: `"{name}, your laundry in the {machine} is done"`; with no active owner,
+    `"The laundry in the {machine} is done"`; plus `" — {name}'s load is waiting"` while the
+    machine before it holds a done load (§7D.3). Built by `machines.ts` `doneMessage`;
+    recipients are the owner, or every active member when the owner is disabled.
   - from the second alert on, append `" (alert {n})"`
 
 A delivery with **no fire** is an announcement (§9.3); it is written by `POST /announce`,
@@ -1613,6 +1666,88 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
 
 ---
 
+## 7D. The laundry loop — `src/shared/machines.ts` (pure)
+
+Decided by MojoSOGO 2026-10-03. Two machines, **Washer** and **Dryer**, each holding at most
+one load. A load turns once around: **start the washer → done → move to the dryer → done →
+fold & out**. The weekly Laundry chore (§7B) is separate and unchanged; the dishwasher is
+deferred.
+
+### 7D.1 A machine
+
+- One `machines` row per machine (§4.2m), seeded free. Its **state** is derived, never stored
+  (`machineState(row, now)`):
+  - **free** — no owner;
+  - **running** — owner set, `now < done_at`: whose load, started, minutes, done-at;
+  - **done** — owner set, `now ≥ done_at`: the card reads **DONE — waiting**.
+- `GET /machines` returns the server-derived `state`; the PWA never re-derives it.
+- The machines in load order are `MACHINE` (vocab): the washer's **next** machine is the dryer;
+  the dryer has none (it is the last).
+- Anyone may act on any machine. Every transition is one `db.batch` (§7D.2).
+
+### 7D.2 Transitions — each returns `{ rows, closeFire?, newFire? }` or a refusal
+
+| Transition | Valid when | Result |
+|---|---|---|
+| **Start** `{ ownerId, minutes }` | the machine is free | owner, minutes, `started_at = now`, `done_at = now + minutes`, `started_by` = me; a new `machine` fire due at `done_at` |
+| **Move** `{ minutes }` (washer → dryer) | the washer is done **and** the dryer is free | washer free, its open fire closes `done` (`closed_by` = me); the dryer starts with the **washer's owner** and its own minutes; a new dryer fire |
+| **Finish** — *Fold & out* | the last machine (dryer) is done | dryer free; its open fire closes `done` — the load's loop ends |
+| **Clear** | running or done | free; its open fire closes `removed`; nothing rings |
+
+- **Minutes** are chips: `MACHINE_MINUTES` = **30 / 45 / 60 / 90**. **Whose load** is one active
+  member (the chooser defaults to me).
+- Refusals are **409** with a message, shown in place:
+  - start on a machine that isn't free, or move while the dryer is full → `busy`,
+    "The dryer still has Sam's load." ("…has a load." when its owner is not an active member).
+    The washer stays DONE — waiting; nothing moves automatically.
+  - move a washer that isn't done → `not_done` "The washer isn't done yet."
+  - move from the dryer, or Fold & out on the washer → `invalid_state` with a message naming
+    what the machine does take.
+  - clear a free machine → `already_free`.
+- **Two taps at once:** every machine-row write is conditional on the row's `started_at` as it
+  was read, inside the same batch as the fire writes; a row that changed under it aborts the
+  whole batch → **409 `conflict`** "Someone else just changed the washer — have another look."
+  `uq_machine_open` also refuses a second open fire for one machine.
+- A machine fire is closed **only** by these routes; `POST /fires/{id}/actions` on one is 409
+  `invalid_action` (§5.4). No new `ACTION` or `CLOSE_REASON`.
+
+### 7D.3 When it's done — reminders
+
+- The fire is inserted by the route at start/move (as a timer's is); `tick` steps it like any
+  fire (§5.3) with `MACHINE_CHANNELS` = **Phone + House**, `MACHINE_RENOTIFY_MIN` = **15**,
+  `MACHINE_MAX_ALERTS` = **4**. After the 4th alert it stays ringing silently in the Ringing
+  bar and the card stays **DONE — waiting**. Never `missed`.
+- Recipients: the load's **owner** (push to their phones) and **one** House announcement. An
+  owner who has since been disabled counts as nobody: every active member is pushed.
+- Message (`doneMessage`): `"Sam, your laundry in the washer is done"` / `"… in the dryer is
+  done"`; with no active owner `"The laundry in the washer is done"`. While the machine
+  before it (the washer) holds a **done** load, every later dryer alert adds
+  `" — Kai's load is waiting"` (`" — another load is waiting"` when that owner is not
+  active). From the second alert on, `" (alert n)"` (§5.7). "Waiting" is derived at alert
+  time, never stored.
+- Phone notifications have **no buttons** for a machine (`pushActions('machine') = []`);
+  tapping one opens the app.
+
+### 7D.4 Acceptance (M4l — each row is a test)
+
+| # | Setup / call | Expected |
+|---|---|---|
+| L1 | `machineState` before / at / after `done_at`, and with no owner | running / done / done / free |
+| L2 | `doneMessage` with an owner, with none, with a waiting load, waiting with an inactive owner | the four §7D.3 texts |
+| L3 | start the washer for A, 45 min | 200; washer `running`, `done_at = now + 45 min`; one `scheduled` machine fire due then |
+| L4 | tick at done-at | fire ringing; push delivery to A only + one house delivery, message `A, your laundry in the washer is done` |
+| L5 | ticks every 15 min after | alerts 2, 3, 4 (`… (alert 4)`); a 5th tick sends nothing; washer state `done` |
+| L6 | move to the dryer, 60 min | washer free, its fire closed `done` by me; dryer running for A with a new fire |
+| L7 | start the washer for B, then move it while the dryer is still full | 409 `busy` "The dryer still has A's load."; the washer stays done; nothing moved |
+| L8 | tick the dryer's done-at while B's load waits in the washer | dryer message `A, your laundry in the dryer is done — B's load is waiting` |
+| L9 | Fold & out on the done dryer | dryer free; its fire closed `done` |
+| L10 | Clear a running machine | free; its fire closed `removed`; a later tick sends nothing |
+| L11 | two Start taps on one free machine at once | one 200, one 409; exactly one open fire |
+| L12 | minutes 20, an unknown owner, an unknown machine, `done` action on a machine fire | 400 / 400 / 404 / 409 `invalid_action`, each with a message |
+| L13 | migration check (§4.2m) | fires and deliveries intact after 0014; machines seeded; CHECK refuses a machine fire without `machine_id` |
+
+---
+
 ## 8. Screens
 
 General rules come from `MOJOSOGO-PREFERENCES.md`: chips are entities, badges are
@@ -1675,6 +1810,9 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
 - Timer row: `⏱ Check on the dog · ringing 45 min` with **[Ack]**
 - Chore row: `🧹 Laundry — Move to dryer · Sam` with **[Done]** (no snooze)
 - Thing row: `📌 Fall fair · to do` with **[Snooze 10m] [Done]** ⚑ glyph
+- Machine row: `🧺 Washer · Sam` with **[Move to dryer]** — it opens the same dryer-minutes
+  chooser the Machines card uses (§8.5); `🧺 Dryer · Sam` with **[Fold & out]**. No Done:
+  a machine fire is closed only by the `/machines` routes (§7D.2). ⚑ Q40
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
   "3 more ringing ▾".
 
@@ -1735,8 +1873,9 @@ Phone unticked** ⚑ Q36) and **Send** / **Cancel**. Send is disabled while the 
 blank or neither channel is ticked. A refusal from the server shows inside the box; on
 success the box closes (there is no toast in the app). What happens is §9.3.
 
-Then three sections, each a single-line list (per the table rules), each with a **＋ Add**
-button in its header.
+Then four sections — Scheduled, Rolling timers, **Machines**, Chores. Scheduled, Rolling
+timers and Chores are single-line lists (per the table rules), each with a **＋ Add** button
+in its header; Machines is two fixed cards and has no ＋ Add.
 
 **Scheduled** — one row per alarm, sorted by time of day, then title:
 
@@ -1764,6 +1903,39 @@ Time   Alarm                    Days            Next
 status badge (running / ringing / stopped) and **[Start]/[Stop]**; tapping a row
 opens the timer form (title, interval 1–1440 min, channels, repeat alert every,
 assigned to, Delete).
+
+**Machines** — the laundry loop (§7D), right after Rolling timers. One card per machine, in
+load order. Each card: the machine (🫧 Washer, 🌀 Dryer ⚑), a state badge (**free** neutral ·
+**running** green · **DONE — waiting** amber), whose load and the done-at time, and its
+actions on a second line. At 320 px:
+
+```
+Machines
+Wash, move to the dryer, fold. Whoever's load it is hears when it's done.
+┌──────────────────────────────────────┐
+│ 🫧 Washer  DONE — waiting   Kai·14:05 │
+│              [Move to dryer] [Clear] │
+├──────────────────────────────────────┤
+│ 🌀 Dryer   running          Sam·14:50 │
+│                              [Clear] │
+└──────────────────────────────────────┘
+```
+
+| State | Washer actions | Dryer actions |
+|---|---|---|
+| free | **[Start]** | **[Start]** |
+| running | [Clear] | [Clear] |
+| done | **[Move to dryer]** [Clear] | **[Fold & out]** [Clear] |
+
+- **The chooser** (a modal, exported from `Machines.tsx` and reused by the Ringing bar): for
+  **Start**, titled "Start the washer" — *Whose load?* one member chip per active member, **me**
+  preselected; *How long?* the minute chips **30 · 45 · 60 · 90 min**. Tapping a minute chip
+  starts the machine at once and closes the box: **two taps** from the card (Start → 60). For
+  **Move to dryer**, titled "Move Sam's load to the dryer" — only the minute chips.
+- Chips are at least 44 px tall; text is 16 px; nothing scrolls sideways at 320 px.
+- A refusal (§7D.2) renders inside the chooser, or above the cards for Clear / Fold & out,
+  with `role="alert"`. Clear asks once ("Clear the washer? Nothing will ring.").
+- Done-at is household local time; the cards re-read `/machines` on every app refresh.
 
 **Chores** — the third section, with its own **＋ Add**. One line per chore, sorted
 by time:
@@ -2356,7 +2528,12 @@ acked, nothing is scheduled — **now only**.
 | GET | `/alarms` | member | → alarms: `{ id, title, time, days: Weekday[], channels, renotifyMin, assignedTo, createdBy, nextDueAt, ringing }` |
 | POST | `/alarms` | member | `{ title, time: "HH:MM", days: Weekday[], channels, renotifyMin?, assignedTo? }` → alarm |
 | PATCH/DELETE | `/alarms/{id}` | creator or owner | same fields as POST, all optional; closes future scheduled fires like an event edit |
-| GET | `/fires?state=ringing` | member | → open fires with titles; chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person) |
+| GET | `/fires?state=ringing` | member | → open fires with titles; chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Washer") and `personId` = the load's owner |
+| GET | `/machines` | member | → `Machine[]` in load order: `{ id, label, state: MachineState, ownerId, minutes, startedAt, doneAt, startedBy, next }` (`state` derived by the server, §7D.1; `next` = the next machine's id or null) |
+| POST | `/machines/{id}/start` | member | `{ ownerId, minutes }` → `Machine[]`; 409 `busy` when not free (§7D.2) |
+| POST | `/machines/{id}/move` | member | `{ minutes }` → `Machine[]`; 409 `busy` / `not_done` / `invalid_state` |
+| POST | `/machines/{id}/finish` | member | Fold & out → `Machine[]`; 409 `not_done` / `invalid_state` |
+| POST | `/machines/{id}/clear` | member | → `Machine[]`; 409 `already_free`. Every `/machines` write: 404 for an unknown machine, 400 `invalid_input`, 409 `conflict` when another tap changed the machine first |
 | POST | `/fires/{id}/actions` | member | `{ action: Action }` → fire (+ next); 409 on `invalid_action` |
 | POST | `/push/subscriptions` | member | `PushSubscriptionJSON` + userAgent → `{ id }` (upserted by endpoint) |
 | POST | `/push/test` | member | one test push to my subscriptions → `{ sent }`; 409 when I have none (§9.1) |
@@ -2527,6 +2704,14 @@ checks.
 - ✅ Manual: an announcement with House ticked is spoken on the Echos and the Voice PE as
   "{name} says: …"; with Phone ticked it arrives on another member's phone.
 
+**M4l — The laundry loop** (v1.8.0)
+- Migration 0014 (`machines` + the `fires` rebuild), `MACHINE` / `MACHINE_STATE` + the
+  `machine` kind, `src/shared/machines.ts`, the `/machines` routes, machine rows in the
+  Ringing bar, the Machines cards + chooser on the Alarms tab (§4.2m, §7D, §8.2, §8.5).
+- ✅ Tests L1–L13 (§7D.4); M1-VOCAB passes with the rebuilt `fires`.
+- ✅ Manual: at 320 px the two cards and the chooser fit with no sideways scroll; on the
+  iPhone a start is two taps; a real done reminder is spoken in the house.
+
 **M4d — Invites**
 - `/auth/invite-preview`, the invites list states, the invite card (QR, Share, Copy),
   the join page at `/join`, the welcome card (§6.2a, §8.9).
@@ -2670,6 +2855,10 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q37 | Voice PE timeout now that the Worker speaks (§9.2) | ⚑ 25 s (the relay used 30 s) so a call fits the Worker's ~30 s `waitUntil` budget; it normally takes ~8 s |
 | Q38 | House badge and Status wording (§8.1, §8.6) | ⚑ Badges "🔇 House failing" and "🔇 House not set up", whose explanations name Home Assistant and the Cloudflare tunnel; Status line "working" / "failing since …" + the error / "not set up" / "not tried yet" |
 | Q39 | House state before anything has been spoken (§9.2) | ⚑ `untried`: no badge, Status says "not tried yet" — a quiet house is not a failure until a delivery fails |
+| Q40 | The laundry loop in the Ringing bar and on phones (§7D, §8.2) | ⚑ The washer row has **Move to dryer**, which opens the same dryer-minutes chooser as the card (exported from `Machines.tsx`); the dryer row has **Fold & out**. Phone notifications have no buttons; tapping one opens the app |
+| Q41 | Move to dryer while the dryer is still full (§7D.2) | ⚑ Refused in place: "The dryer still has Sam's load." The washer stays DONE — waiting and its reminders run out at 4; every later dryer alert adds " — Kai's load is waiting". Nothing moves automatically |
+| Q42 | The done message (§7D.3) | ⚑ "Sam, your laundry in the washer is done" / "… in the dryer is done", plus the waiting suffix; with no active owner "The laundry in the washer is done" |
+| Q43 | Undoing a mistaken start (§7D.2, §8.5) | ⚑ A running or done machine offers **Clear**: its fire closes `removed`, nothing rings, the machine is free. A free dryer also offers **Start** with the same chips |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -2727,6 +2916,17 @@ nullable (applied only in tests so far); the push payload gains `tag`. Built as:
 nobody else to push to → 409 `no_recipients` rather than a quiet success. **Still to check:**
 the box at 320 px and on the iPhone, an announcement spoken on the Echos + Voice PE, and one
 arriving on another member's phone.
+**M4l The laundry loop** (v1.8.0; 290 tests incl. L1–L13): migration 0014 (`machines`, seeded
+free; `fires` rebuilt with kind `machine` + `machine_id`, `uq_machine_open`), `machines.ts`, the
+`/machines` routes, the Machines cards + chooser on the Alarms tab, machine rows in the Ringing
+bar (Move to dryer / Fold & out). Built as: each transition's machine-row writes are guarded by
+the row's `started_at` as read inside the same batch as the fire writes, so a stale tap rolls
+the whole batch back (tested with the second of two rows stale) → 409 `conflict`; `sourceOf`
+now takes `now` (the dryer's "load is waiting" is derived at alert time); the chooser is a
+modal; Clear asks once; a disabled owner's load alerts everyone with "The laundry in the … is
+done". Migration 0014 is applied only in tests so far. **Still owed (manual):** the cards and
+the chooser at 320 px, a two-tap start on the iPhone, and a real done reminder spoken in the
+house.
 **Push fix** (v1.7.1): no `Topic` header — Apple refused pushes carrying one (BadWebPushTopic)
 since v1.6.0. Verified 2026-10-03: a test push arrived on MojoSOGO's iPhone home-screen app.
 **Emoji instead of a dot** (v1.5.1): on phones an event whose emoji shows beside the date has no

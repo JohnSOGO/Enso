@@ -16,6 +16,8 @@ export interface Fire {
   occurrenceDate: string | null; eventId: string | null; timerId: string | null; title: string; startTime: string | null;
   /** Chore fires only (§10): the run, the current step's title (> 1 step only) and its person. */
   choreRunId?: string | null; stepTitle?: string | null; personId?: string | null;
+  /** Machine fires only (§10): the machine; `title` is its label and `personId` the load's owner. */
+  machineId?: string | null;
 }
 export interface Status {
   /** §9.2 — the server's verdict; shown as given, never re-derived here. */

@@ -6,6 +6,7 @@ import {
 import { DEFAULT_MAX_ALERTS, choreFireContext, choreFromRow, planChoreRuns, type Chore, type ChoreRow, type ChoreRun } from '../shared/chores';
 import { isStartReminder, planThingFires, type ThingRow } from '../shared/things';
 import { audience } from '../shared/optins';
+import { doneMessage, isMachineId, machineAlertConfig, waitingLoad, type MachineRow } from '../shared/machines';
 import type { Channel } from '../shared/vocab';
 import type { Recurrence } from '../shared/recurrence';
 import { addMinutes } from '../shared/time';
@@ -24,10 +25,10 @@ interface SourceRow {
 
 export function insertFire(db: D1Database, f: NewFire, ignoreConflict = false): D1PreparedStatement {
   return db.prepare(
-    `INSERT ${ignoreConflict ? 'OR IGNORE ' : ''}INTO fires (id, kind, event_id, occurrence_date, timer_id, chore_run_id, thing_id, due_at, state,
+    `INSERT ${ignoreConflict ? 'OR IGNORE ' : ''}INTO fires (id, kind, event_id, occurrence_date, timer_id, chore_run_id, thing_id, machine_id, due_at, state,
        alert_count, last_alerted_at, close_reason, closed_by, closed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(newId('fire'), f.kind, f.event_id, f.occurrence_date, f.timer_id, f.chore_run_id, f.thing_id, f.due_at, f.state,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(newId('fire'), f.kind, f.event_id, f.occurrence_date, f.timer_id, f.chore_run_id, f.thing_id, f.machine_id, f.due_at, f.state,
     f.alert_count, f.last_alerted_at, f.close_reason, f.closed_by, f.closed_at);
 }
 
@@ -81,10 +82,27 @@ interface Source {
   optional?: boolean; onIds?: string[];
 }
 
-/** Loads the alert config + title for a fire from its event, timer, chore run or thing. */
+/** Loads the alert config + title for a fire from its event, timer, chore run, thing or machine (as of `now`). */
 export async function sourceOf(
-  db: D1Database, fire: Pick<FireRow, 'kind' | 'event_id' | 'timer_id' | 'chore_run_id' | 'thing_id' | 'occurrence_date'>,
+  db: D1Database, fire: Pick<FireRow, 'kind' | 'event_id' | 'timer_id' | 'chore_run_id' | 'thing_id' | 'machine_id' | 'occurrence_date'>,
+  now: string,
 ): Promise<Source | null> {
+  if (fire.kind === 'machine') {
+    // §7D.3: the load's owner (if still active, else everyone), Phone + House; a done load waiting
+    // in the machine before this one is named at alert time.
+    if (!isMachineId(fire.machine_id)) return null;
+    const rows = await all<MachineRow>(db, 'SELECT * FROM machines');
+    const m = rows.find((r) => r.id === fire.machine_id);
+    if (!m) return null;
+    const nameOf = async (id: string | null) => id === null ? null
+      : (await first<{ display_name: string }>(db, 'SELECT display_name FROM members WHERE id = ? AND disabled_at IS NULL', id))?.display_name ?? null;
+    const owner = await nameOf(m.owner_id);
+    const waiting = waitingLoad(rows, m.id, now);
+    return {
+      title: doneMessage(m.id, owner, waiting ? await nameOf(waiting.owner_id) : undefined),
+      assignedTo: owner !== null ? [m.owner_id!] : [], cfg: machineAlertConfig(),
+    };
+  }
   if (fire.kind === 'thing') {
     // §7C.2: the whole household hears it, on the thing's channels; it rings once, like a reminder with no repeat.
     const t = await first<ThingRow>(db, 'SELECT * FROM things WHERE id = ?', fire.thing_id);
@@ -160,7 +178,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
   const open = await all<FireRow>(db, `SELECT * FROM fires WHERE state != 'closed' ORDER BY due_at`);
   const newDeliveryIds: string[] = [];
   for (const fire of open) {
-    const src = await sourceOf(db, fire);
+    const src = await sourceOf(db, fire, now);
     if (!src) continue;
     const { fire: next, alert } = stepFire(fire, src.cfg, now);
     if (next === fire) continue;
