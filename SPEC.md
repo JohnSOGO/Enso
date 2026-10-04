@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.24 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.25-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -20,7 +20,7 @@ exactly these points.
    start the next milestone until the current one's checks pass.
 2. **§3 is the only place a vocabulary is defined.** Every state, channel, action
    and status string lives in `src/shared/vocab.ts` and is imported everywhere —
-   server, frontend, relay, tests. Never type one of those strings as a literal
+   server, frontend, tests. Never type one of those strings as a literal
    anywhere else.
 3. **The engine (§5) is pure.** No database, no `fetch`, no `Date.now()` inside it.
    `now` is always a parameter. This is what makes it testable.
@@ -31,8 +31,8 @@ exactly these points.
    computed or imported, never hand-copied.
 6. **Out of scope means absent.** Anything in §12 is not built and not stubbed.
 7. **If this spec is ambiguous or wrong, stop and ask.** Do not invent behavior.
-8. **A fallback must be visible.** A failed push, an offline relay, an unknown value
-   renders as an honest marker ("House announcements offline since 14:02"), never
+8. **A fallback must be visible.** A failed push, an unreachable Home Assistant, an unknown value
+   renders as an honest marker ("House failing since 14:02"), never
    a plausible substitute or silence.
 9. **Placement before code.** Which file owns new code is looked up in
    `docs/module-ownership.md`, not decided mid-task. A new file needs a new owner
@@ -116,23 +116,29 @@ calendars, anything in §12.
   |   - static assets    the built PWA           |
   |   - cron: every 1 min -> tick() (§5)         |
   |   - Web Push sender  (VAPID)                 |
+  |   - House delivery   (house.ts, §9.2)        |
   |            |                                 |
   |           D1 (SQLite)                        |
   +---------------------------------------------+
-            ^
-            |  HTTPS poll every 10 s (bearer RELAY_TOKEN)
             |
-  +---------------------------+        LAN        +-------------------------+
-  |  LAN relay (home PC)       | ----------------> |  Home Assistant          |
-  |  relay/relay.ts (tsx)      |   REST + token    |  http://192.168.0.123:8123|
+            |  HTTPS https://ha.sogodojo.com
+            |  CF-Access-Client-Id/-Secret + Bearer HA_TOKEN
+            v
+  +---------------------------+                    +-------------------------+
+  |  Cloudflare Access         |  Cloudflare Tunnel |  Home Assistant          |
+  |  (Service Auth policy)     | -----------------> |  cloudflared add-on      |
   +---------------------------+                    |  -> 4 Echos, Voice PE    |
                                                    +-------------------------+
 ```
 
-**Why a relay:** Home Assistant is only on the LAN (`external_url` is null, no
-Nabu Casa). A Cloudflare Worker cannot reach it, and HA cannot usefully call the
-Worker. So a small process on the home PC **pulls** pending house announcements
-from the Worker and speaks them through HA. This is the same pattern AskRoxy uses.
+**Why a tunnel:** Home Assistant is only on the LAN (`external_url` is null, no
+Nabu Casa), and no port is opened to it. Until v1.7.0 a relay process on the home PC
+pulled house deliveries from the Worker and spoke them — one more thing that had to be
+running. Decided by MojoSOGO 2026-10-03: the relay is retired. HA's **Cloudflared
+add-on** opens an outbound Cloudflare Tunnel published at `https://ha.sogodojo.com`,
+guarded by **Cloudflare Access** with a Service Auth policy, so only a caller holding
+the service token gets through. House delivery is now **direct from the Worker via
+Cloudflare Tunnel + Access**.
 
 ### 2.1 Stack
 
@@ -142,7 +148,7 @@ from the Worker and speaks them through HA. This is the same pattern AskRoxy use
 | Frontend | **React + TypeScript + Vite**, `vite-plugin-pwa` | No state library in v1; plain `fetch` + hooks |
 | Styling | CSS Modules + CSS custom properties | Follow `C:\Users\Public\git\MOJOSOGO-PREFERENCES.md` and the `phone-ui` skill |
 | Push | Web Push (VAPID) from the Worker via **`@block65/webcrypto-web-push` 2.0.0** (pinned exactly) | WebCrypto only. Sends `Content-Encoding: aes128gcm` (RFC 8291) + `Authorization: vapid t=…, k=…` (RFC 8292) — the legacy `aesgcm` that some libraries send is refused by Apple. The 2026-10-03 spike decrypted its output under Node **and** workerd, and cross-checked it with `http_ece`. |
-| Relay | Node 20+ script run with `tsx` | No framework. Imports `src/shared/vocab.ts`. |
+| House delivery | The Worker calls Home Assistant's REST API through **Cloudflare Tunnel + Access** (§9.2) | `src/worker/house.ts`; no process at home besides HA itself. |
 | Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Private: photos are served only through the API to signed-in members (§7C.3). |
 | Reading photos | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). |
 | QR codes | `uqr` (MIT, zero dependencies, renders SVG) | **Loaded lazily** (dynamic `import()`) only when an invite card opens — never in the main bundle. |
@@ -165,9 +171,10 @@ Enso/
 │   ├── 0004_options_expiration.sql   # §4.2c
 │   ├── 0005_lists.sql      # §4.2d
 │   ├── …                   # 0006–0011, §4.2e–§4.2j
-│   └── 0012_announcements.sql   # §4.2k
+│   ├── 0012_announcements.sql   # §4.2k
+│   └── 0013_retire_relay.sql    # §4.2l
 ├── src/
-│   ├── shared/             # pure TS, no I/O — imported by worker, frontend, relay
+│   ├── shared/             # pure TS, no I/O — imported by worker and frontend
 │   │   ├── vocab.ts        # §3
 │   │   ├── time.ts         # local wall time <-> UTC, per IANA zone
 │   │   ├── recurrence.ts   # §4.3
@@ -183,20 +190,16 @@ Enso/
 │       ├── routes/         # auth.ts (setup, login, signup, /me) · members.ts (members,
 │       │                   # invites) · events.ts (/calendar, events) · alarms.ts ·
 │       │                   # alerts.ts (timers, fires + actions) · household.ts (settings,
-│       │                   # days off, /push/*, /status) · relay.ts ·
+│       │                   # days off, /push/*, /status) · announce.ts ·
 │       │                   # lists.ts (§7A)
 │       ├── tick.ts         # loads rows, calls engine, writes results
 │       ├── push.ts         # Web Push sending
+│       ├── house.ts        # House delivery via HA through Cloudflare Tunnel + Access (§9.2)
 │       └── session.ts      # password hashing, session cookie
 ├── frontend/               # Vite root
 │   ├── index.html
 │   ├── vite.config.ts
 │   └── src/
-├── relay/
-│   ├── relay.ts
-│   ├── classify.ts         # classifyResult (§9.2), imported by the contract test
-│   ├── relay-task.vbs      # logon launcher (§9.2 "Running it")
-│   └── relay.config.example.json
 ├── scripts/
 │   ├── dev-seed.json, seed-dev.mjs   # `npm run seed:dev`
 │   ├── arch.ts             # §2.5 caps, layering bans, source scan — their ONE home
@@ -216,7 +219,7 @@ Enso/
 | Worker | `wrangler dev` → `http://localhost:8787` | `wrangler deploy` |
 | D1 | local, in `.wrangler/state` | remote D1 `enso` |
 | Frontend | `vite` dev server (proxies `/api` to 8787) | built into `frontend/dist`, served by the Worker |
-| Relay | points at `http://localhost:8787` | points at the production URL |
+| House delivery | speaks through `HA_URL` only when the three HA secrets are in `.dev.vars`; otherwise every house row is visibly `failed`, `house_not_configured` (§9.2). Tests pin `HA_URL` to `https://ha.test` and the secrets empty, so a test can never speak in the real house. | `https://ha.sogodojo.com` with the three secrets (§2.4) |
 | Phones at home | `npm run dev:lan` → `http://<PC's LAN IP>:8787` (listens on all interfaces; needs an inbound Windows Firewall rule for TCP 8787 on the **Private** profile) | the production URL |
 | Clock | `POST /api/v1/dev/tick?now=<ISO>` (only when `DEV_ENDPOINTS=1`) | cron `* * * * *` |
 
@@ -232,14 +235,18 @@ against the deployed Worker. On iPhone, push works only after
 |------|---------|---------|
 | `SETUP_TOKEN` | Worker | One-time owner creation (§6.1) |
 | `VAPID_PUBLIC_KEY` (var, 65-byte raw P-256 key, base64url), `VAPID_PRIVATE_KEY` (secret, the JWK `d`), `VAPID_SUBJECT` (var, `https://enso.sogodojo.com`) | Worker | Web Push (§9.1). Generated once with WebCrypto; never rotated casually — rotating invalidates every phone's subscription. |
-| `RELAY_TOKEN` | Worker + relay | Authenticates the relay |
-| HA token | relay only | Read from `C:\Users\Public\git\HomeAssistant\secrets\ha_token.txt` at startup. Never sent to the Worker, never logged. |
+| `HA_TOKEN` (secret) | Worker | Home Assistant long-lived access token, sent as `Authorization: Bearer …` to HA (§9.2). Never logged, never stored in a delivery's detail. |
+| `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` (secrets) | Worker | The Cloudflare Access **service token** for `ha.sogodojo.com`, sent as `CF-Access-Client-Id` / `CF-Access-Client-Secret` (§9.2). Never logged. |
+| `HA_URL`, `ECHO_TARGETS` (JSON array), `ECHO_TYPE`, `SATELLITE_ENTITY` (vars, `wrangler.toml`) | Worker | Where and on what House speaks (§9.2). |
 
-Dev secrets go in `.dev.vars` (gitignored); production uses `wrangler secret put`.
+Dev secrets go in `.dev.vars` (gitignored); production uses `wrangler secret put`, typed
+in a real PowerShell window (never through a `!` shell, which saves an empty value).
+`RELAY_TOKEN` is gone with the relay (v1.7.0); a production copy of it is harmless and can be
+deleted.
 
 ### 2.5 Architecture guard
 
-Source files are everything under `src/`, `frontend/src/`, `relay/` and `scripts/`
+Source files are everything under `src/`, `frontend/src/` and `scripts/`
 ending in `.ts`, `.tsx`, `.mjs` or `.css`, found on disk (never listed by hand).
 `vitest.config.ts` scans them with `scripts/arch.ts` and hands the result to
 `test/architecture.test.ts`, which fails when:
@@ -247,8 +254,8 @@ ending in `.ts`, `.tsx`, `.mjs` or `.css`, found on disk (never listed by hand).
 - a source file has no row (exact path or `*` pattern) in `docs/module-ownership.md`,
   or a row names nothing on disk;
 - an import crosses a layering ban (`LAYERS` in `scripts/arch.ts`): `src/shared/`
-  imports only its own siblings (no packages, no I/O); the worker, the frontend and
-  the relay never import each other; nothing imports `scripts/`;
+  imports only its own siblings (no packages, no I/O); the worker and the frontend
+  never import each other; nothing imports `scripts/`;
 - a `src/shared/` file uses `Date.now(`, `new Date()`, `fetch(` or `D1Database`
   (§0.3 — `now` is always a parameter);
 - a file is over its line cap: its entry in `CEILINGS`, else `GLOBAL_FILE_CAP`;
@@ -279,7 +286,7 @@ export const FREQ         = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'] as const;
 export const WEEKDAY      = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;  // §4.3 byDay, alarm days
 export const CHORE_TIMING = ['at', 'by'] as const;                               // §7B
 export const THING_STATUS = ['idea', 'planned', 'done', 'dropped'] as const;     // §7C
-export const RELAY_REPORT_STATUS = ['sent', 'partial', 'failed'] as const;    // what /relay/report accepts (§9.2)
+export const HOUSE_STATE  = ['ok', 'failing', 'not_configured', 'untried'] as const; // /status `house.state` (§9.2)
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
 ```
@@ -287,7 +294,7 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | Term | Meaning |
 |------|---------|
 | `push` | Web Push to the phone(s) of the recipients (§5.4) |
-| `house` | Spoken on **all four Echos and the Voice PE** via the relay. One announcement per alert, not per person. |
+| `house` | Spoken on **all four Echos and the Voice PE** — the Worker calls Home Assistant through Cloudflare Tunnel + Access (§9.2). One announcement per alert, not per person. |
 | `scheduled` | Fire exists, due in the future (or snoozed) |
 | `ringing` | Due time passed, alert sent, waiting for a human |
 | `closed` | Finished; `close_reason` says why |
@@ -301,6 +308,9 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `stopped` | The timer was stopped |
 | `removed` | The event or timer was edited or deleted, making this fire obsolete |
 | `partial` | House delivery reached some surfaces but not all |
+| `ok` / `failing` | House state (§9.2): the newest finished house delivery is `sent`/`partial` / is `failed` |
+| `not_configured` | House state: one of the seven House settings (§9.2) is missing — nothing is spoken |
+| `untried` | House state: configured, but no house delivery has finished yet |
 
 Lists are **data, not vocabulary** (§7A): their names live in the `lists` table.
 
@@ -336,7 +346,7 @@ CREATE TABLE settings (
   id            INTEGER PRIMARY KEY CHECK (id = 1),
   household_name TEXT NOT NULL DEFAULT 'Home',
   timezone      TEXT NOT NULL DEFAULT 'America/Los_Angeles',
-  relay_last_seen TEXT                        -- UTC ISO; updated on every relay claim
+  relay_last_seen TEXT                        -- was the relay's heartbeat; DROPPED by 0013 (§4.2l)
 );
 INSERT INTO settings (id) VALUES (1);
 
@@ -784,6 +794,17 @@ CREATE INDEX idx_deliveries_queue ON deliveries(channel, status);
 unchanged, `PRAGMA foreign_key_check` is empty, and afterwards a delivery with
 `fire_id NULL` is accepted.
 
+### 4.2l Schema change — `migrations/0013_retire_relay.sql`
+
+```sql
+-- §9.2 — the relay is retired (v1.7.0); its heartbeat column goes with it. House health is
+-- derived from the deliveries table instead (houseState), never stored.
+ALTER TABLE settings DROP COLUMN relay_last_seen;
+```
+
+**Migration check (H9):** the `settings` row survives 0013 with its name, time zone and days
+off unchanged, and `relay_last_seen` is no longer a column.
+
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
 
@@ -909,7 +930,9 @@ Runs from `scheduled()` every minute, and from `POST /api/v1/dev/tick` in dev.
    - If the fire went `scheduled → ringing` and is a reminder, close any other
      `ringing` fire of the same event as `superseded`.
 3. **Send push.** Send the `push` deliveries created in this tick (§9.1).
-4. Use a D1 `batch()` per fire for the writes. D1 has no `BEGIN`/`COMMIT`.
+4. **Speak house.** `sendHouseDeliveries(env, now)` drains queued and stale-claimed `house`
+   deliveries (§9.2).
+5. Use a D1 `batch()` per fire for the writes. D1 has no `BEGIN`/`COMMIT`.
 
 **Event edits:** when an event is updated or deleted, close its `scheduled` fires
 with `due_at > now` as `removed` in the same request. The next tick
@@ -1628,8 +1651,18 @@ only the grey backdrop):
 - The **＋** floating button appears on Calendar only and creates an event. The
   Alarms tab has its own **＋ Add** button in each section header.
 - **Status badges:**
-  - A **red badge** "House offline" appears in the header when `relay_last_seen`
-    is more than 2 min old.
+  - A **red badge** appears in the header from `/status` `house.state` (§9.2), exactly as the
+    server reports it — the PWA never re-derives it ⚑ (Q38):
+    - `failing` → **"🔇 House failing"**; tapping it: "The last house announcement did not
+      get through to Home Assistant (over the Cloudflare tunnel at ha.sogodojo.com), so
+      alerts set to “House” may not be spoken. Check that Home Assistant and its Cloudflared
+      add-on are running; the error is in Settings → Status. Alerts still show in the Ringing
+      bar."
+    - `not_configured` → **"🔇 House not set up"**; tapping it: "This server has no Home
+      Assistant connection set up (the tunnel address, the HA token or the Cloudflare Access
+      service token is missing), so alerts set to “House” are not spoken. Alerts still show
+      in the Ringing bar."
+    - `ok` and `untried` show no badge.
   - A **red badge** "Phone alerts off" appears when the current member has no push
     subscription.
   - Tapping either explains it and how to fix it.
@@ -1767,7 +1800,10 @@ Time      Chore            Days        This week
   **Make admin** / **Remove admin** (asks first; never on the founder) · **Disable** /
   **Enable** (never on the founder). An admin removing their own admin role is warned
   that they will lose these settings at once.
-- **Status:** relay last seen, the current member's push subscriptions with last
+- **Status:** a **House announcements** line from `house` (§9.2) ⚑ (Q38): `ok` → "working"
+  (good) with the last success time; `failing` → "failing since {lastFailedAt}" (bad) with
+  `lastError` beneath; `not_configured` → "not set up" (bad); `untried` → "not tried yet"
+  (neutral). Then the current member's push subscriptions with last
   success/error, and the last 20 deliveries with their status badge.
 
 ### 8.8 Lists screen
@@ -2141,67 +2177,103 @@ buttons — tapping opens the app, where the Ringing bar has them; expected, not
 Manual on the live site: iPhone home-screen app → Turn on → Send a test arrives; a reminder
 arrives on the lock screen; tapping opens the Ringing bar. Android: Done/Snooze work.
 
-### 9.2 LAN relay — `relay/relay.ts`
+### 9.2 House delivery — `src/worker/house.ts`
 
-**Config** (`relay/relay.config.json`, gitignored; example checked in):
+The Worker speaks every `house` delivery itself, through Home Assistant's REST API at
+`HA_URL` — a **Cloudflare Tunnel** (HA's Cloudflared add-on) behind **Cloudflare Access**
+(§2). There is no process at home besides HA (decided by MojoSOGO 2026-10-03; the LAN relay
+is retired). `house.ts` is the sibling of `push.ts`: no Hono, and it never decides *what* is
+sent — `tick` and `POST /announce` write the rows, `house.ts` delivers them.
 
-```json
-{
-  "serverUrl": "https://<app-domain>",
-  "relayToken": "…",
-  "haUrl": "http://192.168.0.123:8123",
-  "haTokenPath": "C:\\Users\\Public\\git\\HomeAssistant\\secrets\\ha_token.txt",
-  "echoTargets": ["Game Room", "Kid's Room - Echo", "Sogo", "Toasty"],
-  "echoType": "announce",
-  "satelliteEntity": "assist_satellite.home_assistant_voice_09eb97_assist_satellite",
-  "pollSeconds": 10
-}
-```
+**Settings** — all seven are required (§2.4). `houseConfigOf(env)` returns them, or `null`
+when any is missing or empty (`ECHO_TARGETS` must be a non-empty list of strings):
 
-**Loop:**
+| Setting | Kind | Value |
+|---|---|---|
+| `HA_URL` | var | `https://ha.sogodojo.com` (tests: `https://ha.test`) |
+| `ECHO_TARGETS` | var (JSON array) | `["Game Room", "Kid's Room - Echo", "Sogo", "Toasty"]` |
+| `ECHO_TYPE` | var | `announce` |
+| `SATELLITE_ENTITY` | var | `assist_satellite.home_assistant_voice_09eb97_assist_satellite` |
+| `HA_TOKEN` | secret | HA long-lived access token |
+| `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` | secrets | the Access service token |
 
-1. `POST /api/v1/relay/claim` (bearer `relayToken`). The server:
-   - updates `relay_last_seen`;
-   - returns up to 5 `house` deliveries with status `queued`, or `claimed` with
-     `claimed_at` more than 2 min old;
-   - marks them `claimed` and increments `attempts`.
-   
-   A delivery with `attempts > 3` is set to `failed` instead of being returned.
-2. For each delivery, call **both** surfaces in parallel:
-   - Echos: `POST /api/services/notify/alexa_media`
-     `{ "target": echoTargets, "message": message, "data": { "type": echoType } }`
-   - Voice PE: `POST /api/services/assist_satellite/announce`
-     `{ "entity_id": satelliteEntity, "message": message }`. **Timeout 30 s** — it
-     takes about 8 s, and that is not a hang.
-   - Send UTF-8 JSON (`Kid's` contains an apostrophe).
-3. `POST /api/v1/relay/report` `{ id, status, detail }`, where `status` comes from
-   `classifyResult(echoOk, satOk)`:
-   - both ok → `sent`
-   - one ok → `partial`
-   - neither → `failed`
-   
-   `detail` is `{"echo":"ok"|"<error>","voice_pe":"ok"|"<error>"}`.
-4. Sleep `pollSeconds` and repeat. On a network error, log it and keep going. The
-   relay never exits on its own.
+With no config, every house delivery the drain would take becomes `failed` with detail
+**`house_not_configured`**, and nothing is fetched — visibly failed, never quietly queued.
 
-**Running it:** started at logon by `relay/relay-task.vbs`, the same pattern as the
-HA watchdog (`C:\Users\Public\git\HomeAssistant\ha-watchdog-task.vbs`): hidden
-window, exits if a relay is already running, restarts the relay 30 s after it dies.
-It is launched by a shortcut in the user's Startup folder (steps in README). The relay
-logs to `relay/relay.log`; a crash's stderr goes to `relay/relay-crash.log`. Never log
-the HA token.
+**`sendHouseDeliveries(env, now, ids?)`** — the drain. Called by tick step 4 (§5.6) with no
+`ids`, and by `POST /announce` with the new house row's id only (§9.3).
+1. **Exhausted rows fail.** A `house` row with `attempts ≥ 3` that is `queued`, or `claimed`
+   with `claimed_at` more than 2 min old (stale), becomes `failed` with detail
+   `COALESCE(detail, 'house delivery never finished after 3 attempts')`.
+2. **Pick** up to **5** `house` rows that are `queued` or stale-claimed (oldest first; only the
+   given `ids` when passed).
+3. **For each, one after another — claim, then speak.** The claim is conditional, per row,
+   made just before speaking:
+   `UPDATE deliveries SET status='claimed', claimed_at=?, attempts=attempts+1, updated_at=?
+   WHERE id=? AND channel='house' AND (status='queued' OR (status='claimed' AND claimed_at < stale))`
+   and the row is spoken **only if `meta.changes === 1`**. Two drains that pick the same row
+   (a tick and an announcement, or two ticks) speak it once. A row whose isolate dies
+   mid-speech stays `claimed` and is retried after 2 min — at most 3 attempts in all.
+4. **Speak** — both surfaces in parallel, the same payloads the relay sent:
+   - Echos: `POST {HA_URL}/api/services/notify/alexa_media`
+     `{ "target": ECHO_TARGETS, "message": message, "data": { "type": ECHO_TYPE } }`, timeout
+     **15 s**.
+   - Voice PE: `POST {HA_URL}/api/services/assist_satellite/announce`
+     `{ "entity_id": SATELLITE_ENTITY, "message": message }`, timeout **25 s** ⚑ (Q37) — it
+     takes about 8 s; 25 s (not the relay's 30 s) keeps a call inside the Worker's ~30 s
+     `waitUntil` budget.
+   - Every request carries `CF-Access-Client-Id`, `CF-Access-Client-Secret`,
+     `Authorization: Bearer <HA_TOKEN>`, `Content-Type: application/json; charset=utf-8`
+     (UTF-8 JSON — `Kid's` has an apostrophe), and `redirect: 'manual'`.
+   - **Only a 2xx is ok.** Access answers a request without a valid service token with a
+     **302 to its login page**; with `redirect: 'manual'` that is a non-2xx, so it is a
+     failure with its status in the detail — never read as success.
+   - A surface's result is `"ok"`, `"HTTP <status>: <body, first 200 chars>"`, or
+     `"error: <message>"` when the call throws (timeout, DNS, tunnel down). A token is never
+     logged or written into a detail.
+5. **Record** — `classifyHouse(echoOk, satOk)`: both ok → `sent`; one → `partial`; neither →
+   `failed`. Its type is `Exclude<DeliveryStatus, 'queued' | 'claimed'>` — only a finished
+   status. `detail` = `{"echo":"ok"|"<error>","voice_pe":"ok"|"<error>"}`.
+   **A classified `failed` is final** (HA or the tunnel was down): it is not retried —
+   retries cover only stale claims.
 
-**Contract test (M6):** import `classifyResult` from the relay. Call it with all
-four boolean combinations. Assert that the server's `/relay/report` validator
-accepts every status it returns, and rejects `queued` and `claimed`.
+**`houseState(env)`** → `/status` `house` = `{ state: HouseState, lastOkAt, lastFailedAt,
+lastError }`, **derived from the deliveries table, never stored**:
+- `not_configured` — `houseConfigOf(env)` is null;
+- `untried` — no finished (`sent` / `partial` / `failed`) house row yet;
+- `failing` — the newest finished house row (by `updated_at`) is `failed`;
+- `ok` — the newest is `sent` or `partial`.
 
-**Latency budget:** cron granularity (≤ 60 s) + poll interval (≤ 10 s) + Voice PE
-(~8 s). Up to about 80 s from due time to spoken is acceptable.
+`lastOkAt` / `lastFailedAt` are the newest `updated_at` of a `sent`/`partial` / `failed` house
+row (or null); `lastError` is the newest failed row's `detail` (or null).
+
+**Setup** (README): HA runs the **Cloudflared** add-on, publishing `ha.sogodojo.com`, and its
+`configuration.yaml` has `http: use_x_forwarded_for: true` with
+`trusted_proxies: [172.30.33.0/24]` (the add-on network). Cloudflare Access protects
+`ha.sogodojo.com` with a **Service Auth** policy for the Worker's service token. The three
+secrets are set with `wrangler secret put`.
+
+**Acceptance (M6 — each row is a test, `test/house.test.ts`):**
+
+| # | Check | Expected |
+|---|---|---|
+| H1 | `classifyHouse` over all four boolean pairs | exactly `{sent, partial, failed}`, each a `DELIVERY_STATUS` |
+| H2 | a house row drained with a fake HA at `https://ha.test` | two POSTs: `/api/services/notify/alexa_media` with `target` = `ECHO_TARGETS` (incl. `Kid's Room - Echo`, UTF-8) and `data.type` = `ECHO_TYPE`; `/api/services/assist_satellite/announce` with `entity_id` = `SATELLITE_ENTITY`; both bodies = the message; all three auth headers and `Content-Type: application/json; charset=utf-8` on each; the row → `sent`, detail `{"echo":"ok","voice_pe":"ok"}` |
+| H3 | Access answers 302 (both), or one surface 500 | 302 → `failed`, detail `HTTP 302: …` on both; Echos 500 + Voice PE ok → `partial` |
+| H4 | any of the seven settings missing | the row → `failed`, `house_not_configured`; **zero** fetches |
+| H5 | a row `claimed` 3 min ago with attempts 1 | reclaimed, spoken, `sent`, attempts 2 |
+| H6 | a stale-claimed row with attempts 3 | `failed`, `house delivery never finished after 3 attempts`; not spoken |
+| H7 | two drains at once over one queued row | spoken exactly once (one Echos POST, one Voice PE POST) |
+| H8 | `/status` `house.state` | `untried` → (a `sent` row) `ok` → (a `failed` row) `failing`; with a setting missing, `not_configured` |
+| H9 | migration 0013 | the settings row survives; `relay_last_seen` is gone (§4.2l) |
+
+**Latency budget:** cron granularity (≤ 60 s) + Voice PE (~8 s). An announcement is spoken
+right away (§9.3).
 
 ### 9.3 Announcements — `src/shared/announce.ts`, `POST /announce`
 
 A member sends a house announcement **now** from the Alarms tab (§8.5; decided by MojoSOGO
-2026-10-03). An announcement is a **delivery with no fire** (§4.2k): it rides the relay queue
+2026-10-03). An announcement is a **delivery with no fire** (§4.2k): it rides the house delivery
 (§9.2) and push sending (§9.1) that alerts already use. Nothing rings, nothing is done or
 acked, nothing is scheduled — **now only**.
 
@@ -2218,15 +2290,17 @@ acked, nothing is scheduled — **now only**.
 - The sender's name is the **session member's** `display_name` — never taken from the body.
 - One `db.batch`:
   - **House** ticked → one `house` delivery: `fire_id NULL`, `member_id NULL`,
-    `alert_number 1`, `message` = `announceMessage(…)`, `queued`. The relay claims it and speaks
-    it on the four Echos and the Voice PE exactly like a House alert (§9.2).
+    `alert_number 1`, `message` = `announceMessage(…)`, `queued`. The Worker speaks it
+    on the four Echos and the Voice PE exactly like a House alert (§9.2), **right away**: after
+    the 201 body is read, `c.executionCtx.waitUntil(sendHouseDeliveries(env, now, [houseId]))`
+    — a drain restricted to that one row, so the speaker does not wait for the next tick.
   - **Phone** ticked → one `push` delivery per member of `audience(…).push` (§7.5 — with no
     assignment, every active member) **except the sender** ⚑, same `message`, `queued`.
 - Then the push deliveries are sent at once with `sendPushDeliveries` (§9.1): each ends `sent`
   or visibly `failed` (`no_subscription`, `push_not_configured`, a push-service error) — a
   member without a phone gets the honest failed row, as alerts do.
-- → **201** `{ deliveries: { id, channel, memberId, status }[] }`, read after sending (push
-  rows final, the house row `queued`). Every row also shows in Settings → Status.
+- → **201** `{ deliveries: { id, channel, memberId, status }[] }`, read after sending push and
+  **before** the house row is spoken (push rows final, the house row `queued`). Every row also shows in Settings → Status.
 - 400 `invalid_input` with `announceError`'s message. **409 `no_recipients`** when only Phone
   is ticked and there is no other active member — nothing would be sent, so it says so.
 
@@ -2239,7 +2313,7 @@ acked, nothing is scheduled — **now only**.
 |---|---|---|
 | AN1 | `announceError` / `announceMessage` | `"  hi "` ok; `""`, blanks, 201 chars, a non-string → message; channels `[]`, `["sms"]`, `["house","house"]`, not an array → message; `announceMessage("Shelly", " Dinner ")` = `"Shelly says: Dinner"` |
 | AN2 | `POST /announce { text: " Dinner is ready ", channels: ["house"] }` | 201; one `house` delivery: `fire_id` NULL, `member_id` NULL, `alert_number` 1, `"MojoSOGO says: Dinner is ready"`, `queued`; no push rows |
-| AN3 | then `/relay/claim`, `/relay/report sent` | the claim returns it `{ id, message }`; the report makes it `sent` |
+| AN3 | the same, with the House settings present and a fake HA (§9.2), after `waitUntil` settles | the 201 still says `queued`; the row is then `sent`, and the fake HA heard `"MojoSOGO says: Dinner is ready"` on both surfaces |
 | AN4 | Phone, with the sender, a member with a phone, one without, one disabled | one push row each for the other two active members; the sender and the disabled member get none; with a phone → `sent`, without → `failed`, `no_subscription` |
 | AN5 | the push to that phone | decrypts to the payload above with `tag` = the delivery id; the `topic` header is the delivery id |
 | AN6 | blank text, 201 chars, no channels, an unknown channel; no session; a `name` in the body; Phone only with nobody else | 400 with a message ×4; 401; the name in the body is ignored; 409 `no_recipients` |
@@ -2287,10 +2361,8 @@ acked, nothing is scheduled — **now only**.
 | DELETE | `/push/subscriptions/{id}` | owner of the subscription | |
 | GET | `/push/vapid-key` | public | → `{ key }` |
 | GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff }`; PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
-| GET | `/status` | member | → `{ relayLastSeen, mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[] }` |
+| GET | `/status` | member | → `{ house: { state: HouseState, lastOkAt, lastFailedAt, lastError } (§9.2, derived, never stored), mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[] }` |
 | POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `no_recipients` (§9.3); spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
-| POST | `/relay/claim` | bearer `RELAY_TOKEN` | → deliveries |
-| POST | `/relay/report` | bearer `RELAY_TOKEN` | `{ id, status, detail }` |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek }` (`thisWeek`/`nextWeek` = member id or null) |
 | POST | `/chores` | member | `{ title, doneMeans?, days, timing, time, nudge?, people, steps, channels, renotifyMin? }` → chore (201) |
 | PATCH/DELETE | `/chores/{id}` | creator or owner | same fields, all optional; re-plans unstarted runs (§7B.3) |
@@ -2325,12 +2397,11 @@ arrives. That is plenty for one household.
 | `dev:lan` | `dev:api` listening on all interfaces, for phones on the home network (§2.3) |
 | `seed:dev` | fresh local DB only: test accounts from `scripts/dev-seed.json` + sample data |
 | `test` | `vitest run` (pure + Workers pool) |
-| `typecheck` | `tsc --noEmit` for worker + shared + tests, frontend, relay, scripts |
+| `typecheck` | `tsc --noEmit` for worker + shared + tests, frontend, scripts |
 | `db:migrate:local` | `wrangler d1 migrations apply enso --local` |
 | `db:migrate:remote` | `wrangler d1 migrations apply enso --remote` |
 | `build` | `vite build` → `frontend/dist` |
 | `deploy` | `npm run build && wrangler deploy` |
-| `relay` | `tsx relay/relay.ts` |
 | `arch:audit` | `tsx scripts/arch-audit.ts` — size vs cap for every source file, warning band marked (§2.5) |
 
 `wrangler.toml` essentials:
@@ -2342,6 +2413,7 @@ arrives. That is plenty for one household.
   `not_found_handling = "single-page-application"`,
   `run_worker_first = ["/api/*"]`
 - `[triggers] crons = ["* * * * *"]`
+- `[vars]` `HA_URL`, `ECHO_TARGETS`, `ECHO_TYPE`, `SATELLITE_ENTITY` (§9.2)
 
 ---
 
@@ -2481,21 +2553,25 @@ checks.
   - A revoked subscription produces a `failed` delivery, visible in Settings →
     Status.
 
-**M6 — LAN relay**
-- `/relay/claim`, `/relay/report`, `relay.ts`, the "House offline" badge,
-  `relay/relay-task.vbs` + logon setup steps in README.
-- ✅ Contract test (§9.2).
-- ✅ Manual: a 1-min timer with channel House is spoken on the Echos **and** the
-  Voice PE.
-- ✅ Manual: stop the relay → the "House offline" badge appears within about
-  2 min.
+**M6 — House delivery** (the LAN relay until v1.7.0; now direct, §9.2)
+- `src/worker/house.ts` (drain, speak via HA through Cloudflare Tunnel + Access,
+  `classifyHouse`, `houseState`), tick step 4, `POST /announce` speaking at once, `/status`
+  `house`, the "House failing" / "House not set up" badge, migration 0013, tunnel + secrets
+  setup steps in README.
+- ✅ H1–H9 (§9.2).
+- ✅ Manual: an announcement from the Alarms tab is spoken on the Echos **and** the Voice
+  PE through the tunnel.
+- ✅ Manual: a 1-min timer (or a scheduled reminder) with channel House is spoken.
+- ✅ Manual: with the tunnel down, the next house delivery is `failed` and the
+  "House failing" badge appears.
 
 **M7 — Production** — `https://enso.sogodojo.com`
 - `wrangler d1 create enso` → its id in `wrangler.toml`; `db:migrate:remote`.
 - `wrangler.toml`: `[[routes]] pattern = "enso.sogodojo.com", custom_domain = true` (the
   `sogodojo.com` zone is on the same Cloudflare account, like AskRoxy).
-- Secrets (§2.4): `SETUP_TOKEN` and `RELAY_TOKEN`, each 32+ random characters, set with
-  `wrangler secret put`. **`DEV_ENDPOINTS` is never set in production** (no `/dev/*`).
+- Secrets (§2.4): `SETUP_TOKEN`, 32+ random characters, set with
+  `wrangler secret put`; House needs `HA_TOKEN`, `CF_ACCESS_CLIENT_ID` and
+  `CF_ACCESS_CLIENT_SECRET` (§9.2). **`DEV_ENDPOINTS` is never set in production** (no `/dev/*`).
   VAPID keys arrive with M5 (§9.1).
 - **Production starts clean** (decided by MojoSOGO 2026-10-03): no events, alarms, chores,
   timers, list items or accounts. It carries over from the local dev database only the
@@ -2504,7 +2580,6 @@ checks.
   0007), empty.
 - The owner is created on the live site with the setup token (§6.1); everyone else joins
   by invite (§6.2a). The local dev database and its test accounts are untouched.
-- Point the relay at the prod URL with the prod `RELAY_TOKEN` when the relay is set up.
 - ✅ The owner can set up, invite a second member, and both receive a shared
   reminder on phone and house.
 
@@ -2590,6 +2665,9 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q30 | Reading photos | **Decided:** Claude reads them (`claude-opus-5-5`); ≤ 40 reads a day ⚑ |
 | Q35 | Where do the thing form's Open / Map / Call buttons sit, and which maps app? | ⚑ To the right of Link, Address, Phone; Apple Maps on iPhone/iPad, Google Maps elsewhere |
 | Q36 | Announcements (§9.3): defaults of the box, length, who is pushed | ⚑ The box opens with House ticked, Phone unticked; at most 200 characters; at least one of Phone / House; the sender gets no push of their own; push goes to every active member (optins `audience`), and one without a phone gets the honest `failed: no_subscription` row; the push is titled "📢 Announcement" with "{name} says: {text}" as its body |
+| Q37 | Voice PE timeout now that the Worker speaks (§9.2) | ⚑ 25 s (the relay used 30 s) so a call fits the Worker's ~30 s `waitUntil` budget; it normally takes ~8 s |
+| Q38 | House badge and Status wording (§8.1, §8.6) | ⚑ Badges "🔇 House failing" and "🔇 House not set up", whose explanations name Home Assistant and the Cloudflare tunnel; Status line "working" / "failing since …" + the error / "not set up" / "not tried yet" |
+| Q39 | House state before anything has been spoken (§9.2) | ⚑ `untried`: no badge, Status says "not tried yet" — a quiet house is not a failure until a delivery fails |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -2598,9 +2676,9 @@ with reminders and timers (a third fire kind), not a second reminder system.
 
 Built: M0–M4 and M4a fully (alarms, with their API tests), plus the later §7 work:
 household days off (§7.3), grouped multi-day bars (§7.1), monthly-by-weekday repeat
-(§4.3) and the 📈 options-expiration marker (§7.4). M6 code is built (relay + API +
-contract test + logon launcher); its manual checks on real speakers are not yet
-recorded. **M5 Web Push** is built (v1.3.0, §9.1): `web-push.ts` sends (VAPID header per
+(§4.3) and the 📈 options-expiration marker (§7.4). M6 was first built as a LAN relay
+(relay + API + contract test + logon launcher); v1.7.0 retired it for direct House delivery
+(below). **M5 Web Push** is built (v1.3.0, §9.1): `web-push.ts` sends (VAPID header per
 origin, reused for 1 h; parallel sends to one origin share one signing), `push.ts` records
 results, `POST /push/test`, `sw.js` (no fetch listener; `_headers` serves it `no-cache` —
 checked under `wrangler dev`), the Phone alerts row in Settings → Me. P1–P9 green against a fake
@@ -2629,8 +2707,11 @@ images are rendered from it. Its on-iPhone check is still to do.
 is not built — an open app picks the alert up on its 30 s poll, and a reopened app reloads
 (§8.10). Still to check on real phones: Turn on → Send a test (iPhone home-screen app and
 Android), a reminder on the lock screen, Android Done/Snooze.
+**M6 House delivery, direct** (v1.7.0 — being built on `feature/house-direct`): the LAN relay
+is retired (`relay/`, `/relay/*`, `RELAY_TOKEN`, `settings.relay_last_seen` all gone); the Worker
+speaks through Cloudflare Tunnel + Access (`src/worker/house.ts`, §9.2).
 **M4k Announcements** (v1.6.0; 266 tests incl. AN1–AN8): 📢 Announce at the top of the Alarms
-tab → `POST /announce` → a fire-less `house` delivery the relay speaks as "{name} says: …" and/or
+tab → `POST /announce` → a fire-less `house` delivery the relay spoke (the Worker since v1.7.0) as "{name} says: …" and/or
 a push to every other active member, sent at once; migration 0012 makes `deliveries.fire_id`
 nullable (applied only in tests so far); the push payload gains `tag`. Built as: Phone only with
 nobody else to push to → 409 `no_recipients` rather than a quiet success. **Still to check:**
@@ -2690,7 +2771,8 @@ Deviations from this spec, deliberately:
 | **Ringing** | A fire that is due and waiting for a human |
 | **Ack** | Acknowledge a timer; restarts its countdown from now |
 | **Done** | Close a ringing reminder |
-| **Relay** | The home-PC process that speaks house alerts through Home Assistant |
+| **Relay** | Retired in v1.7.0: the home-PC process that used to speak house alerts. The Worker now speaks them itself through Cloudflare Tunnel + Access (§9.2) |
+| **House state** | `ok` / `failing` / `not_configured` / `untried`, derived from the newest finished house delivery (§9.2) |
 | **Continuous calendar** | Weeks flow top to bottom with no month-boundary gaps |
 | **Materialize** | Create fire rows ahead of time from an event's recurrence |
 
