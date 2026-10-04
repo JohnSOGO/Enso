@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.25-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.25 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2258,8 +2258,8 @@ secrets are set with `wrangler secret put`.
 | # | Check | Expected |
 |---|---|---|
 | H1 | `classifyHouse` over all four boolean pairs | exactly `{sent, partial, failed}`, each a `DELIVERY_STATUS` |
-| H2 | a house row drained with a fake HA at `https://ha.test` | two POSTs: `/api/services/notify/alexa_media` with `target` = `ECHO_TARGETS` (incl. `Kid's Room - Echo`, UTF-8) and `data.type` = `ECHO_TYPE`; `/api/services/assist_satellite/announce` with `entity_id` = `SATELLITE_ENTITY`; both bodies = the message; all three auth headers and `Content-Type: application/json; charset=utf-8` on each; the row → `sent`, detail `{"echo":"ok","voice_pe":"ok"}` |
-| H3 | Access answers 302 (both), or one surface 500 | 302 → `failed`, detail `HTTP 302: …` on both; Echos 500 + Voice PE ok → `partial` |
+| H2 | a house row drained with a fake HA at `https://ha.test` | two POSTs: `/api/services/notify/alexa_media` with `target` = `ECHO_TARGETS` (incl. `Kid's Room - Echo`, UTF-8) and `data.type` = `ECHO_TYPE`; `/api/services/assist_satellite/announce` with `entity_id` = `SATELLITE_ENTITY`; both bodies = the message; all three auth headers and `Content-Type: application/json; charset=utf-8` on each; the row → `sent`, detail `{"echo":"ok","voice_pe":"ok"}`; a House timer rung by tick step 4 is spoken the same way |
+| H3 | Access answers 302 (both), or one surface 500 | 302 → `failed`, detail `HTTP 302: …` on both; Echos 500 + Voice PE ok → `partial`; a throw → `"error: …"`; a classified `failed` is not retried; no detail holds a token |
 | H4 | any of the seven settings missing | the row → `failed`, `house_not_configured`; **zero** fetches |
 | H5 | a row `claimed` 3 min ago with attempts 1 | reclaimed, spoken, `sent`, attempts 2 |
 | H6 | a stale-claimed row with attempts 3 | `failed`, `house delivery never finished after 3 attempts`; not spoken |
@@ -2707,9 +2707,17 @@ images are rendered from it. Its on-iPhone check is still to do.
 is not built — an open app picks the alert up on its 30 s poll, and a reopened app reloads
 (§8.10). Still to check on real phones: Turn on → Send a test (iPhone home-screen app and
 Android), a reminder on the lock screen, Android Done/Snooze.
-**M6 House delivery, direct** (v1.7.0 — being built on `feature/house-direct`): the LAN relay
-is retired (`relay/`, `/relay/*`, `RELAY_TOKEN`, `settings.relay_last_seen` all gone); the Worker
-speaks through Cloudflare Tunnel + Access (`src/worker/house.ts`, §9.2).
+**M6 House delivery, direct** (v1.7.0; 273 tests incl. H1–H9 and the rewritten AN3): the LAN
+relay is retired (`relay/`, `/relay/*`, `RELAY_TOKEN`, `settings.relay_last_seen` all gone); the
+Worker speaks through Cloudflare Tunnel + Access (`src/worker/house.ts`, §9.2) — on each tick
+(step 4) and, for an announcement, at once inside `waitUntil`. Tests run against a fake HA at
+`https://ha.test` with fake secrets; the pinned test config is "not configured". Built as: with
+House not configured, every takeable house row becomes `failed` `house_not_configured` (attempts
+unchanged — nothing was tried); a result is written only while the row still carries this drain's
+claim. Migration 0013 is applied only in tests so far. **Still owed (manual):** the tunnel, the
+Access policy and the three secrets set up (README); a real announcement spoken through the
+tunnel on the Echos + Voice PE; a scheduled House reminder spoken; the 🔇 badges and the Status
+line seen at 320 px.
 **M4k Announcements** (v1.6.0; 266 tests incl. AN1–AN8): 📢 Announce at the top of the Alarms
 tab → `POST /announce` → a fire-less `house` delivery the relay spoke (the Worker since v1.7.0) as "{name} says: …" and/or
 a push to every other active member, sent at once; migration 0012 makes `deliveries.fire_id`
