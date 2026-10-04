@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.30 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.31-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -177,7 +177,8 @@ Enso/
 │   ├── 0014_machines.sql        # §4.2m
 │   ├── 0015_timer_window.sql    # §4.2n
 │   ├── 0016_sun_alerts.sql      # §4.2o
-│   └── 0017_recipes.sql         # §4.2p
+│   ├── 0017_recipes.sql         # §4.2p
+│   └── 0018_recipe_emojis.sql   # §4.2q
 ├── src/
 │   ├── shared/             # pure TS, no I/O — imported by worker and frontend
 │   │   ├── vocab.ts        # §3
@@ -939,6 +940,26 @@ There is **no url or thumbnail column**: both are derived from `video_id` (`watc
 **Migration check (RC-M):** rows written under 0001–0016 (members, things, list items) survive
 0017 unchanged; a second live recipe for one video is refused by `uq_recipe_video`, while a
 soft-deleted one does not block it and any number of typed recipes (NULL `video_id`) coexist.
+
+### 4.2q Schema change — `migrations/0018_recipe_emojis.sql`
+
+```sql
+-- §7E.5 — each person's own emoji on a recipe: one per member per recipe. Additive only.
+CREATE TABLE recipe_emojis (
+  recipe_id  TEXT NOT NULL REFERENCES recipes(id),
+  member_id  TEXT NOT NULL REFERENCES members(id),
+  emoji      TEXT NOT NULL,                      -- one emoji (emojiError, §7.6)
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (recipe_id, member_id)
+);
+```
+
+Written only by `PUT /recipes/{id}/emoji` as an upsert (`INSERT … ON CONFLICT(recipe_id,
+member_id) DO UPDATE`) and removed by `DELETE /recipes/{id}/emoji`. A soft-deleted recipe keeps its
+rows; they are never returned, because only live recipes are ⚑ Q75. Nothing existing is rebuilt or
+altered.
+**Migration check (RE-M):** rows written under 0001–0017 (members, things, list items, recipes)
+survive 0018 unchanged; the primary key refuses a second row for the same member and recipe.
 
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
@@ -2053,6 +2074,46 @@ may add, edit or delete any recipe ⚑ Q66. Their own tab, 🍳 Recipes (§8.12)
 | R12 | YouTube: not found / quota / network; captions: blocked / none / failed | the honest failure kinds, the key never in a reason |
 | RC-M | migration check (§4.2p) | earlier rows intact; the unique index refuses a second live recipe per video |
 
+### 7E.5 Each person's emoji — decided by MojoSOGO 2026-10-03
+
+Each person can give a recipe **their own emoji** — any single emoji, or none — and change or
+clear it later. It is personal: the row shows **mine**; the recipe view shows **everyone's**.
+
+- **Stored** in `recipe_emojis` (§4.2q), one row per member per recipe. The emoji follows the
+  event emoji rule: `emojiError` (§7.6, `src/shared/emoji.ts`) — one grapheme of emoji, at most
+  `EMOJI_MAX_BYTES` = 16 bytes.
+- `PUT /recipes/{id}/emoji { emoji }` sets **the signed-in member's** emoji (the member comes from
+  the session, never the body) → 200 the recipe; an emoji `emojiError` refuses → 400
+  `invalid_input` with its message. `DELETE /recipes/{id}/emoji` clears it → 200 the recipe
+  (clearing one that isn't set is fine). A deleted recipe → 404 for both. Neither touches the
+  recipe's `updated_at`: an emoji is not an edit of the recipe.
+- **On the wire** every recipe carries `emojis: RecipeEmoji[]`, `RecipeEmoji = { memberId, emoji }`,
+  ordered by member id — list, one, POST, from-video, PATCH and the emoji routes alike.
+  `recipeFromRow(row, emojis = [])` keeps the rows for that recipe. The list fetches every live
+  recipe's emojis in one more query.
+- `myEmoji(recipe, memberId)` → my emoji or null.
+- `byMyEmoji(recipes, memberId)` — the **By emoji** order ⚑ Q71: recipes grouped by **my** emoji;
+  the biggest group first; equal groups by their newest recipe (newest first), then by the emoji
+  string; newest first within a group; recipes I haven't given an emoji go **last**, newest first.
+  "Newest" is `createdAt`, then `id`, both descending — the server's list order.
+- `usedEmojis(recipes)` — the household's emojis for the picker ⚑ Q72: every emoji anyone has put
+  on these recipes, most used first (ties by the emoji string), at most 12 (`USED_EMOJIS_MAX`).
+
+**Acceptance (M4p — each row is a test):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| RE1 | PUT `{ emoji: "🌶" }`, then GET the recipe and the list | 200; my `{ memberId, emoji }` in `emojis` of both |
+| RE2 | PUT "🌶" then PUT "⭐" | one row for me, "⭐" |
+| RE3 | DELETE after a PUT | 200; my emoji gone from `emojis` |
+| RE4 | PUT "ab", "🌶🌶", a string over 16 bytes | 400 `invalid_input` with `emojiError`'s message; nothing stored |
+| RE5 | a second member sets theirs; I PUT and DELETE mine | theirs is untouched each time |
+| RE6 | PUT / DELETE on a soft-deleted recipe | 404 |
+| RE7 | an emoji PUT and DELETE | the recipe's `updatedAt` is unchanged |
+| RE8 | `byMyEmoji` on groups of 2, 1, 1 (the two 1s with different newest) and unrated ones; equal groups with an equal newest | biggest first; ties by newest, then emoji; newest first within; unrated last, newest first |
+| RE9 | `usedEmojis` on 14 distinct emojis across members, one used three times | that one first, ties by the string, 12 at most |
+| RE-M | migration check (§4.2q) | earlier rows intact; the PK refuses a second row for one member and recipe |
+
 ---
 
 ## 8. Screens
@@ -2501,12 +2562,22 @@ Pumpkin patch        📅 Sat Oct 12
   view opens with its source note; ✎ fixes anything wrong ⚑ Q61. A refusal or failure shows in
   place (`role="alert"`) with the server's message.
 - **A link already read** (409 `duplicate`) opens the existing recipe instead ⚑ Q63.
+- **Newest | By emoji** — two chips above the rows ⚑ Q74. Newest is the server's order; By emoji
+  orders them with `byMyEmoji` (§7E.5) — the PWA never sorts any other way. The choice is
+  remembered on that phone (`localStorage` `enso.recipeSort`; blocked storage means Newest).
 - **Rows**, newest first ⚑ Q62: a small thumbnail (64×36, hotlinked, `loading="lazy"`,
   `referrerPolicy="no-referrer"`; a typed recipe keeps the slot empty), the dish's name on one line,
   and a **watch it** badge when a video's recipe has `found` false (a typed recipe has no video to
-  watch, so never shows it). Tapping a row opens the **recipe view**.
+  watch, so never shows it). **My emoji** (§7E.5), when I've given one, sits before the dish's
+  name. Tapping a row opens the **recipe view**.
 - **＋ Type a recipe** opens the **recipe form** empty.
 - **Recipe view** (modal, `RecipeView.tsx`), titled with the dish:
+  - **everyone's emoji**, "Shelly 🌶 · John ⭐", in the household's member order; a member the PWA
+    can't find reads "Someone" ⚑ Q73;
+  - **Your emoji** (`RecipeEmoji.tsx`) ⚑ Q72: the household's emojis as chips (`usedEmojis`; tap one
+    to set it, mine shown pressed), a one-emoji input (16 px) with **Set**, and **Clear** when I have
+    one → `PUT` / `DELETE /recipes/{id}/emoji`. A refusal shows in place (`role="alert"`) with the
+    server's message; the updated recipe goes back to the view and the row;
   - the thumbnail, full width, and **▶ Watch on YouTube** (opens the video, a new tab);
     the channel; servings and time when stated;
   - the **source note** ⚑ Q64, muted: "From the description and captions" / "From the
@@ -2912,9 +2983,10 @@ acked, nothing is scheduled — **now only**.
 | POST | `/things/{id}/plan` | member | `{ date, time? }` → `{ thing, eventId }`; 400 outside the window |
 | PUT/GET/DELETE | `/things/{id}/photo` | member | PUT raw image body (≤ 4 MB) → 204; GET → the image; DELETE → 204 |
 | POST | `/things/read-photo` | member | raw image body → `{ title, startDate, endDate, place, address, phone, cost, url, note }` (each nullable); 503 / 502 / 422 / 429 per §7C.4 |
-| GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, createdBy, createdAt, updatedAt }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed) (§7E) |
+| GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, createdBy, createdAt, updatedAt, emojis: RecipeEmoji[] }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed; `RecipeEmoji = { memberId, emoji }`, §7E.5) (§7E) |
 | POST | `/recipes` | member | `{ title, ingredients, steps, servings?, time? }` → recipe (201), typed by hand; 400 `invalid_input` |
 | GET/PATCH/DELETE | `/recipes/{id}` | member | GET → recipe; PATCH the POST fields, all optional, merged → recipe (found recomputed); DELETE → 204 (soft); 404 when gone |
+| PUT/DELETE | `/recipes/{id}/emoji` | member (their own) | PUT `{ emoji }` → recipe (200), my emoji set (upsert); DELETE → recipe (200), mine cleared; 400 `invalid_input` (`emojiError`); 404 when the recipe is gone; `updatedAt` untouched (§7E.5) |
 | POST | `/recipes/from-video` | member | `{ url }` → recipe (201); 400 / 409 `duplicate` (+ `recipeId`) / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed`, in the §7E.2 order |
 | GET | `/lists` | member | → `{ id, name, createdBy, openCount }[]`, by name (§7A) |
 | POST | `/lists` | member | `{ name }` → list (201); 409 `duplicate`; 400 at `LISTS_MAX` |
@@ -3082,6 +3154,13 @@ checks.
 - ✅ Tests R1–R12, RC-M.
 - ✅ Manual: the five tabs at 320 px; a real video read on the deployed URL (keys set), its
   ingredients added to Shopping.
+
+**M4p — Each person's recipe emoji** (v1.12.0)
+- Migration 0018 (`recipe_emojis`), `PUT/DELETE /recipes/{id}/emoji`, `emojis` on every recipe,
+  `myEmoji` / `byMyEmoji` / `usedEmojis`, `RecipeEmoji.tsx`, the Newest | By emoji chips
+  (§4.2q, §7E.5, §8.12, §10).
+- ✅ Tests RE1–RE9, RE-M.
+- ✅ Manual: the chips, the picker and the rows at 320 px; Shelly's and John's emojis both show.
 
 **M4l — The laundry loop** (v1.8.0)
 - Migration 0014 (`machines` + the `fires` rebuild), `MACHINE` / `MACHINE_STATE` + the
@@ -3268,6 +3347,11 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q68 | A typed recipe with a video link | ⚑ Not in v1 — a typed recipe has no video |
 | Q69 | Add to Shopping | ⚑ Nothing picked at first, a "Pick all" chip; summary "Added 4 · Milk already on the list"; on a failure it stops and names what wasn't added |
 | Q70 | Privacy of recipe reading | ⚑ The video's text goes to Anthropic; the thumbnail loads from i.ytimg.com (no referrer). Accepted |
+| Q71 | By emoji: the order of the groups (§7E.5) | ⚑ Biggest group first; ties by the group's newest recipe, then the emoji string; newest first within a group; unrated last, newest first |
+| Q72 | Picking my emoji (§8.12) | ⚑ The household's emojis as chips (most used first, 12 at most), a one-emoji input with Set, and Clear when I have one |
+| Q73 | Everyone's emoji names a member the PWA doesn't know | ⚑ "Someone" |
+| Q74 | Newest \| By emoji | ⚑ Remembered per phone (`localStorage`), not per person on the server |
+| Q75 | A soft-deleted recipe's emojis | ⚑ Kept in `recipe_emojis` but never shown — only live recipes are returned |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -3348,6 +3432,13 @@ modal; Clear asks once; a disabled owner's load alerts everyone with "The laundr
 done". Migration 0014 is applied only in tests so far. **Still owed (manual):** the cards and
 the chooser at 320 px, a two-tap start on the iPhone, and a real done reminder spoken in the
 house.
+**M4p Each person's recipe emoji** (v1.12.0; TESTCOUNT tests incl. RE1–RE9 and RE-M): migration 0018
+(`recipe_emojis`), `PUT/DELETE /recipes/{id}/emoji` (the member from the session; `emojiError`; the
+recipe's `updatedAt` untouched), `emojis` on every recipe through one route helper (the list in one
+joined query), `myEmoji` / `byMyEmoji` / `usedEmojis` in `src/shared/recipes.ts`, `RecipeEmoji.tsx` in
+the view, my emoji on each row and the Newest | By emoji chips (`enso.recipeSort`). Migration 0018 is
+applied only in tests so far. **Still owed:** apply 0018 in production; the chips, the picker and the
+rows checked at 320 px and on the iPhone.
 **M4o Recipes** (v1.11.0; 394 tests incl. R1–R12 and RC-M): migration 0017 (`recipes`,
 `recipe_reads`, `uq_recipe_video`), `RECIPE_SOURCE` / `CAPTIONS_FAILURE`, `src/shared/recipes.ts`,
 `youtube.ts` (Data API v3), `youtube-captions.ts` (the unofficial attempt), `recipe-reader.ts` (via
