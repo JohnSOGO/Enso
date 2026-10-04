@@ -1,13 +1,13 @@
-// M1-VOCAB — every SQL CHECK (... IN (...)) list in force must equal its vocab.ts tuple.
+// M1-VOCAB â€” every SQL CHECK (... IN (...)) list in force must equal its vocab.ts tuple.
 // This is the only test allowed to read SQL as text. It reads the MIGRATED schema
 // (sqlite_master of env.DB, which test/apply-migrations.ts has migrated), so a table a
-// later migration rebuilt or dropped is compared as it stands now (SPEC §3). Keyed by
+// later migration rebuilt or dropped is compared as it stands now (SPEC Â§3). Keyed by
 // table.column: two tables may each have a `status` with different vocabularies.
 import { env } from 'cloudflare:test';
 import { expect, it } from 'vitest';
 import * as vocab from '../src/shared/vocab';
 
-/** table.column → the vocab tuple its CHECK list must match */
+/** table.column â†’ the vocab tuple its CHECK list must match */
 const EXPECTED: Record<string, readonly string[]> = {
   'members.role': vocab.ROLE,
   'fires.kind': vocab.ALERT_KIND,
@@ -18,6 +18,8 @@ const EXPECTED: Record<string, readonly string[]> = {
   'chores.timing': vocab.CHORE_TIMING,
   'things.status': vocab.THING_STATUS,
   'events.start_sun': vocab.SUN_EVENT,
+  'login_requests.status': vocab.LOGIN_REQUEST_STATUS,
+  'deliveries.notice': vocab.NOTICE_KIND,
 };
 
 it('every CHECK IN-list in the migrated schema matches vocab.ts', async () => {
