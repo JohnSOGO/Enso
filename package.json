@@ -1,6 +1,6 @@
 {
   "name": "enso",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,12 +8,11 @@
     "dev:api": "wrangler dev --port 8787",
     "dev:lan": "wrangler dev --ip 0.0.0.0 --port 8787",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p frontend/tsconfig.json && tsc --noEmit -p relay/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p frontend/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
     "db:migrate:local": "wrangler d1 migrations apply enso --local",
     "db:migrate:remote": "wrangler d1 migrations apply enso --remote",
     "build": "vite build --config frontend/vite.config.ts",
     "deploy": "npm run build && wrangler deploy",
-    "relay": "tsx relay/relay.ts",
     "arch:audit": "tsx scripts/arch-audit.ts",
     "seed:dev": "node scripts/seed-dev.mjs"
   },

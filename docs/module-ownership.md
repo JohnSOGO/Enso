@@ -15,7 +15,7 @@ verdicts: `docs/modularity.md`.
 new row *is* the placement decision — write it (with its one-line concern) and a
 receipt in `docs/placement-receipts.md`, then the code.
 
-## Shared — pure, imported by Worker, PWA and relay (flow stage: rules)
+## Shared — pure, imported by Worker and PWA (flow stage: rules)
 
 | Module | Owns (one concern) |
 |---|---|
@@ -42,8 +42,9 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/db.ts` | D1 helpers and id minting |
 | `src/worker/http.ts` | Error envelope (§10) and input checks |
 | `src/worker/session.ts` | Password hashing, session cookie, `requireMember` / owner guards |
-| `src/worker/tick.ts` | `tick()` orchestration: load rows, call the engine, write results, deliveries (§5.6–5.7), chore run planning (§7B.3), thing reminder planning (§7C.2) |
+| `src/worker/tick.ts` | `tick()` orchestration: load rows, call the engine, write results, deliveries (§5.6–5.7), chore run planning (§7B.3), thing reminder planning (§7C.2); step 3 sendPushDeliveries, step 4 sendHouseDeliveries |
 | `src/worker/push.ts` | Web Push delivery (§9.1): for queued push deliveries and /push/test, builds the payload { fireId, kind, tag, title, body, actions } (tag: fireId / the delivery id when there is no fire, an announcement / 'enso-test'; it is also the topic), sends to each of the member's subscriptions via web-push.ts, records results (201 → sent + last_ok_at; 404/410 → delete the subscription; else failed with status + body, last_error; none → no_subscription; keys missing → failed, visibly) |
+| `src/worker/house.ts` | House delivery (§9.2): houseConfigOf, drain with a conditional per-row claim, speak via HA through Cloudflare Access, classifyHouse, houseState for /status — no Hono, never decides what is sent |
 | `src/worker/web-push.ts` | Web Push protocol (RFC 8291/8292) — the only importer of `@block65/webcrypto-web-push`: encrypt the payload, VAPID headers cached per push-service origin (~1 h, expiry checked against a passed-in `now`), ttl 3600 / urgency high / topic (≤ 32 url-safe chars), one POST to one subscription → its status + body text; no D1, never decides what is sent or what a result means (§9.1) |
 | `src/worker/routes/auth.ts` | Setup, login/logout, signup, invite preview, rate limit, `/me` |
 | `src/worker/routes/members.ts` | Members list/disable, invites |
@@ -52,9 +53,8 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `src/worker/routes/optins.ts` | `/optional-events`, `/events/{id}/optin` PUT/DELETE — a member's own switch on an optional event (§7.5, §10) |
 | `src/worker/routes/alarms.ts` | `/alarms` — scheduled alarms as `is_alarm` events (§4.2a) |
 | `src/worker/routes/alerts.ts` | Timers + commands, fires + actions |
-| `src/worker/routes/household.ts` | Household settings, days off, `/status`, `/push/*` (vapid-key, subscriptions, test) |
-| `src/worker/routes/announce.ts` | `POST /announce` (§9.3): validate, the sender's name from the session, one batch of fire-less deliveries (one `house`; one `push` per audience member but the sender), then sendPushDeliveries |
-| `src/worker/routes/relay.ts` | `/relay/claim`, `/relay/report` (§9.2) |
+| `src/worker/routes/household.ts` | Household settings, days off, `/status` (incl. `house` from houseState), `/push/*` (vapid-key, subscriptions, test) |
+| `src/worker/routes/announce.ts` | `POST /announce` (§9.3): validate, the sender's name from the session, one batch of fire-less deliveries (one `house`; one `push` per audience member but the sender), then sendPushDeliveries, read the 201 body, then waitUntil an id-restricted sendHouseDeliveries |
 | `src/worker/routes/lists.ts` | `/lists`, `/lists/{id}`, `/lists/{id}/items`, `/list-items/{id}` — list CRUD and list item CRUD (§7A, §10) |
 | `src/worker/routes/chores.ts` | `/chores`, `/chores/today`, `/chore-runs/{id}/done\|undo` — chore CRUD, today's runs, step done/undo and edit re-plan persistence (§7B, §10) |
 | `src/worker/routes/things.ts` | `/things`, `/things/{id}`, `/things/{id}/plan` — thing CRUD, Plan it (event + thing + fire closes in one batch), closing a thing's scheduled fires on edit/delete (§7C, §10) |
@@ -106,13 +106,6 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/Modal.tsx` | The one centred `<dialog>` modal primitive |
 | `frontend/src/*.module.css` | Styles for the same-named component |
 | `frontend/src/components/*.module.css` | Styles for the same-named component; `Lists.module.css` = shared single-line list tables and tick rows |
-
-## Relay (flow stage: deliver to the house)
-
-| Module | Owns (one concern) |
-|---|---|
-| `relay/relay.ts` | Poll loop: claim, speak on Echos + Voice PE, report (§9.2) |
-| `relay/classify.ts` | `classifyResult` — the relay side of the report contract |
 
 ## Tooling
 

@@ -16,6 +16,7 @@ import { SignIn } from './components/SignIn';
 import { JoinPage } from './components/JoinPage';
 import { Welcome } from './components/Welcome';
 import { JOIN_PATH } from '../../src/shared/invite-link';
+import type { HouseState } from '../../src/shared/vocab';
 import { Modal } from './components/Modal';
 import s from './App.module.css';
 
@@ -23,6 +24,13 @@ import s from './App.module.css';
 const NAV = [['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alarms'], ['lists', '🛒', 'Lists'], ['settings', '⚙', 'Settings']] as const;
 type Tab = (typeof NAV)[number][0];
 const TABS: readonly Tab[] = NAV.map(([id]) => id);
+/** §8.1 ⚑ Q38 — the House badge per server-reported state; `ok` and `untried` show none. */
+const HOUSE_BADGE: Partial<Record<HouseState, { label: string; title: string; text: string }>> = {
+  failing: { label: '🔇 House failing', title: 'House failing',
+    text: 'The last house announcement did not get through to Home Assistant (over the Cloudflare tunnel at ha.sogodojo.com), so alerts set to “House” may not be spoken. Check that Home Assistant and its Cloudflared add-on are running; the error is in Settings → Status. Alerts still show in the Ringing bar.' },
+  not_configured: { label: '🔇 House not set up', title: 'House not set up',
+    text: 'This server has no Home Assistant connection set up (the tunnel address, the HA token or the Cloudflare Access service token is missing), so alerts set to “House” are not spoken. Alerts still show in the Ringing bar.' },
+};
 type Overlay =
   | { kind: 'day'; date: string; data: DayData | undefined }
   | { kind: 'event'; date: string; eventId?: string }
@@ -40,18 +48,17 @@ function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boo
   const [overlay, setOverlay] = useState<Overlay>(null);
   useEffect(() => { try { localStorage.setItem('enso.tab', tab); } catch { /* storage may be blocked */ } }, [tab]);
 
-  const houseOffline = status !== null && !status.relayOnline;
+  const house = status ? HOUSE_BADGE[status.house.state] : undefined;
   const phoneOff = status !== null && status.mySubscriptions.length === 0;
 
   return (
     <div className={s.app}>
       <RingingBar />
-      {(houseOffline || phoneOff) && (
+      {(house || phoneOff) && (
         <div className={s.badges}>
-          {houseOffline && (
-            <button className="badge bad" onClick={() => setOverlay({ kind: 'explain', title: 'House offline',
-              text: 'The relay on the home PC has not checked in for over 2 minutes, so alerts set to “House” will not be spoken until it runs again. Start it with “npm run relay” on the home PC. Alerts still show in the Ringing bar.' })}>
-              🔇 House offline
+          {house && (
+            <button className="badge bad" onClick={() => setOverlay({ kind: 'explain', title: house.title, text: house.text })}>
+              {house.label}
             </button>
           )}
           {phoneOff && (

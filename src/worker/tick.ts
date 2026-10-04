@@ -12,6 +12,7 @@ import { addMinutes } from '../shared/time';
 import type { Env } from './env';
 import { all, first, newId, parseJson } from './db';
 import { sendPushDeliveries } from './push';
+import { sendHouseDeliveries } from './house';
 import { onMemberIds } from './event-rows';
 
 export interface TickSummary { materialized: number; stepped: number; alerts: number; deliveries: number }
@@ -200,5 +201,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
 
   // 3. Send the push deliveries created in this tick.
   if (newDeliveryIds.length) await sendPushDeliveries(env, newDeliveryIds, now);
+  // 4. Speak the queued and stale-claimed house deliveries (§9.2).
+  await sendHouseDeliveries(env, now);
   return summary;
 }

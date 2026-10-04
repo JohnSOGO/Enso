@@ -1,7 +1,7 @@
 // SPEC §8.6 — Me, Household (owner), Status.
 import { useEffect, useState, type ReactNode } from 'react';
 import { get, patch, post } from '../api';
-import { useApp } from '../state';
+import { useApp, type Status } from '../state';
 import { MEMBER_PALETTE } from '../../../src/shared/vocab';
 import { useAction } from './useAction';
 import { Invites } from './Invites';
@@ -125,15 +125,22 @@ function DaysOff() {
 
 const STATUS_BADGE: Record<string, string> = { sent: 'good', partial: 'warn', failed: 'bad', queued: 'neutral', claimed: 'neutral' };
 
+/** §8.6 ⚑ Q38 — the House line, from the server's `house` as given (§9.2). */
+function HouseLine({ house: h, localTime }: { house: Status['house']; localTime: (iso: string) => string }) {
+  if (h.state === 'ok') return <span className="badge good">working{h.lastOkAt ? ` · last ${localTime(h.lastOkAt)}` : ''}</span>;
+  if (h.state === 'untried') return <span className="badge neutral">not tried yet</span>;
+  if (h.state === 'not_configured') return <span className="badge bad">not set up</span>;
+  return <><span className="badge bad">failing{h.lastFailedAt ? ` since ${localTime(h.lastFailedAt)}` : ''}</span>
+    {h.lastError && <span className="muted" style={{ display: 'block', overflowWrap: 'anywhere' }}>{h.lastError}</span>}</>;
+}
+
 function StatusSection() {
   const { status, localTime } = useApp();
   if (!status) return null;
   return (
     <Section title="Status">
       <p style={{ marginBottom: 8 }}>
-        House announcements: {status.relayOnline
-          ? <span className="badge good">relay online</span>
-          : <span className="badge bad">relay offline{status.relayLastSeen ? ` since ${localTime(status.relayLastSeen)}` : ' (never seen)'}</span>}
+        House announcements: <HouseLine house={status.house} localTime={localTime} />
       </p>
       {status.recentDeliveries.length === 0 ? <p className="muted">No alerts sent yet.</p> : (
         <table className={s.table}>

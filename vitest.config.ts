@@ -16,10 +16,16 @@ export default defineConfig(async () => {
             // SPEC §2.5 — the source tree measured in Node; test/architecture.test.ts asserts on it.
             ARCH: JSON.parse(JSON.stringify(scan(path.resolve('.')))),
             SETUP_TOKEN: 'test-setup-token',
-            RELAY_TOKEN: 'test-relay-token',
             DEV_ENDPOINTS: '1',
             // §7C.4 — pinned empty so a local .dev.vars key can never reach the real Anthropic API from a test.
             ANTHROPIC_API_KEY: '',
+            // §9.2 — pinned so a test can never speak in the real house: a fake host, and the secrets
+            // empty (House is then not configured). test/house.test.ts overrides them per call, with a
+            // fetch spy answering https://ha.test.
+            HA_URL: 'https://ha.test',
+            HA_TOKEN: '',
+            CF_ACCESS_CLIENT_ID: '',
+            CF_ACCESS_CLIENT_SECRET: '',
             // §9.1 — a TEST-ONLY VAPID keypair (generated once for the suite, signs nothing real), so the
             // production key never signs in a test. test/push.test.ts never lets a push leave the isolate.
             VAPID_PUBLIC_KEY: 'BLGCPcQjOX27VgoqsiHeYtez_W8_HKCafPsFXE5T6QR57UKLYhGF-6BlOWhEzHJSabBTOuhbU-vwJz_lkh3JyY8',
