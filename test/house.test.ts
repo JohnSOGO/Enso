@@ -35,11 +35,14 @@ const rowOf = (id: string) => env.DB.prepare('SELECT status, detail, attempts FR
 
 describe('M6 House delivery (§9.2)', () => {
   it('H1: classifyHouse gives exactly sent / partial / failed, each a DELIVERY_STATUS', () => {
-    const emitted = new Set([true, false].flatMap((a) => [true, false].map((b) => classifyHouse(a, b))));
+    const calls = [[], [true], [false], ...[true, false].flatMap((a) => [true, false].map((b) => [a, b]))];
+    const emitted = new Set(calls.map((c) => classifyHouse(c)));
     expect([...emitted].sort()).toEqual(['failed', 'partial', 'sent']);
     for (const s of emitted) expect(DELIVERY_STATUS).toContain(s);
-    expect(classifyHouse(true, true)).toBe('sent');
-    expect(classifyHouse(false, true)).toBe('partial');
+    expect(classifyHouse([true, true])).toBe('sent');
+    expect(classifyHouse([true])).toBe('sent');
+    expect(classifyHouse([false, true])).toBe('partial');
+    expect(classifyHouse([])).toBe('failed'); // §9.2a: nothing called is never a quiet "sent"
   });
 
   it('H2: both HA calls — paths, UTF-8 bodies, the three auth headers, no redirects followed → sent', async () => {

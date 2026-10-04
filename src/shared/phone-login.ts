@@ -6,7 +6,7 @@ import type { LoginRequestStatus, LoginView } from './vocab';
 export const APPROVE_LOGIN_PATH = '/approve-login';
 export const approveLoginUrl = (id: string) => `${APPROVE_LOGIN_PATH}#${id}`;
 
-/** ⚑ Q125 — a request lives 2 minutes; at most 3 per email per 15 minutes. */
+/** ⚑ Q131 — a request lives 2 minutes; at most 3 per email per 15 minutes. */
 export const LOGIN_REQUEST_TTL_MIN = 2;
 export const LOGIN_REQUESTS_PER_WINDOW = 3;
 export const LOGIN_REQUEST_WINDOW_MIN = 15;
@@ -59,7 +59,7 @@ export type DecideRefusal = 'not_yours' | 'not_pending' | 'expired';
 
 /**
  * The member answers on the phone: `choice` is the number tapped, or null for "This wasn't me".
- * The right number approves; a wrong one or null denies (⚑ Q126 — no second try).
+ * The right number approves; a wrong one or null denies (⚑ Q132 — no second try).
  */
 export function decide(row: LoginRequestState, memberId: string, choice: number | null, now: string):
   { ok: true; status: 'approved' | 'denied' } | { ok: false; refusal: DecideRefusal } {
@@ -112,9 +112,9 @@ export function placeText(city: unknown, country: unknown): string | null {
   return parts.length ? parts.join(', ') : null;
 }
 
-/** ⚑ Q129 — the push title of both notices. */
+/** ⚑ Q135 — the push title of both notices. */
 export const NOTICE_TITLE = '🔑 Ensō sign-in';
 /** The login request's push body. Never the match number. */
 export const loginRequestMessage = (browser: string) => `Sign-in request from ${browser} — tap to check`;
-/** ⚑ Q127 — after a password sign-in. */
+/** ⚑ Q133 — after a password sign-in. */
 export const newSignInMessage = (browser: string) => `New sign-in on ${browser}`;

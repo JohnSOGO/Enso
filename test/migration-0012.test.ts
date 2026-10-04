@@ -35,8 +35,10 @@ it('AN8 deliveries are intact after 0012, and a fire-less delivery is accepted',
 
   await applyD1Migrations(db, env.TEST_MIGRATIONS);
 
-  // Every later migration is applied too: 0022 (§4.2u) adds deliveries.title, and 0025 (§4.2x) notice and url, NULL on every older row.
-  expect((await db.prepare('SELECT * FROM deliveries ORDER BY id').all()).results).toEqual(before.map((d) => ({ ...d, title: null, notice: null, url: null })));
+  // Every later migration is applied too: 0022 (§4.2u) adds deliveries.title, 0024 (§4.2w) speakers, and 0025 (§4.2x) notice and url,
+  // NULL on every older row.
+  expect((await db.prepare('SELECT * FROM deliveries ORDER BY id').all()).results)
+    .toEqual(before.map((d) => ({ ...d, title: null, speakers: null, notice: null, url: null })));
   expect((await db.prepare('PRAGMA foreign_key_check').all()).results).toEqual([]);
   const idx = await db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_deliveries_queue'`).first<{ sql: string }>();
   expect(idx?.sql).toMatch(/ON deliveries\s*\(channel, status\)/);

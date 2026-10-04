@@ -314,7 +314,7 @@ it('PL11: past expires_at → the poll says expired, approve is 409 expired, not
   expect((await p.client.get(`/auth/phone-login/${r.id}`)).json.status).toBe('expired');
   expect((await rowOf(b)).status).toBe('pending'); // expired is derived, never stored
 
-  // Approved in time, but not collected in time: the poll mints nothing (⚑ Q131).
+  // Approved in time, but not collected in time: the poll mints nothing (⚑ Q137).
   const sessionsBefore = await n('SELECT COUNT(*) AS n FROM sessions WHERE member_id = ?', p.id);
   const b2 = new Browser();
   await b2.ask(p.email);

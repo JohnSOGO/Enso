@@ -42,7 +42,7 @@ async function sendNotice(env: Env, memberId: string, notice: NoticeKind, messag
 }
 
 /**
- * ⚑ Q127 — "New sign-in on {browser}" after a password sign-in: only to a member with a phone subscribed (with none
+ * ⚑ Q133 — "New sign-in on {browser}" after a password sign-in: only to a member with a phone subscribed (with none
  * there is nobody to tell, so no row). A failure here is logged and never fails the sign-in.
  */
 export async function sendSignInNotice(env: Env, memberId: string, userAgent: string | null | undefined, now: string): Promise<void> {

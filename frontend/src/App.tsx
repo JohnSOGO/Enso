@@ -122,7 +122,7 @@ export function App() {
   const leaveJoin = useCallback(() => { history.replaceState(null, '', '/'); setJoining(false); }, []);
   useEffect(() => { if (me && joining) leaveJoin(); }, [me, joining, leaveJoin]);
   const signedIn = (m: Me, how?: { joined: boolean }) => { setJustJoined(!!how?.joined); setMe(m); };
-  // §6.6, §8.13 — a sign-in request's push opens /approve-login#{id}; signed out, the sign-in form shows first (⚑ Q128).
+  // §6.6, §8.13 — a sign-in request's push opens /approve-login#{id}; signed out, the sign-in form shows first (⚑ Q134).
   const [approveId, setApproveId] = useState(keepApproveRequest);
 
   // SPEC §8.10: the opening screen (index.html) covers loading; it leaves once we know who this is,
