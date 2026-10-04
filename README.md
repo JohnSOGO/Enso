@@ -117,11 +117,23 @@ folder and end the `node.exe` whose command line contains `relay.ts`.
 ## Captions from home (SogoAI)
 
 YouTube refuses captions to Cloudflare's addresses (LOGIN_REQUIRED) but serves a home one (SPEC
-Â§7E.2c). **SogoAI**, the always-on home PC (Windows 11, Node 24), runs a small helper that polls
-`https://enso.sogodojo.com/api/v1/captions/claim` every 10 s, reads a blocked video's captions from
-home with the same `youtube-captions.ts`, and posts them to `/captions/report`; the Worker re-reads the
-recipe. It only calls out â€” nothing at home is exposed. Without `CAPTIONS_TOKEN` the Worker never queues
-a job and the two routes answer 503.
+§7E.2c). When it blocks the Worker, `POST /recipes/from-video` asks **SogoAI**, the always-on home PC
+(Windows 11, Node 24), **in-line**: one `GET https://sogoai.sogodojo.com/captions?v=…` through Cloudflare
+Access and the `sogoai` Cloudflare Tunnel, answered by a small helper that reads the captions from home
+with the same `youtube-captions.ts`. The recipe is read once and saved complete; nothing is queued or
+polled.
+
+```
+Worker --HTTPS, CF-Access-Client-Id/-Secret + Bearer CAPTIONS_TOKEN--> Cloudflare Access (enso-worker token)
+  --> tunnel `sogoai` --> cloudflared (a Windows service on SogoAI) --> http://127.0.0.1:8790 (the helper)
+```
+
+The helper listens on `127.0.0.1:8790` only, never on the LAN. `cloudflared`, running as a Windows service
+on SogoAI, carries the tunnel outbound, so no port is opened at home. Access lets through only the
+`enso-worker` service token, the same one House delivery uses (`CF_ACCESS_CLIENT_ID` /
+`CF_ACCESS_CLIENT_SECRET`, above), and the helper also checks the bearer. `HOME_CAPTIONS_URL` is a var in
+`wrangler.toml`. Without the Access secrets or `CAPTIONS_TOKEN`, a blocked video is saved with "captions
+couldn't be read: from home: captions from home aren't set up."
 
 ### The Worker's secret (once)
 
@@ -133,20 +145,23 @@ $token = -join ($b | ForEach-Object { $_.ToString('x2') }); $token   # keep it f
 npx wrangler secret put CAPTIONS_TOKEN                                # paste the same value
 ```
 
-### Files on SogoAI â€” `C:\Enso\`, never in the repo
+### Files on SogoAI: `C:\Enso\`, never in the repo
 
 | File | From |
 |---|---|
-| `captions-helper.mjs` | `npm run build:home` on the dev PC â†’ `home/dist/captions-helper.mjs` (one file, no packages) |
+| `captions-helper.mjs` | `npm run build:home` on the dev PC → `home/dist/captions-helper.mjs` (one file; it imports only `node:http`) |
 | `captions-helper.cmd` | `home/captions-helper.cmd` (runs `node --env-file=captions-helper.env captions-helper.mjs`, appending to `captions-helper.log`) |
-| `captions-helper.env` | written by hand there: `ENSO_URL` and `CAPTIONS_TOKEN` |
+| `captions-helper.env` | written by hand there: `CAPTIONS_TOKEN` only |
 
 Write the env file without a byte-order mark (PowerShell 5's `Set-Content -Encoding utf8` adds one):
 
 ```powershell
 New-Item -ItemType Directory -Force C:\Enso | Out-Null
-[IO.File]::WriteAllText('C:\Enso\captions-helper.env', "ENSO_URL=https://enso.sogodojo.com`nCAPTIONS_TOKEN=<the token>`n")
+[IO.File]::WriteAllText('C:\Enso\captions-helper.env', "CAPTIONS_TOKEN=<the token>`n")
 ```
+
+The tunnel's public hostname `sogoai.sogodojo.com` points at `http://127.0.0.1:8790`, and its Access
+application allows the `enso-worker` service token (both set up once in the Cloudflare dashboard).
 
 ### The startup task (once, in an **administrator** PowerShell on SogoAI)
 
@@ -162,23 +177,32 @@ $settings  = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (Ne
   -MultipleInstances IgnoreNew
 Register-ScheduledTask -TaskName 'Enso captions helper' -Action $action -Trigger $trigger -Principal $principal -Settings $settings
 Start-ScheduledTask -TaskName 'Enso captions helper'
-Get-Content C:\Enso\captions-helper.log -Tail 5   # "captions helper polling https://enso.sogodojo.com every 10 s"
+Get-Content C:\Enso\captions-helper.log -Tail 5   # "captions helper listening on http://127.0.0.1:8790"
 ```
 
-`node` must be on the machine PATH (the Node installer puts it there). The log gets one line per job and
-one per error; the token is never written to it.
+`node` must be on the machine PATH (the Node installer puts it there). Without `CAPTIONS_TOKEN` in the env
+file the helper logs that and exits (code 1). The log gets one line per request (the video id and what
+came back); the token is never written to it.
+
+To check it: on SogoAI, `Invoke-WebRequest http://127.0.0.1:8790/captions?v=x` answers 401 (no bearer).
+From anywhere else, `https://sogoai.sogodojo.com` answers 403 without the Access service token, and 502
+with it while the helper isn't running.
 
 ### Updating the helper
 
-On the dev PC `npm run build:home`, copy `home/dist/captions-helper.mjs` over `C:\Enso\captions-helper.mjs`
-on SogoAI, then restart it there:
+On the dev PC `npm run build:home`, then copy `home/dist/captions-helper.mjs` over
+`C:\Enso\captions-helper.mjs` on SogoAI and restart it there. The same scheduled task launches the new one:
 
 ```powershell
 Stop-ScheduledTask -TaskName 'Enso captions helper'
 Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object CommandLine -like '*captions-helper.mjs*' |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
 Start-ScheduledTask -TaskName 'Enso captions helper'
+Get-Content C:\Enso\captions-helper.log -Tail 3
 ```
+
+Coming from the polling helper (v1.15.0): stop it as above, copy the new `.mjs`, rewrite the env file to
+`CAPTIONS_TOKEN` only (drop `ENSO_URL`), then start the task.
 
 A new token is `npx wrangler secret put CAPTIONS_TOKEN` plus the same value in `captions-helper.env`, then
 the restart above.

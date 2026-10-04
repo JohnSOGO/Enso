@@ -28,8 +28,8 @@ export const LAYERS: Layer[] = [
   { from: 'src/worker/', banned: ['frontend/', 'scripts/', 'home/'], why: 'the Worker stands alone' },
   { from: 'frontend/src/', banned: ['src/worker/', 'scripts/', 'home/'], why: 'the PWA talks to the Worker over HTTP only' },
   {
-    from: 'home/', banned: ['src/', 'frontend/', 'scripts/', 'package:'], allowed: ['src/worker/youtube-captions.ts'],
-    why: 'the home helper bundles youtube-captions.ts and Node globals only (§7E.2c)',
+    from: 'home/', banned: ['src/', 'frontend/', 'scripts/', 'package:'], allowed: ['src/worker/youtube-captions.ts', 'package:node:http'],
+    why: 'youtube-captions.ts, node:http and Node globals only (§7E.2c)',
   },
 ];
 

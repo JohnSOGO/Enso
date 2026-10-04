@@ -17,7 +17,6 @@ export const MACHINE_STATE = ['free', 'running', 'done'] as const; // §7D, deri
 export const SUN_EVENT = ['sunset'] as const; // §7.7 events.start_sun — there is no sunrise
 export const RECIPE_SOURCE = ['description', 'captions', 'transcript', 'comments', 'typed'] as const; // §7E what a recipe was read from ('transcript': pasted, §7E.2b)
 export const CAPTIONS_FAILURE = ['blocked', 'none', 'failed'] as const; // §7E why captions couldn't be read
-export const CAPTIONS_JOB = ['queued', 'claimed'] as const; // §7E.2c recipes.captions_job (NULL = no job; done/failed not stored)
 
 export type AlertKind = (typeof ALERT_KIND)[number];
 export type Channel = (typeof CHANNEL)[number];
@@ -36,7 +35,6 @@ export type MachineState = (typeof MACHINE_STATE)[number];
 export type SunEvent = (typeof SUN_EVENT)[number];
 export type RecipeSource = (typeof RECIPE_SOURCE)[number];
 export type CaptionsFailure = (typeof CAPTIONS_FAILURE)[number];
-export type CaptionsJob = (typeof CAPTIONS_JOB)[number];
 
 /** /status `house.state` (§9.2) — derived from the deliveries table, never stored. */
 export const HOUSE_STATE = ['ok', 'failing', 'not_configured', 'untried'] as const;

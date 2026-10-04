@@ -4,16 +4,16 @@
 // for reading a video, src/shared/recipe-reading.ts; the fetching is
 // youtube.ts, youtube-captions.ts and recipe-reader.ts; the re-read itself (re-fetch, count, Claude, clean,
 // UPDATE) is recipe-reread.ts. This route keeps the §7E.2 / §7E.2b check orders, counts reads, and persists. Any member may do anything; delete is soft (⚑ Q66). Each person sets only their own
-// emoji (§7E.5), and every recipe answered carries everyone's through toRecipes. From-video is the one place a
-// captions-from-home job is queued (§7E.2c: wantsHomeCaptions and CAPTIONS_TOKEN set; captions-jobs.ts writes it).
+// emoji (§7E.5), and every recipe answered carries everyone's through toRecipes. From-video is the one place
+// SogoAI is asked for captions, in-line (§7E.2c: wantsHomeCaptions decides, home-captions.ts asks).
 import { Hono, type Context } from 'hono';
-import type { AppEnv } from '../env';
+import type { AppEnv, Env } from '../env';
 import {
   isFound, parseRecipeInput, recipeFromRow, recipeVideoClash, youtubeVideoId, type Recipe, type RecipeEmojiRow, type RecipeInput, type RecipeRow,
 } from '../../shared/recipes';
 import {
-  COMMENTS_LOOKED_AT, PASTED_MAX, RECIPE_READS_PER_DAY, cleanRecipeReading, cleanTranscript, creatorComments, hasRecipeText,
-  parseScreenshots, sourcesOf, wantsHomeCaptions,
+  COMMENTS_LOOKED_AT, HOME_CAPTIONS_OFF, PASTED_MAX, RECIPE_READS_PER_DAY, cleanRecipeReading, cleanTranscript, creatorComments,
+  hasRecipeText, homeCaptionsError, parseScreenshots, sourcesOf, wantsHomeCaptions,
 } from '../../shared/recipe-reading';
 import { emojiError } from '../../shared/emoji';
 import type { RecipeSource } from '../../shared/vocab';
@@ -25,7 +25,7 @@ import { lookUpComments, lookUpVideo } from '../youtube';
 import { readCaptions } from '../youtube-captions';
 import { readRecipe } from '../recipe-reader';
 import { rereadRecipe } from '../recipe-reread';
-import { queueCaptionsJob } from '../captions-jobs';
+import { homeCaptionsConfigOf, readCaptionsFromHome } from '../home-captions';
 
 const LIVE = 'SELECT * FROM recipes WHERE deleted_at IS NULL';
 const loadRow = (db: D1Database, id: string) => first<RecipeRow>(db, `${LIVE} AND id = ?`, id);
@@ -61,6 +61,18 @@ async function readsUsedUp(c: Context<AppEnv>, now: string): Promise<Response | 
     localToUtc(today, '00:00', tz), localToUtc(addDays(today, 1), '00:00', tz));
   if ((reads?.n ?? 0) < RECIPE_READS_PER_DAY) return null;
   return fail(c, 429, 'rate_limited', `Videos can be read ${RECIPE_READS_PER_DAY} times a day, and today's are used up. Try again tomorrow, or type the recipe in.`);
+}
+
+/** §7E.2 step 7 with §7E.2c: the Worker's own attempt; when YouTube blocked it, SogoAI asked in-line. → the
+ *  captions' text, or why there is none (a home failure as "from home: …"). Never throws. */
+async function captionsFor(videoId: string, env: Env): Promise<{ text: string } | { error: string }> {
+  const own = await readCaptions(videoId);
+  if (own.ok) return { text: own.text };
+  if (!wantsHomeCaptions(own)) return { error: own.reason };
+  const cfg = homeCaptionsConfigOf(env);
+  if (!cfg) return { error: homeCaptionsError(HOME_CAPTIONS_OFF) };
+  const home = await readCaptionsFromHome(cfg, videoId);
+  return home.ok ? { text: home.text } : { error: homeCaptionsError(home.reason) };
 }
 
 const readingOff = (c: Context<AppEnv>) => fail(c, 503, 'recipe_reading_off', "Reading recipes from videos isn't set up yet.");
@@ -111,17 +123,17 @@ recipes.post('/recipes/from-video', requireMember, async (c) => {
   const video = await lookUpVideo(videoId, ytKey);
   if (!video.ok && video.kind === 'not_found') return fail(c, 404, 'video_unavailable', `Couldn't find that video. ${video.reason}`);
   if (!video.ok) return fail(c, 502, 'youtube_failed', `Couldn't look the video up: ${video.reason}`);
-  // Steps 7 and 8 side by side; neither is ever fatal.
-  const [captions, comments] = await Promise.all([readCaptions(videoId), lookUpComments(videoId, ytKey, COMMENTS_LOOKED_AT)]);
+  // Steps 7 (with SogoAI when blocked, §7E.2c) and 8 side by side; neither is ever fatal.
+  const [captions, comments] = await Promise.all([captionsFor(videoId, c.env), lookUpComments(videoId, ytKey, COMMENTS_LOOKED_AT)]);
   const me = c.get('member').id;
   await run(db, 'INSERT INTO recipe_reads (at, member_id) VALUES (?, ?)', now, me);
 
   const text = {
-    description: video.description, transcript: captions.ok ? captions.text : null,
+    description: video.description, transcript: 'text' in captions ? captions.text : null,
     comments: comments.ok ? creatorComments(comments.comments, video.channelId) : null,
   };
   const errors: ReadErrors = {
-    captions: captions.ok ? null : captions.reason,
+    captions: 'error' in captions ? captions.error : null,
     comments: comments.ok || comments.kind === 'none' ? null : comments.reason, // turned off is not an error ⚑ Q78
   };
   let raw: Record<string, unknown> | null = null;
@@ -140,7 +152,6 @@ recipes.post('/recipes/from-video', requireMember, async (c) => {
     if (won) return duplicate(c, won); // another paste of the same link saved first (uq_recipe_video)
     throw err;
   }
-  if (wantsHomeCaptions(captions.ok ? null : captions) && c.env.CAPTIONS_TOKEN) await queueCaptionsJob(db, id, now);
   return answer(c, id, 201);
 });
 
@@ -164,7 +175,7 @@ recipes.post('/recipes/:id/transcript', requireMember, async (c) => {
   const { YOUTUBE_API_KEY: ytKey, ANTHROPIC_API_KEY: aiKey } = c.env;
   if (!ytKey || !aiKey) return readingOff(c);
 
-  const out = await rereadRecipe(c.env.DB, { yt: ytKey, ai: aiKey }, r, { transcript: null, pasted, screenshots },
+  const out = await rereadRecipe(c.env.DB, { yt: ytKey, ai: aiKey }, r, { pasted, screenshots },
     c.get('member').id, now);
   if (out.ok) return answer(c, r.id);
   switch (out.kind) {

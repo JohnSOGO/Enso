@@ -1,6 +1,6 @@
-// SPEC §7E — canned YouTube and Anthropic answers for the recipe tests. Nothing here ever leaves the
-// isolate: `fakeWorld` replaces fetch, answers only the five fake endpoints, and fails the test on any
-// other host. The keys the route sees are fake too (`keyedEnv`).
+// SPEC §7E — canned YouTube, Anthropic and SogoAI answers for the recipe tests. Nothing here ever leaves the
+// isolate: `fakeWorld` replaces fetch, answers only the six fake endpoints, and fails the test on any
+// other host. The keys the route sees are fake too (`keyedEnv`, `homeEnv`).
 import { env } from 'cloudflare:test';
 import { vi } from 'vitest';
 import type { Env } from '../src/worker/env';
@@ -10,6 +10,10 @@ export const YT_KEY = 'fake-youtube-key';
 
 /** The pinned env with FAKE recipe keys — reading is "set up", and still reaches only the fakes. */
 export const keyedEnv = (): Env => ({ ...(env as unknown as Env), YOUTUBE_API_KEY: YT_KEY, ANTHROPIC_API_KEY: 'fake-anthropic-key' });
+
+/** keyedEnv with captions from home configured (§7E.2c): FAKE Access credentials; HOME_CAPTIONS_URL and
+ *  CAPTIONS_TOKEN are the pinned test ones, so only the `home` fake ever answers. */
+export const homeEnv = (): Env => ({ ...keyedEnv(), CF_ACCESS_CLIENT_ID: 'fake-access-id', CF_ACCESS_CLIENT_SECRET: 'fake-access-secret' });
 
 /** The player endpoint's answer listing `tracks` (none → playable, but no captions). */
 export const playerAnswer = (tracks?: object[], status = 'OK') =>
@@ -56,8 +60,10 @@ export interface World {
   player?: Reply;
   captions?: Reply;
   claude?: Reply;
+  /** The SogoAI helper's GET /captions (§7E.2c), at the pinned https://sogoai.test. */
+  home?: Reply;
 }
-export interface Heard { host: string; path: string; url: string; body: any }
+export interface Heard { host: string; path: string; url: string; body: any; headers: Headers; redirect: Request['redirect'] }
 
 const respond = (r: Reply | undefined, what: string) => {
   if (!r) throw new Error(`no fake answer for ${what}`);
@@ -75,12 +81,13 @@ export function fakeWorld(world: World) {
     const req = new Request(input, init);
     const url = new URL(req.url);
     const text = req.method === 'POST' ? await req.text() : '';
-    heard.push({ host: url.host, path: url.pathname, url: req.url, body: text ? JSON.parse(text) : null });
+    heard.push({ host: url.host, path: url.pathname, url: req.url, body: text ? JSON.parse(text) : null, headers: req.headers, redirect: req.redirect });
     if (url.host === 'www.googleapis.com' && url.pathname === '/youtube/v3/videos') return respond(world.video, 'videos.list');
     if (url.host === 'www.googleapis.com' && url.pathname === '/youtube/v3/commentThreads') return respond(world.comments, 'commentThreads.list');
     if (url.host === 'www.youtube.com' && url.pathname === '/youtubei/v1/player') return respond(world.player, 'the player');
     if (url.host === 'www.youtube.com' && url.pathname === '/api/timedtext') return respond(world.captions, 'timedtext');
     if (url.host === 'api.anthropic.com' && url.pathname === '/v1/messages') return respond(world.claude, 'Claude');
+    if (url.host === 'sogoai.test' && url.pathname === '/captions') return respond(world.home, 'SogoAI');
     throw new Error(`a test tried to reach ${url.host} — only the recipe fakes are allowed`);
   });
   return heard;

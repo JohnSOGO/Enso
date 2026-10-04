@@ -37,6 +37,9 @@ HA_URL = "https://ha.sogodojo.com"
 ECHO_TARGETS = ["Game Room", "Kid's Room - Echo", "Sogo", "Toasty"]
 ECHO_TYPE = "announce"
 SATELLITE_ENTITY = "assist_satellite.home_assistant_voice_09eb97_assist_satellite"
+# SPEC §7E.2c — captions from home: SogoAI through the `sogoai` tunnel, behind the same Access service token.
+# The bearer CAPTIONS_TOKEN is a secret (`wrangler secret put`, never here).
+HOME_CAPTIONS_URL = "https://sogoai.sogodojo.com"
 
 [triggers]
 crons = ["* * * * *"]

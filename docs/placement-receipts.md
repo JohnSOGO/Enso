@@ -7,6 +7,38 @@ carry its result.
 
 ---
 
+## 2026-10-04 — Captions from home, asked in-line (placement-advisor; feature/inline-home-captions, v1.16.0)
+
+PLACEMENT RECEIPT
+- Feature:      §7E.2c, decided by MojoSOGO 2026-10-04: no polling. When YouTube blocks the Worker's captions
+  request, from-video asks SogoAI in-line through Cloudflare Access and the `sogoai` tunnel, reads the recipe once
+  and saves it complete. The job queue and everything that served it are deleted.
+- Call:         NEW owner `src/worker/home-captions.ts`, a leaf sibling of house.ts — homeCaptionsConfigOf,
+  readCaptionsFromHome (one GET, Access headers + Bearer CAPTIONS_TOKEN, redirect 'manual', 2xx only,
+  HOME_CAPTIONS_TIMEOUT_MS = 20 s, parseCaptionsReport); never throws, never names a secret, never decides; no D1,
+  no Hono.
+- Route:        `src/worker/routes/recipes.ts` from-video — the file-local captionsFor (readCaptions → on blocked,
+  HOME_CAPTIONS_OFF when not configured, else readCaptionsFromHome), run beside the comments; §7E.2 check order and
+  the counting unchanged; no queue, no UPDATE after the INSERT.
+- Re-read:      `src/worker/recipe-reread.ts` loses END_CAPTIONS_JOB, `given.transcript` and the uncounted read
+  (countFor: string); the transcript route behaves as before.
+- Rules:        `src/shared/recipe-reading.ts` keeps wantsHomeCaptions, CaptionsReport, parseCaptionsReport,
+  CAPTIONS_REPORT_REASON_MAX, homeCaptionsError; adds HOME_CAPTIONS_OFF; deletes the CAPTIONS_JOB_* limits, the
+  give-up / no-recipe / edited texts and homeRereadMayReplace. `vocab.ts` deletes CAPTIONS_JOB; `recipes.ts` deletes
+  the four row columns and captionsPending.
+- Deleted:      `src/worker/captions-jobs.ts`, `src/worker/routes/captions.ts` (and their rows), the index.ts mount
+  and the scheduled() give-up.
+- Storage:      migration 0021 drops 0020's index and four columns (§4.2t); 0020 and its test untouched.
+- Config:       `env.ts` HOME_CAPTIONS_URL; wrangler.toml var `https://sogoai.sogodojo.com`; vitest pins
+  `https://sogoai.test` (CF_ACCESS_* stay empty, so home is not configured by default).
+- Helper:       `home/captions-helper.ts` rewritten as a server — `handle` (no node:http) + `main` (the only
+  node:http user, 127.0.0.1:8790). Structure rule approved by the coordinator: the home/ layer's `allowed` gains
+  `package:node:http` (SPEC §2.5); test/architecture.test.ts already matches it exactly (resolveImport gives
+  `package:node:http`), so it is unchanged.
+- PWA:          `RecipeView.tsx` loses the poll, the pending line and the `captionsPending` guard; Recipes.tsx and
+  RecipeTranscript.tsx untouched.
+- Caps:         every touched file under the global cap; no CEILINGS entry added; arch:audit quiet.
+
 ## 2026-10-04 — Captions from home: the SogoAI helper (placement-advisor; feature/home-captions, v1.15.0)
 
 PLACEMENT RECEIPT
