@@ -6,7 +6,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Grow } from './Grow';
 import { errorText, post } from '../api';
-import { SCREENSHOTS_MAX, type Recipe, type Screenshot } from '../../../src/shared/recipes';
+import type { Recipe } from '../../../src/shared/recipes';
+import { SCREENSHOTS_MAX, type Screenshot } from '../../../src/shared/recipe-reading';
 import s from './Recipes.module.css';
 
 interface Shot { blob: Blob; url: string }

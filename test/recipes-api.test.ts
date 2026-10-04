@@ -6,8 +6,9 @@ import { SELF, createExecutionContext, env } from 'cloudflare:test';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src/worker/index';
 import {
-  INGREDIENT_MAX, RECIPE_READS_PER_DAY, cleanRecipeReading, parseRecipeInput, type Recipe, type RecipeInput,
+  INGREDIENT_MAX, parseRecipeInput, type Recipe, type RecipeInput,
 } from '../src/shared/recipes';
+import { RECIPE_READS_PER_DAY, cleanRecipeReading } from '../src/shared/recipe-reading';
 import { SHOPPING_LIST_ID } from '../src/shared/lists';
 import { BASE, Client, owner } from './helpers';
 import {

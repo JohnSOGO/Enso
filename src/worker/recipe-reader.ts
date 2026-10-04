@@ -2,9 +2,9 @@
 // pasted or screenshotted, and the creator's comments) with Claude, via claude.ts (the only
 // importer of the Anthropic SDK). This file owns the recipe prompt and its schema. It returns the raw
 // fields or an honest failure; it never decides what is saved — the route cleans the answer with
-// cleanRecipeReading (src/shared/recipes.ts). Claude is told never to invent a recipe from the title.
+// cleanRecipeReading (src/shared/recipe-reading.ts). Claude is told never to invent a recipe from the title.
 import { askClaude } from './claude';
-import { TRANSCRIPT_MAX, type Screenshot } from '../shared/recipes';
+import { TRANSCRIPT_MAX, type Screenshot } from '../shared/recipe-reading';
 
 export interface ReadRecipeInput {
   apiKey: string;

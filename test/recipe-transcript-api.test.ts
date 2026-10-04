@@ -4,7 +4,7 @@
 import { createExecutionContext, env } from 'cloudflare:test';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src/worker/index';
-import { PASTED_MAX, RECIPE_READS_PER_DAY, SCREENSHOTS_MAX } from '../src/shared/recipes';
+import { PASTED_MAX, RECIPE_READS_PER_DAY, SCREENSHOTS_MAX } from '../src/shared/recipe-reading';
 import { PHOTO_MAX_BYTES } from '../src/shared/things';
 import { BASE, Client, owner } from './helpers';
 import { CHANNEL_ID, VIDEO_ID, claudeMessage, commentsAnswer, fakeWorld, keyedEnv, videoAnswer, warmClaude, type World } from './recipe-fakes';

@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { lookUpComments, lookUpVideo } from '../src/worker/youtube';
 import { readCaptions } from '../src/worker/youtube-captions';
 import { readRecipe } from '../src/worker/recipe-reader';
-import { COMMENTS_LOOKED_AT, TRANSCRIPT_MAX } from '../src/shared/recipes';
+import { COMMENTS_LOOKED_AT, TRANSCRIPT_MAX } from '../src/shared/recipe-reading';
 import { CAPTIONS_FAILURE } from '../src/shared/vocab';
 import {
   CHANNEL_ID, TRACKS, VIDEO_ID, YT_KEY, claudeMessage, commentsAnswer, json3, videoAnswer, warmClaude, playerAnswer,

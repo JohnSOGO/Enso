@@ -7,6 +7,33 @@ carry its result.
 
 ---
 
+## 2026-10-04 — Recipe reading seam (reorganizer; prepares the SogoAI home-PC captions helper)
+
+REORG RECEIPT
+- Trigger:      placement-advisor: the SogoAI home-PC captions helper lands in the §7E.2 reading rules, but
+  `src/shared/recipes.ts` sat at 292/300 lines, in the warning band — extract the reading rules first.
+- Seam moved:   the §7E.2 / §7E.2b video-reading rules (TRANSCRIPT_MAX, PASTED_MAX, SCREENSHOTS_MAX,
+  COMMENTS_LOOKED_AT, CREATOR_COMMENTS_MAX, RECIPE_READS_PER_DAY, UNTITLED_VIDEO; VideoText, sourcesOf,
+  SCREENSHOT_TYPES, Screenshot, parseScreenshots, hasRecipeText, RecipeReading, creatorComments,
+  cleanTranscript, cleanRecipeReading and their private helpers), bodies verbatim, from `src/shared/recipes.ts`
+  to `src/shared/recipe-reading.ts` [NEW owner row].
+- Room opened:  src/shared/recipes.ts: 292 → 164 lines; ceiling none (global 300) → none (global 300), out of
+  the warning band. recipe-reading.ts: 134 lines under the global cap. No CEILINGS entry added.
+- Behavior:     PRESERVED — verified via `npm run typecheck && npm test && npm run build && npm run arch:audit`;
+  bodies moved verbatim, only import lines and two header comments changed in importers; no re-exports; the
+  source vocabulary (RECIPE_SOURCE order), the §7E.2 check order, the daily read cap and the cleaning limits
+  are untouched. Imports go one way: recipe-reading → recipes (limits), things, vocab; recipes.ts dropped
+  its `./things` import and never imports recipe-reading.
+- Sources read: CLAUDE.md, docs/module-ownership.md, scripts/arch.ts, src/shared/recipes.ts, the importers,
+  SPEC.md §2 / §7E.2, this file.
+- Restraint:    §7E.1 (the link → id), §7E.3 (typed input, the clash), rows and the wire stay in recipes.ts;
+  youtube.ts, youtube-captions.ts, claude.ts, recipe-emoji.ts and the recipe components other than
+  RecipeTranscript.tsx's import line are untouched; no feature code for the captions helper.
+- New owner row: `src/shared/recipe-reading.ts` — reading a recipe from a video (§7E.2, §7E.2b); pure;
+  imports recipes (limits), things (photo limits) and vocab only; recipes.ts never imports it.
+
+---
+
 ## 2026-10-04 — Paste (or screenshot) the transcript (placement-advisor; course change from MojoSOGO)
 
 - **Ask:** production captions are refused from Cloudflare ("LOGIN_REQUIRED: Sign in to confirm you're not a
