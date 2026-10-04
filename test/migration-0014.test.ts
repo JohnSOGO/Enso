@@ -53,8 +53,10 @@ it('L13 every fire kind and delivery is intact after 0014; machines seeded; a ma
 
   const after = (await db.prepare('SELECT * FROM fires ORDER BY id').all<Record<string, unknown>>()).results;
   expect(after).toEqual(before.map((f) => ({ ...f, machine_id: null })));
-  // Every later migration is applied too: 0022 (§4.2u) adds deliveries.title, NULL on every older row.
-  expect((await db.prepare('SELECT * FROM deliveries ORDER BY id').all()).results).toEqual(deliveriesBefore.map((d) => ({ ...d, title: null })));
+  // Every later migration is applied too: 0022 (§4.2u) adds deliveries.title and 0024 (§4.2w) deliveries.speakers,
+  // NULL on every older row.
+  expect((await db.prepare('SELECT * FROM deliveries ORDER BY id').all()).results)
+    .toEqual(deliveriesBefore.map((d) => ({ ...d, title: null, speakers: null })));
   expect((await db.prepare('PRAGMA foreign_key_check').all()).results).toEqual([]);
 
   // Both machines are seeded, free.

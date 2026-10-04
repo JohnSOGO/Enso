@@ -7,6 +7,7 @@ import { useAction } from './useAction';
 import { Invites } from './Invites';
 import { OptionalItems } from './OptionalItems';
 import { PhoneAlerts } from './PhoneAlerts';
+import { HouseSpeakers } from './HouseSpeakers';
 import s from './Lists.module.css';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -36,6 +37,7 @@ function MeSection({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
       <PhoneAlerts />
+      <HouseSpeakers />
       <button onClick={() => run(async () => { await post('/auth/logout'); onLogout(); })}>Log out</button>
     </Section>
   );

@@ -1,4 +1,5 @@
-// SPEC §10 — settings, status (incl. the derived House state, §9.2), /push/* (vapid-key, subscriptions, test).
+// SPEC §10 — settings, status (incl. the derived House state, §9.2), /push/* (vapid-key, subscriptions, test),
+// and /house/speakers (the list to tick from, asked of Home Assistant live, §9.2a).
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { isValidTimeZone } from '../../shared/time';
@@ -7,7 +8,9 @@ import { all, first, newId, nowIso, parseJson, run } from '../db';
 import { body, fail, str } from '../http';
 import { requireMember, requireOwner } from '../session';
 import { NO_SUBSCRIPTION, PUSH_NOT_CONFIGURED, sendTestPush } from '../push';
-import { houseState } from '../house';
+import { defaultSpeakers, houseConfigOf, houseSpeakerList, houseState, HOUSE_NOT_CONFIGURED } from '../house';
+import { speakerList } from '../../shared/speakers';
+import { speakerChoices } from '../speaker-choices';
 
 export const household = new Hono<AppEnv>();
 
@@ -85,4 +88,15 @@ household.delete('/push/subscriptions/:id', requireMember, async (c) => {
   const r = await run(c.env.DB, 'DELETE FROM push_subscriptions WHERE id = ? AND member_id = ?', c.req.param('id'), c.get('member').id);
   if (r.meta.changes !== 1) return fail(c, 404, 'not_found', 'No such subscription of yours.');
   return c.json({ ok: true });
+});
+
+household.get('/house/speakers', requireMember, async (c) => {
+  const cfg = houseConfigOf(c.env);
+  if (!cfg) return fail(c, 503, HOUSE_NOT_CONFIGURED, "House isn't set up.");
+  const r = await houseSpeakerList(cfg);
+  if (!r.ok) return fail(c, 502, 'house_unreachable', r.reason);
+  const speakers = speakerList(r.text);
+  if (!speakers) return fail(c, 502, 'house_unreachable', "Home Assistant's speaker list couldn't be read.");
+  const [mine] = await speakerChoices(c.env.DB, [c.get('member').id]);
+  return c.json({ speakers, mine, defaults: defaultSpeakers(cfg) });
 });

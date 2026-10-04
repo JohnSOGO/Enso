@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.40-draft · **Date:** 2026-10-04 · **Owner:** MojoSOGO
+**Version:** 2.40 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3837,6 +3837,15 @@ checks.
 - ✅ Manual: the secret and the token file set; a ping from a Claude session arrives on the founder's
   iPhone with its title.
 
+**M4v — Each person's speakers** (v1.19.0)
+- Migration 0024 (`member_prefs.house_speakers`, `deliveries.speakers`), `SPEAKER_KIND`, `src/shared/speakers.ts`,
+  `src/worker/speaker-choices.ts`, `GET /house/speakers`, `PATCH /me { houseSpeakers }`, the drain speaking on a
+  row's speakers, and 🔊 Speak my alerts on in Settings → Me (`HouseSpeakers.tsx`) (§3, §4.2w, §8.6, §9.2, §9.2a,
+  §9.3, §10, §13 Q125–Q129).
+- ✅ Tests HS1–HS10, HS-M; H1 follows the new classifyHouse.
+- Manual: Home Assistant's real list seen in Settings → Me on the iPhone at 320 px; each person ticks theirs; a
+  reminder for John alone heard only on his speakers.
+
 **M4u — Snap an item** (v1.18.0)
 - Migration 0023 (`list_items.photo_key`), `src/shared/item-reading.ts`, `IDENTIFY_FAILURE` / `ITEM_READ_VIA`,
   `POST /list-items/read-photo` and `/list-items/{id}/photo` (`routes/item-photos.ts`), `identifyFromHome`,
@@ -4281,6 +4290,15 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**M4v Each person's speakers** (v1.19.0, §9.2a; 552 tests incl. HS1–HS10 and HS-M): decided by MojoSOGO
+2026-10-04. Settings → Me lists Home Assistant's Echos and Voice PE, asked live through the tunnel with one
+`/api/template` call; each person ticks theirs. A house delivery is written with the speakers of everyone it is for
+(the union; anyone not chosen, or nobody at all, → the default speakers, as before) and spoken only there; a surface
+with no speaker is not called. Built as: `classifyHouse` takes the called surfaces' results and is `failed` when none
+was called (never a quiet `sent`); the screen shows "not chosen" with every box unticked and names the defaults.
+Migration 0024 is applied only in tests so far. **Still owed:** apply 0024 in production; the real speaker list seen
+on the iPhone (the template's `integration_entities('alexa_media')` may list more than the four Echos); each person's
+ticks; a reminder for one person heard only on their speakers.
 **Identify fix** (v1.18.1): SogoAI's qwen3.6 thinks even with ` /no_think`; at `max_tokens` 100 it was cut off
 with an empty answer every time, which silently sent every photo to the paid Claude fallback. Now 1024
 (`IDENTIFY_MAX_TOKENS`), and a cut-off empty answer is an honest `failed` ("ran out of room"). Verified through

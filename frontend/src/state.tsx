@@ -8,6 +8,8 @@ import type { AlertKind, HouseState, Role } from '../../src/shared/vocab';
 export interface Me {
   id: string; email: string; displayName: string; color: string; role: Role;
   showPublicHolidays: number; showOptionsExpiration: number;
+  /** §9.2a: the house speakers this member chose; null = not chosen (the default speakers). */
+  houseSpeakers: string[] | null;
 }
 /** §6.3: role 'owner' reads Admin; the founder (isFounder) reads Owner and is protected. */
 export interface Member { id: string; displayName: string; color: string; role: Role; isFounder: boolean; email?: string; disabledAt: string | null }

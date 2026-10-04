@@ -7,6 +7,25 @@ carry its result.
 
 ---
 
+## 2026-10-04 — Each person's house speakers (placement-advisor; feature/house-speakers)
+
+PLACEMENT RECEIPT
+- Feature:      §9.2a — each member ticks the house speakers (Home Assistant's Echos and Voice PE) they want to be
+  alerted on; a house delivery is written with the speakers of everyone it is for and spoken only there. Migration
+  0024 (§4.2w).
+- New owners:   `src/shared/speakers.ts` (the rules and the Speaker wire type; pure; imports only vocab);
+  `src/worker/speaker-choices.ts` (the one read of members' choices, shared by tick, /announce, /me and
+  /house/speakers; D1 reads only); `frontend/src/components/HouseSpeakers.tsx` (hosted by Settings → Me).
+- Widened:      house.ts (the drain speaks on the row's speakers; classifyHouse over the called surfaces, `failed`
+  when none was called; houseSpeakerList returns HA's raw text); routes/household.ts (`GET /house/speakers`);
+  routes/auth.ts (`/me` houseSpeakers); tick.ts and routes/announce.ts (the two house-row writers, changed together);
+  vocab.ts (SPEAKER_KIND); state.tsx (Me.houseSpeakers).
+- Rejected:     the choices read in house.ts (the drain must not decide speakers), db.ts (generic helpers only) or
+  tick.ts (83 %, and household.ts must not import tick); a one-route routes/house.ts.
+- Caps:         no reorganizer, no re-pin. tick.ts stays below the band only because the read lives elsewhere.
+
+---
+
 ## 2026-10-04 — Snap an item: a list item's photo, named by SogoAI first, Claude second (placement-advisor; feature/snap-item)
 
 PLACEMENT RECEIPT

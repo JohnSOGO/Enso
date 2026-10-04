@@ -1,5 +1,5 @@
 // SPEC §9.3 — POST /announce: a house announcement, now. A delivery with no fire: one `house` row the
-// Worker speaks right after answering (§9.2), and one `push` row per other member, sent at once. The
+// Worker speaks right after answering (§9.2) on everyone's ticked speakers (§9.2a), and one `push` row per other member, sent at once. The
 // sender's name comes from the session.
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
@@ -12,6 +12,7 @@ import { requireMember } from '../session';
 import { activeMemberIds } from '../tick';
 import { sendPushDeliveries } from '../push';
 import { sendHouseDeliveries } from '../house';
+import { deliverySpeakers } from '../speaker-choices';
 
 export const announce = new Hono<AppEnv>();
 
@@ -29,12 +30,14 @@ announce.post('/announce', requireMember, async (c) => {
   const pushIds: string[] = [];
   let houseId: string | null = null;
   const stmts: D1PreparedStatement[] = [];
-  if (channels.includes('house')) {
+  // §9.2a: for every active member, so on everyone's ticked speakers together; none ticked → not spoken.
+  const speakers = channels.includes('house') ? await deliverySpeakers(db, await activeMemberIds(db)) : [];
+  if (speakers === null || speakers.length) {
     const id = houseId = newId('dlv');
     ids.push(id);
     stmts.push(db.prepare(
-      `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, status, created_at, updated_at)
-       VALUES (?, NULL, 1, 'house', NULL, ?, 'queued', ?, ?)`).bind(id, message, now, now));
+      `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, status, speakers, created_at, updated_at)
+       VALUES (?, NULL, 1, 'house', NULL, ?, 'queued', ?, ?, ?)`).bind(id, message, speakers && JSON.stringify(speakers), now, now));
   }
   if (channels.includes('push')) {
     const aud = audience({ optional: false, assignedTo: [], activeIds: await activeMemberIds(db), onIds: [], channels });
@@ -47,7 +50,8 @@ announce.post('/announce', requireMember, async (c) => {
          VALUES (?, NULL, 1, 'push', ?, ?, 'queued', ?, ?)`).bind(id, memberId, message, now, now));
     }
   }
-  // Phone only, and nobody else in the household: say so rather than succeed with nothing sent.
+  // Nothing would be sent — say why rather than succeed with nothing sent.
+  if (!stmts.length && channels.includes('house') && speakers?.length === 0) return fail(c, 409, 'no_speakers', 'Nobody has a house speaker ticked.');
   if (!stmts.length) return fail(c, 409, 'no_recipients', 'There is nobody else to send a phone announcement to.');
   await db.batch(stmts);
   if (pushIds.length) await sendPushDeliveries(c.env, pushIds, now);
