@@ -46,6 +46,11 @@ read-photo answers 503 "Reading photos isn't set up yet." (tests pin it empty, s
 Things to do, once per account (SPEC §11 M4g): `npx wrangler r2 bucket create enso-photos`, then
 `npx wrangler secret put ANTHROPIC_API_KEY`.
 
+Recipes from YouTube videos (SPEC §7E) also need `YOUTUBE_API_KEY` (a Google Cloud API key with the
+YouTube Data API v3 enabled): `npx wrangler secret put YOUTUBE_API_KEY`, typed in a **real PowerShell
+window**. Without it (or without `ANTHROPIC_API_KEY`) reading a video answers 503 "Reading recipes from
+videos isn't set up yet."; typed recipes still work. Tests pin both keys empty.
+
 ### Simulate the clock
 
 The real cron fires every minute in production. Locally, drive it by hand:

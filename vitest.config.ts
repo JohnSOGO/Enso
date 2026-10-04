@@ -19,6 +19,8 @@ export default defineConfig(async () => {
             DEV_ENDPOINTS: '1',
             // §7C.4 — pinned empty so a local .dev.vars key can never reach the real Anthropic API from a test.
             ANTHROPIC_API_KEY: '',
+            // §7E — pinned empty too: no test reaches the real YouTube API (recipe tests set a fake key per call).
+            YOUTUBE_API_KEY: '',
             // §9.2 — pinned so a test can never speak in the real house: a fake host, and the secrets
             // empty (House is then not configured). test/house.test.ts overrides them per call, with a
             // fetch spy answering https://ha.test.

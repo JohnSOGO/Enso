@@ -7,6 +7,32 @@ carry its result.
 
 ---
 
+## 2026-10-03 — Recipes, a fifth tab (placement-advisor)
+
+- **Ask:** MojoSOGO decided a new 🍳 Recipes tab: paste a YouTube link and the Worker reads the
+  recipe from the video's own text (YouTube Data API v3 snippet + an unofficial captions attempt +
+  Claude, never inventing one from the title), or type one by hand; a ▶ link and the hotlinked
+  thumbnail; Add ingredients to Shopping; household-shared.
+- **Verdict:** eight NEW owners, each one concern — `src/shared/recipes.ts` (the rules; pure,
+  imports lists + vocab only, `INGREDIENT_MAX` derived from the lists' `TEXT_MAX`),
+  `src/worker/youtube.ts` (Data API), `src/worker/youtube-captions.ts` (the unofficial attempt,
+  never throws, deletable alone), `src/worker/recipe-reader.ts` (prompt + schema via `claude.ts`),
+  `src/worker/routes/recipes.ts` (CRUD + the §7E.2 pipeline), and the PWA's `Recipes.tsx`,
+  `RecipeView.tsx`, `RecipeForm.tsx`. Small edits only to `vocab.ts` (`RECIPE_SOURCE`,
+  `CAPTIONS_FAILURE`), `env.ts`, `vitest.config.ts`, `index.ts`, `App.tsx` (one NAV entry, one render
+  line) and `App.module.css` (the tab grid derives its columns from the tabs).
+- **Why not extend Things to do or lists:** a recipe is neither an idea with a window nor a list
+  item; it has its own source pipeline and its own wire shape. Add to Shopping reuses the existing
+  `POST /lists/{SHOPPING_LIST_ID}/items`, once per ingredient from the PWA — no bulk route, and R11
+  asserts every ingredient the rules can produce is accepted by that route.
+- **Why the two seams first:** `claude.ts` and `Grow.tsx` were opened (receipt below) so Recipes
+  imports them instead of reaching into the photo reader or the thing form. `claude.ts`,
+  `photo-reader.ts`, `thing-photos.ts`, `routes/lists.ts`, `shared/lists.ts`, `shared/things.ts`,
+  `ThingForm.tsx`, `Grow.tsx`, `HouseholdLists.tsx`, `state.tsx`, `api.ts` and `scripts/arch.ts` are
+  untouched. No ceilings moved.
+
+---
+
 ## 2026-10-03 — Two seams opened before Recipes (reorganizer)
 
 - **Trigger:** placement-advisor, preparing for Recipes: the Claude plumbing in

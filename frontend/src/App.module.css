@@ -21,7 +21,8 @@
 }
 
 .tabs {
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  /* One equal column per tab (§8.1: five since v1.11.0), derived from the tabs themselves. */
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
   border-top: 1px solid var(--border);
   background: var(--surface);
   padding-bottom: env(safe-area-inset-bottom);
@@ -29,7 +30,7 @@
 .tabs button {
   border: 0; border-radius: 0; background: none;
   height: var(--tabbar-h); color: var(--text-dim); font-size: .75rem;
-  /* Icon above label so four tabs fit one line at 320px without wrapping or truncating. */
+  /* Icon above label so the five tabs fit one line at 320px without wrapping or truncating. */
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   padding: 0 2px; min-width: 0; white-space: nowrap;
 }
