@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.24-draft · **Date:** 2026-10-03 · **Owner:** MojoSOGO
+**Version:** 2.24 · **Date:** 2026-10-03 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2629,6 +2629,13 @@ images are rendered from it. Its on-iPhone check is still to do.
 is not built — an open app picks the alert up on its 30 s poll, and a reopened app reloads
 (§8.10). Still to check on real phones: Turn on → Send a test (iPhone home-screen app and
 Android), a reminder on the lock screen, Android Done/Snooze.
+**M4k Announcements** (v1.6.0; 266 tests incl. AN1–AN8): 📢 Announce at the top of the Alarms
+tab → `POST /announce` → a fire-less `house` delivery the relay speaks as "{name} says: …" and/or
+a push to every other active member, sent at once; migration 0012 makes `deliveries.fire_id`
+nullable (applied only in tests so far); the push payload gains `tag`. Built as: Phone only with
+nobody else to push to → 409 `no_recipients` rather than a quiet success. **Still to check:**
+the box at 320 px and on the iPhone, an announcement spoken on the Echos + Voice PE, and one
+arriving on another member's phone.
 **Emoji instead of a dot** (v1.5.1): on phones an event whose emoji shows beside the date has no
 dot (§7.1); checked at 320 px.
 **Open from the thing form** (v1.5.0): ↗ link, 🗺️ maps, 📞 call beside the fields, checked at
