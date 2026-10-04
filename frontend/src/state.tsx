@@ -14,6 +14,8 @@ export interface Member { id: string; displayName: string; color: string; role: 
 export interface Fire {
   id: string; kind: AlertKind; dueAt: string; state: string; alertCount: number;
   occurrenceDate: string | null; eventId: string | null; timerId: string | null; title: string; startTime: string | null;
+  /** §7.7: 'sunset' for a sun-timed reminder, else null. */
+  startSun: string | null;
   /** Chore fires only (§10): the run, the current step's title (> 1 step only) and its person. */
   choreRunId?: string | null; stepTitle?: string | null; personId?: string | null;
   /** Machine fires only (§10): the machine; `title` is its label and `personId` the load's owner. */

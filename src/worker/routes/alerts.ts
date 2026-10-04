@@ -134,7 +134,7 @@ alerts.get('/fires', requireMember, async (c) => {
     `SELECT f.id, f.kind, f.due_at AS dueAt, f.state, f.alert_count AS alertCount, f.occurrence_date AS occurrenceDate,
             f.event_id AS eventId, f.timer_id AS timerId, f.chore_run_id AS choreRunId, f.thing_id AS thingId,
             f.machine_id AS machineId, m.owner_id AS machineOwner,
-            COALESCE(e.title, t.title, th.title) AS title, e.start_time AS startTime, e.optional
+            COALESCE(e.title, t.title, th.title) AS title, e.start_time AS startTime, e.start_sun AS startSun, e.optional
        FROM fires f LEFT JOIN events e ON e.id = f.event_id LEFT JOIN timers t ON t.id = f.timer_id
        LEFT JOIN things th ON th.id = f.thing_id LEFT JOIN machines m ON m.id = f.machine_id
       WHERE ${state === 'ringing' ? "f.state = 'ringing'" : "f.state != 'closed'"}

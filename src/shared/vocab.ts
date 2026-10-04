@@ -14,6 +14,7 @@ export const CHORE_TIMING = ['at', 'by'] as const; // §7B
 export const THING_STATUS = ['idea', 'planned', 'done', 'dropped'] as const; // §7C
 export const MACHINE = ['washer', 'dryer'] as const; // §7D, in load order
 export const MACHINE_STATE = ['free', 'running', 'done'] as const; // §7D, derived, never stored
+export const SUN_EVENT = ['sunset'] as const; // §7.7 events.start_sun — there is no sunrise
 
 export type AlertKind = (typeof ALERT_KIND)[number];
 export type Channel = (typeof CHANNEL)[number];
@@ -29,6 +30,7 @@ export type ChoreTiming = (typeof CHORE_TIMING)[number];
 export type ThingStatus = (typeof THING_STATUS)[number];
 export type MachineId = (typeof MACHINE)[number];
 export type MachineState = (typeof MACHINE_STATE)[number];
+export type SunEvent = (typeof SUN_EVENT)[number];
 
 /** /status `house.state` (§9.2) — derived from the deliveries table, never stored. */
 export const HOUSE_STATE = ['ok', 'failing', 'not_configured', 'untried'] as const;

@@ -7,9 +7,10 @@ import { DEFAULT_MAX_ALERTS, choreFireContext, choreFromRow, planChoreRuns, type
 import { isStartReminder, planThingFires, type ThingRow } from '../shared/things';
 import { audience } from '../shared/optins';
 import { doneMessage, isMachineId, machineAlertConfig, waitingLoad, type MachineRow } from '../shared/machines';
-import type { Channel } from '../shared/vocab';
+import type { Channel, SunEvent } from '../shared/vocab';
 import type { Recurrence } from '../shared/recurrence';
-import { addMinutes } from '../shared/time';
+import { addMinutes, utcToLocal } from '../shared/time';
+import { sunsetUtc, type Place } from '../shared/sun';
 import type { Env } from './env';
 import { all, first, newId, parseJson } from './db';
 import { sendPushDeliveries } from './push';
@@ -23,7 +24,13 @@ interface SourceRow {
   interval_min: number | null; optional: number;
   /** Timers only (§4.2n): the active time range and the household tz. */
   active_from?: string | null; active_to?: string | null; tz?: string;
+  /** Reminders only (§7.7): a sun event, and the household place. */
+  start_sun?: SunEvent | null; lat?: number | null; lon?: number | null;
 }
+
+/** §4.2o — the household place, or null unless both coordinates are set. */
+const placeOf = (lat: number | null | undefined, lon: number | null | undefined): Place | null =>
+  lat != null && lon != null ? { lat, lon } : null;
 
 export function insertFire(db: D1Database, f: NewFire, ignoreConflict = false): D1PreparedStatement {
   return db.prepare(
@@ -82,6 +89,8 @@ interface Source {
   title: string; assignedTo: string[]; cfg: AlertConfig; chore?: ChoreAlertText; startsToday?: boolean;
   /** §7.5: a reminder of an optional event, and the members who have it on. */
   optional?: boolean; onIds?: string[];
+  /** §7.7: a sun reminder's local sunset HH:MM, or null when it cannot be computed. */
+  sunsetAt?: string | null;
 }
 
 /** Loads the alert config + title for a fire from its event, timer, chore run, thing or machine (as of `now`). */
@@ -127,11 +136,14 @@ export async function sourceOf(
     };
   }
   const row = fire.kind === 'reminder'
-    ? await first<SourceRow>(db, `SELECT title, assigned_to, remind_channels AS channels, renotify_min, max_alerts, NULL AS interval_min, optional FROM events WHERE id = ?`, fire.event_id)
+    ? await first<SourceRow>(db, `SELECT title, assigned_to, remind_channels AS channels, renotify_min, max_alerts, NULL AS interval_min, optional,
+        start_sun, timezone AS tz, latitude AS lat, longitude AS lon FROM events JOIN settings ON settings.id = 1 WHERE events.id = ?`, fire.event_id)
     : await first<SourceRow>(db, `SELECT title, assigned_to, channels, renotify_min, max_alerts, interval_min, 0 AS optional,
         active_from, active_to, (SELECT timezone FROM settings WHERE id = 1) AS tz FROM timers WHERE id = ?`, fire.timer_id);
   if (!row) return null;
   const window = timerWindow(row.active_from, row.active_to, row.tz);
+  const place = placeOf(row.lat, row.lon);
+  const sunset = row.start_sun && fire.occurrence_date && place ? sunsetUtc(fire.occurrence_date, place) : null;
   return {
     title: row.title,
     assignedTo: parseJson<string[]>(row.assigned_to, []),
@@ -143,25 +155,31 @@ export async function sourceOf(
       ...(window ? { window } : {}),
     },
     ...(row.optional === 1 ? { optional: true, onIds: await onMemberIds(db, fire.event_id) } : {}),
+    ...(row.start_sun ? { sunsetAt: sunset && row.tz ? utcToLocal(sunset, row.tz).time : null } : {}),
   };
 }
 
 export async function tick(env: Env, now: string): Promise<TickSummary> {
   const db = env.DB;
   const summary: TickSummary = { materialized: 0, stepped: 0, alerts: 0, deliveries: 0 };
-  const tz = (await first<{ timezone: string }>(db, 'SELECT timezone FROM settings WHERE id = 1'))!.timezone;
+  const settings = (await first<{ timezone: string; latitude: number | null; longitude: number | null }>(db,
+    'SELECT timezone, latitude, longitude FROM settings WHERE id = 1'))!;
+  const tz = settings.timezone, place = placeOf(settings.latitude, settings.longitude);
 
   // 1. Materialize reminder fires for the next 36 h.
-  const evs = await all<{ id: string; start_date: string; start_time: string | null; recurrence: string | null; exdates: string; remind_offset_min: number }>(db,
-    `SELECT id, start_date, start_time, recurrence, exdates, remind_offset_min FROM events
+  const evs = await all<{
+    id: string; start_date: string; start_time: string | null; recurrence: string | null; exdates: string; remind_offset_min: number;
+    start_sun: SunEvent | null;
+  }>(db,
+    `SELECT id, start_date, start_time, recurrence, exdates, remind_offset_min, start_sun FROM events
       WHERE deleted_at IS NULL AND remind_offset_min IS NOT NULL`);
   const to = addMinutes(now, MATERIALIZE_AHEAD_H * 60);
   const inserts: D1PreparedStatement[] = [];
   for (const e of evs) {
     const planned = planReminderFires({
-      id: e.id, start_date: e.start_date, start_time: e.start_time, remind_offset_min: e.remind_offset_min,
+      id: e.id, start_date: e.start_date, start_time: e.start_time, remind_offset_min: e.remind_offset_min, start_sun: e.start_sun,
       recurrence: parseJson<Recurrence | null>(e.recurrence, null), exdates: parseJson<string[]>(e.exdates, []),
-    }, tz, now, to);
+    }, tz, now, to, place);
     for (const f of planned) inserts.push(insertFire(db, f, true));
   }
   // 1b. Plan chore runs (and their first fires) for the same window (§7B.3).
@@ -191,7 +209,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
     const stmts = [updateFire(db, next)];
     if (alert) {
       summary.alerts++;
-      const message = alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday);
+      const message = alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sunsetAt);
       const base = [next.id, next.alert_count] as const;
       // §5.7, §7.5: who it is for. Nobody → the fire still steps, nothing is delivered.
       const aud = audience({

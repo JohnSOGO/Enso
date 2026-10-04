@@ -21,6 +21,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 |---|---|
 | `src/shared/vocab.ts` | Every vocabulary string (§3), the member palette, the `isOneOf` guard |
 | `src/shared/time.ts` | Local wall time ⇄ UTC per IANA zone, DST gap/overlap rules (§4.1) |
+| `src/shared/sun.ts` | Sunset per local date and place (§7.7, NOAA solar algorithm): the `Place` type ({ lat, lon }), sunsetUtc(date, place) → UTC ISO rounded to the minute, or null when the sun does not set that day — pure, imports nothing but time.ts |
 | `src/shared/recurrence.ts` | Recurrence expansion to local dates (§4.3) — the one recurrence format |
 | `src/shared/optins.ts` | Optional-event rule (§7.5): isOnFor (an event exists for a member only if not optional or they have it on) and audience (who gets a fire's push: active ∩ assigned-or-everyone ∩ opted-in when optional; whether House speaks) — pure, imports nothing but vocab |
 | `src/shared/holidays.ts` | The `HOLIDAYS` table, observed rule, default days off (§7.3) |

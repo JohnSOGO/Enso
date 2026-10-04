@@ -1,7 +1,8 @@
 // SPEC §5 — the alert engine. Pure: no I/O, no clock. `now` is always a parameter.
-import type { Action, AlertKind, Channel, CloseReason, FireState, TimerCmd } from './vocab';
+import type { Action, AlertKind, Channel, CloseReason, FireState, SunEvent, TimerCmd } from './vocab';
 import { addDays, addMinutes, localToUtc, ms, utcToLocal } from './time';
 import { occurrences, type Recurrence } from './recurrence';
+import { sunsetUtc, type Place } from './sun';
 
 export const MATERIALIZE_AHEAD_H = 36;
 export const MISSED_AFTER_MIN = 60;
@@ -85,6 +86,8 @@ export interface ReminderEvent {
   recurrence: Recurrence | null;
   exdates: string[];
   remind_offset_min: number | null;
+  /** §7.7: the start is that day's sunset at the household place. */
+  start_sun?: SunEvent | null;
 }
 
 export interface TimerState {
@@ -123,14 +126,15 @@ export function closeFire<T extends NewFire>(fire: T, reason: CloseReason, membe
   return { ...fire, state: 'closed', close_reason: reason, closed_by: memberId, closed_at: now };
 }
 
-/** Reminder fires whose due time falls in [fromUtc, toUtc). Idempotent. */
-export function planReminderFires(ev: ReminderEvent, tz: string, fromUtc: string, toUtc: string): NewFire[] {
+/** Reminder fires whose due time falls in [fromUtc, toUtc). Idempotent. A sun event with no sunset (or no place) is skipped. */
+export function planReminderFires(ev: ReminderEvent, tz: string, fromUtc: string, toUtc: string, place: Place | null = null): NewFire[] {
   if (ev.remind_offset_min === null) return [];
   const fromDate = addDays(utcToLocal(fromUtc, tz).date, -1);
   const toDate = addDays(utcToLocal(toUtc, tz).date, 2); // offsets are ≤ 1 day, so due ≤ start
   const out: NewFire[] = [];
   for (const date of occurrences(ev, fromDate, toDate)) {
-    const start = localToUtc(date, ev.start_time ?? ALL_DAY_REMIND_TIME, tz);
+    const start = ev.start_sun ? place && sunsetUtc(date, place) : localToUtc(date, ev.start_time ?? ALL_DAY_REMIND_TIME, tz);
+    if (!start) continue; // §7.7: never a substitute time
     const due = addMinutes(start, -ev.remind_offset_min);
     if (ms(due) >= ms(fromUtc) && ms(due) < ms(toUtc)) {
       out.push({ kind: 'reminder', event_id: ev.id, occurrence_date: date, timer_id: null, chore_run_id: null, thing_id: null, machine_id: null, due_at: due, ...blankFire() });
@@ -213,9 +217,18 @@ export function applyTimerCmd(
 /** Who a chore alert names and which step it is on (§5.7). */
 export interface ChoreAlertText { personName: string | null; stepTitle: string; stepCount: number }
 
-/** §5.7 — alert message text. `startsToday`: a thing's start reminder (§7C.2). */
-export function alertMessage(kind: AlertKind, title: string, alertNumber: number, chore?: ChoreAlertText, startsToday = false): string {
-  const base = kind === 'reminder' ? `Reminder: ${title}`
+/** "18:42" → "6:42": 12-hour, no am/pm (§7.7). */
+const h12 = (hhmm: string) => `${Number(hhmm.slice(0, 2)) % 12 || 12}:${hhmm.slice(3, 5)}`;
+
+/**
+ * §5.7 — alert message text. `startsToday`: a thing's start reminder (§7C.2). `sunsetAt`: a sun
+ * reminder's local sunset HH:MM, or null when it cannot be computed (§7.7); absent otherwise.
+ */
+export function alertMessage(
+  kind: AlertKind, title: string, alertNumber: number, chore?: ChoreAlertText, startsToday = false, sunsetAt?: string | null,
+): string {
+  const base = kind === 'reminder'
+    ? (sunsetAt !== undefined ? `${title} — ${sunsetAt === null ? 'before sunset' : `sunset at ${h12(sunsetAt)}`}` : `Reminder: ${title}`)
     : kind === 'timer' ? `Timer: ${title}`
     : kind === 'thing' ? `To do: ${title}${startsToday ? ' — starts today' : ''}`
     : kind === 'machine' ? title // the whole sentence, from machines.ts doneMessage (§7D.3)

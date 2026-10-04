@@ -1,7 +1,7 @@
 // SPEC §4.2 — the event row: its shape, its wire view, input validation, and the
 // insert / remove-future-fires statements shared by the events, alarms and things routes,
 // and every read/write of event_optins (§7.5 — who has an optional event on).
-import { CHANNEL, isOneOf, type Channel } from '../shared/vocab';
+import { CHANNEL, isOneOf, type Channel, type SunEvent } from '../shared/vocab';
 import { isDate, isTime } from '../shared/time';
 import { recurrenceError, type Recurrence } from '../shared/recurrence';
 import { emojiError } from '../shared/emoji';
@@ -15,6 +15,8 @@ export interface EventRow {
   remind_offset_min: number | null; remind_channels: string | null; renotify_min: number | null; max_alerts: number;
   created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
   is_alarm: number; thing_id: string | null; optional: number; emoji: string | null;
+  /** §7.7 — set only by coordinator SQL; the event routes never show such a row. */
+  start_sun: SunEvent | null;
 }
 
 export function eventView(e: EventRow) {
@@ -35,7 +37,7 @@ export function eventView(e: EventRow) {
   };
 }
 
-export type EventInput = Omit<EventRow, 'id' | 'exdates' | 'created_by' | 'created_at' | 'updated_at' | 'deleted_at' | 'is_alarm' | 'thing_id'>;
+export type EventInput = Omit<EventRow, 'id' | 'exdates' | 'created_by' | 'created_at' | 'updated_at' | 'deleted_at' | 'is_alarm' | 'thing_id' | 'start_sun'>;
 
 /** Validates untrusted event input → row fields, or an error message. */
 export async function parseEventInput(db: D1Database, b: Record<string, unknown>): Promise<EventInput | string> {

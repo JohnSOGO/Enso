@@ -7,6 +7,35 @@ carry its result.
 
 ---
 
+## 2026-10-03 — Sun-timed alerts: the goat alert (placement-advisor)
+
+- **Ask:** MojoSOGO decided a daily alert 30 minutes before local sunset, "Put the goats away —
+  sunset at 6:42": each person opts in (off by default), Phone + House, never on the calendar,
+  findable only in Optional calendar items; sunset computed locally (NOAA) from the household
+  place, ZIP 92056 (33.20 / −117.29).
+- **Verdict:** one NEW owner, `src/shared/sun.ts` (pure; `Place`, `sunsetUtc`; imports only
+  `time.ts`, never the engine). Everything else is a small edit to existing owners: migration
+  0016 (`settings.latitude` / `longitude`, `events.start_sun`), `SUN_EVENT` in `vocab.ts`,
+  `planReminderFires(…, place)` and `alertMessage(…, sunsetAt)` in `engine.ts`, the settings read
+  and the reminder branch of `sourceOf` in `tick.ts`, `start_sun IS NULL` beside each
+  `is_alarm = 0` in `routes/events.ts`, `startSun` on `/fires`, and the Ringing bar label.
+- **Why an optional event + `start_sun`, not an opt-in alarm or a hidden flag:** optional events
+  already carry everything the goat alert needs — the per-person opt-in, the audience rule (push
+  to who has it on, House only when that audience is not empty), Optional calendar items, Done /
+  Snooze / renotify / missed. Alarms are never optional and have no opt-in; a hidden flag would
+  be a second "not on the calendar" mechanism. A start that IS the sunset is the one new fact, so
+  it is one column whose vocabulary lives in `vocab.ts`. `optins.ts`, `routes/optins.ts` and the
+  Settings screen are untouched.
+- **No all-day fallback:** with no place or no sunset that day (polar) the occurrence is skipped
+  — never planned at 09:00. At alert time a sunset that cannot be computed reads "{title} —
+  before sunset", visibly not a time.
+- **Ringing bar:** a sun reminder's row shows ` · sunset` where an all-day one shows ` · all day`
+  (`/fires` carries `startSun`).
+- **Production insert:** the coordinator creates the goat event by SQL, never a migration or a
+  seed; the statement is in SPEC §14 and must run from a UTF-8 file so the 🐐 survives.
+
+---
+
 ## 2026-10-03 — Rolling timer active time range (placement-advisor)
 
 - **Ask:** MojoSOGO decided that a rolling timer may have an optional "Active from HH:MM to

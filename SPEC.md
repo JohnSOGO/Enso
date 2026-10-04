@@ -3124,7 +3124,19 @@ modal; Clear asks once; a disabled owner's load alerts everyone with "The laundr
 done". Migration 0014 is applied only in tests so far. **Still owed (manual):** the cards and
 the chooser at 320 px, a two-tap start on the iPhone, and a real done reminder spoken in the
 house.
-**M4n Sun-timed alerts — the goat alert** (§7.7, migration 0016): spec written, being built.
+**M4n Sun-timed alerts — the goat alert** (v1.10.0; 330 tests incl. S1–S3, G1–G7, SA-M and
+M1-VOCAB with `events.start_sun`): migration 0016 (`settings.latitude` / `longitude` set to
+33.20 / −117.29, `events.start_sun`), `SUN_EVENT`, `src/shared/sun.ts` (NOAA general solar position
+algorithm), `planReminderFires(…, place)` skipping an occurrence with no sunset, the sunset text,
+sun events off `/calendar` and the event routes, `startSun` on `/fires`, `· sunset` in the Ringing
+bar. Built as: `alertMessage`'s trailing `sunsetAt` is `string | null` — `null` reads "— before
+sunset"; `sourceOf` reads the place and tz in the reminder SELECT (a join on the settings row).
+S1 is checked against an independent implementation of the NOAA spreadsheet formulas in the test;
+the general algorithm agrees within ±1 min on the S1 dates (elsewhere in the year it can differ
+by up to ~1.4 min, e.g. 2026-09-22, the general algorithm's known accuracy). `migration-0013.test.ts`
+now applies migrations only through 0013, so a later settings column does not break H9.
+Migration 0016 is applied only in tests so far. **Still owed:** apply 0016 in production, run the
+insert below, Shelly and John opt in, and a real goat alert arrives and is spoken.
 **Production insert (coordinator only, after 0016 is applied; never a migration or a seed).** Run
 it from a **UTF-8 file** (`wrangler d1 execute enso --remote --file goat.sql`) so the 🐐 survives —
 never typed into a console. Replace `evt_<16 base32>` with a fresh id (`evt_` + 16 lower-case Crockford
