@@ -7,6 +7,25 @@ carry its result.
 
 ---
 
+## 2026-10-04 — The video creator's comments as a recipe source (placement-advisor)
+
+- **Ask:** MojoSOGO decided recipes are often in the creator's first (usually pinned) comment, so the
+  creator's own comments are read as a third source beside the description and captions.
+- **Verdict:** extend the existing owners; no new file. `src/worker/youtube.ts` gains `channelId` on
+  `lookUpVideo` and `lookUpComments` (`commentThreads.list`, 403 `commentsDisabled` → `none`), with ONE
+  private helper for the fetch / quota / error / key-scrub mapping shared by both (its kinds are a local
+  type, not vocab). `src/shared/recipes.ts` (pure) gains `COMMENTS_LOOKED_AT`, `CREATOR_COMMENTS_MAX`,
+  `creatorComments` (exact channel match only, null channel → null, reusing the surrogate-safe cut),
+  `comments` on VideoText / hasRecipeText / sourcesOf, and `comments_error` / `commentsError` on the row and
+  the wire. `vocab.ts` RECIPE_SOURCE gains `comments` before `typed` (no CHECK, no rebuild). Migration 0019
+  (§4.2r) adds `recipes.comments_error`. `routes/recipes.ts` runs captions and comments side by side as the
+  new §7E.2 step 8, neither fatal. `recipe-reader.ts` adds the "Creator's comments:" section.
+  `RecipeView.tsx` names the sources through a label map and adds the comments marker.
+- **Untouched:** youtube-captions.ts, claude.ts, env.ts, scripts/arch.ts, recipe-emoji.ts, Recipes.tsx,
+  RecipeEmoji.tsx, RecipeForm.tsx. No ceilings moved: recipes.ts had room after the recipe-emoji seam below.
+
+---
+
 ## 2026-10-04 — Recipe emoji seam, preparing for reading creator comments (reorganizer)
 
 - **Trigger:** the placement for reading a video's creator comments (§7E) names `src/shared/recipes.ts`

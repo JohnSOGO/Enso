@@ -1,12 +1,14 @@
-// M4o R12 (SPEC §7E.2) — youtube.ts, youtube-captions.ts and recipe-reader.ts over injected fetches with
+// M4o R12 + M4q R15 (SPEC §7E.2) — youtube.ts (video and comments), youtube-captions.ts and recipe-reader.ts over injected fetches with
 // canned answers. Nothing here reaches the network: every fetch is a local function.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { lookUpVideo } from '../src/worker/youtube';
+import { lookUpComments, lookUpVideo } from '../src/worker/youtube';
 import { readCaptions } from '../src/worker/youtube-captions';
 import { readRecipe } from '../src/worker/recipe-reader';
-import { TRANSCRIPT_MAX } from '../src/shared/recipes';
+import { COMMENTS_LOOKED_AT, TRANSCRIPT_MAX } from '../src/shared/recipes';
 import { CAPTIONS_FAILURE } from '../src/shared/vocab';
-import { TRACKS, VIDEO_ID, YT_KEY, claudeMessage, json3, videoAnswer, warmClaude, playerAnswer } from './recipe-fakes';
+import {
+  CHANNEL_ID, TRACKS, VIDEO_ID, YT_KEY, claudeMessage, commentsAnswer, json3, videoAnswer, warmClaude, playerAnswer,
+} from './recipe-fakes';
 
 type Answer = { status?: number; body: string | object } | 'throw';
 /** A fetch answering in order, recording each URL (and JSON body). */
@@ -28,17 +30,18 @@ function scripted(...answers: Answer[]) {
 }
 
 describe('youtube.ts — videos.list?part=snippet', () => {
-  it('asks for one id with the key, and returns title / channel / description', async () => {
+  it('asks for one id with the key, and returns title / channel / channelId / description', async () => {
     const { f, seen } = scripted({ body: videoAnswer({ title: 'Best Pancakes', channelTitle: 'Chef', description: '2 eggs' }) });
-    expect(await lookUpVideo(VIDEO_ID, YT_KEY, { fetch: f })).toEqual({ ok: true, title: 'Best Pancakes', channel: 'Chef', description: '2 eggs' });
+    expect(await lookUpVideo(VIDEO_ID, YT_KEY, { fetch: f }))
+      .toEqual({ ok: true, title: 'Best Pancakes', channel: 'Chef', channelId: CHANNEL_ID, description: '2 eggs' });
     const u = new URL(seen[0].url);
     expect(`${u.host}${u.pathname}`).toBe('www.googleapis.com/youtube/v3/videos');
     expect(Object.fromEntries(u.searchParams)).toEqual({ part: 'snippet', id: VIDEO_ID, key: YT_KEY });
   });
 
-  it('an empty description is null, not ""', async () => {
-    const { f } = scripted({ body: videoAnswer({ title: 'T', channelTitle: 'C', description: '' }) });
-    expect(await lookUpVideo(VIDEO_ID, YT_KEY, { fetch: f })).toMatchObject({ ok: true, description: null });
+  it('an empty description is null, not ""; a missing channelId is null', async () => {
+    const { f } = scripted({ body: videoAnswer({ title: 'T', channelTitle: 'C', description: '', channelId: undefined }) });
+    expect(await lookUpVideo(VIDEO_ID, YT_KEY, { fetch: f })).toMatchObject({ ok: true, description: null, channelId: null });
   });
 
   it('no items → not_found; 403 quotaExceeded → quota; 400 / network → failed; the key is never in a reason', async () => {
@@ -53,6 +56,40 @@ describe('youtube.ts — videos.list?part=snippet', () => {
       expect(JSON.stringify(r)).not.toContain(YT_KEY);
     }
     expect((r1 as any).reason).toMatch(/400/);
+  });
+});
+
+describe('R15 youtube.ts — commentThreads.list (the creator\'s comments)', () => {
+  it('asks for the threads by relevance as plain text, and returns each top-level comment with its author', async () => {
+    const { f, seen } = scripted({ body: commentsAnswer([[CHANNEL_ID, 'Recipe: 2 eggs'], ['UC_viewer', 'Yum'], [null, 'anon']]) });
+    expect(await lookUpComments(VIDEO_ID, YT_KEY, COMMENTS_LOOKED_AT, { fetch: f })).toEqual({
+      ok: true, comments: [
+        { authorChannelId: CHANNEL_ID, text: 'Recipe: 2 eggs' }, { authorChannelId: 'UC_viewer', text: 'Yum' }, { authorChannelId: null, text: 'anon' },
+      ],
+    });
+    const u = new URL(seen[0].url);
+    expect(`${u.host}${u.pathname}`).toBe('www.googleapis.com/youtube/v3/commentThreads');
+    expect(Object.fromEntries(u.searchParams)).toEqual({
+      part: 'snippet', videoId: VIDEO_ID, order: 'relevance', maxResults: String(COMMENTS_LOOKED_AT), textFormat: 'plainText', key: YT_KEY,
+    });
+    expect(await lookUpComments(VIDEO_ID, YT_KEY, 20, { fetch: scripted({ body: commentsAnswer() }).f })).toEqual({ ok: true, comments: [] });
+  });
+
+  it('403 commentsDisabled → none; 403 quotaExceeded → quota; 500 / network → failed; the key is never in a reason', async () => {
+    const answer = (status: number, reason: string, message = reason) =>
+      ({ status, body: { error: { code: status, message, errors: [{ reason }] } } });
+    const off = await lookUpComments(VIDEO_ID, YT_KEY, 20, { fetch: scripted(answer(403, 'commentsDisabled')).f });
+    const quota = await lookUpComments(VIDEO_ID, YT_KEY, 20, { fetch: scripted(answer(403, 'quotaExceeded')).f });
+    const broken = await lookUpComments(VIDEO_ID, YT_KEY, 20, { fetch: scripted(answer(500, 'backendError', `oops ${YT_KEY}`)).f });
+    const down = await lookUpComments(VIDEO_ID, YT_KEY, 20, { fetch: scripted('throw').f });
+    expect(off).toMatchObject({ ok: false, kind: 'none' });
+    expect(quota).toMatchObject({ ok: false, kind: 'quota' });
+    expect(broken).toMatchObject({ ok: false, kind: 'failed', reason: expect.stringMatching(/500/) });
+    expect(down).toMatchObject({ ok: false, kind: 'failed' });
+    for (const r of [off, quota, broken, down]) {
+      expect((r as any).reason).toBeTruthy();
+      expect(JSON.stringify(r)).not.toContain(YT_KEY);
+    }
   });
 });
 
@@ -101,7 +138,7 @@ describe('youtube-captions.ts — the unofficial attempt', () => {
 
 describe('recipe-reader.ts — the Claude request', () => {
   beforeAll(warmClaude, 60_000);
-  const input = { apiKey: 'test-key', title: 'Best Pancakes', channel: 'Chef', description: '2 eggs, 1 cup milk', transcript: 'w'.repeat(TRANSCRIPT_MAX + 500) };
+  const input = { apiKey: 'test-key', title: 'Best Pancakes', channel: 'Chef', description: '2 eggs, 1 cup milk', transcript: 'w'.repeat(TRANSCRIPT_MAX + 500), comments: 'Pinned: bake 20 min' };
 
   it('sends the video text (captions cut to TRANSCRIPT_MAX), forbids inventing, and asks for the schema', async () => {
     const answer = { found: true, title: 'Pancakes', ingredients: ['2 eggs'], steps: ['Mix'], servings: null, time: null };
@@ -114,8 +151,13 @@ describe('recipe-reader.ts — the Claude request', () => {
     expect(videoText.text).toContain('2 eggs, 1 cup milk');
     expect(videoText.text).toContain('w'.repeat(TRANSCRIPT_MAX));
     expect(videoText.text).not.toContain('w'.repeat(TRANSCRIPT_MAX + 1));
+    expect(videoText.text).toContain("Creator's comments:\nPinned: bake 20 min");
     expect(prompt.text).toMatch(/Never invent a recipe from the video's title/);
+    expect(prompt.text).toMatch(/creator's comments/);
     expect(prompt.text).toMatch(/found false/);
+    const none = scripted({ body: claudeMessage(answer) });
+    await readRecipe({ ...input, comments: null }, { fetch: none.f });
+    expect(none.seen[0].body.messages[0].content[0].text).toContain("Creator's comments:\n(none)");
     const schema = body.output_config.format.schema;
     for (const k of ['found', 'title', 'ingredients', 'steps', 'servings', 'time']) expect(schema.required, k).toContain(k);
   });

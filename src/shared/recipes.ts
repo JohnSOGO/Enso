@@ -1,5 +1,5 @@
 // SPEC §7E — recipe rules (pure): limits, a YouTube link → its video id and the derived watch /
-// thumbnail links, when a video's text is worth reading, cleaning Claude's reading, typed input,
+// thumbnail links, the video creator's own comments, when a video's text is worth reading, cleaning Claude's reading, typed input,
 // the one-live-recipe-per-video clash, and the wire shape (each person's emoji rules: recipe-emoji.ts). Imports lists + vocab only.
 import { TEXT_MAX } from './lists';
 import { RECIPE_SOURCE, type RecipeSource } from './vocab';
@@ -14,6 +14,10 @@ export const SERVINGS_MAX = 60;
 export const TIME_MAX = 60;
 /** Captions are cut to this many characters before they go to Claude (§7E.2). */
 export const TRANSCRIPT_MAX = 20_000;
+/** Comment threads asked for per read (§7E.2 step 8, one quota unit). ⚑ Q77 */
+export const COMMENTS_LOOKED_AT = 20;
+/** The creator's kept comments are cut to this many characters before they go to Claude (§7E.2). ⚑ Q77 */
+export const CREATOR_COMMENTS_MAX = 5000;
 /** Video reads per household per local day (§7E.2), apart from photo reads. ⚑ Q65 */
 export const RECIPE_READS_PER_DAY = 20;
 /** The title of a found:false recipe whose video has no title either. */
@@ -50,16 +54,19 @@ export const thumbnailUrl = (videoId: string) => `https://i.ytimg.com/vi/${video
 
 // ---- §7E.2 reading a video ----
 
-/** What a video offered to be read. */
-export interface VideoText { description: string | null; transcript: string | null }
+/** What a video offered to be read; `comments` is the creator's own (creatorComments). */
+export interface VideoText { description: string | null; transcript: string | null; comments: string | null }
 
-/** No description and no captions: there is nothing to ask Claude about (it would only have the title). */
-export const hasRecipeText = (t: VideoText): boolean => !!t.description?.trim() || !!t.transcript?.trim();
+const OFFERED: Partial<Record<RecipeSource, keyof VideoText>> = { description: 'description', captions: 'transcript', comments: 'comments' };
 
-/** What a reading was given: the description when it had text, the captions when a transcript was read. */
+/** What a reading was given: the description when it had text, the captions when a transcript was read, the
+ *  creator's comments when one was kept. */
 export function sourcesOf(t: VideoText): RecipeSource[] {
-  return RECIPE_SOURCE.filter((s) => (s === 'description' && !!t.description?.trim()) || (s === 'captions' && !!t.transcript?.trim()));
+  return RECIPE_SOURCE.filter((s) => { const k = OFFERED[s]; return !!k && !!t[k]?.trim(); });
 }
+
+/** No description, no captions and no creator's comment: nothing to ask Claude about (it would only have the title). */
+export const hasRecipeText = (t: VideoText): boolean => sourcesOf(t).length > 0;
 
 /** A reading, cleaned — what is saved (§7E.2). */
 export interface RecipeReading {
@@ -71,12 +78,25 @@ export interface RecipeReading {
   found: boolean;
 }
 
+/** Cut to `max` (never inside an emoji's surrogate pair), trimmed; empty → null. */
+const cut = (s: string, max: number): string | null => s.slice(0, max).replace(/[\uD800-\uDBFF]$/, '').trim() || null;
+
 /** One line: whitespace collapsed to single spaces, trimmed, cut to `max` (never inside an emoji's surrogate pair); empty → null. */
-const line = (v: unknown, max: number): string | null =>
-  typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max).replace(/[\uD800-\uDBFF]$/, '').trim() || null : null;
+const line = (v: unknown, max: number): string | null => (typeof v === 'string' ? cut(v.replace(/\s+/g, ' ').trim(), max) : null);
 
 const lines = (v: unknown, max: number, count: number): string[] =>
   Array.isArray(v) ? v.map((x) => line(x, max)).filter((x): x is string => x !== null).slice(0, count) : [];
+
+/**
+ * The video creator's own comments (§7E.2 step 8): only those whose author IS the video's channel, in order,
+ * joined with a blank line, cut to CREATOR_COMMENTS_MAX (never inside a surrogate pair). An unknown channel →
+ * null, never a fallback to anyone's comment ⚑ Q80; nothing kept → null.
+ */
+export function creatorComments(comments: readonly { authorChannelId: string | null; text: string }[], channelId: string | null): string | null {
+  if (!channelId) return null;
+  const kept = comments.filter((c) => c.authorChannelId === channelId).map((c) => c.text.trim()).filter(Boolean);
+  return cut(kept.join('\n\n'), CREATOR_COMMENTS_MAX);
+}
 
 /**
  * Claude's answer → what is saved. `found` not true → no ingredients, no steps. Every string is trimmed and
@@ -165,6 +185,7 @@ export interface RecipeRow {
   found: number;
   source: string;
   captions_error: string | null;
+  comments_error: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -187,6 +208,7 @@ export interface Recipe {
   found: boolean;
   source: RecipeSource[];
   captionsError: string | null;
+  commentsError: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -212,7 +234,7 @@ export function recipeFromRow(r: RecipeRow, emojis: readonly RecipeEmojiRow[] = 
     watchUrl: r.video_id ? watchUrl(r.video_id) : null, thumbnailUrl: r.video_id ? thumbnailUrl(r.video_id) : null,
     ingredients: strings(r.ingredients), steps: strings(r.steps), servings: r.servings, time: r.time_text,
     found: r.found === 1, source: RECIPE_SOURCE.filter((s) => listed.includes(s)),
-    captionsError: r.captions_error, createdBy: r.created_by, createdAt: r.created_at, updatedAt: r.updated_at,
+    captionsError: r.captions_error, commentsError: r.comments_error, createdBy: r.created_by, createdAt: r.created_at, updatedAt: r.updated_at,
     emojis: emojis.filter((e) => e.recipe_id === r.id).map((e) => ({ memberId: e.member_id, emoji: e.emoji })),
   };
 }

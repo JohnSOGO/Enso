@@ -11,7 +11,8 @@ import {
 import { SHOPPING_LIST_ID } from '../src/shared/lists';
 import { BASE, Client, owner } from './helpers';
 import {
-  TRACKS, VIDEO_ID, claudeMessage, fakeWorld, json3, keyedEnv, videoAnswer, warmClaude, playerAnswer, type World,
+  CHANNEL_ID, TRACKS, VIDEO_ID, claudeMessage, commentsAnswer, fakeWorld, json3, keyedEnv, videoAnswer, warmClaude, playerAnswer,
+  type World,
 } from './recipe-fakes';
 
 let o: Client;
@@ -34,8 +35,9 @@ async function readVideo(url: string, c: Client = o) {
 
 const PANCAKES = { title: 'Fluffy Pancakes!!', channelTitle: 'Chef Kai', description: 'Ingredients: 2 eggs, 1 cup milk, 1 cup flour.' };
 const READING = { found: true, title: 'Pancakes', ingredients: ['2 eggs', '1 cup milk', '1 cup flour'], steps: ['Whisk', 'Fry'], servings: '4', time: '15 min' };
+/** Every from-video world answers commentThreads: a missing fake would quietly become a commentsError. */
 const happy = (over: World = {}): World => ({
-  video: { body: videoAnswer(PANCAKES) }, player: { body: playerAnswer(TRACKS) }, captions: { body: json3('whisk the eggs then fry') },
+  video: { body: videoAnswer(PANCAKES) }, comments: { body: commentsAnswer([['UC_viewer', 'Looks tasty!']]) }, player: { body: playerAnswer(TRACKS) }, captions: { body: json3('whisk the eggs then fry') },
   claude: { body: claudeMessage(READING) }, ...over,
 });
 
@@ -78,7 +80,7 @@ describe('M4o from-video — reading', () => {
       title: 'Pancakes', videoId: VIDEO_ID, videoTitle: PANCAKES.title, channel: 'Chef Kai',
       watchUrl: `https://www.youtube.com/watch?v=${VIDEO_ID}`, thumbnailUrl: `https://i.ytimg.com/vi/${VIDEO_ID}/hqdefault.jpg`,
       ingredients: READING.ingredients, steps: READING.steps, servings: '4', time: '15 min', found: true,
-      source: ['description', 'captions'], captionsError: null,
+      source: ['description', 'captions'], captionsError: null, commentsError: null,
     });
     expect(await reads()).toBe(1);
     const claude = heard.find((h) => h.host === 'api.anthropic.com')!;
@@ -102,7 +104,7 @@ describe('M4o from-video — reading', () => {
     expect(r.status).toBe(201);
     expect(r.json).toMatchObject({ title: 'Cooking vlog', ingredients: [], steps: [], found: false, source: [], captionsError: 'This video has no captions.' });
     expect(heard.some((h) => h.host === 'api.anthropic.com')).toBe(false);
-    expect(await reads()).toBe(1); // the read is counted at step 8, before the Claude decision
+    expect(await reads()).toBe(1); // the read is counted at step 9, before the Claude decision
   });
 
   it('R9 Claude says found:false but lists ingredients → saved with none', async () => {
@@ -141,6 +143,60 @@ describe('M4o from-video — reading', () => {
     expect(again.json.message).toBeTruthy();
     expect(heard).toEqual([]);
     expect(await reads()).toBe(1);
+  });
+});
+
+describe("M4q from-video — the creator's comments", () => {
+  const CREATOR = 'Pinned recipe: 3 eggs, 2 cups flour. Bake 20 min.';
+  const VIEWER = 'I used 5 eggs and it was great';
+  const claudeText = (heard: { host: string; body: any }[]) =>
+    heard.find((h) => h.host === 'api.anthropic.com')!.body.messages[0].content[0].text as string;
+
+  it("R13 the creator's comment is read: source includes comments; a viewer's is ignored", async () => {
+    const heard = fakeWorld(happy({ comments: { body: commentsAnswer([['UC_viewer', VIEWER], [CHANNEL_ID, CREATOR]]) } }));
+    const r = await readVideo(LINK);
+    expect(r.status, JSON.stringify(r.json)).toBe(201);
+    expect(r.json).toMatchObject({ source: ['description', 'captions', 'comments'], commentsError: null });
+    expect(claudeText(heard)).toContain(CREATOR);
+    expect(claudeText(heard)).not.toContain(VIEWER);
+    const asked = new URL(heard.find((h) => h.path === '/youtube/v3/commentThreads')!.url);
+    expect(asked.searchParams.get('videoId')).toBe(VIDEO_ID);
+  });
+
+  it("R13 a viewer-only comment is ignored: not a source, not sent to Claude", async () => {
+    const heard = fakeWorld(happy({ comments: { body: commentsAnswer([['UC_viewer', VIEWER]]) } }));
+    const r = await readVideo(LINK);
+    expect(r.json).toMatchObject({ source: ['description', 'captions'], commentsError: null });
+    expect(claudeText(heard)).not.toContain(VIEWER);
+    expect(claudeText(heard)).toContain("Creator's comments:\n(none)");
+  });
+
+  it("R13 the creator's comment alone is enough to ask Claude (no description, no captions)", async () => {
+    const heard = fakeWorld(happy({
+      video: { body: videoAnswer({ title: 'Quick bread', channelTitle: 'Kai', description: '' }) }, player: { body: playerAnswer() },
+      comments: { body: commentsAnswer([[CHANNEL_ID, CREATOR]]) },
+    }));
+    const r = await readVideo(LINK);
+    expect(r.status).toBe(201);
+    expect(r.json).toMatchObject({ source: ['comments'], found: true, ingredients: READING.ingredients });
+    expect(claudeText(heard)).toContain(CREATOR);
+  });
+
+  it('R14 comments turned off → saved, commentsError null', async () => {
+    fakeWorld(happy({ comments: { status: 403, body: { error: { code: 403, message: 'disabled', errors: [{ reason: 'commentsDisabled' }] } } } }));
+    const r = await readVideo(LINK);
+    expect(r.status).toBe(201);
+    expect(r.json).toMatchObject({ source: ['description', 'captions'], commentsError: null, found: true });
+  });
+
+  it("R14 comments 500 → still saved, with commentsError; PATCH never touches it", async () => {
+    fakeWorld(happy({ comments: { status: 500, body: { error: { code: 500, message: 'Backend Error', errors: [{ reason: 'backendError' }] } } } }));
+    const r = await readVideo(LINK);
+    expect(r.status).toBe(201);
+    expect(r.json.source).toEqual(['description', 'captions']);
+    expect(r.json.commentsError).toMatch(/500/);
+    const edited = await o.patch(`/recipes/${r.json.id}`, { title: 'Pancakes again' });
+    expect(edited.json.commentsError).toBe(r.json.commentsError);
   });
 });
 

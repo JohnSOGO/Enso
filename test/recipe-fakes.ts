@@ -1,5 +1,5 @@
 // SPEC §7E — canned YouTube and Anthropic answers for the recipe tests. Nothing here ever leaves the
-// isolate: `fakeWorld` replaces fetch, answers only the four fake endpoints, and fails the test on any
+// isolate: `fakeWorld` replaces fetch, answers only the five fake endpoints, and fails the test on any
 // other host. The keys the route sees are fake too (`keyedEnv`).
 import { env } from 'cloudflare:test';
 import { vi } from 'vitest';
@@ -24,7 +24,23 @@ export const TRACKS = [
 export const json3 = (...lines: string[]) =>
   JSON.stringify({ events: lines.map((l) => ({ tStartMs: 0, segs: l.split(' ').map((w, i) => ({ utf8: i ? ` ${w}` : w })) })) });
 
-export const videoAnswer = (snippet: object | null) => ({ kind: 'youtube#videoListResponse', items: snippet ? [{ id: VIDEO_ID, snippet }] : [] });
+/** The video's own channel: the creator of every fake video, unless a snippet says otherwise. */
+export const CHANNEL_ID = 'UC_fake_creator';
+
+/** videos.list's answer; the snippet carries `channelId` (CHANNEL_ID) unless it gives its own. */
+export const videoAnswer = (snippet: object | null) =>
+  ({ kind: 'youtube#videoListResponse', items: snippet ? [{ id: VIDEO_ID, snippet: { channelId: CHANNEL_ID, ...snippet } }] : [] });
+
+/** commentThreads.list's answer: one thread per [authorChannelId, text] (none → no comments at all). */
+export const commentsAnswer = (items: [string | null, string][] = []) => ({
+  kind: 'youtube#commentThreadListResponse',
+  items: items.map(([author, text], i) => ({
+    id: `thread_${i}`,
+    snippet: { videoId: VIDEO_ID, topLevelComment: { id: `c_${i}`, snippet: {
+      textDisplay: text, textOriginal: text, ...(author === null ? {} : { authorChannelId: { value: author } }),
+    } } },
+  })),
+});
 
 /** An Anthropic Messages answer carrying `value` as its structured output. */
 export const claudeMessage = (value: object | null, over: object = {}) => ({
@@ -36,6 +52,7 @@ export const claudeMessage = (value: object | null, over: object = {}) => ({
 type Reply = { status?: number; body: string | object } | 'throw';
 export interface World {
   video?: Reply;
+  comments?: Reply;
   player?: Reply;
   captions?: Reply;
   claude?: Reply;
@@ -60,6 +77,7 @@ export function fakeWorld(world: World) {
     const text = req.method === 'POST' ? await req.text() : '';
     heard.push({ host: url.host, path: url.pathname, url: req.url, body: text ? JSON.parse(text) : null });
     if (url.host === 'www.googleapis.com' && url.pathname === '/youtube/v3/videos') return respond(world.video, 'videos.list');
+    if (url.host === 'www.googleapis.com' && url.pathname === '/youtube/v3/commentThreads') return respond(world.comments, 'commentThreads.list');
     if (url.host === 'www.youtube.com' && url.pathname === '/youtubei/v1/player') return respond(world.player, 'the player');
     if (url.host === 'www.youtube.com' && url.pathname === '/api/timedtext') return respond(world.captions, 'timedtext');
     if (url.host === 'api.anthropic.com' && url.pathname === '/v1/messages') return respond(world.claude, 'Claude');
