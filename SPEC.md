@@ -4170,7 +4170,8 @@ captions (5 ingredients, 6 steps — it had been "watch it").
 **Identify fix** (v1.18.1): SogoAI's qwen3.6 thinks even with ` /no_think`; at `max_tokens` 100 it was cut off
 with an empty answer every time, which silently sent every photo to the paid Claude fallback. Now 1024
 (`IDENTIFY_MAX_TOKENS`), and a cut-off empty answer is an honest `failed` ("ran out of room"). Verified through
-the tunnel with a real photo.
+the tunnel with a real photo. **Verified by MojoSOGO 2026-10-04 on his phone:** a soy-sauce bottle read by SogoAI
+as "Signature Select Less Sodium Soy Sauce", added to Shopping with its photo kept; no Claude read used.
 **Verified by MojoSOGO 2026-10-03:** 📢 announcements spoken through the tunnel (Echos + Voice PE
 `ok`); John opted in to 🐐 Put the goats away (first real alert 2026-10-04 18:00, sunset 18:30).
 **Push fix** (v1.7.1): no `Topic` header — Apple refused pushes carrying one (BadWebPushTopic)
