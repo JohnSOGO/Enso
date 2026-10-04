@@ -76,7 +76,7 @@ describe('M4h optional events (O1–O9)', () => {
 
     // O7
     const list = (await B.get('/optional-events')).json;
-    expect(list).toEqual([{ id, title: 'Street sweeping', recurrence: sweeping.recurrence, startDate: '2026-10-01', on: false }]);
+    expect(list).toEqual([{ id, title: 'Street sweeping', recurrence: sweeping.recurrence, startDate: '2026-10-01', emoji: null, on: false }]);
 
     // O8 — only the creator or an admin changes whether it is optional.
     expect((await B.patch(`/events/${id}`, { optional: false })).status).toBe(403);

@@ -1,6 +1,6 @@
-// SPEC §8.6 — Me, Household (owner), School holidays (owner), Status.
+// SPEC §8.6 — Me, Household (owner), Status.
 import { useEffect, useState, type ReactNode } from 'react';
-import { del, get, patch, post, put } from '../api';
+import { get, patch, post } from '../api';
 import { useApp } from '../state';
 import { MEMBER_PALETTE } from '../../../src/shared/vocab';
 import { useAction } from './useAction';
@@ -34,15 +34,6 @@ function MeSection({ onLogout }: { onLogout: () => void }) {
           ))}
         </div>
       </div>
-      <label className="row" style={{ marginBottom: 8 }}>
-        <input type="checkbox" checked={!!me.showPublicHolidays} onChange={(e) => save({ showPublicHolidays: e.target.checked })} /> Show public holidays
-      </label>
-      <label className="row" style={{ marginBottom: 12 }}>
-        <input type="checkbox" checked={!!me.showSchoolHolidays} onChange={(e) => save({ showSchoolHolidays: e.target.checked })} /> Show school holidays
-      </label>
-      <label className="row" style={{ marginBottom: 12, marginTop: -4 }}>
-        <input type="checkbox" checked={!!me.showOptionsExpiration} onChange={(e) => save({ showOptionsExpiration: e.target.checked })} /> 📈 Show monthly options expiration
-      </label>
       <PhoneAlerts />
       <button onClick={() => run(async () => { await post('/auth/logout'); onLogout(); })}>Log out</button>
     </Section>
@@ -152,42 +143,6 @@ function DaysOff() {
   );
 }
 
-function SchoolHolidaysSection() {
-  const { version, refresh } = useApp();
-  const [rows, setRows] = useState<{ date: string; label: string }[]>([]);
-  const [f, setF] = useState({ from: '', to: '', label: '' });
-  const { run, busy, errorEl } = useAction();
-  useEffect(() => { get('/school-holidays').then(setRows).catch(() => undefined); }, [version]);
-
-  return (
-    <Section title="School holidays">
-      {errorEl}
-      <div className="row wrap">
-        <label className="field" style={{ flex: 1, minWidth: 130 }}><span>From</span><input type="date" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></label>
-        <label className="field" style={{ flex: 1, minWidth: 130 }}><span>To (optional)</span><input type="date" min={f.from} value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></label>
-      </div>
-      <label className="field"><span>Label</span><input value={f.label} maxLength={80} onChange={(e) => setF({ ...f, label: e.target.value })} placeholder="e.g. Winter break" /></label>
-      <button className="primary" disabled={busy || !f.from || !f.label.trim()} onClick={() => run(async () => {
-        await put('/school-holidays', { from: f.from, to: f.to || f.from, label: f.label }); setF({ from: '', to: '', label: '' }); refresh();
-      })}>Add</button>
-      {rows.length > 0 && (
-        <table className={s.table} style={{ marginTop: 10 }}>
-          <thead><tr><th scope="col">Date</th><th scope="col">Label</th><th scope="col"><span className="visually-hidden">Remove</span></th></tr></thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.date}>
-                <th scope="row" className={s.rigid}>{r.date}</th>
-                <td className={s.flexible}>{r.label}</td>
-                <td className={s.rigid}><button className="plain" aria-label={`Remove ${r.date}`} title="Remove" disabled={busy} onClick={() => run(async () => { await del(`/school-holidays/${r.date}`); refresh(); })}>🗑</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </Section>
-  );
-}
-
 const STATUS_BADGE: Record<string, string> = { sent: 'good', partial: 'warn', failed: 'bad', queued: 'neutral', claimed: 'neutral' };
 
 function StatusSection() {
@@ -226,7 +181,6 @@ export function Settings({ onLogout }: { onLogout: () => void }) {
       <h1 style={{ fontSize: '1.15rem', marginBottom: 12 }}>Settings</h1>
       <MeSection onLogout={onLogout} />
       {me.role === 'owner' && <HouseholdSection />}
-      {me.role === 'owner' && <SchoolHolidaysSection />}
       <StatusSection />
     </div>
   );

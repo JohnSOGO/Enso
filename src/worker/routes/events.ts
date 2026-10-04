@@ -41,13 +41,12 @@ events.get('/calendar', requireMember, async (c) => {
       occ.push({
         eventId: e.id, date, endDate: addDays(date, span), startTime: e.start_time, endTime: e.end_time,
         title: e.title, allDay: e.start_time === null, color: e.color, createdBy: e.created_by, creatorName: e.creator_name,
-        assignedTo: parseJson<string[]>(e.assigned_to, []), hasReminder: e.remind_offset_min !== null, recurring: e.recurrence !== null,
+        assignedTo: parseJson<string[]>(e.assigned_to, []), hasReminder: e.remind_offset_min !== null, recurring: e.recurrence !== null, emoji: e.emoji,
       });
     }
   }
   occ.sort((a, b) => (a.date + (a.startTime ?? '')).localeCompare(b.date + (b.startTime ?? '')));
-  const schoolHolidays = await all(c.env.DB, 'SELECT date, label FROM school_holidays WHERE date BETWEEN ? AND ? ORDER BY date', from, to);
-  return c.json({ occurrences: occ, publicHolidays: publicHolidaysBetween(from, to, await daysOff(c.env.DB)), schoolHolidays, marketDays: marketDaysBetween(from, to) });
+  return c.json({ occurrences: occ, publicHolidays: publicHolidaysBetween(from, to, await daysOff(c.env.DB)), marketDays: marketDaysBetween(from, to) });
 });
 
 events.post('/events', requireMember, async (c) => {
@@ -74,10 +73,10 @@ events.patch('/events/:id', requireMember, async (c) => {
   await c.env.DB.batch([
     c.env.DB.prepare(
       `UPDATE events SET title = ?, notes = ?, start_date = ?, start_time = ?, end_date = ?, end_time = ?, recurrence = ?,
-         assigned_to = ?, remind_offset_min = ?, remind_channels = ?, renotify_min = ?, max_alerts = ?, optional = ?, updated_at = ?
+         assigned_to = ?, remind_offset_min = ?, remind_channels = ?, renotify_min = ?, max_alerts = ?, optional = ?, emoji = ?, updated_at = ?
        WHERE id = ?`).bind(
       input.title, input.notes, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
-      input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, input.optional, now, e.id),
+      input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, input.optional, input.emoji, now, e.id),
     removeFutureFires(c.env.DB, e.id, now),
     // §7.5 ⚑: whoever edits an event into optional has it on.
     ...(input.optional && !e.optional ? [optInStatement(c.env.DB, e.id, c.get('member').id, now)] : []),

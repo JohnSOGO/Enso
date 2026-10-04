@@ -8,12 +8,11 @@ import s from './Calendar.module.css';
 export interface Occurrence {
   eventId: string; date: string; endDate: string; startTime: string | null; endTime: string | null;
   title: string; allDay: boolean; color: string; createdBy: string; creatorName: string;
-  assignedTo: string[]; hasReminder: boolean; recurring: boolean;
+  assignedTo: string[]; hasReminder: boolean; recurring: boolean; emoji: string | null;
 }
 export interface DayData {
   items: (Occurrence & { continued: boolean })[];
   publicHolidays: { name: string; emoji: string }[];
-  schoolHolidays: string[];
   marketDays: { name: string; emoji: string }[];
 }
 
@@ -65,7 +64,7 @@ function buildDays(json: any, from: string, to: string): Map<string, DayData> {
   const days = new Map<string, DayData>();
   const day = (d: string) => {
     let x = days.get(d);
-    if (!x) { x = { items: [], publicHolidays: [], schoolHolidays: [], marketDays: [] }; days.set(d, x); }
+    if (!x) { x = { items: [], publicHolidays: [], marketDays: [] }; days.set(d, x); }
     return x;
   };
   for (const o of json.occurrences as Occurrence[]) {
@@ -76,7 +75,6 @@ function buildDays(json: any, from: string, to: string): Map<string, DayData> {
     }
   }
   for (const h of json.publicHolidays) day(h.date).publicHolidays.push({ name: h.name, emoji: h.emoji });
-  for (const h of json.schoolHolidays) day(h.date).schoolHolidays.push(h.label);
   for (const m of json.marketDays ?? []) day(m.date).marketDays.push({ name: m.name, emoji: m.emoji });
   return days;
 }
@@ -159,29 +157,24 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
       const [y, m, d] = date.split('-').map(Number);
       const data = dayData(date, w);
       const pub = me.showPublicHolidays ? data?.publicHolidays ?? [] : [];
-      const school = me.showSchoolHolidays ? data?.schoolHolidays ?? [] : [];
       const market = me.showOptionsExpiration ? data?.marketDays ?? [] : [];
       const items = data?.items ?? [];
       const single = items.filter((o) => !isMultiDay(o)); // multi-day events are drawn as bars
       const stay = spans.find((sp) => sp.start <= i && i <= sp.end);
-      // Beside the date number when there is room; on phone widths, first on the line below it.
-      const holidayEmoji = (pub.length > 0 || school.length > 0 || market.length > 0) && (
-        <span className={s.hEmoji} aria-hidden title={[...pub.map((h) => h.name), ...school, ...market.map((m) => m.name)].join(', ')}>
-          {pub.length > 0 && pub[0].emoji}{school.length > 0 && '🏫'}{market.length > 0 && market[0].emoji}
-        </span>
-      );
+      // §7.2 day icons: beside the date number at every width — holiday, 📈, then the day's event emoji; at most two.
+      const withEmoji = items.filter((o) => o.emoji);
+      const icons = [...pub.slice(0, 1), ...market.slice(0, 1), ...withEmoji.map((o) => ({ emoji: o.emoji! }))].slice(0, 2);
       const cls = [
         s.cell,
         (y * 12 + m) % 2 ? s.toneB : s.toneA,
         date === todayStr ? s.today : '',
         pub.length ? s.pub : '',
-        school.length ? s.school : '',
         date < todayStr ? s.past : '',
       ].join(' ');
       const label = [
         new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }),
         items.length ? `${items.length} event${items.length > 1 ? 's' : ''}` : '',
-        ...pub.map((h) => h.name), ...school, ...market.map((m) => m.name),
+        ...pub.map((h) => h.name), ...market.map((m) => m.name),
       ].filter(Boolean).join(', ');
       cells.push(
         <button key={date} className={cls} aria-label={label} onClick={() => onOpenDay(date, data)}
@@ -195,12 +188,13 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
           <span className={s.num}>
             {d === 1 ? <><span className={s.monthTag}>{MONTHS[m - 1]}</span> </> : null}
             <span className={s.dot}>{d}</span>
-            {!narrow && holidayEmoji}
+            {icons.length > 0 && (
+              <span className={s.hEmoji} aria-hidden title={[...pub.map((h) => h.name), ...market.map((m) => m.name), ...withEmoji.map((o) => o.title)].join(', ')}>{icons.map((x) => x.emoji).join('')}</span>
+            )}
           </span>
           {lanes > 0 && <span aria-hidden style={{ height: lanes * (barH + 1), flex: 'none' }} />}
           {narrow ? (
             <span className={s.dots}>
-              {holidayEmoji}
               {single.slice(0, 4).map((o, k) => <i key={k} style={{ background: o.color }} />)}
               {single.length > 4 && <b>+</b>}
             </span>
@@ -208,7 +202,7 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
             <span className={s.chips}>
               {single.slice(0, 3 - Math.min(lanes, 2)).map((o, k) => (
                 <span key={k} className={s.ev} style={{ borderLeftColor: o.color }}>
-                  {o.startTime ? `${o.startTime} ` : ''}{o.title}
+                  {o.startTime ? `${o.startTime} ` : ''}{o.emoji ? `${o.emoji} ` : ''}{o.title}
                 </span>
               ))}
               {single.length > 3 - Math.min(lanes, 2) && <span className="badge neutral">+{single.length - (3 - Math.min(lanes, 2))}</span>}
@@ -242,14 +236,13 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
 
   const [hy, hm] = headerDate.split('-').map(Number);
   return (
-    <section className={s.root} aria-label="Calendar">
+    <section className={`${s.root} ${narrow ? s.narrow : ''}`} aria-label="Calendar">
       <div className={s.head}>
         <h1 className={s.month}>{new Date(Date.UTC(hy, hm - 1, 15)).toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' })}</h1>
         <button onClick={() => scrollToToday(true)}>Today</button>
       </div>
       <div className={s.legend}>
         {!!me.showPublicHolidays && <span><i className={s.legendPub} /> Public holiday</span>}
-        {!!me.showSchoolHolidays && <span><i className={s.legendSchool} /> School holiday</span>}
         {!!me.showOptionsExpiration && <span>📈 Options expiration</span>}
         {loadError && <span className="badge bad" role="alert">Calendar failed to load: {loadError}</span>}
       </div>

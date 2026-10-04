@@ -4,6 +4,7 @@
 import { CHANNEL, isOneOf, type Channel } from '../shared/vocab';
 import { isDate, isTime } from '../shared/time';
 import { recurrenceError, type Recurrence } from '../shared/recurrence';
+import { emojiError } from '../shared/emoji';
 import { all, parseJson } from './db';
 import { intIn, optStr, str } from './http';
 
@@ -13,7 +14,7 @@ export interface EventRow {
   recurrence: string | null; exdates: string; assigned_to: string;
   remind_offset_min: number | null; remind_channels: string | null; renotify_min: number | null; max_alerts: number;
   created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
-  is_alarm: number; thing_id: string | null; optional: number;
+  is_alarm: number; thing_id: string | null; optional: number; emoji: string | null;
 }
 
 export function eventView(e: EventRow) {
@@ -30,7 +31,7 @@ export function eventView(e: EventRow) {
       renotifyMin: e.renotify_min,
       maxAlerts: e.max_alerts,
     },
-    createdBy: e.created_by, updatedAt: e.updated_at, thingId: e.thing_id, optional: e.optional === 1,
+    createdBy: e.created_by, updatedAt: e.updated_at, thingId: e.thing_id, optional: e.optional === 1, emoji: e.emoji,
   };
 }
 
@@ -58,6 +59,9 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
     }
   }
   if (b.optional !== undefined && typeof b.optional !== 'boolean') return 'optional must be true or false.';
+  const emoji = b.emoji === undefined || b.emoji === null || b.emoji === '' ? null : b.emoji;
+  const emojiErr = emoji === null ? null : emojiError(emoji);
+  if (emojiErr) return emojiErr;
   const recurrence = b.recurrence ?? null;
   const recErr = recurrenceError(recurrence);
   if (recErr) return recErr;
@@ -86,7 +90,7 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
   return {
     title, notes: notes ?? null, start_date: b.startDate, start_time: startTime, end_date: endDate as string, end_time: endTime,
     recurrence: recurrence === null ? null : JSON.stringify(recurrence), assigned_to: JSON.stringify(assigned), ...remind,
-    optional: b.optional ? 1 : 0,
+    optional: b.optional ? 1 : 0, emoji: emoji as string | null,
   };
 }
 
@@ -101,10 +105,10 @@ export function removeFutureFires(db: D1Database, eventId: string, now: string):
 export function insertEventStatement(db: D1Database, id: string, input: EventInput, memberId: string, now: string, thingId: string | null = null): D1PreparedStatement {
   return db.prepare(
     `INSERT INTO events (id, title, notes, start_date, start_time, end_date, end_time, recurrence, assigned_to,
-       remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at, thing_id, optional)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at, thing_id, optional, emoji)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(id, input.title, input.notes, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
-    input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, memberId, now, now, thingId, input.optional);
+    input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, memberId, now, now, thingId, input.optional, input.emoji);
 }
 
 /** §7.5 — the ids of the events this member has turned on (their on-set). */
