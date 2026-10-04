@@ -7,6 +7,23 @@ carry its result.
 
 ---
 
+## 2026-10-04 — Fill a thing from a pasted link (placement-advisor; feature/thing-from-link)
+
+- **Ask:** place §7C.4b: `POST /things/read-link` (link check, the Worker fetches the page, pure HTML extraction,
+  a Claude look-up with web search and web fetch, the structured reading, cleanPhotoReading, the same 40-a-day
+  `photo_reads` budget, nothing saved), the thing-form button and the per-field source mark.
+- **Verdict:** NEW `src/shared/link-reading.ts`, `src/worker/page-fetch.ts`, `src/worker/link-reader.ts`,
+  `frontend/src/components/ThingLinkFill.tsx`; EXISTING `claude.ts` (askClaudeResearch, one shared stop / error
+  mapping), `routes/thing-photos.ts` (read-link beside read-photo, one file-local budget helper), `photo-reader.ts`
+  (exports thingReadingSchema so the schema is not restated), `ThingForm.tsx` (source per marked field).
+- **Why:** `things.ts` is at 252/300, so the link rules got their own pure file. A separate route file would have
+  copied the cap / key / count / error block. `access.ts` is only for calls home. Redirects are followed by hand with
+  every hop re-checked, so a public link can't bounce the Worker to a private host. Shared stays free of `fetch(`.
+- **Caps:** nothing pinned touched; claude.ts ~120, thing-photos.ts ~95, ThingForm.tsx ~222, all under 300.
+- **Reorganizer:** none needed.
+
+---
+
 ## 2026-10-04 — Each person's house speakers (placement-advisor; feature/house-speakers)
 
 PLACEMENT RECEIPT

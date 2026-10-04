@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.42 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
+**Version:** 2.43 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2291,6 +2291,57 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
 - **Privacy:** the photo is sent to Anthropic to be read (MojoSOGO's choice, Q30); stored
   photos stay in the household's own R2.
 
+### 7C.4b Reading a link (fills the fields) — asked by MojoSOGO 2026-10-04
+
+A link someone pasted — an event page, a venue's site, a ticket listing — often holds the dates, the
+place and the price, and what it leaves out can usually be found by looking it up. Reading it fills the
+form the way a photo does (§7C.4): **nothing is saved**, only **empty** fields fill, each marked
+*from link — check it*, and the person reviews and taps Save.
+
+- `POST /things/read-link { url }` → the same `PhotoReading` as read-photo, cleaned by the same
+  `cleanPhotoReading`. The answer's `url` is the link as given (through `webLink`), never one the model
+  found ⚑ Q138.
+- **The link:** `readableLink(url)` (link-reading.ts, pure) takes what `webLink` keeps and refuses a
+  host that is an IP address, `localhost` / `*.localhost`, has no dot, or ends in `.local` / `.internal`
+  / `.lan` / `.home.arpa` → 400 `invalid_input` "That link can't be read." (Cloudflare can't reach the
+  home network anyway; this keeps the Worker from being pointed at anything that isn't a public site.)
+- **Check order:** signed in (401) → the link (400) → daily cap (429, the **same 40-a-day `photo_reads`
+  budget** as photos ⚑ Q139) → key present (503 `link_reading_off` "Reading links isn't set up yet.") →
+  count the read → fetch the page → Claude looks it up → Claude fills the fields → refusal 422
+  `link_refused` "Couldn't read that link." / failure 502 `link_reading_failed` with the reason →
+  cleaned → 200.
+- **Fetching the page** (`src/worker/page-fetch.ts`): one GET from the Worker, no cookies or
+  credentials, redirects followed by hand (at most 5, **each hop re-checked by `readableLink`**, so a public link
+  can't send the Worker to a private host), `PAGE_FETCH_TIMEOUT_MS` = 8 000, at most `PAGE_BYTES_MAX` = 1.5 MB read
+  (the rest dropped, not an error), only an HTML or text answer kept. It never throws: any failure
+  (refused, 4xx/5xx, timeout, not a web page) is **kept as a reason, never fatal** — many sites turn away
+  servers, and Claude can still look the link up.
+- **What the page says** — `pageExtract(html)` (pure): the `<title>`, the `description` and `og:*` /
+  `twitter:*` meta tags, every JSON-LD block (`application/ld+json`, where event pages put their dates,
+  venue, address and offers) cut to `JSONLD_MAX` = 8 000 characters, and the visible text (scripts,
+  styles, comments and tags removed, entities decoded, whitespace collapsed) cut to `PAGE_TEXT_MAX` =
+  12 000 characters (never inside a surrogate pair).
+- **Looking it up** (`askClaudeResearch` in claude.ts): one request with Anthropic's server tools
+  **web search** (`web_search_20260209`, at most `LINK_SEARCHES_MAX` = 3 searches ⚑ Q140) and **web
+  fetch** (`web_fetch_20260209`, at most `LINK_FETCHES_MAX` = 2 fetches, so the pasted link can be read
+  from Anthropic's side when the Worker was turned away). The prompt gives the link, what the page said
+  (or why it couldn't be fetched), today's date and the household zone, and asks for plain notes: what
+  the thing is, when, where, the address, a phone number, the cost, and anything else useful, **only from
+  the page and what the searches found, never guessed**. `pause_turn` is continued (the paused answer sent
+  back unchanged) up to `RESEARCH_TURNS_MAX` = 4 requests; still paused after that is a failure (502), never
+  half-finished notes passed off as the answer. The notes are the text after the last tool result.
+- **Filling the fields** (`askClaude`, the photo reader's schema): the page extract and the notes →
+  `{ title, startDate, endDate, place, address, phone, cost, url, note }`, dates resolved as for a photo
+  (the next such date on or after today). Two requests rather than one because web search always answers
+  with citations, which a structured answer can't carry.
+- **Honest failures:** a failed look-up is a failure (502 with its reason), even when the page was read,
+  so a reading never quietly rests on half the work. The page couldn't be fetched **and** the look-up found
+  nothing → the reading is all nulls but the link, and the form says "Nothing new found at that link." A refusal → 422; a model
+  or network failure → 502 with the reason (never the key).
+- **Cost:** roughly a few cents a link (two requests and at most three searches at $10 per 1 000).
+- **Privacy** ⚑ Q141: the link and the page's text go to Anthropic, and the searches run on Anthropic's
+  side. Nothing about the household is sent but today's date and its time zone.
+
 ### 7C.5 Acceptance (M4g — each row is a test)
 
 | # | Setup / call | Expected |
@@ -2308,6 +2359,14 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
 | D11 | `cleanPhotoReading` on raw model output with `2026-02-30`, reversed dates, a `javascript:` link, a 300-char title | invalid date dropped, dates swapped, link dropped, title cut to 120 |
 | D12 | migration check (§4.2g) | every fire kind and delivery intact after 0008 |
 | D13 | a 41st read in one day | 429 with a message |
+| D14 | read-link on an event page whose JSON-LD holds the dates, venue and price (fake page, fake Claude) | 200 with the fields; one `photo_reads` row; the research request carries web search (max 3) and web fetch (max 2) and the page's JSON-LD and text; nothing saved |
+| D15 | read-link whose page answers 403 | still 200: the research prompt names the failure ("403") and Claude is asked |
+| D16 | read-link with `http://192.168.0.123`, `localhost:8787`, `intranet`, `ftp://x` | 400 `invalid_input`; no fetch, no read counted |
+| D17 | read-link with no API key; at the daily cap | 503 `link_reading_off`, no fetch; 429, no fetch, no read counted |
+| D18 | read-link where research answers `pause_turn` once | the paused answer is sent back unchanged and the second answer's notes are used |
+| D19 | read-link where Claude's fill gives another link | the answer's `url` is the pasted link |
+| D20 | `pageExtract` on HTML with a script, a style, a comment, `&amp;`, meta og:title and two JSON-LD blocks | title and meta kept, both JSON-LD blocks kept, script/style/comment text gone, `&` decoded; a 50 000-char body cut to 12 000 |
+| D21 | refusal / failure from Claude | 422 `link_refused` / 502 `link_reading_failed` with the reason |
 
 ---
 
@@ -3164,6 +3223,10 @@ Pumpkin patch        📅 Sat Oct 12
 - **＋ Add a thing to do** and tapping a row open the **thing form** (modal):
   - **📷 Add photo** (camera or library) → a thumbnail; then "Reading the photo…" and the
     empty fields fill in, each marked *from photo — check it*. Remove / replace photo.
+  - **🔗 Fill in from this link** (asked by MojoSOGO 2026-10-04), a full-width button right under
+    **Link**, shown when the field holds a link `webLink` accepts ⚑ Q142. Tapping it shows "Reading the
+    link…", then the empty fields fill in, each marked *from link — check it*; nothing filled → "Nothing
+    new found at that link."; a failure shows its message. Nothing is saved until Save.
   - Title · From / To dates (both optional) · Place · Address · Phone · Cost · Link · Note.
   - **Every text field grows to fit its text** (auto-sizing, no inner scrolling), so all of a
     long title, address, cost or note is visible at once (decided by MojoSOGO). Phone is a
@@ -3840,6 +3903,7 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | POST | `/things/{id}/plan` | member | `{ date, time? }` → `{ thing, eventId }`; 400 outside the window |
 | PUT/GET/DELETE | `/things/{id}/photo` | member | PUT raw image body (≤ 4 MB) → 204; GET → the image; DELETE → 204 |
 | POST | `/things/read-photo` | member | raw image body → `{ title, startDate, endDate, place, address, phone, cost, url, note }` (each nullable); 503 / 502 / 422 / 429 per §7C.4 |
+| POST | `/things/read-link` | member | `{ url }` → the same reading as read-photo; nothing stored; 400 / 429 / 503 `link_reading_off` / 422 `link_refused` / 502 `link_reading_failed` per §7C.4b |
 | GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, commentsError, createdBy, createdAt, updatedAt, emojis: RecipeEmoji[] }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed; `RecipeEmoji = { memberId, emoji }`, §7E.5) (§7E) |
 | POST | `/recipes` | member | `{ title, ingredients, steps, servings?, time? }` → recipe (201), typed by hand; 400 `invalid_input` |
 | GET/PATCH/DELETE | `/recipes/{id}` | member | GET → recipe; PATCH the POST fields, all optional, merged → recipe (found recomputed); DELETE → 204 (soft); 404 when gone |
@@ -4323,6 +4387,11 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q135 | The notice push title | ⚑ "🔑 Ensō sign-in" for both the request and the new-sign-in notice; the request's body "Sign-in request from Chrome on Windows — tap to check" |
 | Q136 | Where the approve screen says the browser is | ⚑ Cloudflare's rough city and country for the waiting browser ("Oceanside, US"), or "Place unknown" |
 | Q137 | A request that was approved but not collected in time | ⚑ Expires with the request (2 minutes from creation); the PC says "No answer in 2 minutes." |
+| Q138 | A link reading's own link | ⚑ The form's Link stays the pasted link; a link the look-up found (a ticket page, say) may go in the note, never replaces it |
+| Q139 | Which budget link readings use | ⚑ The same 40-a-day `photo_reads` budget as photos (one read per tap, counted before Claude is asked); no new table |
+| Q140 | How hard a link reading looks | ⚑ At most 3 web searches and 2 page fetches per tap |
+| Q141 | Sending a link to Anthropic | ⚑ The link, the page's text and the searches go to Anthropic, as photos do (Q30) |
+| Q142 | Where "Fill in from this link" sits | ⚑ A full-width button right under the Link field, only when the field holds a usable link; reading starts on the tap, never on paste |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -4535,6 +4604,12 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Fill a thing from a link** (v1.21.0, §7C.4b, §8.11; asked by MojoSOGO 2026-10-04; D14–D21 green): under the thing
+form's Link, **🔗 Fill in from this link** fetches the page from the Worker (title, meta, JSON-LD, text), has Claude
+look it up with web search (≤ 3) and web fetch (≤ 2), then fills the empty fields marked *from link — check it*.
+Counted in the 40-a-day `photo_reads` budget. No migration. Tests reach only a fake site and a fake Claude; the
+pairing of server tools and the two requests has **not yet been run against the real API**. **Still owed:** a real
+event link read on the deployed URL; Q138–Q142 are ⚑ defaults awaiting MojoSOGO.
 **M4v Each person's speakers** (v1.19.0, §9.2a; 552 tests incl. HS1–HS10 and HS-M): decided by MojoSOGO
 2026-10-04. Settings → Me lists Home Assistant's Echos and Voice PE, asked live through the tunnel with one
 `/api/template` call; each person ticks theirs. A house delivery is written with the speakers of everyone it is for
