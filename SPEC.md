@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.58 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.59 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3712,7 +3712,8 @@ Pumpkin patch        📅 Sat Oct 12
     server's message; the updated recipe goes back to the view and the row;
   - **the kept screenshot** (⚑ Q174), when there is one, first and whole (never cropped, at most 420 px
     tall), in place of the thumbnail; the row's small picture is the screenshot too, also **whole** — scaled
-    down inside a 64 × 64 slot, never cropped (asked by MojoSOGO 2026-10-05 ⚑ Q176);
+    down inside the same 64 × 36 slot, never cropped, so every row keeps one height (asked by MojoSOGO
+    2026-10-05 ⚑ Q176);
   - the thumbnail, full width, and **▶ Watch on YouTube** (opens the video, a new tab);
     the channel; servings and time when stated;
   - the **source note** ⚑ Q64 ⚑ Q81, muted: "From the " + what was read, each named — description,
@@ -5025,7 +5026,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q173 | Screenshots in the recipe form (§8.12, §7E.2b) | ⚑ On every existing recipe, typed ones included; Claude reads them with the title (nothing fetched); a brand-new recipe takes them after its first Save |
 | Q174 | A recipe's screenshot as its picture (§7E.2b, §8.12) | ⚑ The first screenshot of the latest successful read is kept and shown whole at the top of the view and as the row's picture, ahead of a YouTube thumbnail; a new read replaces it; no separate upload or remove |
 | Q175 | A recipe's picture by hand (§8.12) | ⚑ 📷 Add photo in the recipe form, on new and saved recipes alike, any member; it replaces a kept screenshot and is replaced by a later screenshot read; nothing is read from it |
-| Q176 | A recipe's picture in the list (§8.12) | ⚑ Whole, never cropped, in a 64 × 64 slot (a row with one is taller); YouTube thumbnails keep their 64 × 36 crop |
+| Q176 | A recipe's picture in the list (§8.12) | Whole, never cropped, inside the usual 64 × 36 slot; every row the same height (decided by MojoSOGO 2026-10-05); YouTube thumbnails keep their crop |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5238,8 +5239,8 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
-**Whole pictures in the recipe list** (v1.32.1, §8.12; asked by MojoSOGO 2026-10-05): a recipe's own picture is
-scaled to fit its row slot, never cropped. Q176 is a ⚑ default.
+**Whole pictures in the recipe list** (v1.32.1–1.32.2, §8.12; asked by MojoSOGO 2026-10-05): a recipe's own picture
+is scaled to fit the usual 64 × 36 row slot, never cropped, and every row keeps one height (Q176, decided).
 **A recipe's picture by hand** (v1.32.0, §8.12; asked by MojoSOGO 2026-10-05; RL13): 📷 Add photo in the recipe
 form sets the recipe's picture with nothing read. Q175 is a ⚑ default.
 **A recipe's screenshot as its picture** (v1.31.0, §7E.2b, §8.12, §4.2zd; asked by MojoSOGO 2026-10-05; RL12, RP-M):
