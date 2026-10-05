@@ -18,10 +18,14 @@ export const COMMENTS_LOOKED_AT = 20;
 export const CREATOR_COMMENTS_MAX = 5000;
 /** Video reads per household per local day (§7E.2), apart from photo reads. ⚑ Q65 */
 export const RECIPE_READS_PER_DAY = 20;
-/** Every reading is saved in English (§7E.2, §7E.6): a recipe in another language is translated, never left as is. ⚑ Q171 */
+/** Every reading is saved in English and US units (§7E.2, §7E.6): a recipe in another language is translated,
+ *  metric amounts converted. ⚑ Q171 ⚑ Q172 */
 export const RECIPE_IN_ENGLISH =
   `Write the title, ingredients, steps, servings and time in English: if the recipe is in another language ` +
-  `(Spanish, say), translate it faithfully, keeping every amount and unit as given and adding nothing.`;
+  `(Spanish, say), translate it faithfully, adding nothing. Use American units: convert metric amounts to US ` +
+  `ones, rounded to what a home cook measures — Celsius to Fahrenheit (180 °C → 350 °F), grams to ounces or ` +
+  `pounds, milliliters and liters to teaspoons, tablespoons, cups or fluid ounces, centimeters to inches. Leave ` +
+  `amounts already in US units, and counts such as 2 eggs, as given.`;
 
 /** The title of a found:false recipe whose video has no title either. */
 export const UNTITLED_VIDEO = 'Recipe from YouTube';
