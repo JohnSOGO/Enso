@@ -85,7 +85,7 @@ export function MachinesSection() {
     get<Machine[]>('/machines').then((m) => { setMachines(m); setError(null); }).catch((e) => setError(errorText(e)));
   }, [version]);
 
-  async function act(m: Machine, what: 'finish' | 'clear') {
+  async function act(m: Machine, what: 'finish' | 'clear' | 'remind') {
     if (what === 'clear' && !confirm(`Clear the ${lower(m.id)}? Nothing will ring.`)) return;
     setError(null);
     try { await post(`/machines/${m.id}/${what}`); refresh(); } catch (e) { setError(errorText(e)); refresh(); }
@@ -110,7 +110,7 @@ export function MachinesSection() {
                 <b style={{ flex: 'none' }}>{GLYPH[m.id]} {m.label}</b>
                 <span className={`badge ${BADGE[m.state].mood}`} style={{ flex: 'none' }}>{BADGE[m.state].text}</span>
               </div>
-              <div className="row" style={{ marginTop: 6 }}>
+              <div className="row wrap" style={{ marginTop: 6 }}>
                 {/* whose load and when it's done: its own line, wrapping, so 320 px never cuts the time off */}
                 <span className="muted" style={{ flex: 1, fontVariantNumeric: 'tabular-nums' }}>{load(m)}</span>
                 {m.state === 'free' && (
@@ -123,6 +123,9 @@ export function MachinesSection() {
                   </button>
                 )}
                 {m.state === 'done' && !m.next && <button className="primary" onClick={() => act(m, 'finish')}>Fold &amp; out</button>}
+                {m.state === 'done' && (
+                  <button onClick={() => act(m, 'remind')} aria-label={`Still loaded: remind about the ${lower(m.id)} again`}>Still loaded</button>
+                )}
                 {m.state !== 'free' && <button onClick={() => act(m, 'clear')} aria-label={`Clear the ${lower(m.id)}`}>Clear</button>}
               </div>
             </li>

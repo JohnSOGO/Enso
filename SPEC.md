@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.46 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.47 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2459,6 +2459,7 @@ deferred.
 | **Move** `{ minutes }` (washer → dryer) | the washer is done **and** the dryer is free | washer free, its open fire closes `done` (`closed_by` = me); the dryer starts with the **washer's owner** and its own minutes; a new dryer fire |
 | **Finish** — *Fold & out* | the last machine (dryer) is done | dryer free; its open fire closes `done` — the load's loop ends |
 | **Clear** | running or done | free; its open fire closes `removed`; nothing rings |
+| **Remind** — *Still loaded* ⚑ Q159 | done | the load stays; its open fire closes `superseded` (`closed_by` = me) and a new `machine` fire is due **now**, so the reminders run again from alert 1 (§7D.3) |
 
 - **Minutes** are chips: `MACHINE_MINUTES` = **30 / 45 / 60 / 90**. **Whose load** is one active
   member (the chooser defaults to me).
@@ -2470,6 +2471,7 @@ deferred.
   - move from the dryer, or Fold & out on the washer → `invalid_state` with a message naming
     what the machine does take.
   - clear a free machine → `already_free`.
+  - Still loaded on a machine that isn't done → `not_done`.
 - **Two taps at once:** every machine-row write is conditional on the row's `started_at` as it
   was read, inside the same batch as the fire writes; a row that changed under it aborts the
   whole batch → **409 `conflict`** "Someone else just changed the washer — have another look."
@@ -2491,6 +2493,11 @@ deferred.
   `" — Kai's load is waiting"` (`" — another load is waiting"` when that owner is not
   active). From the second alert on, `" (alert n)"` (§5.7). "Waiting" is derived at alert
   time, never stored.
+- **Still loaded** (⚑ Q159): a fire due *after* the machine's done-at was restarted by Still
+  loaded (`isStillLoaded`, derived, never stored). Its message says what the load needs next:
+  `"Sam, your laundry is still in the washer — move it to the dryer"` / `"… still in the dryer
+  — take it out"`; with no active owner `"The laundry is still in the washer — …"`. The waiting
+  suffix and `" (alert n)"` follow as above.
 - Phone notifications have **no buttons** for a machine (`pushActions('machine') = []`);
   tapping one opens the app.
 
@@ -2510,6 +2517,8 @@ deferred.
 | L10 | Clear a running machine | free; its fire closed `removed`; a later tick sends nothing |
 | L11 | two Start taps on one free machine at once | one 200, one 409; exactly one open fire |
 | L12 | minutes 20, an unknown owner, an unknown machine, `done` action on a machine fire | 400 / 400 / 404 / 409 `invalid_action`, each with a message |
+| L14 | `remindMachine` on a done washer / a running or free one; `doneMessage(…, still)` | the load stays, the open fire closes `superseded`, a new fire due now / `not_done`; the §7D.3 Still loaded texts |
+| L15 | Still loaded on a washer done 70 min ago, then ticks every 15 min | the old fire closed `superseded`; the new fire alerts 4 times (A's phone + house), message `A, your laundry is still in the washer — move it to the dryer` |
 | L13 | migration check (§4.2m) | fires and deliveries intact after 0014; machines seeded; CHECK refuses a machine fire without `machine_id` |
 
 ---
@@ -3142,7 +3151,7 @@ Machines
 Wash, move to the dryer, fold. Whoever's load it is hears when it's done.
 ┌──────────────────────────────────────┐
 │ 🫧 Washer  DONE — waiting   Kai·14:05 │
-│              [Move to dryer] [Clear] │
+│ [Move to dryer] [Still loaded] [Clear]│
 ├──────────────────────────────────────┤
 │ 🌀 Dryer   running          Sam·14:50 │
 │                              [Clear] │
@@ -3153,7 +3162,10 @@ Wash, move to the dryer, fold. Whoever's load it is hears when it's done.
 |---|---|---|
 | free | **[Start]** | **[Start]** |
 | running | [Clear] | [Clear] |
-| done | **[Move to dryer]** [Clear] | **[Fold & out]** [Clear] |
+| done | **[Move to dryer]** [Still loaded] [Clear] | **[Fold & out]** [Still loaded] [Clear] |
+
+- **Still loaded** (⚑ Q159) restarts the reminders (§7D.2) with one tap, no confirm; the action
+  line wraps at 320 px.
 
 - **The chooser** (a modal, exported from `Machines.tsx` and reused by the Ringing bar): for
   **Start**, titled "Start the washer" — *Whose load?* one member chip per active member, **me**
@@ -4099,6 +4111,7 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | POST | `/machines/{id}/start` | member | `{ ownerId, minutes }` → `Machine[]`; 409 `busy` when not free (§7D.2) |
 | POST | `/machines/{id}/move` | member | `{ minutes }` → `Machine[]`; 409 `busy` / `not_done` / `invalid_state` |
 | POST | `/machines/{id}/finish` | member | Fold & out → `Machine[]`; 409 `not_done` / `invalid_state` |
+| POST | `/machines/{id}/remind` | member | Still loaded → `Machine[]`; 409 `not_done` (§7D.2) |
 | POST | `/machines/{id}/clear` | member | → `Machine[]`; 409 `already_free`. Every `/machines` write: 404 for an unknown machine, 400 `invalid_input`, 409 `conflict` when another tap changed the machine first |
 | POST | `/fires/{id}/actions` | member | `{ action: Action }` → fire (+ next); 409 on `invalid_action` |
 | POST | `/push/subscriptions` | member | `PushSubscriptionJSON` + userAgent → `{ id }` (upserted by endpoint) |
@@ -4647,6 +4660,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q156 | Comments read for a YouTube link | ⚑ The top 20 by relevance (one quota unit), plus the title, channel and description; replies not read; other sites' comments only if Claude's own page fetch shows them |
 | Q157 | Lists' emojis | ⚑ A list without its own shows one picked from its name (keyword table in §7A.1, else 📋); Today 🧹, Things to do ✅, Movies & shows 🎬 are fixed |
 | Q158 | When the Lists popup opens | ⚑ On every tap of the bottom tab's 🛒 Lists (and the list button), not when the app opens on Lists; closing it stays on the remembered list |
+| Q159 | A done load nobody has moved (§7D.2, §8.5) | ⚑ A done washer or dryer offers **Still loaded**: the reminders start over now (alert 1, then every 15 min, 4 in all, Phone + House), saying "… is still in the washer — move it to the dryer" / "… still in the dryer — take it out". Move, Fold & out or Clear stops them as before |
 | Q142 | Where "Fill in from this link" sits | ⚑ A full-width button right under the Link field, only when the field holds a usable link; reading starts on the tap, never on paste |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
@@ -4860,6 +4874,10 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Still loaded** (v1.24.0, §7D.2–7D.3, §8.5; asked by MojoSOGO 2026-10-05; L14–L15): a done washer or dryer card
+offers **Still loaded**, which closes its fire `superseded` and starts a new one now, so the 15-minute reminders run
+again from the first, telling the household to move the load to the dryer or take it out. No migration. Q159 is a ⚑
+default awaiting MojoSOGO.
 **Lists popup** (v1.23.0, §8.8, §7A.1; asked by MojoSOGO 2026-10-05; L21–L22 and LE-M): tapping 🛒 Lists in the tab
 bar opens a popup of buttons, one per list with its emoji and open count, the remembered list marked; the old
 `<select>` is gone. Lists gain an emoji (migration 0027, §4.2z), set in the new-list form and ⋯ options, else picked

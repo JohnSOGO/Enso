@@ -1,11 +1,11 @@
-// SPEC §7D, §10 — the laundry loop: /machines and its four transitions, one batch each.
+// SPEC §7D, §10 — the laundry loop: /machines and its five transitions, one batch each.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { MACHINE } from '../../shared/vocab';
 import type { FireRow } from '../../shared/engine';
 import {
   MACHINE_LABEL, clearMachine, finishMachine, isMachineId, machineState, moveMachine, nextMachine, parseMove, parseStart,
-  refusalText, startMachine, type MachineChange, type MachineResult, type MachineRow,
+  refusalText, remindMachine, startMachine, type MachineChange, type MachineResult, type MachineRow,
 } from '../../shared/machines';
 import { all, nowIso } from '../db';
 import { body, fail } from '../http';
@@ -109,4 +109,11 @@ machines.post('/machines/:id/clear', requireMember, async (c) => {
   if (m instanceof Response) return m;
   const now = nowIso();
   return save(c, m.rows, clearMachine(m.row, m.openFire, c.get('member').id, now), now);
+});
+
+machines.post('/machines/:id/remind', requireMember, async (c) => {
+  const m = await load(c);
+  if (m instanceof Response) return m;
+  const now = nowIso();
+  return save(c, m.rows, remindMachine(m.row, m.openFire, c.get('member').id, now), now);
 });
