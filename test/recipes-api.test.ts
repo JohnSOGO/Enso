@@ -8,7 +8,7 @@ import worker from '../src/worker/index';
 import {
   INGREDIENT_MAX, parseRecipeInput, type Recipe, type RecipeInput,
 } from '../src/shared/recipes';
-import { HOME_CAPTIONS_OFF, RECIPE_READS_PER_DAY, cleanRecipeReading, homeCaptionsError } from '../src/shared/recipe-reading';
+import { HOME_CAPTIONS_OFF, RECIPE_IN_ENGLISH, RECIPE_READS_PER_DAY, cleanRecipeReading, homeCaptionsError } from '../src/shared/recipe-reading';
 import { SHOPPING_LIST_ID } from '../src/shared/lists';
 import { BASE, Client, owner } from './helpers';
 import {
@@ -87,6 +87,7 @@ describe('M4o from-video — reading', () => {
     const claude = heard.find((h) => h.host === 'api.anthropic.com')!;
     expect(claude.body.messages[0].content[0].text).toContain('whisk the eggs then fry');
     expect(claude.body.messages[0].content[0].text).toContain(PANCAKES.description);
+    expect(JSON.stringify(claude.body)).toContain(RECIPE_IN_ENGLISH); // RL10 (§7E.2 ⚑ Q171)
     expect((await o.get('/recipes')).json.map((x: Recipe) => x.id)).toEqual([r.json.id]);
   });
 

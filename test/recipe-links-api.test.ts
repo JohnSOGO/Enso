@@ -5,7 +5,7 @@ import { createExecutionContext, env } from 'cloudflare:test';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src/worker/index';
 import type { Env } from '../src/worker/env';
-import { RECIPE_READS_PER_DAY } from '../src/shared/recipe-reading';
+import { RECIPE_IN_ENGLISH, RECIPE_READS_PER_DAY } from '../src/shared/recipe-reading';
 import { BASE, Client, owner } from './helpers';
 import { claudeMessage, keyedEnv, warmClaude } from './recipe-fakes';
 
@@ -77,6 +77,7 @@ describe('§7E.6 from-link through the Worker', () => {
     ]);
     expect(promptOf(look)).toContain('"recipeIngredient"');
     expect(promptOf(filled)).toContain('Garlic Noodles: 8 oz noodles');
+    expect(promptOf(filled)).toContain(RECIPE_IN_ENGLISH); // RL10
     expect(r.heard.filter((h) => h.host === 'www.googleapis.com')).toEqual([]);
   });
 
@@ -147,6 +148,7 @@ describe('§7E.6 from-link through the Worker', () => {
     const content = heard[0].body.messages[0].content;
     expect(content[0].type).toBe('image');
     expect(content.map((b: any) => b.text ?? '').join('\n')).toContain('Site: Facebook');
+    expect(content.map((b: any) => b.text ?? '').join('\n')).toContain(RECIPE_IN_ENGLISH); // RL10
     expect(await reads()).toBe(2);
   });
 });

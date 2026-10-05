@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.52 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.53 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2758,6 +2758,10 @@ transcript given by hand, cleaning Claude's reading) live in `src/shared/recipe-
   unless stated). **Claude must never invent a recipe from the title** or from general knowledge:
   only what the description, captions and the creator's comments say; when they hold no recipe,
   `found` is false and the lists are empty.
+- **In English** ⚑ Q171 (asked by MojoSOGO 2026-10-05: "Translate to English if required… the fb link is
+  Spanish"): every reading — a video's, a transcript's (§7E.2b), a link's fill (§7E.6) — asks for the title,
+  ingredients, steps, servings and time in English, a recipe in another language translated faithfully, every
+  amount and unit kept as given, nothing added (`RECIPE_IN_ENGLISH`, one sentence, never restated).
 - **The creator's comments** — recipes are often in the creator's first comment, usually pinned
   (decided by MojoSOGO 2026-10-04). `COMMENTS_LOOKED_AT` = 20 threads are asked for, by relevance
   ⚑ Q77. `creatorComments(comments, channelId)` (pure): an unknown (null or empty) `channelId` →
@@ -3086,6 +3090,7 @@ for it (as §7C.4b).
 | RL6 | from-link with the Anthropic key empty (YouTube's key set or not); at the cap; an unreadable link | 503 / 429 / 400, nothing fetched, no read counted |
 | RL7 | Claude finds no recipe; a refusal; a failure | saved `found: false` with the page's title; 422; 502 |
 | RL8 | from-video with a page link | the same as from-link |
+| RL10 | the video reading, the transcript re-read and a link's fill | each prompt carries `RECIPE_IN_ENGLISH` |
 | RL9 | a transcript (text or a screenshot) on a link recipe | 200; re-read with nothing fetched but Claude; source `transcript`; YouTube's key not needed |
 | RL-M | migration check (§4.2zc) | as written there |
 
@@ -4978,6 +4983,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q168 | A link recipe's picture and name (§7E.6, §8.12) | ⚑ No thumbnail (nothing stored or hotlinked); the site's name (Facebook, Instagram, TikTok, Pinterest, else the host) in place of the channel |
 | Q169 | The transcript, by hand, on a link recipe (§7E.2b) | ⚑ Offered like a video's; nothing is re-fetched — Claude reads the screenshots or text with the recipe's title and site |
 | Q170 | Where a link's recipe may come from (§7E.6) | ⚑ The page, the post's or reel's caption, or the creator's own recipe for that dish where the post points to it; never another creator's |
+| Q171 | A recipe in another language (§7E.2) | ⚑ Always saved in English, translated faithfully with amounts and units as given; the original is not kept (the link or video still is) |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5190,6 +5196,8 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Recipes in English** (v1.29.1, §7E.2; asked by MojoSOGO 2026-10-05; RL10): every recipe reading — video,
+transcript or link — is saved in English, a Spanish reel's recipe translated. Q171 is a ⚑ default.
 **Recipes from any link** (v1.29.0, §7E.6, §4.2zc; asked by MojoSOGO 2026-10-05; RL1–RL9, RL-M): the paste box
 takes any link and detects its kind — a YouTube video reads as before; a Facebook reel or post, a recipe site or
 any page is fetched (a login wall kept, never fatal) and looked up by Claude with web fetch and search, then
