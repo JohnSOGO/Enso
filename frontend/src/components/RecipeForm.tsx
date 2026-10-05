@@ -1,11 +1,14 @@
 // SPEC §8.12 — the recipe form (modal): title, ingredients and steps one per line, servings, time; Save /
 // Cancel / Delete (asks). Fixes a read recipe or types a new one (no video, ⚑ Q68). Validation and found
-// are the server's (§7E.3); a video's own fields are not editable.
+// are the server's (§7E.3); a video's own fields are not editable. An existing recipe can also be re-read from
+// screenshots or pasted text here (RecipeTranscript, ⚑ Q173); the re-read recipe is handed back as saved.
 import { useState } from 'react';
 import { Modal } from './Modal';
 import { Grow } from './Grow';
+import { RecipeTranscript } from './RecipeTranscript';
 import { del, errorText, patch, post } from '../api';
 import { RECIPE_TITLE_MAX, SERVINGS_MAX, TIME_MAX, type Recipe } from '../../../src/shared/recipes';
+import s from './Recipes.module.css';
 
 const formOf = (r: Recipe | null) => ({
   title: r?.title ?? '', ingredients: r?.ingredients.join('\n') ?? '', steps: r?.steps.join('\n') ?? '',
@@ -65,6 +68,12 @@ export function RecipeForm({ recipe, onSaved, onDeleted, onClose }: Props) {
           </label>
         </div>
       </fieldset>
+      {recipe && (
+        <>
+          <h3 className={s.section}>Fill in from screenshots</h3>
+          <RecipeTranscript recipe={recipe} onChange={onSaved} />
+        </>
+      )}
     </Modal>
   );
 }

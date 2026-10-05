@@ -13,7 +13,7 @@ export type RereadOutcome =
   | { ok: true }
   | { ok: false; kind: 'video_unavailable' | 'youtube_failed' | 'recipe_refused' | 'recipe_reading_failed' | 'no_recipe'; reason: string };
 
-/** Re-read `row` (a recipe with a video_id or a link) from the transcript given. `countFor`: the member the read is
+/** Re-read `row` (any recipe: a video's, a link's or a typed one) from the transcript given. `countFor`: the member the read is
  *  counted against in recipe_reads. Claude's captions slot gets the pasted text. */
 export async function rereadRecipe(db: D1Database, keys: { yt: string; ai: string }, row: RecipeRow,
   given: Pick<VideoText, 'pasted' | 'screenshots'>, countFor: string, now: string): Promise<RereadOutcome> {
@@ -46,13 +46,14 @@ const save = (db: D1Database, id: string, reading: RecipeReading, source: Recipe
   reading.title, JSON.stringify(reading.ingredients), JSON.stringify(reading.steps), reading.servings, reading.time,
   JSON.stringify(source), commentsError, nowIso(), id);
 
-/** §7E.2b on a link recipe (§7E.6 ⚑ Q169): nothing fetched; Claude reads what was given with the recipe's title and site. */
+/** §7E.2b on a link or typed recipe (§7E.6 ⚑ Q169, ⚑ Q173): nothing fetched; Claude reads what was given with the
+ *  recipe's title and, for a link, its site. */
 async function rereadLink(db: D1Database, aiKey: string, row: RecipeRow, given: Pick<VideoText, 'pasted' | 'screenshots'>,
   countFor: string, now: string): Promise<RereadOutcome> {
   await run(db, 'INSERT INTO recipe_reads (at, member_id) VALUES (?, ?)', now, countFor);
   const read: VideoText = { description: null, transcript: null, comments: null, ...given };
   const res = await readRecipe({
-    apiKey: aiKey, title: row.title, channel: null, site: row.channel ?? 'web', ...read, transcript: given.pasted ?? null,
+    apiKey: aiKey, title: row.title, channel: null, site: row.link ? row.channel : null, ...read, transcript: given.pasted ?? null,
   });
   if (!res.ok && res.kind === 'refused') return { ok: false, kind: 'recipe_refused', reason: res.reason };
   if (!res.ok) return { ok: false, kind: 'recipe_reading_failed', reason: res.reason };
