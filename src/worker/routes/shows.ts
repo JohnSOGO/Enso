@@ -34,7 +34,8 @@ async function lookUp(c: Context<AppEnv>, ask: ShowAsk, url: string | null) {
     return fail(c, 429, 'rate_limited', `Photos, links and shows can be looked up ${READS_PER_DAY} times a day, and today's are used up. Try again tomorrow, or type it in.`);
   }
   if (!spent.ok) return fail(c, 503, 'show_lookup_off', "Looking up movies and shows isn't set up yet.");
-  const r = await lookUpShow({ apiKey: spent.apiKey, tz: spent.tz, today: spent.today, ask, home: await householdPlace(db) });
+  const r = await lookUpShow({ apiKey: spent.apiKey, tz: spent.tz, today: spent.today, ask, home: await householdPlace(db),
+    youtubeKey: c.env.YOUTUBE_API_KEY });
   if (!r.ok && r.kind === 'refused') return fail(c, 422, 'show_refused', "Couldn't look that up.");
   if (!r.ok) return fail(c, 502, 'show_lookup_failed', `Couldn't look that up: ${r.reason}`);
   return c.json(cleanShowReading(r.raw, url, nowIso()));

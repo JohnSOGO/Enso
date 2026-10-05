@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.44 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.45 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2872,6 +2872,15 @@ taps Save ⚑ Q151. Three ways in:
 - **A link** — `{ url }`, through `readableLink` (§7C.4b). The Worker fetches the page exactly as a thing's link
   reading does (`fetchPage`, `pageExtract`; a failure is kept as a reason, never fatal). The link is usually a
   clip, a trailer, a post or an article, so the first job is working out which show it is about.
+- **A video's comments** (asked by MojoSOGO 2026-10-05: "you may need to read the comments to find out what it is"):
+  for a YouTube link (`youtubeVideoId`, §7E.2) the Worker also asks the YouTube Data API (`YOUTUBE_API_KEY`, as
+  recipes do) for the video's title, channel and description and its top `SHOW_COMMENTS_LOOKED_AT` = 20 comments
+  by relevance ⚑ Q156, alongside the page fetch. They go to the look-up as their own section (`videoSection`,
+  show-reading.ts): the description cut to `VIDEO_DESCRIPTION_MAX` = 3 000 characters, each comment to
+  `COMMENT_MAX` = 500 and all of them to `COMMENTS_TEXT_MAX` = 6 000. A missing key, a failure or comments turned
+  off is kept as a reason in that section, never fatal and never a 4xx. For any link, the prompt says viewers'
+  comments often name the show, so a page Claude fetches is read for them too (other sites' comments are not
+  fetched by the Worker).
 - **A picture** — `POST /shows/look-up-photo` with a raw image body (a screenshot, a photo of a TV, a poster;
   `photoBody`, §7C.3). It goes to Claude as an image block with the look-up and is **never stored** ⚑ Q150. A video
   clip itself is not read ⚑ Q149: paste its link, or screenshot a frame.
@@ -2927,6 +2936,7 @@ null means it couldn't tell which show it is.
 | W12 | refusal / failure from Claude | 422 `show_refused` / 502 `show_lookup_failed` with the reason |
 | W13 | `cleanShowReading` on `rtCritics` "92%", `rtAudience` 140, kind `film`, a `cable` option, two "netflix" streams, four theaters, a 300-char title | 92, null, null, dropped, merged, three theaters, title cut to 120 |
 | W14 | `bestWatch` on rent + stream + theater | the theater; stream before tv before rent before buy |
+| W15 | look-up `{ url }` of a YouTube video (fake YouTube API: snippet + 3 comments, one naming the show) | the look-up's prompt carries the video's title, description and every comment; YouTube's key is never in the prompt; with no `YOUTUBE_API_KEY` the look-up still runs and its prompt says the comments couldn't be read |
 | W-M | migration check (§4.2y) | 0026 is additive: earlier rows intact, `shows` exists empty, `PRAGMA foreign_key_check` empty |
 
 ---
@@ -4605,6 +4615,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q153 | Editing how to watch | ⚑ Lines can be removed (✕) or refreshed (Check again), not typed by hand |
 | Q154 | Who may change a show | ⚑ Anyone in the household: add, edit, mark watched, delete |
 | Q155 | The row's way to watch | ⚑ The best option: theater, then stream, tv, rent, buy |
+| Q156 | Comments read for a YouTube link | ⚑ The top 20 by relevance (one quota unit), plus the title, channel and description; replies not read; other sites' comments only if Claude's own page fetch shows them |
 | Q142 | Where "Fill in from this link" sits | ⚑ A full-width button right under the Link field, only when the field holds a usable link; reading starts on the tap, never on paste |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
@@ -4827,7 +4838,7 @@ refreshes a saved one; Watched records who and when. Counted in the 40-a-day `ph
 Built as (not in the first draft of the spec): **Add it by hand** after a failed or empty look-up, so a show can always
 be added. Checked locally at 320 px (rows one line, 44 px, no sideways scroll; the form fits) with the look-up off; the
 look-up itself is tested only against a fake Claude. **Still owed:** a real title, clip link and screenshot looked up on
-the deployed URL (the first run against the real API); Q144–Q155 are ⚑ defaults awaiting MojoSOGO; follow-ups in §12.2.
+the deployed URL (the first run against the real API); v1.22.1 reads a YouTube link's comments (W15); Q144–Q156 are ⚑ defaults awaiting MojoSOGO; follow-ups in §12.2.
 **Fill a thing from a link** (v1.21.0, §7C.4b, §8.11; asked by MojoSOGO 2026-10-04; D14–D22 green; v1.21.1 picks the location closest to home): under the thing
 form's Link, **🔗 Fill in from this link** fetches the page from the Worker (title, meta, JSON-LD, text), has Claude
 look it up with web search (≤ 3) and web fetch (≤ 2), then fills the empty fields marked *from link — check it*.

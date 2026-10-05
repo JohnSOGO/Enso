@@ -7,7 +7,7 @@ import worker from '../src/worker/index';
 import type { Env } from '../src/worker/env';
 import { READS_PER_DAY } from '../src/shared/things';
 import { BASE, Client, member, owner } from './helpers';
-import { claudeMessage, keyedEnv, warmClaude } from './recipe-fakes';
+import { YT_KEY, claudeMessage, commentsAnswer, keyedEnv, videoAnswer, warmClaude } from './recipe-fakes';
 
 let o: Client, A: string;
 beforeAll(async () => { o = await owner(); A = (await o.get('/me')).json.id; await warmClaude(); }, 60_000);
@@ -88,7 +88,7 @@ describe('§7F the list', () => {
 
 type Reply = { status?: number; body: object | string };
 interface Heard { host: string; path: string; body: any }
-type World = { page?: Reply; claude?: Reply[] };
+type World = { page?: Reply; claude?: Reply[]; videos?: Reply; comments?: Reply };
 
 function fakes(w: World) {
   const heard: Heard[] = [];
@@ -98,7 +98,8 @@ function fakes(w: World) {
     const url = new URL(req.url);
     const text = req.method === 'POST' ? await req.text() : '';
     heard.push({ host: url.host, path: url.pathname, body: text ? JSON.parse(text) : null });
-    const reply = url.host === 'clips.example.com' ? w.page
+    const reply = url.host === 'clips.example.com' || url.host === 'www.youtube.com' ? w.page
+      : url.host === 'www.googleapis.com' ? (url.pathname.endsWith('/videos') ? w.videos : url.pathname.endsWith('/commentThreads') ? w.comments : undefined)
       : url.host === 'api.anthropic.com' && url.pathname === '/v1/messages' ? claude.shift() : undefined;
     if (!reply) throw new Error(`a test tried to reach ${url.host}${url.pathname} — no fake for it`);
     const json = typeof reply.body !== 'string';
@@ -207,5 +208,27 @@ describe('§7F.2 look-ups', () => {
     expect(failed.status).toBe(502);
     expect(failed.json.error).toBe('show_lookup_failed');
     expect(failed.json.message).toMatch(/Couldn't look that up: .*boom/);
+  });
+
+  it('W15 a YouTube link: its title, description and comments go into the look-up; the key never does; no key still looks up', async () => {
+    const link = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+    const world = {
+      page: { status: 403, body: 'no bots' },
+      videos: { body: videoAnswer({ title: 'best scene ever 😂', channelTitle: 'Clips4U', description: 'no idea what this is from' }) },
+      comments: { body: commentsAnswer([[null, 'This is from The Bear season 2'], [null, 'yes chef'], [null, 'lol']]) },
+      claude: [notes('The Bear'), fill({ ...WICKED, title: 'The Bear', kind: 'show' })],
+    };
+    const r = await lookUp(keyedEnv(), { url: link }, world);
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    const asked = promptOf(claudeAsks(r.heard)[0]);
+    for (const said of ['best scene ever', 'Clips4U', 'no idea what this is from', 'This is from The Bear season 2', 'yes chef', 'lol']) {
+      expect(asked).toContain(said);
+    }
+    expect(asked).not.toContain(YT_KEY);
+    expect(r.heard.some((h) => h.path.endsWith('/commentThreads'))).toBe(true);
+    const noKey = await lookUp({ ...keyedEnv(), YOUTUBE_API_KEY: '' }, { url: link }, { ...world, claude: [notes('x'), fill(WICKED)] });
+    expect(noKey.status).toBe(200);
+    expect(promptOf(claudeAsks(noKey.heard)[0])).toMatch(/details and comments couldn't be read: reading YouTube isn't set up/);
+    expect(noKey.heard.filter((h) => h.host === 'www.googleapis.com')).toHaveLength(0);
   });
 });
