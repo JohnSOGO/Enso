@@ -11,7 +11,7 @@ import { fail, photoBody } from '../http';
 import { requireMember } from '../session';
 import { homeCaptionsConfigOf, identifyFromHome } from '../home-captions';
 import { readItemPhoto } from '../photo-reader';
-import { householdToday, photoReadsUsedUp, recordPhotoRead } from '../photo-reads';
+import { spendPhotoRead } from '../photo-reads';
 import { ITEM_GONE, loadItem } from './lists';
 
 const NO_PHOTO = 'This item has no photo.';
@@ -35,14 +35,12 @@ itemPhotos.post('/list-items/read-photo', requireMember, async (c) => {
   const home = await askHome(c, photo);
   if ('name' in home) return c.json<ItemReading>({ name: home.name, via: 'sogoai' });
 
-  const db = c.env.DB, now = nowIso();
-  const { tz, today } = await householdToday(db, now);
-  if (await photoReadsUsedUp(db, today, tz)) {
+  const spent = await spendPhotoRead(c.env.DB, nowIso(), c.get('member').id, c.env.ANTHROPIC_API_KEY);
+  if (!spent.ok && spent.why === 'used_up') {
     return fail(c, 429, 'rate_limited', `Photos can be read ${READS_PER_DAY} times a day, and today's are used up. Try again tomorrow, or type it in.`);
   }
-  if (!c.env.ANTHROPIC_API_KEY) return fail(c, 503, 'photo_reading_off', "Reading photos isn't set up yet.");
-  await recordPhotoRead(db, now, c.get('member').id);
-  const r = await readItemPhoto({ apiKey: c.env.ANTHROPIC_API_KEY, bytes: photo.bytes, mediaType: photo.type });
+  if (!spent.ok) return fail(c, 503, 'photo_reading_off', "Reading photos isn't set up yet.");
+  const r = await readItemPhoto({ apiKey: spent.apiKey, bytes: photo.bytes, mediaType: photo.type });
   if (!r.ok && r.kind === 'refused') return fail(c, 422, 'photo_refused', "Couldn't read that photo.");
   if (!r.ok) return fail(c, 502, 'photo_reading_failed', `Couldn't read that photo: ${r.reason} (SogoAI: ${home.why})`);
   const name = cleanItemName(r.name);
