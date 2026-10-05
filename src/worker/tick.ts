@@ -17,6 +17,7 @@ import { sendPushDeliveries } from './push';
 import { allHouseSpeakers, sendHouseDeliveries } from './house';
 import { deliverySpeakers } from './speaker-choices';
 import { onMemberIds } from './event-rows';
+import { messTick } from './mess-asks';
 
 export interface TickSummary { materialized: number; stepped: number; alerts: number; deliveries: number }
 
@@ -248,6 +249,8 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
 
   // 3. Send the push deliveries created in this tick.
   if (newDeliveryIds.length) await sendPushDeliveries(env, newDeliveryIds, now);
+  // 3b. Ask again about open messes, move unclaimed ones to To talk about, delete old mess photos (§7B.7).
+  await messTick(env, now);
   // 4. Speak the queued and stale-claimed house deliveries (§9.2).
   await sendHouseDeliveries(env, now);
   return summary;

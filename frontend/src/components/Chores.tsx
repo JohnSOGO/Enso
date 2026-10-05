@@ -1,9 +1,10 @@
-// SPEC §8.15 — the 🧹 Chores tab: Today (ChoresToday) on top, then All chores — one line per chore, sorted by time
+// SPEC §8.15 — the 🧹 Chores tab: Today (ChoresToday) on top, then Messes (§8.15a), then All chores — one line per chore, sorted by time
 // (§8.5). A row opens the chore's What done looks like sheet. Whose turn it is comes from the server (thisWeek /
 // nextWeek); nothing is computed here.
 import { useEffect, useState } from 'react';
 import { daysText } from './AlertFields';
 import { ChoresToday } from './ChoresToday';
+import { MessesSection } from './Messes';
 import { errorText, get } from '../api';
 import { useApp } from '../state';
 import type { Channel, ChoreTiming, Weekday } from '../../../src/shared/vocab';
@@ -35,6 +36,9 @@ export function ChoresTab({ onEdit, onOpenAreas }: { onEdit: (c: Chore | null) =
       <section className={s.section} aria-label="Today">
         <h1 style={{ fontSize: '1.15rem', marginBottom: 12 }}>Today</h1>
         <ChoresToday onOpenAreas={openAreas} />
+      </section>
+      <section className={s.section} aria-label="Messes">
+        <MessesSection />
       </section>
       <section className={s.section} aria-label="All chores">
         <div className="row" style={{ marginBottom: 6 }}>

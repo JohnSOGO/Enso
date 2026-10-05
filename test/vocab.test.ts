@@ -20,6 +20,7 @@ const EXPECTED: Record<string, readonly string[]> = {
   'events.start_sun': vocab.SUN_EVENT,
   'login_requests.status': vocab.LOGIN_REQUEST_STATUS,
   'deliveries.notice': vocab.NOTICE_KIND,
+  'messes.settled_how': vocab.MESS_SETTLE,
   'shows.kind': vocab.SHOW_KIND,
   'shows.status': vocab.SHOW_STATUS,
 };

@@ -7,6 +7,33 @@ carry its result.
 
 ---
 
+## 2026-10-05 — Whose mess? (placement-advisor)
+
+- **Ask:** mess reports in Chores. Members answer That was me or Not me. Asks go by push up to 4 times, 15 min
+  apart, plus an in-app banner. Unclaimed messes go to To talk about, an admin records the outcome, and there is a
+  balances ledger of who owes whom (SPEC §7B.7, §8.15a, §4.2ze / migration 0032). Reviewed after a first build
+  already sat in the working tree; placed as if fresh.
+- **Verdict:** NEW rows `src/shared/messes.ts` (rules, pure), `src/worker/routes/messes.ts` (routes + private R2
+  photo), `src/worker/mess-asks.ts` (asks, To talk about, photo expiry; shared by the route and tick),
+  `frontend/src/components/{Messes,MessBanner,MessReport}.tsx` + `Messes.module.css`, `migrations/0032_messes.sql`.
+  Small edits to existing owners: `vocab.ts` (MESS_SETTLE, MESS_STATUS), `tick.ts` (step 3b, one call),
+  `routes/ops.ts` (mess asks don't count toward the hourly limit), `index.ts` (mount), `Chores.tsx` (section),
+  `App.tsx` (banner). **Reorganizer first:** `activeMemberIds` moved from `tick.ts` to `db.ts` in its own commit,
+  breaking a tick.ts ↔ mess-asks.ts import cycle and taking fan-in off `tick.ts`.
+- **Flow stage:** rules (shared/messes.ts) · route + persist (routes/messes.ts) · persist + deliver via push.ts
+  (mess-asks.ts, from the route and tick) · render (the three components).
+- **Why:** a mess has no due time and no engine actions, so it is not a fire or a chore run. Its asks are
+  fire-less push deliveries tied by `deliveries.mess_id`, like announcements and sign-in notices, and the ask count
+  is derived from those rows rather than stored. Rejected: `shared/chores.ts` (241/300, a different concern); a new
+  fire kind in `tick.ts`/`engine.ts` (wrong shape, grows the hub); the asks inside `routes/messes.ts` (tick would
+  import a route). The banner and the section share one version-keyed hook from `Messes.tsx`, so `state.tsx` is not
+  widened.
+- **Caps:** messes.ts 91, routes/messes.ts 150, mess-asks.ts 77, Messes.tsx 146, MessReport.tsx 50, MessBanner.tsx
+  27 (all /300); tick.ts ~258/300 after the extract; db.ts ~51/300. No file newly in the band (routes/recipes.ts at
+  91 % predates this). No ceiling re-pinned.
+
+---
+
 ## 2026-10-05 — Recipes from any link (coordinating session)
 
 - **Ask:** recipe import takes Facebook reels and any web page; the link's kind is detected (§7E.6).
