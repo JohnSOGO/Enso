@@ -46,8 +46,8 @@ const prompt = (today: string, tz: string) =>
   `else useful, such as times or what to bring). Give every detail the photo shows, copied exactly as written. ` +
   `Use null for anything not shown.`;
 
-/** The photo as an image block, or the failure when Claude can't read its type. */
-function imageBlock(bytes: ArrayBuffer, mediaType: string): ClaudeBlock | { ok: false; kind: 'failed'; reason: string } {
+/** The photo as an image block, or the failure when Claude can't read its type. Also used by show-reader.ts. */
+export function imageBlock(bytes: ArrayBuffer, mediaType: string): ClaudeBlock | { ok: false; kind: 'failed'; reason: string } {
   if (!(READABLE as readonly string[]).includes(mediaType)) {
     return { ok: false, kind: 'failed', reason: `Claude can't read ${mediaType} pictures; send a JPEG.` };
   }

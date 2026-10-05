@@ -1,10 +1,11 @@
-// SPEC §8.8 — the 🛒 Lists tab: the list picker (Today + Things to do + every list + ＋ New list…, ⋯ options),
-// composing ChoresToday, ThingsToDo (§8.11) and HouseholdListOptions, and the list panel (add box with ItemPhoto's 📷,
+// SPEC §8.8 — the 🛒 Lists tab: the list picker (Today + Things to do + Movies & shows + every list + ＋ New list…,
+// ⋯ options), composing ChoresToday, ThingsToDo (§8.11), Shows (§8.14) and HouseholdListOptions, and the list panel (add box with ItemPhoto's 📷,
 // rows, Done). Every list behaves the same (Q24). The server decides added / existing / reopened and who may manage
 // a list (§7A.1); this screen shows what it returns. A snapped photo waits here until Add, then is saved (§7A.3).
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { ChoresToday } from './ChoresToday';
 import { ThingsToDo } from './ThingsToDo';
+import { Shows } from './Shows';
 import { ItemForm, type Item } from './HouseholdListItemForm';
 import { ListOptions, NewListForm, type ListSummary } from './HouseholdListOptions';
 import { ItemPhoto, type Snap } from './ItemPhoto';
@@ -17,10 +18,11 @@ import s from './HouseholdLists.module.css';
 interface ListData { list: Omit<ListSummary, 'openCount'>; open: Item[]; checked: Item[] }
 type AddResult = 'added' | 'existing' | 'reopened';
 
-/** Remembered per device: a list id, TODAY or THINGS. */
+/** Remembered per device: a list id, TODAY, THINGS or SHOWS. */
 const STORE_KEY = 'enso.list';
 const TODAY = 'today';
 const THINGS = 'things';
+const SHOWS = 'shows';
 /** The picker's "＋ New list…" option — never a list id (those start 'lst_'). */
 const NEW_LIST = 'new';
 
@@ -38,6 +40,7 @@ export function HouseholdLists() {
   const { me, version } = useApp();
   const [lists, setLists] = useState<ListSummary[] | null>(null);
   const [thingsOpen, setThingsOpen] = useState<number | null>(null);
+  const [showsWant, setShowsWant] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [choice, setChoice] = useState<string | null>(remembered);
   const [creating, setCreating] = useState(false);
@@ -47,14 +50,16 @@ export function HouseholdLists() {
     get<ListSummary[]>('/lists').then((l) => { setLists(l); setError(null); }).catch((e) => setError(errorText(e)));
     // The open count only; a failure leaves the option without a count (ThingsToDo shows the error when opened).
     get<{ open: unknown[] }>('/things').then((t) => setThingsOpen(t.open.length)).catch(() => setThingsOpen(null));
+    get<{ want: unknown[] }>('/shows').then((t) => setShowsWant(t.want.length)).catch(() => setShowsWant(null));
   }, []);
   useEffect(() => { loadLists(); }, [loadLists, version]);
   useEffect(() => { if (choice) try { localStorage.setItem(STORE_KEY, choice); } catch { /* storage may be blocked: the choice just isn't remembered */ } }, [choice]);
 
   // A remembered list that no longer exists falls back to Shopping, else the first list (§8.8).
-  const current = choice === TODAY || choice === THINGS || lists === null ? undefined
+  const special = choice === TODAY || choice === THINGS || choice === SHOWS;
+  const current = special || lists === null ? undefined
     : lists.find((l) => l.id === choice) ?? lists.find((l) => l.id === SHOPPING_LIST_ID) ?? lists[0];
-  const view = choice === TODAY || choice === THINGS ? choice : current?.id ?? '';
+  const view = special ? choice : current?.id ?? '';
 
   function pick(v: string) {
     if (v === NEW_LIST) setCreating(true); // the picker stays on the current view until a list is created
@@ -77,6 +82,7 @@ export function HouseholdLists() {
             {view === '' && <option value="" disabled>{lists === null ? 'Loading…' : 'No lists'}</option>}
             <option value={TODAY}>Today — chores</option>
             <option value={THINGS}>Things to do{thingsOpen === null ? '' : ` (${thingsOpen})`}</option>
+            <option value={SHOWS}>Movies &amp; shows{showsWant === null ? '' : ` (${showsWant})`}</option>
             {(lists ?? []).map((l) => <option key={l.id} value={l.id}>{l.name} ({l.openCount})</option>)}
             <option value={NEW_LIST}>＋ New list…</option>
           </select>
@@ -90,6 +96,7 @@ export function HouseholdLists() {
       {/* Keyed by list: switching lists starts a fresh panel (empty add box, no note, reloads). */}
       {view === TODAY ? <ChoresToday />
         : view === THINGS ? <ThingsToDo />
+        : view === SHOWS ? <Shows onChanged={loadLists} />
         : current ? <ListPanel key={current.id} list={current} onItemsChanged={loadLists} />
         : lists && <p className="muted">No lists yet. Choose ＋ New list… to make one.</p>}
 

@@ -79,6 +79,8 @@ export async function askClaude<S extends ZodType>(input: AskClaudeInput<S>): Pr
 export interface AskClaudeResearchInput {
   apiKey: string;
   prompt: string;
+  /** Blocks sent before the prompt, in order (e.g. a picture, §7F.2). */
+  content?: ClaudeBlock[];
   /** Server tools the caller chooses (e.g. web search and web fetch, with their max_uses). */
   tools: ClaudeServerTool[];
   /** How many requests in all, counting each `pause_turn` continuation; past it → an honest failure. */
@@ -94,7 +96,7 @@ export interface AskClaudeResearchInput {
 export async function askClaudeResearch(input: AskClaudeResearchInput): Promise<AskClaudeResult<string>> {
   const { default: Anthropic } = await loadSdk();
   const client = new Anthropic({ apiKey: input.apiKey, ...(input.fetch ? { fetch: input.fetch } : {}) });
-  const messages: BetaMessageParam[] = [{ role: 'user', content: [{ type: 'text', text: input.prompt }] }];
+  const messages: BetaMessageParam[] = [{ role: 'user', content: [...(input.content ?? []), { type: 'text', text: input.prompt }] }];
   try {
     for (let turn = 1; turn <= input.maxTurns; turn++) {
       const res = await client.beta.messages.create({
