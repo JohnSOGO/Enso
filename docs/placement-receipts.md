@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-05 — Fire rows out of the orchestrator (placement-advisor)
+
+- **Ask:** steward backlog item 2 (approved): move insertFire, updateFire, choreRunInserts, updateChoreRun, loadChoreRun and sourceOf out of `tick.ts`; move the machine every-speaker rule to shared; fold placeOf into the householdPlace rule (§5.6, §7B.3, §7D.3, §4.2o). Behavior-preserving.
+- **Verdict:** `src/worker/fire-rows.ts` [NEW row]; `src/shared/machines.ts` (machineAlert) and `src/worker/db.ts` (placeOf) [EXISTING].
+- **Flow stage:** persist (rows) and rules (the machine alert shape).
+- **Why:** three routes imported from the cron orchestrator, an inverted dependency on a hub at 86%. The every-speaker decision sat in orchestration (`9ae12ab`). The place null rule was written twice. Rejected: AlertConfig.allSpeakers (leaks speakers into the engine); changing machineAlertConfig's shape; dropping the reminder JOIN; moving the deliveries inserts here (item 3).
+- **Caps:** tick.ts 257 → 111, pinned at 111 + WORKING_BUFFER = 151; fire-rows.ts 147/300; machines.ts 232/300; db.ts 55/300.
+
+## 2026-10-05 — Fire and chore-run rows to fire-rows.ts (reorganizer)
+
+- **Trigger:** steward backlog item 2; placement-advisor verdict "Fire rows out of the orchestrator" (routes importing row writers from the 257/300 cron hub).
+- **Seam moved:** SourceRow, Source, insertFire, updateFire, loadChoreRun, choreRunInserts, updateChoreRun and sourceOf from `src/worker/tick.ts` to `src/worker/fire-rows.ts` [NEW row]; the machine branch's audience/config to `src/shared/machines.ts` machineAlert(quietUntil) [EXISTING]; tick's local placeOf to `src/worker/db.ts` placeOf, which householdPlace now uses [EXISTING]. routes/alerts.ts, chores.ts and machines.ts import from fire-rows.ts; no re-export from tick.
+- **Room opened:** tick.ts: 257 → 111 lines; cap 300 (global) → 151 (111 + WORKING_BUFFER).
+- **Behavior:** preserved — typecheck, npm test (70 files, 658 tests, unchanged) and arch:audit green; every SQL string moved byte-for-byte, tick's single settings SELECT and sourceOf's reminder JOIN kept, machineAlertConfig unchanged, machineAlert returns the same `{ assignedTo: [], allSpeakers: true, cfg }` spread, householdPlace still null when the settings row or either coordinate is missing.
+- **Restraint:** the two deliveries INSERTs and step 2's audience call stay in tick (item 3 owns the deliveries writers); no engine, house, speaker-choices or event-rows change; SPEC's §2 tree line for tick.ts left as is (outside the write boundary, still true).
+
 ## 2026-10-05 — Recipe read pipelines and budget out of the route (placement-advisor)
 
 - **Ask:** steward backlog item 1 (approved by MojoSOGO): move the from-video and page read pipelines, captionsFor and the recipe-read budget out of `routes/recipes.ts` (§7E.2, §7E.2c, §7E.6). Behavior-preserving.

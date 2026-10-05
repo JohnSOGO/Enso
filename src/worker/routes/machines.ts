@@ -10,7 +10,7 @@ import {
 import { activeMemberIds, all, first, nowIso } from '../db';
 import { body, fail } from '../http';
 import { requireMember, requireOwner } from '../session';
-import { insertFire, updateFire } from '../tick';
+import { insertFire, updateFire } from '../fire-rows';
 
 const loadRows = (db: D1Database) => all<MachineRow>(db, 'SELECT * FROM machines');
 

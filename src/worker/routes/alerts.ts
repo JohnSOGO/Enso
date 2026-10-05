@@ -8,7 +8,7 @@ import { isTime } from '../../shared/time';
 import { body, fail, intIn, str } from '../http';
 import { requireMember } from '../session';
 import { choreFireContext } from '../../shared/chores';
-import { insertFire, loadChoreRun, sourceOf, updateFire } from '../tick';
+import { insertFire, loadChoreRun, sourceOf, updateFire } from '../fire-rows';
 import { completeStep } from './chores';
 import { isOnFor } from '../../shared/optins';
 import { MACHINE_LABEL, isMachineId } from '../../shared/machines';
