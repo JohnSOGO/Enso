@@ -201,14 +201,14 @@ describe('M4l /machines (L3–L12)', () => {
     await tickAt(o, doneAt);
     expect(await openFire('washer')).toMatchObject({ state: 'ringing', alert_count: 1 });
     const first = await deliveriesOf(fire.id);
-    expect(first.filter((d) => d.channel === 'push').map((d) => d.member_id)).toEqual([A]);
+    expect(first.filter((d) => d.channel === 'push').map((d) => d.member_id).sort()).toEqual([A, B].sort());
     expect(first.filter((d) => d.channel === 'house')).toHaveLength(1);
     expect(first.every((d) => d.message === `${A_NAME}, your laundry in the washer is done`)).toBe(true);
 
     for (const n of [1, 2, 3]) await tickAt(o, addMinutes(doneAt, 15 * n));
     await tickAt(o, addMinutes(doneAt, 60)); // a 5th would be here
     const all = await deliveriesOf(fire.id);
-    expect(all).toHaveLength(8);
+    expect(all).toHaveLength(12);
     expect(Math.max(...all.map((d) => d.alert_number))).toBe(4);
     expect(all.find((d) => d.alert_number === 4 && d.channel === 'house').message).toBe(`${A_NAME}, your laundry in the washer is done (alert 4)`);
     expect(await view('washer')).toMatchObject({ state: 'done', ownerId: A });
@@ -295,7 +295,7 @@ describe('M4l /machines (L3–L12)', () => {
 
     for (const n of [0, 1, 2, 3, 4]) await tickAt(o, addMinutes(fresh.due_at, 15 * n));
     const sent = await deliveriesOf(fresh.id);
-    expect(sent).toHaveLength(8); // 4 alerts × (A's phone + the house)
+    expect(sent).toHaveLength(12); // 4 alerts × (A and B's phones + the house)
     expect(sent.find((d) => d.alert_number === 1 && d.channel === 'house').message)
       .toBe(`${A_NAME}, your laundry is still in the washer — move it to the dryer`);
     expect(sent.find((d) => d.alert_number === 4 && d.channel === 'push').message)
@@ -310,7 +310,7 @@ describe('M4l /machines (L3–L12)', () => {
     const fire = await openFire('washer');
     await tickAt(o, fire.due_at);
     const sent = await deliveriesOf(fire.id);
-    expect(sent.filter((d) => d.channel === 'push').map((d) => d.member_id)).toEqual([A]);
+    expect(sent.filter((d) => d.channel === 'push').map((d) => d.member_id).sort()).toEqual([A, B].sort());
     expect(sent.find((d) => d.channel === 'house').message).toBe(`${A_NAME}, your laundry in the washer is done`);
     expect((await o.post('/machines/washer/done', {})).json).toMatchObject({ error: 'busy' });
     // The dryer, running, finishes early: its old fire is replaced by one due now.

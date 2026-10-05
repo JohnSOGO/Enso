@@ -157,3 +157,26 @@ it("HS10: an announcement is spoken on every active member's speakers; none at a
   expect(both.status).toBe(201);
   expect(both.json.deliveries.map((d: any) => d.channel)).toEqual(['push']);
 });
+
+it('HS11 (§7D.3): a machine alert is spoken on every speaker HA lists but Everywhere, whatever anyone ticked; HA unreadable → the defaults', async () => {
+  await A.patch('/me', { houseSpeakers: [GAME] });
+  ha.answers.set(TEMPLATE_PATH, { status: 200, body: JSON.stringify([
+    { id: GAME, name: 'Game Room' }, { id: 'media_player.everywhere', name: 'Everywhere' }, { id: TOASTY, name: 'Toasty' }, { id: PE, name: 'Office' },
+  ]) });
+  const ring = async () => {
+    expect((await call(A, 'POST', '/machines/washer/done', { ownerId: aId })).status).toBe(200);
+    const now = new Date(Date.now() + 1000).toISOString();
+    expect((await call(A, 'POST', `/dev/tick?now=${encodeURIComponent(now)}`)).status).toBe(200);
+    const rows = await houseRows();
+    expect(rows).toHaveLength(1);
+    expect((await call(A, 'POST', '/machines/washer/clear')).status).toBe(200);
+    await env.DB.prepare('DELETE FROM deliveries').run();
+    return rows[0];
+  };
+  const row = await ring();
+  expect(JSON.parse(row.speakers)).toEqual([GAME, TOASTY, PE]);
+  expect(ha.heard.find((h) => h.path === ECHO_PATH)!.json.target).toEqual([GAME, TOASTY]);
+
+  ha.answers.set(TEMPLATE_PATH, { status: 500, body: 'down' });
+  expect((await ring()).speakers).toBeNull();
+});

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.48 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.49 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2487,8 +2487,12 @@ deferred.
   fire (§5.3) with `MACHINE_CHANNELS` = **Phone + House**, `MACHINE_RENOTIFY_MIN` = **15**,
   `MACHINE_MAX_ALERTS` = **4**. After the 4th alert it stays ringing silently in the Ringing
   bar and the card stays **DONE — waiting**. Never `missed`.
-- Recipients: the load's **owner** (push to their phones) and **one** House announcement. An
-  owner who has since been disabled counts as nobody: every active member is pushed.
+- Recipients (decided by MojoSOGO 2026-10-05: "always go to all devices"): **every active
+  member's phones**, and **one** House announcement on **every speaker** Home Assistant lists
+  (the §9.2a list, fetched at most once a tick), whatever anyone ticked in 🔊 Speak my alerts on.
+  The `Everywhere` group is left out so no Echo speaks twice ⚑ Q161 (`everySpeaker`). When House
+  is off or the list can't be read, the row is written with NULL: the default speakers. The
+  message still names the load's owner.
 - Message (`doneMessage`): `"Sam, your laundry in the washer is done"` / `"… in the dryer is
   done"`; with no active owner `"The laundry in the washer is done"`. While the machine
   before it (the washer) holds a **done** load, every later dryer alert adds
@@ -2510,7 +2514,7 @@ deferred.
 | L1 | `machineState` before / at / after `done_at`, and with no owner | running / done / done / free |
 | L2 | `doneMessage` with an owner, with none, with a waiting load, waiting with an inactive owner | the four §7D.3 texts |
 | L3 | start the washer for A, 45 min | 200; washer `running`, `done_at = now + 45 min`; one `scheduled` machine fire due then |
-| L4 | tick at done-at | fire ringing; push delivery to A only + one house delivery, message `A, your laundry in the washer is done` |
+| L4 | tick at done-at | fire ringing; push to every active member (A and B) + one house delivery, message `A, your laundry in the washer is done` |
 | L5 | ticks every 15 min after | alerts 2, 3, 4 (`… (alert 4)`); a 5th tick sends nothing; washer state `done` |
 | L6 | move to the dryer, 60 min | washer free, its fire closed `done` by me; dryer running for A with a new fire |
 | L7 | start the washer for B, then move it while the dryer is still full | 409 `busy` "The dryer still has A's load."; the washer stays done; nothing moved |
@@ -2523,6 +2527,7 @@ deferred.
 | L15 | Still loaded on a washer done 70 min ago, then ticks every 15 min | the old fire closed `superseded`; the new fire alerts 4 times (A's phone + house), message `A, your laundry is still in the washer — move it to the dryer` |
 | L16 | `doneNowMachine` on a free washer for A / a running dryer / a done one; `parseDoneNow` | A's load done now, a fire due now / done-at now, old fire `superseded` / `busy`; owner required only when free |
 | L17 | Done now on a free washer for A, then tick | washer done for A; alert 1 to A's phone + house, `A, your laundry in the washer is done`; again → `busy`; a running dryer's Done now closes its fire `superseded` |
+| L18 (HS11) | a machine alert while A ticked only Game Room; HA lists Game Room, Everywhere, Toasty, the Voice PE; then HA down | the house row's speakers are Game Room, Toasty, the Voice PE; then NULL (the defaults) |
 | L13 | migration check (§4.2m) | fires and deliveries intact after 0014; machines seeded; CHECK refuses a machine fire without `machine_id` |
 
 ---
@@ -3906,6 +3911,8 @@ for someone who is never in that room.
   named `This Device`, or whose name contains `Alexa App`, is dropped (case-insensitive) ⚑ Q130. Fire TVs, the
   Echo Show and the `Everywhere` group stay.
 
+**Machine alerts are the exception** (§7D.3): they are spoken on every listed speaker, not on anyone's choice.
+
 **Who a house delivery is for** is the audience tick already computes (`audience(…).push`, §7.5: active
 members, narrowed to the assigned ones, and for an optional event to those who have it on). An
 **announcement** is for every active member ⚑ Q127 (it has no assignment). The writer reads those members'
@@ -4670,6 +4677,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q158 | When the Lists popup opens | ⚑ On every tap of the bottom tab's 🛒 Lists (and the list button), not when the app opens on Lists; closing it stays on the remembered list |
 | Q159 | A done load nobody has moved (§7D.2, §8.5) | ⚑ A done washer or dryer offers **Still loaded**: the reminders start over now (alert 1, then every 15 min, 4 in all, Phone + House), saying "… is still in the washer — move it to the dryer" / "… still in the dryer — take it out". Move, Fold & out or Clear stops them as before |
 | Q160 | A load nobody started in the app, or one that finished early (§7D.2, §8.5) | ⚑ A free or running machine offers **Done now**: free asks whose load; the machine shows DONE — waiting and the done alerts ring at once, then Still loaded works as usual |
+| Q161 | Machine alerts on "all devices" (§7D.3) | Everyone's phones and every speaker HA lists (decided by MojoSOGO 2026-10-05); ⚑ the `Everywhere` group is left out so each Echo speaks once; HA unreadable → the default speakers |
 | Q142 | Where "Fill in from this link" sits | ⚑ A full-width button right under the Link field, only when the field holds a usable link; reading starts on the tap, never on paste |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
@@ -4883,6 +4891,9 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Machine alerts to all devices** (v1.26.0, §7D.3; asked by MojoSOGO 2026-10-05; L4, HS11): washer and dryer
+alerts push every active member and are spoken on every speaker HA lists (Everywhere left out), whatever anyone
+ticked. Q161's Everywhere rule is a ⚑ default.
 **Done now** (v1.25.0, §7D.2, §8.5; asked by MojoSOGO 2026-10-05; L16–L17): the app tolerates loads nobody recorded.
 A free machine's **Done now** asks whose load and marks it done now; a running one's finishes early. The done alerts
 ring at once. No migration. Q160 is a ⚑ default awaiting MojoSOGO.

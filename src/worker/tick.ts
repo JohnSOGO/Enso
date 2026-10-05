@@ -14,7 +14,7 @@ import { sunsetUtc, type Place } from '../shared/sun';
 import type { Env } from './env';
 import { all, first, newId, parseJson } from './db';
 import { sendPushDeliveries } from './push';
-import { sendHouseDeliveries } from './house';
+import { allHouseSpeakers, sendHouseDeliveries } from './house';
 import { deliverySpeakers } from './speaker-choices';
 import { onMemberIds } from './event-rows';
 
@@ -92,6 +92,8 @@ interface Source {
   optional?: boolean; onIds?: string[];
   /** §7.7: a sun reminder's local sunset HH:MM, or null when it cannot be computed. */
   sunsetAt?: string | null;
+  /** §7D.3: spoken on every speaker HA lists, whatever anyone ticked. */
+  allSpeakers?: boolean;
 }
 
 /** Loads the alert config + title for a fire from its event, timer, chore run, thing or machine (as of `now`). */
@@ -100,7 +102,7 @@ export async function sourceOf(
   now: string,
 ): Promise<Source | null> {
   if (fire.kind === 'machine') {
-    // §7D.3: the load's owner (if still active, else everyone), Phone + House; a done load waiting
+    // §7D.3: every active member's phones and the default speakers, naming the load's owner; a done load waiting
     // in the machine before this one is named at alert time; a fire restarted by Still loaded says what's next.
     if (!isMachineId(fire.machine_id)) return null;
     const rows = await all<MachineRow>(db, 'SELECT * FROM machines');
@@ -112,7 +114,7 @@ export async function sourceOf(
     const waiting = waitingLoad(rows, m.id, now);
     return {
       title: doneMessage(m.id, owner, waiting ? await nameOf(waiting.owner_id) : undefined, isStillLoaded(m, fire.due_at)),
-      assignedTo: owner !== null ? [m.owner_id!] : [], cfg: machineAlertConfig(),
+      assignedTo: [], allSpeakers: true, cfg: machineAlertConfig(),
     };
   }
   if (fire.kind === 'thing') {
@@ -201,6 +203,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
   // 2. Step every open fire.
   const open = await all<FireRow>(db, `SELECT * FROM fires WHERE state != 'closed' ORDER BY due_at`);
   const newDeliveryIds: string[] = [];
+  let everySpeakerNow: Promise<string[] | null> | undefined; // asked of HA at most once a tick (§7D.3)
   for (const fire of open) {
     const src = await sourceOf(db, fire, now);
     if (!src) continue;
@@ -226,8 +229,9 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
              VALUES (?, ?, ?, 'push', ?, ?, 'queued', ?, ?)`).bind(id, ...base, memberId, message, now, now));
         }
       }
-      // §9.2a: on the speakers of everyone it is for — none ticked by any of them → not spoken.
-      const speakers = src.cfg.channels.includes('house') && aud.house ? await deliverySpeakers(db, aud.push) : [];
+      // §9.2a: on the speakers of everyone it is for — none ticked by any of them → not spoken (§7D.3: a machine, every speaker).
+      const speakers = !(src.cfg.channels.includes('house') && aud.house) ? []
+        : src.allSpeakers ? (everySpeakerNow ??= allHouseSpeakers(env), await everySpeakerNow) : await deliverySpeakers(db, aud.push);
       if (speakers === null || speakers.length) {
         stmts.push(db.prepare(
           `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, status, speakers, created_at, updated_at)
