@@ -151,4 +151,20 @@ describe('§7E.6 from-link through the Worker', () => {
     expect(content.map((b: any) => b.text ?? '').join('\n')).toContain(RECIPE_IN_ENGLISH); // RL10
     expect(await reads()).toBe(2);
   });
+  it('RL11 a typed recipe takes screenshots too (⚑ Q173): re-read with only Claude asked; the typed title kept for Claude', async () => {
+    const typed = await o.post('/recipes', { title: "Grandma's flan" });
+    expect(typed.status).toBe(201);
+    const heard = fakes({ claude: [fill(READING)] });
+    const res = await worker.fetch(new Request(`${BASE}/recipes/${typed.json.id}/transcript`, {
+      method: 'POST', headers: { 'content-type': 'application/json', cookie: o.cookie! },
+      body: JSON.stringify({ screenshots: [{ type: 'image/jpeg', data: btoa('fake cookbook page') }] }),
+    }), { ...keyedEnv(), YOUTUBE_API_KEY: '' }, createExecutionContext());
+    const json = await res.json<any>();
+    expect(res.status, JSON.stringify(json)).toBe(200);
+    expect(json).toMatchObject({ found: true, ingredients: READING.ingredients, source: ['transcript'], link: null, videoId: null });
+    expect(heard.map((h) => h.host)).toEqual(['api.anthropic.com']);
+    const text = heard[0].body.messages[0].content.map((b: any) => b.text ?? '').join('\n');
+    expect(text).toContain("Title: Grandma's flan");
+    expect(text).toContain('Site: (none)');
+  });
 });

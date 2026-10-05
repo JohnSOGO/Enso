@@ -197,7 +197,6 @@ recipes.post('/recipes/:id/transcript', requireMember, async (c) => {
   // captions attempt) → count → Claude → clean → found, else nothing changes → save.
   const r = await loadRecipe(c);
   if (r instanceof Response) return r;
-  if (!r.video_id && !r.link) return fail(c, 400, 'invalid_input', 'Only a recipe read from a video or a link takes a transcript.');
   const { text, screenshots: shots } = await body(c);
   const screenshots = parseScreenshots(shots);
   if (typeof screenshots === 'string') return fail(c, 400, 'invalid_input', screenshots);

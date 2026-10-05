@@ -23,8 +23,9 @@ export interface ReadRecipeInput {
   comments: string | null;
   /** Screenshots of the video's transcript (§7E.2b), already checked by parseScreenshots; sent as image blocks. */
   screenshots?: readonly Screenshot[];
-  /** A link recipe's site (§7E.6, §7E.2b ⚑ Q169): the prompts then speak of a post, not a YouTube video. */
-  site?: string;
+  /** Given for a recipe that is not a video's (§7E.2b ⚑ Q169 ⚑ Q173): a link's site, or null for a typed one. The
+   *  prompts then speak of a post or page given by hand, not a YouTube video. */
+  site?: string | null;
 }
 
 export type ReadRecipeResult =
@@ -34,9 +35,9 @@ export type ReadRecipeResult =
 const VIDEO_INTRO =
   `Above is the text of one YouTube video: its title, channel, description and, when available, its captions and ` +
   `the comments its creator posted under it (creators often put the recipe in a pinned comment). `;
-const postIntro = (site: string) =>
-  `Above is what someone gave from one ${site} post or page they saved as a recipe: its title, and screenshots or ` +
-  `text of the post's caption, its transcript or the recipe. `;
+const postIntro = (site: string | null) =>
+  `Above is what someone gave for a recipe they saved${site ? ` from ${site}` : ''}: its title, and screenshots or ` +
+  `text of the recipe (a post's caption, a transcript, a cookbook or web page). `;
 const PROMPT =
   `Read the recipe that this text gives, if it gives one. Fill in: found (true only when the description, the ` +
   `captions or the creator's comments actually state a recipe's ingredients or steps), title (the dish's name), ` +
@@ -50,14 +51,15 @@ const SCREENSHOTS_LINE =
   `The images above are screenshots of this video's transcript or captions: read their text as what is spoken ` +
   `in the video, like the captions, and ignore timestamps and the app around them.`;
 const POST_SCREENSHOTS_LINE =
-  `The images above are screenshots of the post: read their text (its caption, a transcript or the recipe shown) ` +
+  `The images above are screenshots of the recipe: read their text (a post's caption, a transcript or the recipe shown) ` +
   `and ignore the app around it.`;
 
 /** One structured-output request through askClaude. `fetch` is for tests only. */
 export async function readRecipe(input: ReadRecipeInput, opts: { fetch?: typeof fetch } = {}): Promise<ReadRecipeResult> {
+  const byHand = input.site !== undefined;
   const text = [
-    `${input.site ? 'Title' : 'Video title'}: ${input.title ?? '(none)'}`,
-    `${input.site ? 'Site' : 'Channel'}: ${input.site ?? input.channel ?? '(unknown)'}`,
+    `${byHand ? 'Title' : 'Video title'}: ${input.title ?? '(none)'}`,
+    byHand ? `Site: ${input.site ?? '(none)'}` : `Channel: ${input.channel ?? '(unknown)'}`,
     `Description:\n${input.description?.trim() || '(empty)'}`,
     `Captions:\n${input.transcript?.trim().slice(0, TRANSCRIPT_MAX) || '(none)'}`,
     `Creator's comments:\n${input.comments?.trim() || '(none)'}`,
@@ -69,8 +71,8 @@ export async function readRecipe(input: ReadRecipeInput, opts: { fetch?: typeof 
       ...(input.screenshots ?? []).map((s) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: s.type, data: s.data } })),
       { type: 'text', text },
     ],
-    prompt: [input.screenshots?.length ? (input.site ? POST_SCREENSHOTS_LINE : SCREENSHOTS_LINE) : '',
-      input.site ? postIntro(input.site) : VIDEO_INTRO, PROMPT].filter(Boolean).join(' ').replace(/ {2,}/g, ' '),
+    prompt: [input.screenshots?.length ? (byHand ? POST_SCREENSHOTS_LINE : SCREENSHOTS_LINE) : '',
+      byHand ? postIntro(input.site ?? null) : VIDEO_INTRO, PROMPT].filter(Boolean).join(' ').replace(/ {2,}/g, ' '),
     schema: recipeReadingSchema,
   });
   return res.ok ? { ok: true, raw: res.value } : res;

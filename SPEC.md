@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.54 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.55 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2816,8 +2816,8 @@ no migration ⚑ Q93 (§12).
 
 1. signed in (401);
 2. a live recipe with that id → else 404 `not_found`;
-3. the recipe has a `video_id` or a `link` (§7E.6) → else 400 `invalid_input` "Only a recipe read
-   from a video or a link takes a transcript.";
+3. *(since v1.30.0, ⚑ Q173: any recipe takes one — a video's, a link's or a typed one; there is no
+   400 here any more)*;
 4. `parseScreenshots(screenshots)` accepts them (too many, HEIC or another type, damaged, too large →
    400); `text`, when given, is a string of at most **`PASTED_MAX` = 100 000** characters ⚑ Q89 (else
    400); and there is **at least one screenshot or a `cleanTranscript(text)` that is not null** → else
@@ -2827,8 +2827,8 @@ no migration ⚑ Q93 (§12).
    429 `rate_limited`;
 6. `YOUTUBE_API_KEY` (a video recipe only) **and** `ANTHROPIC_API_KEY` present → else 503
    `recipe_reading_off`, before any fetch;
-7. **a link recipe** (§7E.6) skips this step: nothing is fetched ⚑ Q169, and Claude is given the recipe's
-   title, its site and what was given. **A video recipe:** the YouTube lookup and the creator's comments, side by side — **re-fetched**, since neither the
+7. **a link or typed recipe** (§7E.6) skips this step: nothing is fetched ⚑ Q169 ⚑ Q173, and Claude is
+   given the recipe's title, its site (a link's; "(none)" when typed) and what was given. **A video recipe:** the YouTube lookup and the creator's comments, side by side — **re-fetched**, since neither the
    description nor the comments are stored ⚑ Q84 (2 quota units). A failed lookup → 404
    `video_unavailable` / 502 `youtube_failed` and **nothing changes**; a comments failure is never
    fatal (as §7E.2 step 8). **No captions attempt** — that is what failed;
@@ -3094,6 +3094,7 @@ for it (as §7C.4b).
 | RL7 | Claude finds no recipe; a refusal; a failure | saved `found: false` with the page's title; 422; 502 |
 | RL8 | from-video with a page link | the same as from-link |
 | RL10 | the video reading, the transcript re-read and a link's fill | each prompt carries `RECIPE_IN_ENGLISH` |
+| RL11 | a transcript (a screenshot) on a typed recipe | 200; only Claude asked, with the typed title and "Site: (none)"; source `transcript`; YouTube's key not needed |
 | RL9 | a transcript (text or a screenshot) on a link recipe | 200; re-read with nothing fetched but Claude; source `transcript`; YouTube's key not needed |
 | RL-M | migration check (§4.2zc) | as written there |
 
@@ -3723,7 +3724,12 @@ Pumpkin patch        📅 Sat Oct 12
   - **Steps**, numbered; then **✎ Edit** and **Close**.
 - **Recipe form** (modal, `RecipeForm.tsx`): Title · Ingredients (one per line) · Steps (one per
   line) · Servings · Time. Title, ingredients and steps grow to fit (`Grow`). Save / Cancel /
-  Delete (asks; existing recipes only). The video, its title and the source are not editable.
+  Delete (asks; existing recipes only). On an **existing** recipe of any kind, under the fields, **Fill in
+  from screenshots** (asked by MojoSOGO 2026-10-05: "In recipes edit, let me add a screen shot" ⚑ Q173):
+  the same `RecipeTranscript` as the view (📷 Add screenshots, "or paste the text", Read it → `POST
+  /recipes/{id}/transcript`); a typed recipe's hint reads "Screenshot or photograph the recipe, then add it
+  here." The re-read recipe is handed back as saved (the view opens with it); unsaved typing in the form
+  is replaced. A new recipe is saved first, then edited, to take screenshots. The video, its title and the source are not editable.
 
 ### 8.9 Invites (owner) and the join page
 
@@ -4988,6 +4994,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q170 | Where a link's recipe may come from (§7E.6) | ⚑ The page, the post's or reel's caption, or the creator's own recipe for that dish where the post points to it; never another creator's |
 | Q171 | A recipe in another language (§7E.2) | ⚑ Always saved in English, translated faithfully; the original is not kept (the link or video still is) |
 | Q172 | Metric amounts (§7E.2) | ⚑ Converted to US units by Claude when read, rounded to kitchen measures (180 °C → 350 °F); the metric original is not kept; typed recipes are never converted |
+| Q173 | Screenshots in the recipe form (§8.12, §7E.2b) | ⚑ On every existing recipe, typed ones included; Claude reads them with the title (nothing fetched); a brand-new recipe takes them after its first Save |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5200,6 +5207,9 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Screenshots in the recipe form** (v1.30.0, §8.12, §7E.2b; asked by MojoSOGO 2026-10-05; RL11): ✎ Edit on any
+recipe, typed ones included, offers Fill in from screenshots; a typed recipe's screenshots are read by Claude alone.
+Q173 is a ⚑ default.
 **US units** (v1.29.2, §7E.2; asked by MojoSOGO 2026-10-05; RL10): readings convert metric to °F, ounces / pounds,
 cups / spoons and inches. Q172 is a ⚑ default.
 **Recipes in English** (v1.29.1, §7E.2; asked by MojoSOGO 2026-10-05; RL10): every recipe reading — video,
