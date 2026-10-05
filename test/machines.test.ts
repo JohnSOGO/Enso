@@ -5,8 +5,8 @@ import { env } from 'cloudflare:test';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Client, member, owner, tickAt } from './helpers';
 import {
-  MACHINE_MAX_ALERTS, MACHINE_MINUTES, MACHINE_RENOTIFY_MIN, clearMachine, doneMessage, finishMachine, machineAlertConfig, machineState,
-  isStillLoaded, moveMachine, parseMove, parseStart, refusalText, remindMachine, startMachine, waitingLoad, type MachineRow,
+  MACHINE_MAX_ALERTS, MACHINE_MINUTES, MACHINE_RENOTIFY_MIN, clearMachine, doneMessage, doneNowMachine, finishMachine, machineAlertConfig, machineState,
+  isStillLoaded, moveMachine, parseDoneNow, parseMove, parseStart, refusalText, remindMachine, startMachine, waitingLoad, type MachineRow,
 } from '../src/shared/machines';
 import { alertMessage, applyAction, newMachineFire, pushActions, stepFire, type FireRow } from '../src/shared/engine';
 import { machineWrites } from '../src/worker/routes/machines';
@@ -95,6 +95,25 @@ describe('L1–L2 the pure rules (machines.ts)', () => {
     expect(doneMessage('dryer', 'Sam', undefined, true)).toBe('Sam, your laundry is still in the dryer — take it out');
     expect(doneMessage('washer', null, undefined, true)).toBe('The laundry is still in the washer — move it to the dryer');
     expect(doneMessage('dryer', 'Sam', 'Kai', true)).toBe("Sam, your laundry is still in the dryer — take it out — Kai's load is waiting");
+  });
+
+  it('L16 Done now: a free machine gets the load, done now; a running one finishes early; a done one is refused', () => {
+    const now = addMinutes(T, -20);
+    const f = doneNowMachine(row('washer'), 'A', null, 'B', now);
+    if ('error' in f) throw new Error(f.error);
+    expect(f.rows[0]).toMatchObject({ owner_id: 'A', minutes: null, started_at: now, done_at: now, started_by: 'B', updated_at: now });
+    expect(machineState(f.rows[0], now)).toBe('done');
+    expect(f.closeFire).toBeUndefined();
+    expect(f.newFire).toMatchObject({ machine_id: 'washer', due_at: now, state: 'scheduled' });
+    const r = doneNowMachine(running('dryer', 'K', T), null, fireOf('dryer', T), 'B', now);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.rows[0]).toMatchObject({ owner_id: 'K', minutes: 45, done_at: now, updated_at: now });
+    expect(r.closeFire).toMatchObject({ close_reason: 'superseded', closed_by: 'B' });
+    expect(r.newFire).toMatchObject({ machine_id: 'dryer', due_at: now });
+    expect(doneNowMachine(running('dryer', 'K', T), null, null, 'B', T)).toMatchObject({ error: 'busy' });
+    expect(parseDoneNow({}, ['A'], true)).toBe('Whose load must be an active member.');
+    expect(parseDoneNow({ ownerId: 'A' }, ['A'], true)).toEqual({ ownerId: 'A' });
+    expect(parseDoneNow({}, ['A'], false)).toEqual({ ownerId: null });
   });
 
   it('refusal texts and input rules', () => {
@@ -281,6 +300,25 @@ describe('M4l /machines (L3–L12)', () => {
       .toBe(`${A_NAME}, your laundry is still in the washer — move it to the dryer`);
     expect(sent.find((d) => d.alert_number === 4 && d.channel === 'push').message)
       .toBe(`${A_NAME}, your laundry is still in the washer — move it to the dryer (alert 4)`);
+  });
+
+  it('L17 Done now on a washer the app thought was free: done now for A, its alert rings at once', async () => {
+    expect((await o.post('/machines/washer/done', {})).status).toBe(400);
+    const r = await bClient.post('/machines/washer/done', { ownerId: A });
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    expect(r.json.find((m: any) => m.id === 'washer')).toMatchObject({ state: 'done', ownerId: A, minutes: null, startedBy: B });
+    const fire = await openFire('washer');
+    await tickAt(o, fire.due_at);
+    const sent = await deliveriesOf(fire.id);
+    expect(sent.filter((d) => d.channel === 'push').map((d) => d.member_id)).toEqual([A]);
+    expect(sent.find((d) => d.channel === 'house').message).toBe(`${A_NAME}, your laundry in the washer is done`);
+    expect((await o.post('/machines/washer/done', {})).json).toMatchObject({ error: 'busy' });
+    // The dryer, running, finishes early: its old fire is replaced by one due now.
+    await o.post('/machines/dryer/start', { ownerId: B, minutes: 60 });
+    const old = await openFire('dryer');
+    const early = await o.post('/machines/dryer/done');
+    expect(early.json.find((m: any) => m.id === 'dryer')).toMatchObject({ state: 'done', ownerId: B, minutes: 60 });
+    expect((await firesOf('dryer')).find((f) => f.id === old.id)).toMatchObject({ state: 'closed', close_reason: 'superseded' });
   });
 
   it('L11 two Start taps at once: one wins, the other is a 409, one open fire', async () => {

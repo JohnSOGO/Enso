@@ -1,10 +1,10 @@
-// SPEC §7D, §10 — the laundry loop: /machines and its five transitions, one batch each.
+// SPEC §7D, §10 — the laundry loop: /machines and its six transitions, one batch each.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { MACHINE } from '../../shared/vocab';
 import type { FireRow } from '../../shared/engine';
 import {
-  MACHINE_LABEL, clearMachine, finishMachine, isMachineId, machineState, moveMachine, nextMachine, parseMove, parseStart,
+  MACHINE_LABEL, clearMachine, doneNowMachine, finishMachine, isMachineId, machineState, moveMachine, nextMachine, parseDoneNow, parseMove, parseStart,
   refusalText, remindMachine, startMachine, type MachineChange, type MachineResult, type MachineRow,
 } from '../../shared/machines';
 import { all, nowIso } from '../db';
@@ -116,4 +116,13 @@ machines.post('/machines/:id/remind', requireMember, async (c) => {
   if (m instanceof Response) return m;
   const now = nowIso();
   return save(c, m.rows, remindMachine(m.row, m.openFire, c.get('member').id, now), now);
+});
+
+machines.post('/machines/:id/done', requireMember, async (c) => {
+  const m = await load(c);
+  if (m instanceof Response) return m;
+  const now = nowIso();
+  const input = parseDoneNow(await body(c), await activeMemberIds(c.env.DB), machineState(m.row, now) === 'free');
+  if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
+  return save(c, m.rows, doneNowMachine(m.row, input.ownerId, m.openFire, c.get('member').id, now), now);
 });

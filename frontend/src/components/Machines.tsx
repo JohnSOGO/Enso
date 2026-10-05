@@ -22,11 +22,12 @@ const lower = (id: MachineId) => MACHINE_LABEL[id].toLowerCase();
 const bigChip = { minHeight: 44, fontSize: '1rem', padding: '0 14px', cursor: 'pointer' } as const;
 
 /**
- * Start a machine (whose load, then a minute chip) or move its done load on (a minute chip only).
- * Tapping a minute chip does it at once: two taps from the card. A refusal shows inside.
+ * Start a machine (whose load, then a minute chip), move its done load on (a minute chip only), or
+ * mark a free machine's unrecorded load done (whose load, then It's done). Tapping a minute chip
+ * does it at once: two taps from the card. A refusal shows inside.
  */
 export function MachineChooser({ from, mode, ownerId, onClose }: {
-  from: MachineId; mode: 'start' | 'move'; ownerId?: string | null; onClose: () => void;
+  from: MachineId; mode: 'start' | 'move' | 'done'; ownerId?: string | null; onClose: () => void;
 }) {
   const { me, members, memberById, refresh } = useApp();
   const [owner, setOwner] = useState(me.id);
@@ -34,13 +35,13 @@ export function MachineChooser({ from, mode, ownerId, onClose }: {
   const [error, setError] = useState<string | null>(null);
   const to = mode === 'move' ? nextMachine(from) : null;
   const ownerName = ownerId ? memberById(ownerId)?.displayName ?? 'unknown member' : null;
-  const title = mode === 'start' ? `Start the ${lower(from)}`
+  const title = mode === 'start' ? `Start the ${lower(from)}` : mode === 'done' ? `The ${lower(from)} is done`
     : `Move ${ownerName ? `${ownerName}'s load` : 'the load'} to the ${to ? lower(to) : 'next machine'}`;
 
-  async function go(minutes: number) {
+  async function go(minutes?: number) {
     setBusy(true); setError(null);
     try {
-      await post(`/machines/${from}/${mode}`, mode === 'start' ? { ownerId: owner, minutes } : { minutes });
+      await post(`/machines/${from}/${mode}`, mode === 'move' ? { minutes } : { ownerId: owner, minutes });
       refresh(); onClose();
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
@@ -48,7 +49,7 @@ export function MachineChooser({ from, mode, ownerId, onClose }: {
   return (
     <Modal title={title} onClose={onClose} error={error} footer={<button onClick={onClose} disabled={busy}>Cancel</button>}>
       <fieldset disabled={busy}>
-        {mode === 'start' && (
+        {mode !== 'move' && (
           <div className="field" role="group" aria-label="Whose load?">
             <span className="muted" style={{ fontSize: '.8rem' }}>Whose load?</span>
             <div className="row wrap" style={{ marginTop: 4 }}>
@@ -61,14 +62,15 @@ export function MachineChooser({ from, mode, ownerId, onClose }: {
             </div>
           </div>
         )}
-        <div className="field" role="group" aria-label="How long?">
+        {mode === 'done' && <button className="primary" style={bigChip} onClick={() => go()}>It's done</button>}
+        {mode !== 'done' && <div className="field" role="group" aria-label="How long?">
           <span className="muted" style={{ fontSize: '.8rem' }}>How long{mode === 'move' && to ? ` in the ${lower(to)}` : ''}?</span>
           <div className="row wrap" style={{ marginTop: 4 }}>
             {MACHINE_MINUTES.map((n) => (
               <button key={n} className="chip" style={bigChip} onClick={() => go(n)}>{n} min</button>
             ))}
           </div>
-        </div>
+        </div>}
       </fieldset>
     </Modal>
   );
@@ -79,13 +81,13 @@ export function MachinesSection() {
   const { version, localTime, memberById, refresh } = useApp();
   const [machines, setMachines] = useState<Machine[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [chooser, setChooser] = useState<{ from: MachineId; mode: 'start' | 'move'; ownerId: string | null } | null>(null);
+  const [chooser, setChooser] = useState<{ from: MachineId; mode: 'start' | 'move' | 'done'; ownerId: string | null } | null>(null);
 
   useEffect(() => {
     get<Machine[]>('/machines').then((m) => { setMachines(m); setError(null); }).catch((e) => setError(errorText(e)));
   }, [version]);
 
-  async function act(m: Machine, what: 'finish' | 'clear' | 'remind') {
+  async function act(m: Machine, what: 'finish' | 'clear' | 'remind' | 'done') {
     if (what === 'clear' && !confirm(`Clear the ${lower(m.id)}? Nothing will ring.`)) return;
     setError(null);
     try { await post(`/machines/${m.id}/${what}`); refresh(); } catch (e) { setError(errorText(e)); refresh(); }
@@ -117,6 +119,11 @@ export function MachinesSection() {
                   <button className="primary" onClick={() => setChooser({ from: m.id, mode: 'start', ownerId: null })}
                     aria-label={`Start the ${lower(m.id)}`}>Start</button>
                 )}
+                {m.state === 'free' && (
+                  <button onClick={() => setChooser({ from: m.id, mode: 'done', ownerId: null })}
+                    aria-label={`Done now: the ${lower(m.id)} already finished a load`}>Done now</button>
+                )}
+                {m.state === 'running' && <button onClick={() => act(m, 'done')} aria-label={`Done now: the ${lower(m.id)} finished early`}>Done now</button>}
                 {m.state === 'done' && m.next && (
                   <button className="primary" onClick={() => setChooser({ from: m.id, mode: 'move', ownerId: m.ownerId })}>
                     Move to {lower(m.next)}

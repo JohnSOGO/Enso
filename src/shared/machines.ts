@@ -83,6 +83,24 @@ export function finishMachine(row: MachineRow, openFire: FireRow | null, by: str
   return { rows: [freed(row, now)], closeFire: openFire ? closeFire(openFire, 'done', by, now) : undefined };
 }
 
+/**
+ * Done now: the household's real state when the app missed it — a free machine whose load was
+ * never started here (`ownerId` names it), or a running one that finished early. Done at `now`;
+ * any open fire closes `superseded` and a new one rings now (§7D.2).
+ */
+export function doneNowMachine(row: MachineRow, ownerId: string | null, openFire: FireRow | null, by: string, now: string): MachineResult {
+  const state = machineState(row, now);
+  if (state === 'done') return { error: 'busy', machine: row };
+  const next: MachineRow = state === 'free'
+    ? { ...loaded(row, ownerId!, 0, by, now), minutes: null }
+    : { ...row, done_at: now, updated_at: now };
+  return {
+    rows: [next],
+    closeFire: openFire ? closeFire(openFire, 'superseded', by, now) : undefined,
+    newFire: newMachineFire(row.id, now),
+  };
+}
+
 /** Clear a running or done machine: nothing rings for it any more. */
 export function clearMachine(row: MachineRow, openFire: FireRow | null, by: string, now: string): MachineResult {
   if (machineState(row, now) === 'free') return { error: 'already_free', machine: row };
@@ -154,6 +172,12 @@ export function parseStart(b: Record<string, unknown>, activeIds: readonly strin
   if (typeof b.ownerId !== 'string' || !activeIds.includes(b.ownerId)) return 'Whose load must be an active member.';
   if (!isMinutes(b.minutes)) return MINUTES_TEXT;
   return { ownerId: b.ownerId, minutes: b.minutes };
+}
+
+/** Done now's body: whose load, needed only when the machine is free. */
+export function parseDoneNow(b: Record<string, unknown>, activeIds: readonly string[], free: boolean): { ownerId: string | null } | string {
+  if (!free) return { ownerId: null };
+  return typeof b.ownerId === 'string' && activeIds.includes(b.ownerId) ? { ownerId: b.ownerId } : 'Whose load must be an active member.';
 }
 
 /** Move's body: the next machine's minute chip. */
