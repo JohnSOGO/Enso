@@ -8,8 +8,9 @@
 
 /* A small hotlinked thumbnail, 16:9; a typed recipe keeps the same slot empty so titles line up. */
 .thumb { flex: none; width: 64px; height: 36px; border-radius: 6px; object-fit: cover; background: var(--surface); }
-/* A recipe's own picture (⚑ Q176): shown whole, never cropped — scaled down inside a square slot of the same width. */
-.whole { height: 64px; object-fit: contain; }
+/* A recipe's own picture (⚑ Q176): shown whole, never cropped — scaled down inside the same 64×36 slot, so every
+   row keeps the same height. */
+.whole { object-fit: contain; }
 .text { flex: 1 1 auto; min-width: 0; }
 
 /* The view */
