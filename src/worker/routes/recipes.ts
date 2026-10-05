@@ -1,34 +1,25 @@
-// SPEC §7E, §10 — recipes: CRUD, reading one from any link (§7E.6: its kind detected; a page through recipe-link-reader.ts)
-// or a YouTube video, and re-reading one from its transcript, pasted or
-// screenshotted (§7E.2b; screenshots are read, never stored). Every rule (limits, the link → id,
-// whose comments are the creator's, when to ask Claude, cleaning the answer, found, the clash) is src/shared/recipes.ts or,
-// for reading a video, src/shared/recipe-reading.ts; the fetching is
-// youtube.ts, youtube-captions.ts and recipe-reader.ts; the re-read itself (re-fetch, count, Claude, clean,
-// UPDATE) is recipe-reread.ts. This route keeps the §7E.2 / §7E.2b check orders, counts reads, and persists. Any member may do anything; delete is soft (⚑ Q66). Each person sets only their own
-// emoji (§7E.5), and every recipe answered carries everyone's through toRecipes. From-video is the one place
-// SogoAI is asked for captions, in-line (§7E.2c: wantsHomeCaptions decides, home-captions.ts asks).
+// SPEC §7E, §10 — recipes: CRUD, reading one from any link (§7E.6: its kind detected) or a YouTube video, and
+// re-reading one from its transcript, pasted or screenshotted (§7E.2b; screenshots are read, never stored). Every rule
+// (limits, the link → id, whose comments are the creator's, when to ask Claude, cleaning the answer, found, the clash)
+// is src/shared/recipes.ts or, for reading, src/shared/recipe-reading.ts; reading a new recipe (YouTube, captions with
+// SogoAI in-line §7E.2c, count, Claude, clean) and the daily-cap budget are recipe-reads.ts; the re-read itself is
+// recipe-reread.ts. This route keeps the §7E.2 / §7E.6 / §7E.2b check orders before them, maps their outcomes to HTTP,
+// and persists. Any member may do anything; delete is soft (⚑ Q66). Each person sets only their own emoji (§7E.5),
+// and every recipe answered carries everyone's through toRecipes.
 import { Hono, type Context } from 'hono';
-import type { AppEnv, Env } from '../env';
+import type { AppEnv } from '../env';
 import {
   isFound, parseRecipeInput, recipeFromRow, recipeVideoClash, type Recipe, type RecipeEmojiRow, type RecipeInput, type RecipeRow,
 } from '../../shared/recipes';
 import { recipeLinkOf, siteName } from '../../shared/recipe-link';
-import {
-  COMMENTS_LOOKED_AT, HOME_CAPTIONS_OFF, PASTED_MAX, RECIPE_READS_PER_DAY, cleanRecipeReading, cleanTranscript, creatorComments,
-  hasRecipeText, homeCaptionsError, parseScreenshots, sourcesOf, wantsHomeCaptions,
-} from '../../shared/recipe-reading';
+import { PASTED_MAX, RECIPE_READS_PER_DAY, cleanTranscript, parseScreenshots } from '../../shared/recipe-reading';
 import { emojiError } from '../../shared/emoji';
 import type { RecipeSource } from '../../shared/vocab';
-import { addDays, localToUtc, utcToLocal } from '../../shared/time';
-import { all, first, householdTz, newId, nowIso, run } from '../db';
+import { all, first, newId, nowIso, run } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
-import { lookUpComments, lookUpVideo } from '../youtube';
-import { readCaptions } from '../youtube-captions';
-import { readRecipe } from '../recipe-reader';
-import { readRecipeLink } from '../recipe-link-reader';
-import { rereadRecipe } from '../recipe-reread';
-import { homeCaptionsConfigOf, readCaptionsFromHome } from '../home-captions';
+import { readPageRecipe, readVideoRecipe, recipeReadsUsedUp, type ReadErrors } from '../recipe-reads';
+import { rereadRecipe, type RereadOutcome } from '../recipe-reread';
 
 const LIVE = 'SELECT * FROM recipes WHERE deleted_at IS NULL';
 const loadRow = (db: D1Database, id: string) => first<RecipeRow>(db, `${LIVE} AND id = ?`, id);
@@ -58,31 +49,24 @@ const duplicate = (c: Context<AppEnv>, r: RecipeRow) =>
 /** Where a read recipe came from: a YouTube video, or a page's cleaned link and its site's name (§7E.6). */
 type From = { video: { id: string; title: string | null; channel: string | null } } | { link: string; site: string };
 
-/** The daily cap (§7E.2 step 4, §7E.2b step 5): today's video reads, in the household's day, are used up → 429. */
+/** The daily cap (§7E.2 step 4, §7E.2b step 5) via recipe-reads.ts: used up → 429. */
 async function readsUsedUp(c: Context<AppEnv>, now: string): Promise<Response | null> {
-  const db = c.env.DB, tz = await householdTz(db), today = utcToLocal(now, tz).date;
-  const reads = await first<{ n: number }>(db, 'SELECT COUNT(*) AS n FROM recipe_reads WHERE at >= ? AND at < ?',
-    localToUtc(today, '00:00', tz), localToUtc(addDays(today, 1), '00:00', tz));
-  if ((reads?.n ?? 0) < RECIPE_READS_PER_DAY) return null;
+  if (!(await recipeReadsUsedUp(c.env.DB, now))) return null;
   return fail(c, 429, 'rate_limited', `Videos can be read ${RECIPE_READS_PER_DAY} times a day, and today's are used up. Try again tomorrow, or type the recipe in.`);
-}
-
-/** §7E.2 step 7 with §7E.2c: the Worker's own attempt; when YouTube blocked it, SogoAI asked in-line. → the
- *  captions' text, or why there is none (a home failure as "from home: …"). Never throws. */
-async function captionsFor(videoId: string, env: Env): Promise<{ text: string } | { error: string }> {
-  const own = await readCaptions(videoId);
-  if (own.ok) return { text: own.text };
-  if (!wantsHomeCaptions(own)) return { error: own.reason };
-  const cfg = homeCaptionsConfigOf(env);
-  if (!cfg) return { error: homeCaptionsError(HOME_CAPTIONS_OFF) };
-  const home = await readCaptionsFromHome(cfg, videoId);
-  return home.ok ? { text: home.text } : { error: homeCaptionsError(home.reason) };
 }
 
 const readingOff = (c: Context<AppEnv>, what = 'videos') => fail(c, 503, 'recipe_reading_off', `Reading recipes from ${what} isn't set up yet.`);
 
-/** Why the captions and the creator's comments couldn't be read (NULL when they were, or weren't tried). */
-interface ReadErrors { captions: string | null; comments: string | null }
+/** A read or re-read that stopped → its status, code and message; `noun` is what Claude was given. */
+function readFailed(c: Context<AppEnv>, out: Extract<RereadOutcome, { ok: false }>, noun: 'video' | 'link' | 'transcript'): Response {
+  switch (out.kind) {
+    case 'video_unavailable': return fail(c, 404, 'video_unavailable', `Couldn't find that video. ${out.reason}`);
+    case 'youtube_failed': return fail(c, 502, 'youtube_failed', `Couldn't look the video up: ${out.reason}`);
+    case 'recipe_refused': return fail(c, 422, 'recipe_refused', `Couldn't read a recipe from that ${noun}.`);
+    case 'recipe_reading_failed': return fail(c, 502, 'recipe_reading_failed', `Couldn't read the recipe: ${out.reason}`);
+    case 'no_recipe': return fail(c, 422, 'no_recipe', 'No recipe in that transcript — nothing was changed.');
+  }
+}
 
 function insert(db: D1Database, id: string, f: RecipeInput, from: From | null, source: RecipeSource[],
   errors: ReadErrors, me: string, now: string) {
@@ -115,7 +99,8 @@ async function fromLink(c: Context<AppEnv>): Promise<Response> {
   const kind = recipeLinkOf((await body(c)).url);
   if (!kind) return fail(c, 400, 'invalid_input', "That isn't a link that can be read.");
   if (kind.kind === 'video') return fromVideo(c, kind.videoId);
-  // §7E.6 check order: link → duplicate → daily cap → key → the page → count → look-up + fill → clean → save.
+  // §7E.6 check order: link → duplicate → daily cap → key → (recipe-reads.ts) count → the page, look-up + fill →
+  // clean → save.
   const db = c.env.DB, { link } = kind, site = siteName(link);
   const clash = await first<RecipeRow>(db, `${LIVE} AND link = ?`, link);
   if (clash) return duplicate(c, clash);
@@ -125,14 +110,11 @@ async function fromLink(c: Context<AppEnv>): Promise<Response> {
   const aiKey = c.env.ANTHROPIC_API_KEY;
   if (!aiKey) return readingOff(c, 'links');
   const me = c.get('member').id;
-  await run(db, 'INSERT INTO recipe_reads (at, member_id) VALUES (?, ?)', now, me);
-  const r = await readRecipeLink({ apiKey: aiKey, link, site });
-  if (!r.ok && r.kind === 'refused') return fail(c, 422, 'recipe_refused', "Couldn't read a recipe from that link.");
-  if (!r.ok) return fail(c, 502, 'recipe_reading_failed', `Couldn't read the recipe: ${r.reason}`);
+  const r = await readPageRecipe(db, aiKey, link, site, me, now);
+  if (!r.ok) return readFailed(c, r, 'link');
   const id = newId('rcp');
   try {
-    await insert(db, id, cleanRecipeReading(r.raw, r.title), { link, site },
-      sourcesOf({ description: null, transcript: null, comments: null, page: r.notes }), { captions: null, comments: null }, me, now);
+    await insert(db, id, r.reading, { link, site }, r.source, { captions: null, comments: null }, me, now);
   } catch (err) {
     const won = await first<RecipeRow>(db, `${LIVE} AND link = ?`, link);
     if (won) return duplicate(c, won); // another paste of the same link saved first (uq_recipe_link)
@@ -145,8 +127,8 @@ recipes.post('/recipes/from-link', requireMember, fromLink);
 recipes.post('/recipes/from-video', requireMember, fromLink); // the same handler, for phones on an older app (§7E.6)
 
 async function fromVideo(c: Context<AppEnv>, videoId: string): Promise<Response> {
-  // §7E.2 check order: link → duplicate → daily cap → keys → YouTube → captions + the creator's comments → count →
-  // Claude → clean → save.
+  // §7E.2 check order: link → duplicate → daily cap → keys → (recipe-reads.ts) YouTube → captions + the creator's
+  // comments → count → Claude → clean → save.
   const db = c.env.DB;
   const clash = recipeVideoClash(videoId, await all<RecipeRow>(db, `${LIVE} AND video_id IS NOT NULL`));
   if (clash) return duplicate(c, clash);
@@ -157,33 +139,12 @@ async function fromVideo(c: Context<AppEnv>, videoId: string): Promise<Response>
   const { YOUTUBE_API_KEY: ytKey, ANTHROPIC_API_KEY: aiKey } = c.env;
   if (!ytKey || !aiKey) return readingOff(c);
 
-  const video = await lookUpVideo(videoId, ytKey);
-  if (!video.ok && video.kind === 'not_found') return fail(c, 404, 'video_unavailable', `Couldn't find that video. ${video.reason}`);
-  if (!video.ok) return fail(c, 502, 'youtube_failed', `Couldn't look the video up: ${video.reason}`);
-  // Steps 7 (with SogoAI when blocked, §7E.2c) and 8 side by side; neither is ever fatal.
-  const [captions, comments] = await Promise.all([captionsFor(videoId, c.env), lookUpComments(videoId, ytKey, COMMENTS_LOOKED_AT)]);
   const me = c.get('member').id;
-  await run(db, 'INSERT INTO recipe_reads (at, member_id) VALUES (?, ?)', now, me);
-
-  const text = {
-    description: video.description, transcript: 'text' in captions ? captions.text : null,
-    comments: comments.ok ? creatorComments(comments.comments, video.channelId) : null,
-  };
-  const errors: ReadErrors = {
-    captions: 'error' in captions ? captions.error : null,
-    comments: comments.ok || comments.kind === 'none' ? null : comments.reason, // turned off is not an error ⚑ Q78
-  };
-  let raw: Record<string, unknown> | null = null;
-  if (hasRecipeText(text)) {
-    const r = await readRecipe({ apiKey: aiKey, title: video.title, channel: video.channel, ...text });
-    if (!r.ok && r.kind === 'refused') return fail(c, 422, 'recipe_refused', "Couldn't read a recipe from that video.");
-    if (!r.ok) return fail(c, 502, 'recipe_reading_failed', `Couldn't read the recipe: ${r.reason}`);
-    raw = r.raw;
-  }
-  const reading = cleanRecipeReading(raw, video.title);
+  const r = await readVideoRecipe(db, c.env, { yt: ytKey, ai: aiKey }, videoId, me, now);
+  if (!r.ok) return readFailed(c, r, 'video');
   const id = newId('rcp');
   try {
-    await insert(db, id, reading, { video: { id: videoId, title: video.title, channel: video.channel } }, sourcesOf(text), errors, me, now);
+    await insert(db, id, r.reading, { video: r.video }, r.source, r.errors, me, now);
   } catch (err) {
     const won = recipeVideoClash(videoId, await all<RecipeRow>(db, `${LIVE} AND video_id = ?`, videoId));
     if (won) return duplicate(c, won); // another paste of the same link saved first (uq_recipe_video)
@@ -214,13 +175,7 @@ recipes.post('/recipes/:id/transcript', requireMember, async (c) => {
   const out = await rereadRecipe(c.env.DB, { yt: ytKey ?? '', ai: aiKey }, r, { pasted, screenshots },
     c.get('member').id, now, c.env.PHOTOS);
   if (out.ok) return answer(c, r.id);
-  switch (out.kind) {
-    case 'video_unavailable': return fail(c, 404, 'video_unavailable', `Couldn't find that video. ${out.reason}`);
-    case 'youtube_failed': return fail(c, 502, 'youtube_failed', `Couldn't look the video up: ${out.reason}`);
-    case 'recipe_refused': return fail(c, 422, 'recipe_refused', "Couldn't read a recipe from that transcript.");
-    case 'recipe_reading_failed': return fail(c, 502, 'recipe_reading_failed', `Couldn't read the recipe: ${out.reason}`);
-    case 'no_recipe': return fail(c, 422, 'no_recipe', 'No recipe in that transcript — nothing was changed.');
-  }
+  return readFailed(c, out, 'transcript');
 });
 
 recipes.get('/recipes/:id', requireMember, async (c) => {

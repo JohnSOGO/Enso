@@ -243,6 +243,7 @@ Enso/
 │       │                   # days off, /push/*, /status) · announce.ts ·
 │       │                   # lists.ts (§7A) · item-photos.ts (§7A.3) · machines.ts (§7D) ·
 │       │                   # recipes.ts (§7E) · phone-login.ts (§6.6)
+│       ├── recipe-reads.ts # §7E.2, §7E.6 reading a new recipe + the daily read budget
 │       ├── recipe-reread.ts # §7E.2b re-reading a recipe in place
 │       ├── claude.ts       # the one Claude API call (§7C.4, §7E)
 │       ├── recipe-reader.ts # §7E the recipe prompt + schema
@@ -3055,11 +3056,11 @@ Worker asks SogoAI **in-line**, inside `POST /recipes/from-video`, through Cloud
 saves it complete. Nothing is pending, and nothing is re-read later.
 
 The rules (pure) are `src/shared/recipe-reading.ts`; the call is `src/worker/home-captions.ts`; the
-decision to ask is the from-video route.
+decision to ask is the from-video read in `src/worker/recipe-reads.ts`.
 
 **When** — in §7E.2 step 7, `wantsHomeCaptions(failure)` is true **only** for kind `blocked` ⚑ Q95;
 `none` and `failed` never ask (they would fail at home too), nor does the transcript route; there is no
-backfill of older recipes and no "try from home" button ⚑ Q102. The route's file-local
+backfill of older recipes and no "try from home" button ⚑ Q102. `recipe-reads.ts`'s file-local
 `captionsFor(videoId, env)`:
 
 1. `readCaptions(videoId)` — read → its text; a failure that is not `blocked` → that failure, kept;

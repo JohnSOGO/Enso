@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-05 — Recipe read pipelines and budget out of the route (placement-advisor)
+
+- **Ask:** steward backlog item 1 (approved by MojoSOGO): move the from-video and page read pipelines, captionsFor and the recipe-read budget out of `routes/recipes.ts` (§7E.2, §7E.2c, §7E.6). Behavior-preserving.
+- **Verdict:** `src/worker/recipe-reads.ts` [NEW row]; `routes/recipes.ts` and `recipe-reread.ts` [EXISTING, shrink]. Reorganizer, own commit.
+- **Flow stage:** persist (the read and count) out of route; the route keeps validation, row persistence and the HTTP mapping.
+- **Why:** the route is at 274/300 with four concerns, 4 copies of the recipe_reads INSERT and 3 copies of the error mapping. The pipelines follow recipe-reread.ts's shape: the caller's checks first, then outcome kinds, never HTTP. Rejected: raising the cap; merging the budget into photo-reads.ts (a different table and cap); folding recipe-reread.ts in (a different contract); moving `insert` out.
+- **Caps:** routes/recipes.ts 274 → 229, pinned at 229 + WORKING_BUFFER (269); recipe-reads.ts 97/300; recipe-reread.ts 79/300.
+
+## 2026-10-05 — Recipe read pipelines to recipe-reads.ts (reorganizer)
+
+- **Trigger:** steward backlog item 1: `routes/recipes.ts` at 274/300 carrying CRUD, two read pipelines, the budget and three copies of the error mapping.
+- **Seam moved:** the from-video and page read pipelines (YouTube, captionsFor with SogoAI in-line, comments, count, Claude / recipe-link-reader.ts, clean) and the recipe-read budget (recipeReadsUsedUp, countRecipeRead) from `src/worker/routes/recipes.ts` to `src/worker/recipe-reads.ts` [NEW row]; `recipe-reread.ts`'s two INSERTs now call countRecipeRead; the route's three outcome mappings folded into one file-local readFailed (noun video / link / transcript), every string unchanged.
+- **Room opened:** routes/recipes.ts: 274 → 229 lines; cap 300 (global) → 269 (229 + WORKING_BUFFER).
+- **Behavior:** preserved — typecheck, npm test (658/658, unchanged) and arch:audit green; check orders (duplicate, cap, keys in the route; YouTube, captions ∥ comments, count, Claude in the pipeline), every status, code and message, the recipe_reads and recipes rows and the unique-constraint race catch unchanged.
+- **Restraint:** `insert`, `answer`, toRecipes, the duplicate checks, the 429 text and readingOff stay in the route; recipe-reread.ts gets only the count call (keepPicture is item 4's); no new shared rule.
+
 ## 2026-10-05 — Whose mess? (placement-advisor)
 
 - **Ask:** mess reports in Chores. Members answer That was me or Not me. Asks go by push up to 4 times, 15 min

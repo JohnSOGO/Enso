@@ -8,6 +8,7 @@ import type { RecipeSource } from '../shared/vocab';
 import { nowIso, randomBase32, run } from './db';
 import { lookUpComments, lookUpVideo } from './youtube';
 import { readRecipe } from './recipe-reader';
+import { countRecipeRead } from './recipe-reads';
 
 export type RereadOutcome =
   | { ok: true }
@@ -36,7 +37,7 @@ async function rereadVideo(db: D1Database, keys: { yt: string; ai: string }, row
   const [video, comments] = await Promise.all([lookUpVideo(videoId, keys.yt), lookUpComments(videoId, keys.yt, COMMENTS_LOOKED_AT)]);
   if (!video.ok && video.kind === 'not_found') return { ok: false, kind: 'video_unavailable', reason: video.reason };
   if (!video.ok) return { ok: false, kind: 'youtube_failed', reason: video.reason };
-  await run(db, 'INSERT INTO recipe_reads (at, member_id) VALUES (?, ?)', now, countFor);
+  await countRecipeRead(db, now, countFor);
 
   const read: VideoText = {
     description: video.description, transcript: null, ...given,
@@ -64,7 +65,7 @@ const save = (db: D1Database, id: string, reading: RecipeReading, source: Recipe
  *  recipe's title and, for a link, its site. */
 async function rereadLink(db: D1Database, aiKey: string, row: RecipeRow, given: Pick<VideoText, 'pasted' | 'screenshots'>,
   countFor: string, now: string): Promise<RereadOutcome> {
-  await run(db, 'INSERT INTO recipe_reads (at, member_id) VALUES (?, ?)', now, countFor);
+  await countRecipeRead(db, now, countFor);
   const read: VideoText = { description: null, transcript: null, comments: null, ...given };
   const res = await readRecipe({
     apiKey: aiKey, title: row.title, channel: null, site: row.link ? row.channel : null, ...read, transcript: given.pasted ?? null,
