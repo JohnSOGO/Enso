@@ -36,6 +36,8 @@ export interface AlertConfig {
   intervalMin?: number;
   /** §4.2n — a rolling timer's active time range, if it has one. */
   window?: TimerWindow;
+  /** §7D.5 — set when the source may not sound now: the instant it next may. */
+  quietUntil?: string;
 }
 
 /** §4.2n — a rolling timer's active time range: local HH:MM in the household tz; from > to = overnight. */
@@ -145,6 +147,15 @@ export function planReminderFires(ev: ReminderEvent, tz: string, fromUtc: string
 
 /** §5.3 — advance one open fire to `now`. */
 export function stepFire(fire: FireRow, cfg: AlertConfig, now: string): { fire: FireRow; alert: boolean } {
+  const r = stepOpen(fire, cfg, now);
+  // Rule 0b (§5.3, §7D.5): an alert in quiet hours waits for them to end — the snooze shape, alerts counted afresh.
+  if (r.alert && cfg.quietUntil) {
+    return { fire: { ...fire, state: 'scheduled', due_at: cfg.quietUntil, alert_count: 0, last_alerted_at: null }, alert: false };
+  }
+  return r;
+}
+
+function stepOpen(fire: FireRow, cfg: AlertConfig, now: string): { fire: FireRow; alert: boolean } {
   const t = ms(now);
   // Rule 0 (§5.3): a timer never rings outside its window — the snooze shape, no close, no alert.
   if (

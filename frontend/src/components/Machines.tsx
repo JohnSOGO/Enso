@@ -2,6 +2,7 @@
 // which the Ringing bar reuses for Move to dryer (§8.2).
 import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
+import { MachineHoursLine } from './MachineHours';
 import { errorText, get, post } from '../api';
 import { useApp } from '../state';
 import { MACHINE_LABEL, MACHINE_MINUTES, nextMachine } from '../../../src/shared/machines';
@@ -100,8 +101,9 @@ export function MachinesSection() {
     <section className={s.section} aria-label="Machines">
       <h2 style={{ marginBottom: 6 }}>Machines</h2>
       <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>
-        Wash, move to the dryer, fold. Whoever's load it is hears when it's done.
+        Wash, move to the dryer, fold. Everyone hears when it's done.
       </p>
+      <MachineHoursLine />
       {error && <div role="alert" className="alert-error">{error}</div>}
       {machines === null && !error && <p className="muted">Loading…</p>}
       {!!machines?.length && (

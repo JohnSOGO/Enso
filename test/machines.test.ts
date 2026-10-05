@@ -6,11 +6,11 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Client, member, owner, tickAt } from './helpers';
 import {
   MACHINE_MAX_ALERTS, MACHINE_MINUTES, MACHINE_RENOTIFY_MIN, clearMachine, doneMessage, doneNowMachine, finishMachine, machineAlertConfig, machineState,
-  isStillLoaded, moveMachine, parseDoneNow, parseMove, parseStart, refusalText, remindMachine, startMachine, waitingLoad, type MachineRow,
+  isStillLoaded, machineQuietUntil, moveMachine, parseMachineHours, DEFAULT_MACHINE_HOURS, parseDoneNow, parseMove, parseStart, refusalText, remindMachine, startMachine, waitingLoad, type MachineRow,
 } from '../src/shared/machines';
 import { alertMessage, applyAction, newMachineFire, pushActions, stepFire, type FireRow } from '../src/shared/engine';
 import { machineWrites } from '../src/worker/routes/machines';
-import { addMinutes } from '../src/shared/time';
+import { addMinutes, localToUtc } from '../src/shared/time';
 
 const T = '2026-10-05T12:00:00.000Z';
 const row = (id: 'washer' | 'dryer', over: Partial<MachineRow> = {}): MachineRow =>
@@ -116,6 +116,41 @@ describe('L1–L2 the pure rules (machines.ts)', () => {
     expect(parseDoneNow({}, ['A'], false)).toEqual({ ownerId: null });
   });
 
+  it('L19 machineQuietUntil: inside the hours → null; before, after, and across a weekend → the next opening', () => {
+    const tz = 'America/Los_Angeles', H = DEFAULT_MACHINE_HOURS;
+    const at = (date: string, time: string) => localToUtc(date, time, tz);
+    // Mon 2026-10-05 (PDT): weekday 17:30–20:30.
+    expect(machineQuietUntil(H, tz, at('2026-10-05', '18:00'))).toBeNull();
+    expect(machineQuietUntil(H, tz, at('2026-10-05', '17:29'))).toBe(at('2026-10-05', '17:30'));
+    expect(machineQuietUntil(H, tz, at('2026-10-05', '20:30'))).toBe(at('2026-10-06', '17:30'));
+    // Fri 21:00 → Sat 09:00 (weekend); Sun 21:00 → Mon 17:30.
+    expect(machineQuietUntil(H, tz, at('2026-10-09', '21:00'))).toBe(at('2026-10-10', '09:00'));
+    expect(machineQuietUntil(H, tz, at('2026-10-10', '12:00'))).toBeNull();
+    expect(machineQuietUntil(H, tz, at('2026-10-11', '21:00'))).toBe(at('2026-10-12', '17:30'));
+    // A day with no hours is any time: Fri 22:00 with the weekend open all day → Sat 00:00.
+    expect(machineQuietUntil({ ...H, weekend: null }, tz, at('2026-10-09', '22:00'))).toBe(at('2026-10-10', '00:00'));
+    expect(machineQuietUntil({ ...H, weekend: null }, tz, at('2026-10-10', '03:00'))).toBeNull();
+    expect(machineQuietUntil({ weekday: null, weekend: null }, tz, at('2026-10-05', '03:00'))).toBeNull();
+  });
+
+  it('L20 stepFire in quiet hours: an alert due waits for the opening, counted afresh; with no alert due nothing moves', () => {
+    const cfg = { ...machineAlertConfig(), quietUntil: addMinutes(T, 300) };
+    const due = stepFire(fireOf('washer', T), cfg, addMinutes(T, 1));
+    expect(due).toEqual({ fire: expect.objectContaining({ state: 'scheduled', due_at: addMinutes(T, 300), alert_count: 0, last_alerted_at: null }), alert: false });
+    const ringing = { ...fireOf('washer', T), state: 'ringing' as const, alert_count: 2, last_alerted_at: T };
+    expect(stepFire(ringing, cfg, addMinutes(T, 15)).fire).toMatchObject({ state: 'scheduled', due_at: addMinutes(T, 300), alert_count: 0 });
+    expect(stepFire(ringing, cfg, addMinutes(T, 5))).toEqual({ fire: ringing, alert: false });
+    const silent = { ...ringing, alert_count: MACHINE_MAX_ALERTS };
+    expect(stepFire(silent, cfg, addMinutes(T, 60))).toEqual({ fire: silent, alert: false });
+  });
+
+  it('parseMachineHours', () => {
+    expect(parseMachineHours({ weekday: { from: '17:30', to: '20:30' }, weekend: null })).toEqual({ weekday: { from: '17:30', to: '20:30' }, weekend: null });
+    expect(parseMachineHours({ weekday: { from: '20:30', to: '17:30' }, weekend: null })).toBe('The start must be before the end, on the same day.');
+    expect(parseMachineHours({ weekday: { from: '5pm', to: '20:30' }, weekend: null })).toMatch(/HH:MM/);
+    expect(parseMachineHours({ weekend: null })).toMatch(/HH:MM/);
+  });
+
   it('refusal texts and input rules', () => {
     const names = new Map([['S', 'Sam']]);
     expect(refusalText({ error: 'busy', machine: running('dryer', 'S', T) }, names)).toBe("The dryer still has Sam's load.");
@@ -154,6 +189,9 @@ beforeAll(async () => {
   const m = await member(o);
   B = m.id; bClient = m.client;
   B_NAME = (await o.get('/members')).json.find((x: any) => x.id === B).displayName;
+  expect((await o.get('/machines/hours')).json).toEqual(DEFAULT_MACHINE_HOURS); // migration 0028's defaults
+  // Routes run on the real clock: these tests ring at any hour (§7D.5 has its own tests, L19–L21).
+  expect((await o.patch('/machines/hours', { weekday: null, weekend: null })).status).toBe(200);
 });
 
 /** Every test starts with both machines free and no open machine fire. */
@@ -319,6 +357,16 @@ describe('M4l /machines (L3–L12)', () => {
     const early = await o.post('/machines/dryer/done');
     expect(early.json.find((m: any) => m.id === 'dryer')).toMatchObject({ state: 'done', ownerId: B, minutes: 60 });
     expect((await firesOf('dryer')).find((f) => f.id === old.id)).toMatchObject({ state: 'closed', close_reason: 'superseded' });
+  });
+
+  it('L21 /machines/hours: an admin sets them and anyone reads them back; a member is refused; bad hours 400', async () => {
+    expect((await o.patch('/machines/hours', DEFAULT_MACHINE_HOURS)).json).toEqual(DEFAULT_MACHINE_HOURS);
+    expect((await bClient.get('/machines/hours')).json).toEqual(DEFAULT_MACHINE_HOURS);
+    expect((await bClient.patch('/machines/hours', { weekday: null, weekend: null })).status).toBe(403);
+    const bad = await o.patch('/machines/hours', { weekday: { from: '21:00', to: '09:00' }, weekend: null });
+    expect(bad.status).toBe(400);
+    expect(bad.json.message).toBeTruthy();
+    expect((await o.patch('/machines/hours', { weekday: null, weekend: null })).json).toEqual({ weekday: null, weekend: null });
   });
 
   it('L11 two Start taps at once: one wins, the other is a 409, one open fire', async () => {

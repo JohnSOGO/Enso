@@ -6,7 +6,7 @@ import {
 import { DEFAULT_MAX_ALERTS, choreFireContext, choreFromRow, planChoreRuns, type Chore, type ChoreRow, type ChoreRun } from '../shared/chores';
 import { isStartReminder, planThingFires, type ThingRow } from '../shared/things';
 import { audience } from '../shared/optins';
-import { doneMessage, isMachineId, isStillLoaded, machineAlertConfig, waitingLoad, type MachineRow } from '../shared/machines';
+import { doneMessage, isMachineId, isStillLoaded, machineAlertConfig, machineHoursOf, machineQuietUntil, waitingLoad, type MachineRow } from '../shared/machines';
 import type { Channel, SunEvent } from '../shared/vocab';
 import type { Recurrence } from '../shared/recurrence';
 import { addMinutes, utcToLocal } from '../shared/time';
@@ -102,7 +102,7 @@ export async function sourceOf(
   now: string,
 ): Promise<Source | null> {
   if (fire.kind === 'machine') {
-    // §7D.3: every active member's phones and the default speakers, naming the load's owner; a done load waiting
+    // §7D.5: outside the alert hours an alert waits for them (quietUntil). §7D.3: every active member's phones and the default speakers, naming the load's owner; a done load waiting
     // in the machine before this one is named at alert time; a fire restarted by Still loaded says what's next.
     if (!isMachineId(fire.machine_id)) return null;
     const rows = await all<MachineRow>(db, 'SELECT * FROM machines');
@@ -112,9 +112,11 @@ export async function sourceOf(
       : (await first<{ display_name: string }>(db, 'SELECT display_name FROM members WHERE id = ? AND disabled_at IS NULL', id))?.display_name ?? null;
     const owner = await nameOf(m.owner_id);
     const waiting = waitingLoad(rows, m.id, now);
+    const st = (await first<Parameters<typeof machineHoursOf>[0] & { timezone: string }>(db, 'SELECT * FROM settings WHERE id = 1'))!;
+    const quietUntil = machineQuietUntil(machineHoursOf(st), st.timezone, now);
     return {
       title: doneMessage(m.id, owner, waiting ? await nameOf(waiting.owner_id) : undefined, isStillLoaded(m, fire.due_at)),
-      assignedTo: [], allSpeakers: true, cfg: machineAlertConfig(),
+      assignedTo: [], allSpeakers: true, cfg: { ...machineAlertConfig(), ...(quietUntil ? { quietUntil } : {}) },
     };
   }
   if (fire.kind === 'thing') {

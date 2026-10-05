@@ -159,6 +159,7 @@ it("HS10: an announcement is spoken on every active member's speakers; none at a
 });
 
 it('HS11 (§7D.3): a machine alert is spoken on every speaker HA lists but Everywhere, whatever anyone ticked; HA unreadable → the defaults', async () => {
+  await A.patch('/machines/hours', { weekday: null, weekend: null }); // the real clock: ring at any hour (§7D.5)
   await A.patch('/me', { houseSpeakers: [GAME] });
   ha.answers.set(TEMPLATE_PATH, { status: 200, body: JSON.stringify([
     { id: GAME, name: 'Game Room' }, { id: 'media_player.everywhere', name: 'Everywhere' }, { id: TOASTY, name: 'Toasty' }, { id: PE, name: 'Office' },
