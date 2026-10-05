@@ -91,7 +91,7 @@ export function Recipes() {
             <li key={r.id}>
               <button className={`${ls.item} ${ls.main}`} onClick={() => setOpen({ kind: 'view', recipe: r })}>
                 {r.hasPhoto || r.thumbnailUrl
-                  ? <img className={s.thumb} src={r.hasPhoto ? apiUrl(recipePhotoPath(r)) : r.thumbnailUrl!} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                  ? <img className={`${s.thumb} ${r.hasPhoto ? s.whole : ''}`} src={r.hasPhoto ? apiUrl(recipePhotoPath(r)) : r.thumbnailUrl!} alt="" loading="lazy" referrerPolicy="no-referrer" />
                   : <span className={s.thumb} aria-hidden />}
                 <span className={`${ls.title} ${s.text}`}>{myEmoji(r, me.id) && `${myEmoji(r, me.id)} `}{r.title}</span>
                 {!r.found && (r.videoId || r.link) && <span className="badge warn">{r.videoId ? 'watch it' : 'open it'}</span>}
