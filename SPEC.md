@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.43 · **Date:** 2026-10-04 · **Owner:** MojoSOGO
+**Version:** 2.44 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1163,6 +1163,40 @@ NULL on every existing row and on every fire, announcement, ping and house deliv
 covers `login_requests.status` (`LOGIN_REQUEST_STATUS`) and `deliveries.notice` (`NOTICE_KIND`). **Migration check
 (PL-M):** rows written under 0001–0023 survive 0025 unchanged with `notice` and `url` NULL; `login_requests` exists
 empty; `PRAGMA foreign_key_check` is empty.
+
+### 4.2y Schema change — `migrations/0026_shows.sql`
+
+Asked by MojoSOGO 2026-10-05: the household's movies & shows list (§7F).
+
+```sql
+-- §7F — the household's movies & shows. Soft-deleted; a watched show keeps who and when.
+CREATE TABLE shows (
+  id           TEXT PRIMARY KEY,                -- 'shw_' + 16 base32
+  title        TEXT NOT NULL,                   -- 1–120
+  title_key    TEXT NOT NULL,                   -- showKey(title, year): one per key among live rows (§7F.1)
+  kind         TEXT CHECK (kind IN ('movie','show')),  -- NULL = unknown
+  year         TEXT,                            -- ≤ 20, free text
+  rt_critics   INTEGER CHECK (rt_critics BETWEEN 0 AND 100),
+  rt_audience  INTEGER CHECK (rt_audience BETWEEN 0 AND 100),
+  watch        TEXT NOT NULL DEFAULT '[]',      -- JSON { how, where, note }[] (≤ 12)
+  checked_at   TEXT,                            -- when how-to-watch was last looked up; NULL = never
+  summary      TEXT,                            -- ≤ 500
+  note         TEXT,                            -- ≤ 2000
+  url          TEXT,                            -- ≤ 500, http(s) only
+  status       TEXT NOT NULL DEFAULT 'want' CHECK (status IN ('want','watched')),
+  watched_at   TEXT,
+  watched_by   TEXT REFERENCES members(id),
+  created_by   TEXT NOT NULL REFERENCES members(id),
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL,
+  deleted_at   TEXT
+);
+CREATE UNIQUE INDEX uq_shows_key ON shows(title_key) WHERE deleted_at IS NULL;
+```
+
+Additive only. M1-VOCAB covers `shows.kind` (`SHOW_KIND`) and `shows.status` (`SHOW_STATUS`); `watch[].how`
+(`WATCH_HOW`) is JSON, checked by `parseShowInput`. **Migration check (W-M):** rows written under 0001–0025
+survive unchanged; `shows` exists empty; `PRAGMA foreign_key_check` is empty.
 
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
@@ -2799,6 +2833,102 @@ clear it later. It is personal: the row shows **mine**; the recipe view shows **
 | RE9 | `usedEmojis` on 14 distinct emojis across members, one used three times | that one first, ties by the string, 12 at most |
 | RE-M | migration check (§4.2q) | earlier rows intact; the PK refuses a second row for one member and recipe |
 
+## 7F. Movies & shows — `src/shared/shows.ts` (pure) — asked by MojoSOGO 2026-10-05
+
+The household's shared watch list: "we enter a show we want to see; you tell us how we can see it and what
+the Rotten Tomatoes rating is — theater? streaming? which service?" — and sometimes all anyone has is a clip, a
+link or a screenshot, and the first job is working out which show it is. Its loop: **heard of it → look it up →
+want to see it → watched**. It reuses the link reader's plumbing (§7C.4b): the page fetch, `pageExtract`, Claude's
+look-up with web search and web fetch, then a structured fill.
+
+### 7F.1 A show
+
+- **Title** 1–120 (required). **Kind** `movie` | `show` (`SHOW_KIND`) or unknown. **Year** ≤ 20, free text
+  ("2024", "2019–2023").
+- **Ratings:** Rotten Tomatoes **critics** (Tomatometer) and **audience** (Popcornmeter), each a whole percent
+  0–100 or unknown ⚑ Q146.
+- **How to watch** (`watch`): at most `WATCH_MAX` = 12 options, each `{ how, where, note }` — `how` one of
+  `WATCH_HOW` = `theater` · `stream` · `tv` · `rent` · `buy`; `where` 1–100 (a service, a store, a channel or a
+  theater's name: "Netflix", "Apple TV (rent $5.99)", "Regal Oceanside"); `note` ≤ 200 or null ("with ads",
+  "4.1 mi · Mission Ave", "in theaters Nov 14"). Availability is **US-based** (`WATCH_COUNTRY` = `US`) ⚑ Q145; at
+  most `THEATERS_MAX` = 3 theaters, the ones **closest to the household** (§7.7's place, Oceanside).
+- **Checked** (`checkedAt`): when how to watch and the ratings were last looked up; unknown for one typed by hand.
+- **Summary** ≤ 500 (what it is about). **Note** ≤ 2000 (the household's own). **Link** ≤ 500 through `webLink`
+  (§7C.1) — the clip or page it came from.
+- **Status** `want` → `watched` (`SHOW_STATUS`); a watched show can go back to `want`. Watching records who and when.
+  **Delete** removes it (soft). **Anyone** may add, edit, mark watched or delete any show ⚑ Q154.
+- **One per title:** the key is the title lower-cased with whitespace collapsed, plus the year. A second show with
+  the same key (whatever its status) is 409 `duplicate` "{title} is already on the list." ⚑ Q152; the same title
+  with another year is a different show (remakes).
+- `shows.ts` owns: limits, `parseShowInput`, `showKey`, `showFromRow`, `bestWatch` (the row's option, §8.14) and
+  `cleanShowReading` (§7F.2).
+
+### 7F.2 Looking it up — `POST /shows/look-up`, `POST /shows/look-up-photo`
+
+**Nothing is saved**: a look-up returns a `ShowReading`, the show form opens filled, the person checks it and
+taps Save ⚑ Q151. Three ways in:
+
+- **A title** — `{ title, year?, kind? }` (year and kind narrow it; Check again sends them).
+- **A link** — `{ url }`, through `readableLink` (§7C.4b). The Worker fetches the page exactly as a thing's link
+  reading does (`fetchPage`, `pageExtract`; a failure is kept as a reason, never fatal). The link is usually a
+  clip, a trailer, a post or an article, so the first job is working out which show it is about.
+- **A picture** — `POST /shows/look-up-photo` with a raw image body (a screenshot, a photo of a TV, a poster;
+  `photoBody`, §7C.3). It goes to Claude as an image block with the look-up and is **never stored** ⚑ Q150. A video
+  clip itself is not read ⚑ Q149: paste its link, or screenshot a frame.
+
+`ShowReading` = `{ title, kind, year, rtCritics, rtAudience, watch, summary, note, url, checkedAt }` — `url` is
+the pasted link (`webLink`) or null, never one the look-up found; `checkedAt` is the server's time; a `title` of
+null means it couldn't tell which show it is.
+
+- **Check order:** signed in (401) → the input (400 `invalid_input`: "Type a title or paste a link." for no title
+  and no link, or both; "That link can't be read." for a link `readableLink` refuses; a picture as §7C.3) → daily
+  cap (429, the **same 40-a-day `photo_reads` budget** ⚑ Q147) → key present (503 `show_lookup_off` "Looking up
+  movies and shows isn't set up yet.") → count the read → (a link: fetch the page) → the look-up → the fill →
+  refusal 422 `show_refused` "Couldn't look that up." / failure 502 `show_lookup_failed` "Couldn't look that up:
+  {reason}" → `cleanShowReading` → 200.
+- **The look-up** (`askClaudeResearch`, which now also takes content blocks before the prompt, for the picture):
+  web search (`SHOW_SEARCHES_MAX` = 5 ⚑ Q148, `user_location` approximate with `country` `US` and the household
+  zone) and web fetch (`SHOW_FETCHES_MAX` = 3), `pause_turn` continued as §7C.4b (`RESEARCH_TURNS_MAX`). The prompt
+  (`showResearchPrompt`, `src/shared/show-reading.ts`) gives the title, link (and what the page said) or picture,
+  today, and the household's place (`nearestTheaters`), and asks for plain notes: which movie or show it is (title,
+  movie or show, year; when several match, the likeliest, the others named), the Rotten Tomatoes critics and
+  audience percentages **as rottentomatoes.com shows them**, and how to watch it **in the United States now** — in
+  theaters (then up to 3 theaters showing it closest to the household, each with its town and rough distance),
+  streaming with a subscription (the service, and "with ads" or the plan when it matters), on live TV, to rent or to
+  buy (the store, and the price when found); when it isn't out yet, when and where it's coming. A one- or two-line
+  summary. **Only from what the page and the searches say, never guessed**; what can't be found is said so.
+- **The fill** (`askClaude`, `showReadingSchema` in `show-reader.ts`): the notes → the reading's fields, `watch` in
+  the order found, ratings as whole numbers, nulls for anything not found.
+- `cleanShowReading` (pure) trims every field to its limit; `kind` must be in `SHOW_KIND`; a rating must be a whole
+  number 0–100 (a string like "92%" is read as 92; anything else is null); a watch option with an unknown `how` or an
+  empty `where` is dropped, repeats (same `how` and `where`, ignoring case) are merged, theaters past
+  `THEATERS_MAX` and options past `WATCH_MAX` are dropped; `url` is the pasted link through `webLink`.
+- **Honest failures:** a failed look-up is a 502 with its reason, even when the page was read. Nothing identified →
+  200 with `title` null, and the screen says "Couldn't tell which movie or show that is."
+- **Cost:** roughly a few cents a look-up (two requests, at most five searches at $10 per 1 000).
+- **Privacy** ⚑ Q141 as for links: the title, link, page text or picture go to Anthropic, with today's date, the
+  zone and the household's latitude / longitude (for the nearest theaters).
+
+### 7F.3 Acceptance (M4x — each row is a test)
+
+| # | Setup / call | Expected |
+|---|---|---|
+| W1 | POST "Dune" (movie, 2021, 🍅 83 / 90, watch Max stream, checkedAt) | 201; listed first under `want` with every field |
+| W2 | empty title; `rtCritics` 101; a watch option with `how` `cable`; link `ftp://x`; 13 watch options | 400 `invalid_input`, the message names the field |
+| W3 | POST " dune " 2021 again; then "Dune" 1984 | 409 `duplicate` "Dune is already on the list."; 201 |
+| W4 | PATCH status `watched`; then `want` | `watchedAt` / `watchedBy` set and it lists under `watched`; both cleared, back under `want` |
+| W5 | PATCH a title onto another show's key | 409 `duplicate` |
+| W6 | DELETE | 204; gone from the list; GET → 404 |
+| W7 | look-up `{ title: "Wicked" }` (fake Claude) | 200 cleaned reading with `checkedAt`, `url` null; one `photo_reads` row; nothing saved; the look-up carries web search (max 5, `user_location` country `US` + zone) and web fetch (max 3); its prompt names the title, "United States", Rotten Tomatoes and the household's latitude / longitude |
+| W8 | look-up `{ url }` of a clip page (fake site) | the page's title and text are in the look-up's prompt; `url` is the pasted link |
+| W9 | look-up-photo with a JPEG | the look-up's message carries the image block before the prompt; nothing stored in R2 |
+| W10 | look-up `{}`, `{ title, url }`, `{ url: "http://192.168.0.1" }` | 400; no fetch, no read counted |
+| W11 | no API key; at the daily cap | 503 `show_lookup_off`; 429 — neither fetches nor counts |
+| W12 | refusal / failure from Claude | 422 `show_refused` / 502 `show_lookup_failed` with the reason |
+| W13 | `cleanShowReading` on `rtCritics` "92%", `rtAudience` 140, kind `film`, a `cable` option, two "netflix" streams, four theaters, a 300-char title | 92, null, null, dropped, merged, three theaters, title cut to 120 |
+| W14 | `bestWatch` on rent + stream + theater | the theater; stream before tv before rent before buy |
+| W-M | migration check (§4.2y) | 0026 is additive: earlier rows intact, `shows` exists empty, `PRAGMA foreign_key_check` empty |
+
 ---
 
 ## 8. Screens
@@ -3054,13 +3184,14 @@ The **🛒 Lists** tab. At the top, a **list picker** — a native `<select>` la
 List [ Shopping (3)          ▾ ] [⋯]
       Today — chores
       Things to do (4)
+      Movies & shows (6)
       Shopping (3)
       Wish list (5)
       Hardware store (1)
       ＋ New list…
 ```
 
-- Options: **Today — chores** first, **Things to do** second (§8.11), then every list by name with its open-item count,
+- Options: **Today — chores** first, **Things to do** second (§8.11), **Movies & shows** third (§8.14), then every list by name with its open-item count,
   then **＋ New list…**. Choosing **＋ New list…** opens the **new list** form (name,
   Create; errors inside the dialog); after creating, the picker switches to it.
 - **⋯** (accessible name "List options") next to the picker opens **Rename** / **Delete
@@ -3440,6 +3571,47 @@ not a modal, signed in only):
   expired."; not found → "This sign-in request isn't for you, or it is gone." Each with **Done**, which forgets
   the id, sets the address to `/` and shows the app.
 - Opened when the request is no longer pending, it says so at once (the same texts) without the buttons.
+
+### 8.14 Movies & shows (Lists → Movies & shows, §7F)
+
+A picker option on the 🛒 Lists tab, third, after Things to do ⚑ Q144 — not a new tab.
+
+```
+[ A title, or paste a link…   ][📷][ Find ]
+Dune: Part Two  2024      🍅 92%  📺 Max
+Wicked  2024              🍅 88%  🎟️ In theaters
+The Bear  show            🍅 99%  📺 Hulu
+Hoosiers  1986            🍅 —    💵 Rent
+▸ Watched (4)
+```
+
+- **The box** (placeholder "A title, or paste a link…", accessible name "Movie or show") takes a title or a link:
+  text starting `http://` or `https://` is a link, anything else a title ⚑. **Find** (or Enter) looks it up
+  (§7F.2); **📷** (accessible name "Find from a picture") picks a picture (camera or library), shrinks it as a
+  thing's photo is (§7C.3) and looks it up. While it works the box says "Looking it up…" and Find is disabled.
+- A reading with a title opens the **show form** filled, with "Found by looking it up — check it before saving." at
+  the top ⚑; the box clears when the form saves. A reading with no title says "Couldn't tell which movie or show
+  that is." under the box; a failure shows its message there. The text stays in the box either way, and typed text
+  gets **Add it by hand** under the message, which opens an empty show form with the text as its Title (or Link, for
+  a link) — so a show can always be added, looked up or not.
+- **Rows** (want): newest added first, one line: the title, then the year (or "show" for a show without a year),
+  🍅 and the critics % ("🍅 —" when unknown), and the **best** way to watch (`bestWatch`: theater, then stream, tv,
+  rent, buy ⚑ Q155) as its glyph and `where` — 🎟️ "In theaters" for a theater, 📺 a stream (the service), 📡 tv (the
+  channel), 💵 rent or buy (the store) — or "—" when nothing was found. Tapping a row opens its form.
+- **Watched** is collapsed by default, newest watched first; a row there shows who watched it and when, in place of
+  how to watch ("Oct 4 · Shelly").
+- **The show form** (modal; "New movie or show" / "Edit: {title}"):
+  - Title · **Movie / Show** (two chips, neither = unknown) · Year.
+  - **Rotten Tomatoes:** 🍅 Critics % · 🍿 Audience % (numbers 0–100, empty = unknown).
+  - **How to watch:** one line per option — glyph, `where`, and its note dimmed — each with **✕** (accessible name
+    "Remove {where}"). None: "Nowhere found yet." Under it, muted: "Checked {Oct 4}" or "Not looked up". Options
+    are not typed by hand in v1 ⚑ Q153 (the note is there for that).
+  - **🔄 Check again** (full width, shown when Title holds something) looks it up by the form's title, year and kind,
+    busy "Looking it up…", then **replaces** the ratings, how to watch and Checked, and fills Summary only when
+    empty. It counts as one read. Nothing is saved until Save.
+  - Summary · Link (↗ beside it, as the thing form's) · Note — growing text fields as §8.11.
+  - **Watched** (a want show) / **Want to see it again** (a watched one) — each saves and closes · Save / Cancel /
+    **Delete** (asks first). A 409 `duplicate` shows inside the form.
 
 ### 8.7 Theme
 
@@ -3910,6 +4082,11 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | POST | `/things/{id}/plan` | member | `{ date, time? }` → `{ thing, eventId }`; 400 outside the window |
 | PUT/GET/DELETE | `/things/{id}/photo` | member | PUT raw image body (≤ 4 MB) → 204; GET → the image; DELETE → 204 |
 | POST | `/things/read-photo` | member | raw image body → `{ title, startDate, endDate, place, address, phone, cost, url, note }` (each nullable); 503 / 502 / 422 / 429 per §7C.4 |
+| GET | `/shows` | member | → `{ want: Show[], watched: Show[] }` (want newest added first, watched newest watched first); `Show = { id, title, kind, year, rtCritics, rtAudience, watch: { how, where, note }[], summary, note, url, checkedAt, status, watchedAt, watchedBy, createdBy, createdAt, updatedAt }` (§7F) |
+| POST | `/shows` | member | `{ title, kind?, year?, rtCritics?, rtAudience?, watch?, summary?, note?, url?, checkedAt? }` → show (201); 400 `invalid_input`; 409 `duplicate` (+ `showId`) |
+| GET/PATCH/DELETE | `/shows/{id}` | member | GET → show; PATCH the POST fields, all optional, merged, plus `status: 'want' \| 'watched'` → show; 409 `duplicate`; DELETE → 204 (soft); 404 when gone |
+| POST | `/shows/look-up` | member | `{ title, year?, kind? }` or `{ url }` → `ShowReading` (§7F.2); nothing stored; 400 / 429 / 503 `show_lookup_off` / 422 `show_refused` / 502 `show_lookup_failed` |
+| POST | `/shows/look-up-photo` | member | raw image body → `ShowReading`; the picture is never stored; errors as look-up |
 | POST | `/things/read-link` | member | `{ url }` → the same reading as read-photo; nothing stored; 400 / 429 / 503 `link_reading_off` / 422 `link_refused` / 502 `link_reading_failed` per §7C.4b |
 | GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, commentsError, createdBy, createdAt, updatedAt, emojis: RecipeEmoji[] }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed; `RecipeEmoji = { memberId, emoji }`, §7E.5) (§7E) |
 | POST | `/recipes` | member | `{ title, ingredients, steps, servings?, time? }` → recipe (201), typed by hand; 400 `invalid_input` |
@@ -4125,6 +4302,15 @@ checks.
 - ✅ Manual: the secret and the token file set; a ping from a Claude session arrives on the founder's
   iPhone with its title.
 
+**M4x — Movies & shows** (v1.22.0)
+- Migration 0026 (`shows`), `SHOW_KIND` / `SHOW_STATUS` / `WATCH_HOW`, `src/shared/shows.ts`,
+  `src/shared/show-reading.ts`, `src/worker/show-reader.ts`, the `/shows` routes (`routes/shows.ts`), optional content
+  blocks on `askClaudeResearch`, Lists → Movies & shows (`Shows.tsx`, `ShowForm.tsx`) (§3, §4.2y, §7F, §8.8, §8.14,
+  §10, §12, §13 Q144–Q155).
+- Tests W1–W14, W-M.
+- Manual: a real title, a real clip link and a real screenshot looked up on the deployed URL (the first runs against
+  the real API); the list and the form at 320 px.
+
 **M4v — Each person's speakers** (v1.19.0)
 - Migration 0024 (`member_prefs.house_speakers`, `deliveries.speakers`), `SPEAKER_KIND`, `src/shared/speakers.ts`,
   `src/worker/speaker-choices.ts`, `GET /house/speakers`, `PATCH /me { houseSpeakers }`, the drain speaking on a
@@ -4222,7 +4408,7 @@ Captured from v1.0-draft so nothing is lost:
   actions need network, and buttons show disabled "offline".
 - Queued offline acks
 - Photos anywhere other than Things to do (§7C.3) and list items (§7A.3), the only two
-  attachments. A recipe's video
+  attachments. A picture a show is looked up from (§7F.2) is read once and never stored, so it is not one. A recipe's video
   thumbnail (§7E.1) is hotlinked from YouTube — not stored, not in R2, not an attachment — so it
   is not one. Transcript screenshots (§7E.2b) are read once and never stored — not in R2, not an
   attachment — so they are not one either ⚑ Q93.
@@ -4243,6 +4429,14 @@ Captured from v1.0-draft so nothing is lost:
   goes through Home Assistant's own Assist, never Alexa skills or lists.
 - Chore points, streaks or rewards
 - Shopping list grouped by store aisle; list sharing outside the household; list ordering by hand
+
+### 12.2 Movies & shows — follow-ups (suggested 2026-10-05, not built, need MojoSOGO's word)
+
+- Each person's "I want to see it" emoji on a show, as on recipes (§7E.5), and a "for us all" filter.
+- The household's own services, so "on a service we have" stands out and rent/buy sinks.
+- A weekly re-check that pings the household when a wanted show leaves theaters or lands on a service.
+- Movie night: Plan it onto the calendar from a show (as a thing's Plan it), with showtimes for a theater.
+- Reading a video clip itself (frames), posters and trailers, and the household's own stars after watching.
 
 ### 12.1 Next — decided with MojoSOGO (2026-10-03), spec to be written before building
 
@@ -4399,6 +4593,18 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q140 | How hard a link reading looks | ⚑ At most 3 web searches and 2 page fetches per tap |
 | Q141 | Sending a link to Anthropic | ⚑ The link, the page's text and the searches go to Anthropic, as photos do (Q30) |
 | Q143 | "Closest" for a link with several locations | ⚑ Closest to the household's own place (Oceanside, the sun-alerts location), which MojoSOGO named "San Diego"; with no place set, every location goes in the note |
+| Q144 | Where the movies & shows list lives (§8.14) | ⚑ A third option in the Lists picker, "Movies & shows (n)", not a new tab |
+| Q145 | Where to watch: which country | ⚑ The United States only (`WATCH_COUNTRY` `US`); theaters: up to 3 showing it, closest to the household's place |
+| Q146 | Which ratings | ⚑ Rotten Tomatoes critics (Tomatometer) and audience (Popcornmeter), as rottentomatoes.com shows them; unknown → "🍅 —" |
+| Q147 | Which budget look-ups use | ⚑ The same 40-a-day `photo_reads` budget; each Find, 📷 or Check again is one read |
+| Q148 | How hard a look-up looks | ⚑ At most 5 web searches and 3 page fetches |
+| Q149 | A video clip itself | ⚑ Not read in v1: paste the clip's link, or screenshot a frame |
+| Q150 | The picture a show is found from | ⚑ Read once, never stored |
+| Q151 | Saving a look-up | ⚑ Find opens the show form filled; nothing is saved until Save (as a thing's link reading) |
+| Q152 | The same show twice | ⚑ Same title (ignoring case and spaces) and year → 409 "… is already on the list.", watched or not |
+| Q153 | Editing how to watch | ⚑ Lines can be removed (✕) or refreshed (Check again), not typed by hand |
+| Q154 | Who may change a show | ⚑ Anyone in the household: add, edit, mark watched, delete |
+| Q155 | The row's way to watch | ⚑ The best option: theater, then stream, tv, rent, buy |
 | Q142 | Where "Fill in from this link" sits | ⚑ A full-width button right under the Link field, only when the field holds a usable link; reading starts on the tap, never on paste |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
@@ -4612,6 +4818,16 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**M4x Movies & shows** (v1.22.0, §7F, §8.14; asked by MojoSOGO 2026-10-05; 596 tests incl. W1–W14 and W-M): Lists →
+**Movies & shows** — type a title, paste a link or snap a picture, and **Find** has Claude look it up (web search ≤ 5
+with `user_location` country US, web fetch ≤ 3) and fill the show form: Rotten Tomatoes critics / audience, how to watch
+in the US (theaters closest to home, streaming, tv, rent, buy), summary. Nothing is saved until Save; Check again
+refreshes a saved one; Watched records who and when. Counted in the 40-a-day `photo_reads` budget. Migration 0026
+(§4.2y). Placement: `spendPhotoRead` (photo-reads.ts) and `householdPlace` (db.ts) opened first in their own commit.
+Built as (not in the first draft of the spec): **Add it by hand** after a failed or empty look-up, so a show can always
+be added. Checked locally at 320 px (rows one line, 44 px, no sideways scroll; the form fits) with the look-up off; the
+look-up itself is tested only against a fake Claude. **Still owed:** a real title, clip link and screenshot looked up on
+the deployed URL (the first run against the real API); Q144–Q155 are ⚑ defaults awaiting MojoSOGO; follow-ups in §12.2.
 **Fill a thing from a link** (v1.21.0, §7C.4b, §8.11; asked by MojoSOGO 2026-10-04; D14–D22 green; v1.21.1 picks the location closest to home): under the thing
 form's Link, **🔗 Fill in from this link** fetches the page from the Worker (title, meta, JSON-LD, text), has Claude
 look it up with web search (≤ 3) and web fetch (≤ 2), then fills the empty fields marked *from link — check it*.

@@ -1,4 +1,5 @@
 // Thin D1 helpers + id minting. D1 has no BEGIN/COMMIT — group writes with db.batch().
+import type { Place } from '../shared/sun';
 
 const BASE32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // Crockford
 
@@ -37,4 +38,10 @@ export function parseJson<T>(text: string | null, fallback: T): T {
 /** The household timezone (§4.1), from the settings row. */
 export async function householdTz(db: D1Database): Promise<string> {
   return (await first<{ timezone: string }>(db, 'SELECT timezone FROM settings WHERE id = 1'))!.timezone;
+}
+
+/** The household's own place (§7.7), or null when none is set. */
+export async function householdPlace(db: D1Database): Promise<Place | null> {
+  const at = await first<{ lat: number | null; lon: number | null }>(db, 'SELECT latitude AS lat, longitude AS lon FROM settings WHERE id = 1');
+  return at && at.lat !== null && at.lon !== null ? { lat: at.lat, lon: at.lon } : null;
 }

@@ -5,12 +5,12 @@ import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { READS_PER_DAY, URL_MAX, cleanPhotoReading } from '../../shared/things';
 import { readableLink } from '../../shared/link-reading';
-import { first, nowIso, randomBase32, run } from '../db';
+import { householdPlace, nowIso, randomBase32, run } from '../db';
 import { body, fail, photoBody } from '../http';
 import { requireMember } from '../session';
 import { readPhoto } from '../photo-reader';
 import { readLink } from '../link-reader';
-import { householdToday, photoReadsUsedUp, recordPhotoRead } from '../photo-reads';
+import { spendPhotoRead } from '../photo-reads';
 import { loadThing } from './things';
 
 export const thingPhotos = new Hono<AppEnv>();
@@ -20,14 +20,11 @@ export const thingPhotos = new Hono<AppEnv>();
  * read is counted. → the key and today, or the answer to send.
  */
 async function spendRead(c: Context<AppEnv>, off: string, offMessage: string) {
-  const db = c.env.DB, now = nowIso();
-  const { tz, today } = await householdToday(db, now);
-  if (await photoReadsUsedUp(db, today, tz)) {
-    return fail(c, 429, 'rate_limited', `Photos and links can be read ${READS_PER_DAY} times a day, and today's are used up. Try again tomorrow, or fill the fields in by hand.`);
-  }
-  if (!c.env.ANTHROPIC_API_KEY) return fail(c, 503, off, offMessage);
-  await recordPhotoRead(db, now, c.get('member').id);
-  return { apiKey: c.env.ANTHROPIC_API_KEY, tz, today };
+  const spent = await spendPhotoRead(c.env.DB, nowIso(), c.get('member').id, c.env.ANTHROPIC_API_KEY);
+  if (spent.ok) return spent;
+  return spent.why === 'used_up'
+    ? fail(c, 429, 'rate_limited', `Photos and links can be read ${READS_PER_DAY} times a day, and today's are used up. Try again tomorrow, or fill the fields in by hand.`)
+    : fail(c, 503, off, offMessage);
 }
 
 thingPhotos.post('/things/read-photo', requireMember, async (c) => {
@@ -36,7 +33,7 @@ thingPhotos.post('/things/read-photo', requireMember, async (c) => {
   if (photo instanceof Response) return photo;
   const spent = await spendRead(c, 'photo_reading_off', "Reading photos isn't set up yet.");
   if (spent instanceof Response) return spent;
-  const r = await readPhoto({ ...spent, bytes: photo.bytes, mediaType: photo.type });
+  const r = await readPhoto({ apiKey: spent.apiKey, tz: spent.tz, today: spent.today, bytes: photo.bytes, mediaType: photo.type });
   if (!r.ok && r.kind === 'refused') return fail(c, 422, 'photo_refused', "Couldn't read that photo.");
   if (!r.ok) return fail(c, 502, 'photo_reading_failed', `Couldn't read that photo: ${r.reason}`);
   return c.json(cleanPhotoReading(r.raw, spent.today));
@@ -49,9 +46,7 @@ thingPhotos.post('/things/read-link', requireMember, async (c) => {
   if (!url) return fail(c, 400, 'invalid_input', "That link can't be read.");
   const spent = await spendRead(c, 'link_reading_off', "Reading links isn't set up yet.");
   if (spent instanceof Response) return spent;
-  const at = await first<{ lat: number | null; lon: number | null }>(c.env.DB, 'SELECT latitude AS lat, longitude AS lon FROM settings WHERE id = 1');
-  const home = at && at.lat !== null && at.lon !== null ? { lat: at.lat, lon: at.lon } : null;
-  const r = await readLink({ ...spent, url, home });
+  const r = await readLink({ apiKey: spent.apiKey, tz: spent.tz, today: spent.today, url, home: await householdPlace(c.env.DB) });
   if (!r.ok && r.kind === 'refused') return fail(c, 422, 'link_refused', "Couldn't read that link.");
   if (!r.ok) return fail(c, 502, 'link_reading_failed', `Couldn't read that link: ${r.reason}`);
   return c.json(cleanPhotoReading(r.raw, spent.today));

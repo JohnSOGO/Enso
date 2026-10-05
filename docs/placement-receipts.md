@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-05 — Movies & shows (placement-advisor; feature/movies-shows)
+
+- **Ask:** place §7F: a shared watch list (want / watched), looked up by title, link or picture with Claude's web
+  search and web fetch (US availability, nearest theaters), filled into a form and saved only on Save.
+- **Verdict:** new owners `src/shared/shows.ts` (rules), `src/shared/show-reading.ts` (prompts), `src/worker/show-reader.ts`
+  (pipeline), `src/worker/routes/shows.ts`, `frontend/src/components/Shows.tsx` and `ShowForm.tsx`; existing owners
+  vocab.ts, claude.ts (optional `content` on askClaudeResearch), photo-reader.ts (exports imageBlock), index.ts,
+  HouseholdLists.tsx; migration 0026. Rejected: the zod schema in shared (package ban); widening ItemPhoto.tsx (tied
+  to list items); a Check-again route that writes in place (breaks nothing-saved-until-Save); splitting the route file.
+- **Reorganizer first (two-commit rule):** the cap → key → count steps existed twice (thing-photos' spendRead, inline in
+  item-photos); a third copy would let them drift. `spendPhotoRead` went into photo-reads.ts without Hono (each route
+  keeps its own messages) and `householdPlace` into db.ts, in their own commit before the feature.
+- **Caps:** every touched file under 300; HouseholdLists.tsx the tightest. things.ts (84 %) deliberately untouched.
+
+---
+
 ## 2026-10-04 — Fill a thing from a pasted link (placement-advisor; feature/thing-from-link)
 
 - **Ask:** place §7C.4b: `POST /things/read-link` (link check, the Worker fetches the page, pure HTML extraction,

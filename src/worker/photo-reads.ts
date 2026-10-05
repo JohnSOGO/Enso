@@ -22,3 +22,15 @@ export async function photoReadsUsedUp(db: D1Database, today: string, tz: string
 export async function recordPhotoRead(db: D1Database, at: string, memberId: string): Promise<void> {
   await run(db, 'INSERT INTO photo_reads (at, member_id) VALUES (?, ?)', at, memberId);
 }
+
+export type SpentRead = { ok: true; apiKey: string; tz: string; today: string } | { ok: false; why: 'used_up' | 'off' };
+
+/** The §7C.4 budget steps every Claude reading shares: the daily cap, then the key, then the read is counted. The
+ *  caller owns the 429 / 503 messages. */
+export async function spendPhotoRead(db: D1Database, now: string, memberId: string, apiKey: string | undefined): Promise<SpentRead> {
+  const { tz, today } = await householdToday(db, now);
+  if (await photoReadsUsedUp(db, today, tz)) return { ok: false, why: 'used_up' };
+  if (!apiKey) return { ok: false, why: 'off' };
+  await recordPhotoRead(db, now, memberId);
+  return { ok: true, apiKey, tz, today };
+}
