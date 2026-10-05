@@ -164,7 +164,7 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
       </fieldset>
       {chore && canEdit && (
         <div className="row wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-          <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete chore "${chore.title}"?`)) run(() => del(`/chores/${chore.id}`)); }}>Delete chore</button>
+          <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete chore "${chore.title}" and what done looks like for it?`)) run(() => del(`/chores/${chore.id}`)); }}>Delete chore</button>
         </div>
       )}
     </Modal>

@@ -1,4 +1,4 @@
-// SPEC §8.8 — the Lists popup: one button per view (Today, Things to do, Movies & shows, every list with its emoji
+// SPEC §8.8 — the Lists popup: one button per view (Things to do, Movies & shows, every list with its emoji
 // and open count, ＋ New list…), the chosen one marked. Holds no state of its own; HouseholdLists decides what each
 // pick means and remembers it.
 import { Modal } from './Modal';

@@ -7,6 +7,23 @@ carry its result.
 
 ---
 
+## 2026-10-05 — Chores tab and what done looks like (coordinating session)
+
+- **Ask:** chores get their own section, and each chore a "what done looks like" with specific areas, pictures and
+  a list of expectations.
+- **Verdict:** `src/shared/chore-areas.ts` [NEW] (limits, parseAreaInput, the ChoreArea wire type — pure),
+  `src/worker/routes/chore-areas.ts` [NEW] (areas + their R2 photos; exports areaCounts and choreAreaDeletes),
+  `frontend/src/components/ChoreAreas.tsx` [NEW] (the sheet) and `ChoreAreaForm.tsx` [NEW] (the editor), migration
+  0029. Edits to existing owners: `Chores.tsx` becomes the tab (Today + All chores), `routes/chores.ts` (areaCount,
+  delete takes the areas), `ChoresToday.tsx` (📋), `App.tsx` (sixth tab, the sheet overlay), and Chores leaving
+  `Alarms.tsx` and `HouseholdLists.tsx`.
+- **Why:** areas are their own concern (reference content with photos, editable by anyone), not run rules, so they
+  sit beside chores.ts rather than in it (241/300). Photos follow the list-item pattern (R2, private, key never on
+  the wire) with a row per photo because an area holds several. The sheet and its editor are separate views so the
+  tab file stays small.
+- **Caps:** no pinned file touched; none of the new or edited files near the band. **Reorganizer:** none needed.
+  No `placement-advisor` agent exists in this checkout; placed by the coordinating session.
+
 ## 2026-10-05 — Machine alert hours (coordinating session)
 
 - **Ask:** washer/dryer alerts sound only in editable hours (weekdays 17:30–20:30, weekends 09:00–21:00).

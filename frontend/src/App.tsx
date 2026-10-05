@@ -7,8 +7,9 @@ import { DaySheet } from './components/DaySheet';
 import { EventForm } from './components/EventForm';
 import { TimerForm, type Timer } from './components/Timers';
 import { Alarms, AlarmForm, type Alarm } from './components/Alarms';
-import { type Chore } from './components/Chores';
+import { ChoresTab, type Chore } from './components/Chores';
 import { ChoreForm } from './components/ChoreForm';
+import { ChoreAreas } from './components/ChoreAreas';
 import { HouseholdLists } from './components/HouseholdLists';
 import { Recipes } from './components/Recipes';
 import { Settings } from './components/Settings';
@@ -23,7 +24,7 @@ import { Modal } from './components/Modal';
 import s from './App.module.css';
 
 /** The bottom tab bar (§8.1): the one list of tabs — id, icon, label. */
-const NAV = [['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alarms'], ['lists', '🛒', 'Lists'], ['recipes', '🍳', 'Recipes'], ['settings', '⚙', 'Settings']] as const;
+const NAV = [['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alarms'], ['chores', '🧹', 'Chores'], ['lists', '🛒', 'Lists'], ['recipes', '🍳', 'Recipes'], ['settings', '⚙', 'Settings']] as const;
 type Tab = (typeof NAV)[number][0];
 const TABS: readonly Tab[] = NAV.map(([id]) => id);
 /** §8.1 ⚑ Q38 — the House badge per server-reported state; `ok` and `untried` show none. */
@@ -39,6 +40,7 @@ type Overlay =
   | { kind: 'timer'; timer: Timer | null }
   | { kind: 'alarm'; alarm: Alarm | null }
   | { kind: 'chore'; chore: Chore | null }
+  | { kind: 'areas'; chore: Chore }
   | { kind: 'explain'; title: string; text: string }
   | null;
 
@@ -75,8 +77,8 @@ function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boo
       )}
       <main className={s.main}>
         {tab === 'calendar' && <Calendar onOpenDay={(date, data) => setOverlay({ kind: 'day', date, data })} />}
-        {tab === 'alarms' && <Alarms onEditAlarm={(alarm) => setOverlay({ kind: 'alarm', alarm })} onEditTimer={(timer) => setOverlay({ kind: 'timer', timer })}
-          onEditChore={(chore) => setOverlay({ kind: 'chore', chore })} />}
+        {tab === 'alarms' && <Alarms onEditAlarm={(alarm) => setOverlay({ kind: 'alarm', alarm })} onEditTimer={(timer) => setOverlay({ kind: 'timer', timer })} />}
+        {tab === 'chores' && <ChoresTab onEdit={(chore) => setOverlay({ kind: 'chore', chore })} onOpenAreas={(chore) => setOverlay({ kind: 'areas', chore })} />}
         {tab === 'lists' && <HouseholdLists pickRequest={listsTap} />}
         {tab === 'recipes' && <Recipes />}
         {tab === 'settings' && <Settings onLogout={onLogout} />}
@@ -101,6 +103,9 @@ function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boo
       {overlay?.kind === 'timer' && <TimerForm timer={overlay.timer} onClose={() => setOverlay(null)} />}
       {overlay?.kind === 'alarm' && <AlarmForm alarm={overlay.alarm} onClose={() => setOverlay(null)} />}
       {overlay?.kind === 'chore' && <ChoreForm chore={overlay.chore} onClose={() => setOverlay(null)} />}
+      {overlay?.kind === 'areas' && (
+        <ChoreAreas chore={overlay.chore} onClose={() => setOverlay(null)} onEditChore={() => setOverlay({ kind: 'chore', chore: overlay.chore })} />
+      )}
       {overlay?.kind === 'explain' && (
         <Modal title={overlay.title} onClose={() => setOverlay(null)} footer={<button onClick={() => setOverlay(null)}>OK</button>}>
           <p>{overlay.text}</p>

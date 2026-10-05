@@ -1,5 +1,5 @@
-// SPEC §8.8 — Lists → Today: today's chore runs, Mine | Everyone, tap a row to tick the current
-// step, ↶ to undo the last one. Whose turn and what rings next come from the server (§7B).
+// SPEC §8.15 — Chores → Today: today's chore runs, Mine | Everyone, tap a row to tick the current
+// step, ↶ to undo the last one, 📋 for what done looks like. Whose turn and what rings next come from the server (§7B).
 import { useEffect, useState } from 'react';
 import { errorText, get, post } from '../api';
 import { useApp } from '../state';
@@ -12,7 +12,7 @@ import s from './ChoresToday.module.css';
 export interface Run {
   id: string; choreId: string; title: string; doneMeans: string | null; timing: ChoreTiming; time: string;
   step: number; steps: ChoreStep[]; assigneeId: string | null; personId: string | null;
-  doneAt: string | null; doneBy: string | null; nextDueAt: string | null; ringing: boolean;
+  doneAt: string | null; doneBy: string | null; nextDueAt: string | null; ringing: boolean; areaCount: number;
 }
 
 const SCOPES = [['mine', 'Mine'], ['everyone', 'Everyone']] as const;
@@ -23,7 +23,7 @@ function initialScope(): Scope {
   try { return localStorage.getItem(STORE_KEY) === 'everyone' ? 'everyone' : 'mine'; } catch { return 'mine'; }
 }
 
-export function ChoresToday() {
+export function ChoresToday({ onOpenAreas }: { onOpenAreas: (choreId: string) => void }) {
   const { me, version, refresh, localTime, memberById } = useApp();
   const [scope, setScope] = useState<Scope>(initialScope);
   const [runs, setRuns] = useState<Run[] | null>(null);
@@ -85,6 +85,10 @@ export function ChoresToday() {
               {body}
             </button>
           )}
+        {(r.doneMeans || r.areaCount > 0) && (
+          <button className={`plain ${s.undo} ${s.look}`} onClick={() => onOpenAreas(r.choreId)}
+            aria-label={`What done looks like for ${r.title}`} title={`What done looks like for ${r.title}`}>📋</button>
+        )}
         {r.step > 0 && (
           <button className={`plain ${s.undo}`} disabled={busy === r.id} onClick={() => act(r, 'undo')}
             aria-label={`Undo last step of ${r.title}`} title={`Undo last step of ${r.title}`}>↶</button>

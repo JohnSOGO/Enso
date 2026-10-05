@@ -1,9 +1,8 @@
-// SPEC §8.8 — the 🛒 Lists tab: the list button and its ListPicker popup (Today + Things to do + Movies & shows + every
-// list with its emoji + ＋ New list…, opened by each tap of the tab), ⋯ options, composing ChoresToday, ThingsToDo (§8.11), Shows (§8.14) and HouseholdListOptions, and the list panel (add box with ItemPhoto's 📷,
+// SPEC §8.8 — the 🛒 Lists tab: the list button and its ListPicker popup (Things to do + Movies & shows + every
+// list with its emoji + ＋ New list…, opened by each tap of the tab), ⋯ options, composing ThingsToDo (§8.11), Shows (§8.14) and HouseholdListOptions, and the list panel (add box with ItemPhoto's 📷,
 // rows, Done). Every list behaves the same (Q24). The server decides added / existing / reopened and who may manage
 // a list (§7A.1); this screen shows what it returns. A snapped photo waits here until Add, then is saved (§7A.3).
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { ChoresToday } from './ChoresToday';
 import { ThingsToDo } from './ThingsToDo';
 import { Shows } from './Shows';
 import { ItemForm, type Item } from './HouseholdListItemForm';
@@ -19,9 +18,8 @@ import s from './HouseholdLists.module.css';
 interface ListData { list: Omit<ListSummary, 'openCount'>; open: Item[]; checked: Item[] }
 type AddResult = 'added' | 'existing' | 'reopened';
 
-/** Remembered per device: a list id, TODAY, THINGS or SHOWS. */
+/** Remembered per device: a list id, THINGS or SHOWS. (An old `today` falls back to Shopping: chores have their own tab, §8.15.) */
 const STORE_KEY = 'enso.list';
-const TODAY = 'today';
 const THINGS = 'things';
 const SHOWS = 'shows';
 
@@ -57,13 +55,12 @@ export function HouseholdLists({ pickRequest }: { pickRequest: number }) {
   useEffect(() => { if (choice) try { localStorage.setItem(STORE_KEY, choice); } catch { /* storage may be blocked: the choice just isn't remembered */ } }, [choice]);
 
   // A remembered list that no longer exists falls back to Shopping, else the first list (§8.8).
-  const special = choice === TODAY || choice === THINGS || choice === SHOWS;
+  const special = choice === THINGS || choice === SHOWS;
   const current = special || lists === null ? undefined
     : lists.find((l) => l.id === choice) ?? lists.find((l) => l.id === SHOPPING_LIST_ID) ?? lists[0];
   const view = special ? choice : current?.id ?? '';
 
   const entries = pickerEntries(lists ?? [], [
-    { value: TODAY, emoji: '🧹', label: 'Today — chores' },
     { value: THINGS, emoji: '✅', label: 'Things to do', count: thingsOpen },
     { value: SHOWS, emoji: '🎬', label: 'Movies & shows', count: showsWant },
   ]);
@@ -92,8 +89,7 @@ export function HouseholdLists({ pickRequest }: { pickRequest: number }) {
 
       {error && <div role="alert" className="alert-error">{error}</div>}
       {/* Keyed by list: switching lists starts a fresh panel (empty add box, no note, reloads). */}
-      {view === TODAY ? <ChoresToday />
-        : view === THINGS ? <ThingsToDo />
+      {view === THINGS ? <ThingsToDo />
         : view === SHOWS ? <Shows onChanged={loadLists} />
         : current ? <ListPanel key={current.id} list={current} onItemsChanged={loadLists} />
         : lists && <p className="muted">No lists yet. Tap the list button, then ＋ New list…, to make one.</p>}

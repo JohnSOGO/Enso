@@ -1,4 +1,4 @@
-/* SPEC §8.8 — Lists → Today only. Tick rows reuse Lists.module.css (.list, .item, .title, .row, .main, .box, .done, .checked). */
+/* SPEC §8.15 — Chores → Today only. Tick rows reuse Lists.module.css (.list, .item, .title, .row, .main, .box, .done, .checked). */
 .scope {
   display: inline-grid; grid-template-columns: 1fr 1fr; margin-bottom: 10px;
   border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
@@ -10,3 +10,4 @@
 .doneMeans { font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .when { flex: none; white-space: nowrap; font-size: .8rem; font-variant-numeric: tabular-nums; }
 .undo { flex: none; min-width: 44px; min-height: 44px; font-size: 1.15rem; color: var(--text-dim); }
+.look { font-size: 1rem; } /* 📋 What done looks like, sized as ↶ */

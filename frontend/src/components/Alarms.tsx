@@ -1,8 +1,7 @@
-// SPEC §8.5 — Alarms tab: 📢 Announce (§9.3), Scheduled alarms (days of week + time), Rolling timers, Machines and Chores.
+// SPEC §8.5 — Alarms tab: 📢 Announce (§9.3), Scheduled alarms (days of week + time), Rolling timers and Machines.
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
 import { TimersSection, type Timer } from './Timers';
-import { ChoresSection, type Chore } from './Chores';
 import { MachinesSection } from './Machines';
 import { Announce } from './Announce';
 import { ChannelChecks, DayChips, RenotifySelect, SHORT, daysText } from './AlertFields';
@@ -137,9 +136,7 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
   );
 }
 
-export function Alarms({ onEditAlarm, onEditTimer, onEditChore }: {
-  onEditAlarm: (a: Alarm | null) => void; onEditTimer: (t: Timer | null) => void; onEditChore: (c: Chore | null) => void;
-}) {
+export function Alarms({ onEditAlarm, onEditTimer }: { onEditAlarm: (a: Alarm | null) => void; onEditTimer: (t: Timer | null) => void }) {
   return (
     <div style={{ padding: 12, overflowY: 'auto', height: '100%' }}>
       <h1 style={{ fontSize: '1.15rem', marginBottom: 12 }}>Alarms</h1>
@@ -147,7 +144,6 @@ export function Alarms({ onEditAlarm, onEditTimer, onEditChore }: {
       <ScheduledSection onEdit={onEditAlarm} />
       <TimersSection onEdit={onEditTimer} />
       <MachinesSection />
-      <ChoresSection onEdit={onEditChore} />
     </div>
   );
 }
