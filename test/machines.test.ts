@@ -6,7 +6,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Client, member, owner, tickAt } from './helpers';
 import {
   MACHINE_MAX_ALERTS, MACHINE_MINUTES, MACHINE_RENOTIFY_MIN, clearMachine, doneMessage, finishMachine, machineAlertConfig, machineState,
-  moveMachine, parseMove, parseStart, refusalText, startMachine, waitingLoad, type MachineRow,
+  isStillLoaded, moveMachine, parseMove, parseStart, refusalText, remindMachine, startMachine, waitingLoad, type MachineRow,
 } from '../src/shared/machines';
 import { alertMessage, applyAction, newMachineFire, pushActions, stepFire, type FireRow } from '../src/shared/engine';
 import { machineWrites } from '../src/worker/routes/machines';
@@ -78,6 +78,23 @@ describe('L1–L2 the pure rules (machines.ts)', () => {
     const c = clearMachine(running('washer', 'A', T), fireOf('washer', T), 'B', addMinutes(T, -20));
     expect(c).toMatchObject({ rows: [{ id: 'washer', owner_id: null }], closeFire: { close_reason: 'removed', closed_by: 'B' } });
     expect(clearMachine(row('dryer'), null, 'B', now)).toMatchObject({ error: 'already_free' });
+  });
+
+  it('L14 Still loaded: a done load restarts its reminders now; the message says what the load needs next', () => {
+    const w = running('washer', 'A', T), now = addMinutes(T, 70);
+    const r = remindMachine(w, { ...fireOf('washer', T), state: 'ringing' }, 'B', now);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.rows).toEqual([{ ...w, updated_at: now }]);
+    expect(r.closeFire).toMatchObject({ state: 'closed', close_reason: 'superseded', closed_by: 'B', closed_at: now });
+    expect(r.newFire).toMatchObject({ kind: 'machine', machine_id: 'washer', due_at: now, state: 'scheduled' });
+    expect(remindMachine(w, null, 'B', addMinutes(T, -1))).toMatchObject({ error: 'not_done' });
+    expect(remindMachine(row('dryer'), null, 'B', now)).toMatchObject({ error: 'not_done' });
+    expect(isStillLoaded(w, T)).toBe(false);
+    expect(isStillLoaded(w, now)).toBe(true);
+    expect(doneMessage('washer', 'Sam', undefined, true)).toBe('Sam, your laundry is still in the washer — move it to the dryer');
+    expect(doneMessage('dryer', 'Sam', undefined, true)).toBe('Sam, your laundry is still in the dryer — take it out');
+    expect(doneMessage('washer', null, undefined, true)).toBe('The laundry is still in the washer — move it to the dryer');
+    expect(doneMessage('dryer', 'Sam', 'Kai', true)).toBe("Sam, your laundry is still in the dryer — take it out — Kai's load is waiting");
   });
 
   it('refusal texts and input rules', () => {
@@ -240,6 +257,30 @@ describe('M4l /machines (L3–L12)', () => {
     const again = await o.post('/machines/dryer/clear');
     expect(again.status).toBe(409);
     expect(again.json).toEqual({ error: 'already_free', message: 'The dryer is already free.' });
+  });
+
+  it('L15 Still loaded on a done washer: the old fire closes superseded; a new one rings now, every 15 min, 4 times', async () => {
+    await o.post('/machines/washer/start', { ownerId: A, minutes: 30 });
+    await finishedAgo('washer', 70);
+    const old = await openFire('washer');
+    const notDone = await o.post('/machines/dryer/remind');
+    expect(notDone.status).toBe(409);
+    expect(notDone.json).toMatchObject({ error: 'not_done' });
+
+    const r = await bClient.post('/machines/washer/remind');
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    expect(r.json.find((m: any) => m.id === 'washer')).toMatchObject({ state: 'done', ownerId: A });
+    expect((await firesOf('washer')).find((f) => f.id === old.id)).toMatchObject({ state: 'closed', close_reason: 'superseded', closed_by: B });
+    const fresh = await openFire('washer');
+    expect(fresh).toMatchObject({ kind: 'machine', state: 'scheduled' });
+
+    for (const n of [0, 1, 2, 3, 4]) await tickAt(o, addMinutes(fresh.due_at, 15 * n));
+    const sent = await deliveriesOf(fresh.id);
+    expect(sent).toHaveLength(8); // 4 alerts × (A's phone + the house)
+    expect(sent.find((d) => d.alert_number === 1 && d.channel === 'house').message)
+      .toBe(`${A_NAME}, your laundry is still in the washer — move it to the dryer`);
+    expect(sent.find((d) => d.alert_number === 4 && d.channel === 'push').message)
+      .toBe(`${A_NAME}, your laundry is still in the washer — move it to the dryer (alert 4)`);
   });
 
   it('L11 two Start taps at once: one wins, the other is a 409, one open fire', async () => {

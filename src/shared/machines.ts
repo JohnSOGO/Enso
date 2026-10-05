@@ -89,6 +89,23 @@ export function clearMachine(row: MachineRow, openFire: FireRow | null, by: stri
   return { rows: [freed(row, now)], closeFire: openFire ? closeFire(openFire, 'removed', by, now) : undefined };
 }
 
+/**
+ * Still loaded: a done load nobody has moved yet. Its open fire closes `superseded` and a new one
+ * rings now, so the 15-minute reminders run again from the first (§7D.2, §7D.3).
+ */
+export function remindMachine(row: MachineRow, openFire: FireRow | null, by: string, now: string): MachineResult {
+  if (machineState(row, now) !== 'done') return { error: 'not_done', machine: row };
+  return {
+    rows: [{ ...row, updated_at: now }],
+    closeFire: openFire ? closeFire(openFire, 'superseded', by, now) : undefined,
+    newFire: newMachineFire(row.id, now),
+  };
+}
+
+/** §7D.3 — a fire due after the machine's done-at was restarted by Still loaded. */
+export const isStillLoaded = (row: MachineRow, fireDueAt: string): boolean =>
+  row.done_at !== null && ms(fireDueAt) > ms(row.done_at);
+
 /** The refusal's message (§7D.2). `names`: display names of active members. */
 export function refusalText(r: MachineRefusal, names: ReadonlyMap<string, string>): string {
   const label = MACHINE_LABEL[r.machine.id];
@@ -108,10 +125,14 @@ export function refusalText(r: MachineRefusal, names: ReadonlyMap<string, string
 /**
  * §7D.3 — the done message. `ownerName`: the owner if still active, else null. `waiting`: the
  * name of a done load waiting in the machine before (null when that owner is not active), or
- * undefined when no load is waiting.
+ * undefined when no load is waiting. `still`: the reminders were restarted by Still loaded, so the
+ * message says what the load needs next.
  */
-export function doneMessage(id: MachineId, ownerName: string | null, waiting?: string | null): string {
-  const base = ownerName ? `${ownerName}, your laundry in the ${lower(id)} is done` : `The laundry in the ${lower(id)} is done`;
+export function doneMessage(id: MachineId, ownerName: string | null, waiting?: string | null, still = false): string {
+  const next = nextMachine(id);
+  const base = !still
+    ? ownerName ? `${ownerName}, your laundry in the ${lower(id)} is done` : `The laundry in the ${lower(id)} is done`
+    : `${ownerName ? `${ownerName}, your laundry is` : 'The laundry is'} still in the ${lower(id)} — ${next ? `move it to the ${lower(next)}` : 'take it out'}`;
   if (waiting === undefined) return base;
   return `${base} — ${waiting ? `${waiting}'s load` : 'another load'} is waiting`;
 }

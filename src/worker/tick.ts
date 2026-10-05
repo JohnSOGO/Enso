@@ -6,7 +6,7 @@ import {
 import { DEFAULT_MAX_ALERTS, choreFireContext, choreFromRow, planChoreRuns, type Chore, type ChoreRow, type ChoreRun } from '../shared/chores';
 import { isStartReminder, planThingFires, type ThingRow } from '../shared/things';
 import { audience } from '../shared/optins';
-import { doneMessage, isMachineId, machineAlertConfig, waitingLoad, type MachineRow } from '../shared/machines';
+import { doneMessage, isMachineId, isStillLoaded, machineAlertConfig, waitingLoad, type MachineRow } from '../shared/machines';
 import type { Channel, SunEvent } from '../shared/vocab';
 import type { Recurrence } from '../shared/recurrence';
 import { addMinutes, utcToLocal } from '../shared/time';
@@ -96,12 +96,12 @@ interface Source {
 
 /** Loads the alert config + title for a fire from its event, timer, chore run, thing or machine (as of `now`). */
 export async function sourceOf(
-  db: D1Database, fire: Pick<FireRow, 'kind' | 'event_id' | 'timer_id' | 'chore_run_id' | 'thing_id' | 'machine_id' | 'occurrence_date'>,
+  db: D1Database, fire: Pick<FireRow, 'kind' | 'event_id' | 'timer_id' | 'chore_run_id' | 'thing_id' | 'machine_id' | 'occurrence_date' | 'due_at'>,
   now: string,
 ): Promise<Source | null> {
   if (fire.kind === 'machine') {
     // §7D.3: the load's owner (if still active, else everyone), Phone + House; a done load waiting
-    // in the machine before this one is named at alert time.
+    // in the machine before this one is named at alert time; a fire restarted by Still loaded says what's next.
     if (!isMachineId(fire.machine_id)) return null;
     const rows = await all<MachineRow>(db, 'SELECT * FROM machines');
     const m = rows.find((r) => r.id === fire.machine_id);
@@ -111,7 +111,7 @@ export async function sourceOf(
     const owner = await nameOf(m.owner_id);
     const waiting = waitingLoad(rows, m.id, now);
     return {
-      title: doneMessage(m.id, owner, waiting ? await nameOf(waiting.owner_id) : undefined),
+      title: doneMessage(m.id, owner, waiting ? await nameOf(waiting.owner_id) : undefined, isStillLoaded(m, fire.due_at)),
       assignedTo: owner !== null ? [m.owner_id!] : [], cfg: machineAlertConfig(),
     };
   }
