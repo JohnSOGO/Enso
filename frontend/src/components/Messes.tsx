@@ -1,11 +1,11 @@
 // SPEC §8.15a — the Messes section of the 🧹 Chores tab: 📸 Report a mess, Waiting for answers, To talk about (an
 // admin records whose it was), and Balances (who owes whom, each pair's owed messes, Paid back / Let it go). The
-// server decides who is asked, the state and the balances (§7B.7); nothing is derived here.
+// server decides who is asked, the state and the balances (§7B.7); who may answer, settle or delete is the shared rule.
 import { useCallback, useEffect, useState } from 'react';
 import { MessReport } from './MessReport';
 import { apiUrl, del, errorText, get, post } from '../api';
 import { useApp } from '../state';
-import type { Balance, Mess } from '../../../src/shared/messes';
+import { canDelete, canSettle, isAnswerable, type Balance, type Mess } from '../../../src/shared/messes';
 import s from './Messes.module.css';
 
 const NOBODY = 'nobody'; // the "Whose was it?" choice that closes a mess as nobody's
@@ -65,7 +65,7 @@ function MessRow({ m, act, busy, owedView }: { m: Mess; act: ReturnType<typeof u
   const admin = me.role === 'owner';
   const date = new Date(m.createdAt).toLocaleDateString(undefined, { timeZone: tz });
   const when = new Date(m.createdAt).toLocaleDateString('en-CA', { timeZone: tz }) === today() ? localTime(m.createdAt) : date;
-  const answerable = m.status === 'open' || m.status === 'discuss';
+  const viewer = { id: me.id, admin };
   const decide = (choice: string) => {
     const who = choice === NOBODY ? null : choice;
     if (confirm(who ? `Record that this was ${name(who)}'s?` : 'Close this mess as nobody\'s?')) act(m.id, () => post(`/messes/${m.id}/decide`, { memberId: who }));
@@ -76,11 +76,11 @@ function MessRow({ m, act, busy, owedView }: { m: Mess; act: ReturnType<typeof u
       <div className={s.body}>
         <div><b>{messWhat(m)}</b></div>
         <div className="muted">{m.reportedBy === me.id ? 'You' : name(m.reportedBy)} cleaned this up · {when}</div>
-        {m.deniedBy.length > 0 && answerable && <div className="muted">Not me: {m.deniedBy.map(name).join(', ')}</div>}
+        {m.deniedBy.length > 0 && isAnswerable(m.status) && <div className="muted">Not me: {m.deniedBy.map(name).join(', ')}</div>}
         {m.status === 'owed' && <div className="muted">{m.claimedBy === me.id ? 'Yours' : `${name(m.claimedBy)}'s`}{m.assignedBy ? ` (recorded by ${name(m.assignedBy)})` : ''}</div>}
         <div className={s.actions}>
           {m.asked.includes(me.id) && <AnswerButtons m={m} busy={busy} act={act} />}
-          {owedView && (m.reportedBy === me.id || admin) && <>
+          {owedView && canSettle(m, viewer) && <>
             <button className="primary" disabled={busy} onClick={() => act(m.id, () => post(`/messes/${m.id}/settle`, { how: 'paid' }))}>Paid back</button>
             <button disabled={busy} onClick={() => act(m.id, () => post(`/messes/${m.id}/settle`, { how: 'forgiven' }))}>Let it go</button>
           </>}
@@ -91,7 +91,7 @@ function MessRow({ m, act, busy, owedView }: { m: Mess; act: ReturnType<typeof u
               <option value={NOBODY}>Nobody's</option>
             </select>
           )}
-          {(admin || (m.reportedBy === me.id && answerable)) && (
+          {canDelete(m, viewer) && (
             <button className="plain" aria-label="Delete this mess" title="Delete this mess" disabled={busy}
               onClick={() => { if (confirm('Delete this mess?')) act(m.id, () => del(`/messes/${m.id}`)); }}>✕</button>
           )}

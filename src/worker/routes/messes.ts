@@ -2,7 +2,9 @@
 // the outcome, settling a point, and who owes whom. The rules are src/shared/messes.ts; the asks are mess-asks.ts.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
-import { askedOf, balancesOf, messStatus, parseMessInput, type Mess, type MessRow } from '../../shared/messes';
+import {
+  askedOf, balancesOf, canDelete, canSettle, decideError, isAnswerable, isDecidable, messStatus, parseMessInput, type Mess, type MessRow,
+} from '../../shared/messes';
 import { MESS_SETTLE, isOneOf } from '../../shared/vocab';
 import { activeMemberIds, all, first, newId, nowIso } from '../db';
 import { body, fail, photoBody } from '../http';
@@ -11,7 +13,6 @@ import { askAbout, deniedIdsOf, moveToDiscuss } from '../mess-asks';
 import { putPhoto, servePhoto } from '../photo-store';
 
 const GONE = 'That mess no longer exists.';
-const ANSWERABLE = ['open', 'discuss'];
 
 async function view(db: D1Database, m: MessRow, activeIds: string[]): Promise<Mess> {
   const denied = await deniedIdsOf(db, m.id);
@@ -74,7 +75,7 @@ messes.get('/messes/:id/photo', requireMember, async (c) => {
 /** That was me / Not me: an answerable mess, and not its reporter. */
 function answerable(c: Context<AppEnv>, m: MessRow): Response | null {
   if (m.reported_by === c.get('member').id) return fail(c, 400, 'invalid_input', 'You reported this mess, so you are not asked about it.');
-  if (!ANSWERABLE.includes(messStatus(m))) return fail(c, 409, 'mess_settled', 'That mess is already settled.');
+  if (!isAnswerable(messStatus(m))) return fail(c, 409, 'mess_settled', 'That mess is already settled.');
   return null;
 }
 
@@ -104,17 +105,15 @@ messes.post('/messes/:id/deny', requireMember, async (c) => {
 messes.post('/messes/:id/decide', requireMember, requireOwner, async (c) => {
   const m = await loadMess(c);
   if (m instanceof Response) return m;
-  if (!['open', 'discuss', 'owed'].includes(messStatus(m))) return fail(c, 409, 'mess_settled', 'That mess is already settled.');
+  if (!isDecidable(messStatus(m))) return fail(c, 409, 'mess_settled', 'That mess is already settled.');
   const b = await body(c), db = c.env.DB, me = c.get('member').id, now = nowIso();
   if (b.memberId === null) {
     await dropPhoto(c, m);
     await db.prepare('UPDATE messes SET closed_at = ?, closed_by = ?, photo_key = NULL WHERE id = ?').bind(now, me, m.id).run();
     return answer(c, m.id);
   }
-  if (typeof b.memberId !== 'string' || !(await activeMemberIds(db)).includes(b.memberId)) {
-    return fail(c, 400, 'invalid_input', 'memberId must be an active member, or null for nobody\'s.');
-  }
-  if (b.memberId === m.reported_by) return fail(c, 400, 'invalid_input', 'The one who cleaned it up can\'t owe themselves.');
+  const no = decideError(b.memberId, m.reported_by, await activeMemberIds(db));
+  if (no) return fail(c, 400, 'invalid_input', no);
   await db.prepare('UPDATE messes SET claimed_by = ?, claimed_at = ?, assigned_by = ? WHERE id = ?').bind(b.memberId, now, me, m.id).run();
   return answer(c, m.id);
 });
@@ -124,8 +123,9 @@ messes.post('/messes/:id/settle', requireMember, async (c) => {
   if (m instanceof Response) return m;
   const how = (await body(c)).how, me = c.get('member');
   if (!isOneOf(MESS_SETTLE, how)) return fail(c, 400, 'invalid_input', `how must be one of: ${MESS_SETTLE.join(', ')}.`);
-  if (messStatus(m) !== 'owed') return fail(c, 409, 'mess_settled', 'That mess isn\'t owed.');
-  if (me.id !== m.reported_by && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the one owed or an admin can settle it.');
+  const status = messStatus(m);
+  if (status !== 'owed') return fail(c, 409, 'mess_settled', 'That mess isn\'t owed.');
+  if (!canSettle({ status, reportedBy: m.reported_by }, { id: me.id, admin: me.role === 'owner' })) return fail(c, 403, 'forbidden', 'Only the one owed or an admin can settle it.');
   await dropPhoto(c, m);
   await c.env.DB.prepare('UPDATE messes SET settled_at = ?, settled_how = ?, settled_by = ?, photo_key = NULL WHERE id = ?')
     .bind(nowIso(), how, me.id, m.id).run();
@@ -136,8 +136,7 @@ messes.delete('/messes/:id', requireMember, async (c) => {
   const m = await loadMess(c);
   if (m instanceof Response) return m;
   const me = c.get('member');
-  const mine = m.reported_by === me.id && ANSWERABLE.includes(messStatus(m));
-  if (!mine && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the one who reported it, before anyone answers, or an admin can delete a mess.');
+  if (!canDelete({ status: messStatus(m), reportedBy: m.reported_by }, { id: me.id, admin: me.role === 'owner' })) return fail(c, 403, 'forbidden', 'Only the one who reported it, before anyone answers, or an admin can delete a mess.');
   await dropPhoto(c, m);
   await c.env.DB.prepare('UPDATE messes SET deleted_at = ?, photo_key = NULL WHERE id = ?').bind(nowIso(), m.id).run();
   return c.body(null, 204);

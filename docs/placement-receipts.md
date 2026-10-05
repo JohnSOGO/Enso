@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-05 — Mess permissions into the shared rules (placement-advisor)
+
+- **Ask:** steward backlog item 5 (approved): move the who-can-answer, settle, delete and decide checks out of `routes/messes.ts` into `src/shared/messes.ts`; the route and Messes.tsx import them (§7B.7, §8.15a). Behavior-preserving.
+- **Verdict:** `src/shared/messes.ts` [EXISTING, row widened]; routes/messes.ts and Messes.tsx [EXISTING, call it].
+- **Flow stage:** rules (moved out of route and render).
+- **Why:** permission decisions in a route, and the answerable rule restated in the route twice, the PWA and askedOf. One pure home lets server and PWA agree by construction. Rejected: HTTP codes in shared; changing the admin select gate; MessBanner (already server-driven).
+- **Caps:** shared/messes.ts 115/300, routes/messes.ts 143/300, Messes.tsx 146/300 (none pinned).
+
+## 2026-10-05 — Mess permissions: isAnswerable, isDecidable, canSettle, canDelete, decideError (reorganizer)
+
+- **Trigger:** steward backlog item 5: permission rules for messes restated in `routes/messes.ts`, `Messes.tsx` and `askedOf`.
+- **Seam moved:** who may answer, decide, settle or delete a mess, from `src/worker/routes/messes.ts` (ANSWERABLE, the decide status list, the settle and delete checks, the decide member checks) and `frontend/src/components/Messes.tsx` (answerable, the settle and delete button gates) to `src/shared/messes.ts` [EXISTING row, widened]. `askedOf` now uses isAnswerable.
+- **Room opened:** routes/messes.ts: 144 → 143 lines; Messes.tsx: 146 → 146; shared/messes.ts: 91 → 115. No pins; caps stay GLOBAL_FILE_CAP 300.
+- **Behavior:** preserved — typecheck (all four projects, frontend included), npm test (662, the 659 existing unchanged plus 3 new unit tests) and arch:audit green; every HTTP status, code, message and check order unchanged (answerable keeps its reporter 400 before the 409; settle 409 before 403; decide 409, then the null branch, then the 400s); HTTP codes stay in the route.
+- **Restraint:** no MessBanner, MessReport, mess-asks.ts or vocab.ts change; the admin Whose was it? select stays gated on admin only; the route's `answerable()` wrapper kept for its reporter check.
+
 ## 2026-10-05 — One owner for private photos in R2 (placement-advisor)
 
 - **Ask:** steward backlog item 4 (approved): one `photo-store.ts` for putPhoto, replacePhoto and the photo response (§7C.3, §7A.3, §7B.6, §7B.7, §7E.2b). Behavior-preserving.
