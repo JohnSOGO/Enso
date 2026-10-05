@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.55 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.56 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1279,6 +1279,17 @@ A link recipe keeps `video_id` and `video_title` NULL and its site's name ("Face
 `channel`. **Migration check (RL-M):** rows written under 0001–0029 survive 0030 unchanged, existing recipes
 have `link` NULL; a second live recipe for one link is refused by `uq_recipe_link`, a soft-deleted one does not
 block it.
+
+### 4.2zd Schema change — `migrations/0031_recipe_photo.sql`
+
+Asked by MojoSOGO 2026-10-05 (§7E.2b ⚑ Q174).
+
+```sql
+-- §7E.2b — a recipe's picture: the first screenshot of its latest read from screenshots, in R2. Additive only.
+ALTER TABLE recipes ADD COLUMN photo_key TEXT;  -- R2 recipes/{id}/{random}.jpg; never on the wire; NULL = none
+```
+
+**Migration check (RP-M):** rows written under 0001–0030 survive 0031 unchanged, `photo_key` NULL.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -2809,8 +2820,12 @@ read (JPEG, PNG, WebP); `data` the bytes in base64, at most `PHOTO_MAX_BYTES` on
 (`parseScreenshots`, pure). Base64 in JSON — not multipart, not a raw body — so one request carries
 up to four pictures and the text, and the base64 goes to Claude's image block as it came. The phone
 shrinks each picture to a JPEG first, exactly like a thing's photo (§7C.3, which also turns an Apple
-HEIC photo into a JPEG). `text` — optional pasted text. Screenshots are **read, never stored**: no R2,
-no migration ⚑ Q93 (§12).
+HEIC photo into a JPEG). `text` — optional pasted text. Screenshots were first read, never stored ⚑ Q93;
+since v1.31.0 (asked by MojoSOGO 2026-10-05: "Show screenshot on main display if exists" ⚑ Q174) **the first
+screenshot of a read that succeeds is kept** as the recipe's picture: R2 `recipes/{id}/{random}.jpg`,
+`recipes.photo_key` (§4.2zd), replacing (and deleting) the one before; the others are still dropped, and a read
+that fails or that had only pasted text changes nothing. It is served privately by `GET /recipes/{id}/photo`
+(`routes/recipe-photos.ts`) and on the wire as `hasPhoto`.
 
 **Check order** (each step's failure answers at once; nothing later runs):
 
@@ -3095,6 +3110,7 @@ for it (as §7C.4b).
 | RL8 | from-video with a page link | the same as from-link |
 | RL10 | the video reading, the transcript re-read and a link's fill | each prompt carries `RECIPE_IN_ENGLISH` |
 | RL11 | a transcript (a screenshot) on a typed recipe | 200; only Claude asked, with the typed title and "Site: (none)"; source `transcript`; YouTube's key not needed |
+| RL12 | after RL11: GET its photo; read two more screenshots; then pasted text only | 200 with the first screenshot's bytes; the old object deleted, the new one served; unchanged |
 | RL9 | a transcript (text or a screenshot) on a link recipe | 200; re-read with nothing fetched but Claude; source `transcript`; YouTube's key not needed |
 | RL-M | migration check (§4.2zc) | as written there |
 
@@ -3693,6 +3709,8 @@ Pumpkin patch        📅 Sat Oct 12
     to set it, mine shown pressed), a one-emoji input (16 px) with **Set**, and **Clear** when I have
     one → `PUT` / `DELETE /recipes/{id}/emoji`. A refusal shows in place (`role="alert"`) with the
     server's message; the updated recipe goes back to the view and the row;
+  - **the kept screenshot** (⚑ Q174), when there is one, first and whole (never cropped, at most 420 px
+    tall), in place of the thumbnail; the row's small picture is the screenshot too;
   - the thumbnail, full width, and **▶ Watch on YouTube** (opens the video, a new tab);
     the channel; servings and time when stated;
   - the **source note** ⚑ Q64 ⚑ Q81, muted: "From the " + what was read, each named — description,
@@ -4452,7 +4470,8 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | POST | `/shows/look-up` | member | `{ title, year?, kind? }` or `{ url }` → `ShowReading` (§7F.2); nothing stored; 400 / 429 / 503 `show_lookup_off` / 422 `show_refused` / 502 `show_lookup_failed` |
 | POST | `/shows/look-up-photo` | member | raw image body → `ShowReading`; the picture is never stored; errors as look-up |
 | POST | `/things/read-link` | member | `{ url }` → the same reading as read-photo; nothing stored; 400 / 429 / 503 `link_reading_off` / 422 `link_refused` / 502 `link_reading_failed` per §7C.4b |
-| GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, link, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, commentsError, createdBy, createdAt, updatedAt, emojis: RecipeEmoji[] }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed or a link; `link` the page a link recipe was read from, §7E.6; `RecipeEmoji = { memberId, emoji }`, §7E.5) (§7E) |
+| GET | `/recipes/{id}/photo` | member | → the recipe's kept screenshot (§7E.2b ⚑ Q174), private cache; 404 when none or the recipe is gone |
+| GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, link, hasPhoto, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, commentsError, createdBy, createdAt, updatedAt, emojis: RecipeEmoji[] }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed or a link; `link` the page a link recipe was read from, §7E.6; `RecipeEmoji = { memberId, emoji }`, §7E.5) (§7E) |
 | POST | `/recipes` | member | `{ title, ingredients, steps, servings?, time? }` → recipe (201), typed by hand; 400 `invalid_input` |
 | GET/PATCH/DELETE | `/recipes/{id}` | member | GET → recipe; PATCH the POST fields, all optional, merged → recipe (found recomputed); DELETE → 204 (soft); 404 when gone |
 | PUT/DELETE | `/recipes/{id}/emoji` | member (their own) | PUT `{ emoji }` → recipe (200), my emoji set (upsert); DELETE → recipe (200), mine cleared; 400 `invalid_input` (`emojiError`); 404 when the recipe is gone; `updatedAt` untouched (§7E.5) |
@@ -4776,7 +4795,8 @@ Captured from v1.0-draft so nothing is lost:
   only three attachments. A picture a show is looked up from (§7F.2) is read once and never stored, so it is not one. A recipe's video
   thumbnail (§7E.1) is hotlinked from YouTube — not stored, not in R2, not an attachment — so it
   is not one. Transcript screenshots (§7E.2b) are read once and never stored — not in R2, not an
-  attachment — so they are not one either ⚑ Q93.
+  attachment — so they are not one either ⚑ Q93, except the one kept as a recipe's picture (§7E.2b ⚑ Q174),
+  which is read-only (no upload or delete of its own).
 - Data export
 - Audit-log screen
 - Event templates
@@ -4995,6 +5015,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q171 | A recipe in another language (§7E.2) | ⚑ Always saved in English, translated faithfully; the original is not kept (the link or video still is) |
 | Q172 | Metric amounts (§7E.2) | ⚑ Converted to US units by Claude when read, rounded to kitchen measures (180 °C → 350 °F); the metric original is not kept; typed recipes are never converted |
 | Q173 | Screenshots in the recipe form (§8.12, §7E.2b) | ⚑ On every existing recipe, typed ones included; Claude reads them with the title (nothing fetched); a brand-new recipe takes them after its first Save |
+| Q174 | A recipe's screenshot as its picture (§7E.2b, §8.12) | ⚑ The first screenshot of the latest successful read is kept and shown whole at the top of the view and as the row's picture, ahead of a YouTube thumbnail; a new read replaces it; no separate upload or remove |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5207,6 +5228,9 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**A recipe's screenshot as its picture** (v1.31.0, §7E.2b, §8.12, §4.2zd; asked by MojoSOGO 2026-10-05; RL12, RP-M):
+the first screenshot of a read that succeeds is kept in R2 and shown whole at the top of the recipe and as its row
+picture. Migration 0031. Q174 is a ⚑ default. **Still owed:** apply 0031 in production.
 **Screenshots in the recipe form** (v1.30.0, §8.12, §7E.2b; asked by MojoSOGO 2026-10-05; RL11): ✎ Edit on any
 recipe, typed ones included, offers Fill in from screenshots; a typed recipe's screenshots are read by Claude alone.
 Q173 is a ⚑ default.

@@ -166,5 +166,25 @@ describe('§7E.6 from-link through the Worker', () => {
     const text = heard[0].body.messages[0].content.map((b: any) => b.text ?? '').join('\n');
     expect(text).toContain("Title: Grandma's flan");
     expect(text).toContain('Site: (none)');
+
+    // RL12 ⚑ Q174 — the first screenshot is kept as its picture; a later screenshot read replaces it (the old object
+    // deleted); a pasted-text read leaves it.
+    expect(json.hasPhoto).toBe(true);
+    const photo = async () => worker.fetch(new Request(`${BASE}/recipes/${typed.json.id}/photo`, { headers: { cookie: o.cookie! } }), env, createExecutionContext());
+    const got = await photo();
+    expect(got.status).toBe(200);
+    expect(got.headers.get('content-type')).toBe('image/jpeg');
+    expect(await got.text()).toBe('fake cookbook page');
+    const firstKey = (await env.DB.prepare('SELECT photo_key FROM recipes WHERE id = ?').bind(typed.json.id).first<{ photo_key: string }>())!.photo_key;
+    vi.restoreAllMocks();
+    fakes({ claude: [fill(READING), fill(READING)] });
+    const again = (body: object) => worker.fetch(new Request(`${BASE}/recipes/${typed.json.id}/transcript`, {
+      method: 'POST', headers: { 'content-type': 'application/json', cookie: o.cookie! }, body: JSON.stringify(body),
+    }), keyedEnv(), createExecutionContext());
+    expect((await again({ screenshots: [{ type: 'image/jpeg', data: btoa('second page') }] })).status).toBe(200);
+    expect(await env.PHOTOS.get(firstKey)).toBeNull();
+    expect(await (await photo()).text()).toBe('second page');
+    expect((await again({ text: 'two eggs, whisk' })).status).toBe(200);
+    expect(await (await photo()).text()).toBe('second page');
   });
 });

@@ -39,6 +39,9 @@ export function youtubeVideoId(text: unknown): string | null {
   return id && VIDEO_ID.test(id) ? id : null;
 }
 
+/** The recipe's kept picture (⚑ Q174), versioned by `updatedAt` so a new read shows at once. */
+export const recipePhotoPath = (r: Pick<Recipe, 'id' | 'updatedAt'>) => `/recipes/${r.id}/photo?v=${encodeURIComponent(r.updatedAt)}`;
+
 export const watchUrl = (videoId: string) => `https://www.youtube.com/watch?v=${videoId}`;
 /** Hotlinked, never stored: not an attachment (§7E.1, §12). */
 export const thumbnailUrl = (videoId: string) => `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
@@ -104,6 +107,8 @@ export interface RecipeRow {
   channel: string | null;
   /** The cleaned link a page recipe was read from (§7E.6); NULL for a video or a typed recipe. */
   link: string | null;
+  /** R2 key of the recipe's picture (§7E.2b ⚑ Q174); never on the wire. */
+  photo_key?: string | null;
   ingredients: string;
   steps: string;
   servings: string | null;
@@ -126,6 +131,8 @@ export interface Recipe {
   videoTitle: string | null;
   channel: string | null;
   link: string | null;
+  /** A picture is kept (the first screenshot of its latest read from screenshots): GET /recipes/{id}/photo (⚑ Q174). */
+  hasPhoto: boolean;
   watchUrl: string | null;
   thumbnailUrl: string | null;
   ingredients: string[];
@@ -157,7 +164,7 @@ export function recipeFromRow(r: RecipeRow, emojis: readonly RecipeEmojiRow[] = 
   const strings = (text: string) => jsonList(text).filter((x): x is string => typeof x === 'string');
   const listed = jsonList(r.source);
   return {
-    id: r.id, title: r.title, videoId: r.video_id, videoTitle: r.video_title, channel: r.channel, link: r.link ?? null,
+    id: r.id, title: r.title, videoId: r.video_id, videoTitle: r.video_title, channel: r.channel, link: r.link ?? null, hasPhoto: !!r.photo_key,
     watchUrl: r.video_id ? watchUrl(r.video_id) : null, thumbnailUrl: r.video_id ? thumbnailUrl(r.video_id) : null,
     ingredients: strings(r.ingredients), steps: strings(r.steps), servings: r.servings, time: r.time_text,
     found: r.found === 1, source: RECIPE_SOURCE.filter((s) => listed.includes(s)),

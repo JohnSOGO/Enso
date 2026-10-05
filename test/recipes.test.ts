@@ -181,7 +181,7 @@ describe('the clash and the wire shape', () => {
 describe("M4p each person's emoji (§7E.5)", () => {
   const ME = 'mem_me', YOU = 'mem_you';
   const rec = (id: string, createdAt: string, mine: string | null, yours: string | null = null): Recipe => ({
-    id, title: id, videoId: null, videoTitle: null, channel: null, link: null, watchUrl: null, thumbnailUrl: null, ingredients: [], steps: [],
+    id, title: id, videoId: null, videoTitle: null, channel: null, link: null, hasPhoto: false, watchUrl: null, thumbnailUrl: null, ingredients: [], steps: [],
     servings: null, time: null, found: false, source: ['typed'], captionsError: null, commentsError: null, createdBy: ME, createdAt, updatedAt: createdAt,
     emojis: [...(mine ? [{ memberId: ME, emoji: mine }] : []), ...(yours ? [{ memberId: YOU, emoji: yours }] : [])],
   });

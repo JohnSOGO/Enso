@@ -5,11 +5,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { RecipeView } from './RecipeView';
 import { RecipeForm } from './RecipeForm';
-import { ApiError, errorText, get, post } from '../api';
+import { ApiError, apiUrl, errorText, get, post } from '../api';
 import { useApp } from '../state';
 import { byMyEmoji, myEmoji } from '../../../src/shared/recipe-emoji';
 import { recipeLinkOf } from '../../../src/shared/recipe-link';
-import type { Recipe } from '../../../src/shared/recipes';
+import { recipePhotoPath, type Recipe } from '../../../src/shared/recipes';
 import ls from './Lists.module.css';
 import s from './Recipes.module.css';
 
@@ -90,8 +90,8 @@ export function Recipes() {
           {rows.map((r) => (
             <li key={r.id}>
               <button className={`${ls.item} ${ls.main}`} onClick={() => setOpen({ kind: 'view', recipe: r })}>
-                {r.thumbnailUrl
-                  ? <img className={s.thumb} src={r.thumbnailUrl} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                {r.hasPhoto || r.thumbnailUrl
+                  ? <img className={s.thumb} src={r.hasPhoto ? apiUrl(recipePhotoPath(r)) : r.thumbnailUrl!} alt="" loading="lazy" referrerPolicy="no-referrer" />
                   : <span className={s.thumb} aria-hidden />}
                 <span className={`${ls.title} ${s.text}`}>{myEmoji(r, me.id) && `${myEmoji(r, me.id)} `}{r.title}</span>
                 {!r.found && (r.videoId || r.link) && <span className="badge warn">{r.videoId ? 'watch it' : 'open it'}</span>}
