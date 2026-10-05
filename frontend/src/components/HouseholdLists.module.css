@@ -1,11 +1,8 @@
 /* SPEC §8.8 — Lists tab only. Row cards and tick rows reuse Lists.module.css (.list, .item, .title, .row, .main, .box, .done, .checked). */
 .screen { padding: 12px; overflow-y: auto; overscroll-behavior: contain; height: 100%; }
 
-/* List [ Shopping (3) ▾ ] [⋯] — the native picker takes the slack, ⋯ stays a 44 px target. */
+/* [ 🛒 Shopping 3 ▾ ] [⋯] — the list button takes the slack, ⋯ stays a 44 px target. */
 .picker { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.pickerLabel { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
-.pickerLabel > span { flex: none; color: var(--text-dim); font-size: .85rem; }
-.pickerLabel > select { flex: 1; min-width: 0; min-height: 44px; }
 .more { flex: none; min-width: 44px; min-height: 44px; padding: 0; font-size: 1.2rem; line-height: 1; }
 
 .said { min-height: 1.4em; font-size: .85rem; margin: 4px 0 8px; }
@@ -16,3 +13,15 @@
 .assignee { display: block; flex: 0 1 auto; min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
 .whoWhen { flex: none; white-space: nowrap; font-size: .8rem; }
 .edit { flex: none; min-width: 44px; min-height: 44px; color: var(--text-dim); }
+
+/* The list button and the ListPicker popup's buttons (§8.8): emoji, name (truncates), open count. */
+.chosen { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 8px; text-align: left; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 359px) { .grid { grid-template-columns: 1fr; } }
+.pick { min-height: 52px; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 6px 8px; text-align: left; }
+.pick[aria-pressed='true'] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.pickEmoji { flex: none; font-size: 1.3rem; line-height: 1; }
+.pickName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pickCount { flex: none; font-size: .85rem; font-variant-numeric: tabular-nums; }
+/* In the popup a long name wraps to two lines rather than cutting off. */
+.grid .pickName { white-space: normal; overflow-wrap: break-word; hyphens: auto; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }

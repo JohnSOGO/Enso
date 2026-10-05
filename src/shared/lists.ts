@@ -26,6 +26,31 @@ export function listNameClash<T extends { id: string; name_key: string }>(id: st
   return lists.find((l) => l.id !== id && l.name_key === key) ?? null;
 }
 
+/** §7A.1 ⚑ Q157 — a list without its own emoji: the first keyword found in its name, else 📋. */
+const NAME_EMOJIS: readonly [RegExp, string][] = [
+  [/shop|grocer|store|market/, '🛒'],
+  [/wish|gift|birthday|christmas/, '🎁'],
+  [/hardware|tool|fix|repair/, '🔨'],
+  [/garden|plant/, '🌱'],
+  [/pharmacy|medicine/, '💊'],
+  [/pack|trip|travel|camp/, '🧳'],
+  [/book/, '📚'],
+  [/pet|dog|cat/, '🐾'],
+  [/school|kid/, '🎒'],
+  [/meal|food|cook/, '🍽️'],
+  [/clean/, '🧽'],
+  [/house|home/, '🏠'],
+];
+export const DEFAULT_LIST_EMOJI = '📋';
+
+export function defaultListEmoji(name: string): string {
+  const key = itemKey(name);
+  return NAME_EMOJIS.find(([re]) => re.test(key))?.[1] ?? DEFAULT_LIST_EMOJI;
+}
+
+/** What a list shows: its own emoji, else the default from its name. */
+export const listEmoji = (l: { name: string; emoji: string | null }): string => l.emoji ?? defaultListEmoji(l.name);
+
 const DAY_MS = 86_400_000;
 
 /** The one-item-per-thing key: trimmed, lower-cased, inner whitespace collapsed to one space. */

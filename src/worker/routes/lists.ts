@@ -8,12 +8,13 @@ import type { AppEnv } from '../env';
 import {
   LISTS_MAX, LIST_NAME_MAX, NOTE_MAX, TEXT_MAX, canManageList, itemKey, listNameClash, renameClash, resolveAdd, visibleItems,
 } from '../../shared/lists';
+import { emojiError } from '../../shared/emoji';
 import { all, first, newId, nowIso, run } from '../db';
 import { body, fail, optStr, str } from '../http';
 import { requireMember } from '../session';
 
 interface ListRow {
-  id: string; name: string; name_key: string; created_by: string | null;
+  id: string; name: string; name_key: string; emoji: string | null; created_by: string | null;
   created_at: string; updated_at: string; deleted_at: string | null;
 }
 
@@ -23,7 +24,7 @@ interface ItemRow {
   checked_at: string | null; checked_by: string | null; deleted_at: string | null; photo_key: string | null;
 }
 
-const listView = (l: ListRow) => ({ id: l.id, name: l.name, createdBy: l.created_by });
+const listView = (l: ListRow) => ({ id: l.id, name: l.name, emoji: l.emoji, createdBy: l.created_by });
 
 const itemView = (r: ItemRow) => ({
   id: r.id, listId: r.list_id, text: r.text, note: r.note, assigneeId: r.assignee_id, createdBy: r.created_by,
@@ -58,6 +59,13 @@ function listName(v: unknown): string | null {
   return t.length >= 1 && t.length <= LIST_NAME_MAX ? t : null;
 }
 
+/** emoji: undefined = not given; null = the default from the name; else one emoji (§7A.1). */
+function emojiParam(v: unknown): string | null | undefined | { error: string } {
+  if (v === undefined || v === null) return v;
+  const err = emojiError(v);
+  return err ? { error: err } : v as string;
+}
+
 /** The :id list (non-deleted), else a 404 with a message. */
 async function listParam(c: Context<AppEnv>): Promise<ListRow | Response> {
   return (await loadList(c.env.DB, c.req.param('id')!)) ?? fail(c, 404, 'not_found', LIST_GONE);
@@ -83,8 +91,11 @@ lists.get('/lists', requireMember, async (c) => {
 });
 
 lists.post('/lists', requireMember, async (c) => {
-  const name = listName((await body(c)).name);
+  const b = await body(c);
+  const name = listName(b.name);
   if (!name) return fail(c, 400, 'invalid_input', NAME_MSG);
+  const emoji = emojiParam(b.emoji);
+  if (typeof emoji === 'object' && emoji !== null) return fail(c, 400, 'invalid_input', emoji.error);
   const existing = await loadLists(c.env.DB);
   const clash = listNameClash(null, name, existing);
   if (clash) return fail(c, 409, 'duplicate', `There is already a list called “${clash.name}”.`);
@@ -92,8 +103,8 @@ lists.post('/lists', requireMember, async (c) => {
 
   const id = newId('lst'), now = nowIso();
   await run(c.env.DB,
-    'INSERT INTO lists (id, name, name_key, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-    id, name, itemKey(name), c.get('member').id, now, now);
+    'INSERT INTO lists (id, name, name_key, emoji, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    id, name, itemKey(name), emoji ?? null, c.get('member').id, now, now);
   return c.json(listView((await loadList(c.env.DB, id))!), 201);
 });
 
@@ -103,11 +114,15 @@ lists.patch('/lists/:id', requireMember, async (c) => {
   if (!canManageList(list.created_by, c.get('member'))) {
     return fail(c, 403, 'forbidden', list.created_by ? 'Only the person who made this list or an admin can rename it.' : 'Only an admin can rename this list.');
   }
-  const name = listName((await body(c)).name);
+  const b = await body(c);
+  const name = listName(b.name);
   if (!name) return fail(c, 400, 'invalid_input', NAME_MSG);
+  const emoji = emojiParam(b.emoji);
+  if (typeof emoji === 'object' && emoji !== null) return fail(c, 400, 'invalid_input', emoji.error);
   const clash = listNameClash(list.id, name, await loadLists(c.env.DB));
   if (clash) return fail(c, 409, 'duplicate', `There is already a list called “${clash.name}”.`);
-  await run(c.env.DB, 'UPDATE lists SET name = ?, name_key = ?, updated_at = ? WHERE id = ?', name, itemKey(name), nowIso(), list.id);
+  await run(c.env.DB, 'UPDATE lists SET name = ?, name_key = ?, emoji = ?, updated_at = ? WHERE id = ?',
+    name, itemKey(name), emoji === undefined ? list.emoji : emoji, nowIso(), list.id);
   return c.json(listView((await loadList(c.env.DB, list.id))!));
 });
 

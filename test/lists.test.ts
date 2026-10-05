@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Client, member, owner } from './helpers';
 import {
   CHECKED_VISIBLE_DAYS, LISTS_MAX, LIST_NAME_MAX, SHOPPING_LIST_ID, TEXT_MAX,
-  canManageList, checkedCutoff, itemKey, listNameClash, renameClash, resolveAdd, visibleItems,
+  DEFAULT_LIST_EMOJI, canManageList, checkedCutoff, defaultListEmoji, itemKey, listEmoji, listNameClash, renameClash, resolveAdd, visibleItems,
 } from '../src/shared/lists';
 
 describe('list rules (pure)', () => {
@@ -44,6 +44,17 @@ describe('list rules (pure)', () => {
     expect(canManageList('mem_x', admin)).toBe(true);
     expect(canManageList(null, m)).toBe(false);
     expect(canManageList(null, admin)).toBe(true);
+  });
+
+  it('defaultListEmoji picks from the name (⚑ Q157); listEmoji prefers the list\'s own', () => {
+    expect(defaultListEmoji('Shopping')).toBe('🛒');
+    expect(defaultListEmoji('Wish list')).toBe('🎁');
+    expect(defaultListEmoji('HARDWARE store')).toBe('🛒'); // the first keyword in the table wins: "store"
+    expect(defaultListEmoji('Hardware')).toBe('🔨');
+    expect(defaultListEmoji('Camping trip')).toBe('🧳');
+    expect(defaultListEmoji('Odds and ends')).toBe(DEFAULT_LIST_EMOJI);
+    expect(listEmoji({ name: 'Shopping', emoji: null })).toBe('🛒');
+    expect(listEmoji({ name: 'Shopping', emoji: '🛍️' })).toBe('🛍️');
   });
 
   it(`visibleItems hides checked items older than ${CHECKED_VISIBLE_DAYS} days`, () => {
@@ -217,9 +228,9 @@ describe('M4b + M4e lists API (§7A.2)', () => {
     await add('Milk');
     const all = await lists();
     expect(all.map((l) => l.name)).toEqual(['Hardware store', 'Shopping', 'Wish list']);
-    expect(all.find((l) => l.id === r.json.id)).toEqual({ id: r.json.id, name: 'Hardware store', createdBy: me, openCount: 0 });
+    expect(all.find((l) => l.id === r.json.id)).toEqual({ id: r.json.id, name: 'Hardware store', emoji: null, createdBy: me, openCount: 0 });
     expect(all.find((l) => l.id === SHOPPING_LIST_ID)?.openCount).toBe(1);
-    expect((await o.get(`/lists/${r.json.id}`)).json).toEqual({ list: { id: r.json.id, name: 'Hardware store', createdBy: me }, open: [], checked: [] });
+    expect((await o.get(`/lists/${r.json.id}`)).json).toEqual({ list: { id: r.json.id, name: 'Hardware store', emoji: null, createdBy: me }, open: [], checked: [] });
   });
 
   it('L14 POST /lists { name: " hardware  STORE " } → 409 duplicate', async () => {
@@ -314,5 +325,25 @@ describe('M4b + M4e lists API (§7A.2)', () => {
     expect(r.status).toBe(400);
     expect(r.json.error).toBe('invalid_input');
     expect(r.json.message).toMatch(String(LISTS_MAX));
+  });
+
+  it('L21 POST /lists with an emoji → 201 carrying it; GET /lists carries it', async () => {
+    const r = await o.post('/lists', { name: 'Costco', emoji: '🛍️' });
+    expect(r.status).toBe(201);
+    expect(r.json.emoji).toBe('🛍️');
+    expect((await lists()).find((l) => l.id === r.json.id)).toMatchObject({ name: 'Costco', emoji: '🛍️' });
+    expect((await lists()).find((l) => l.id === SHOPPING_LIST_ID)).toMatchObject({ emoji: null });
+  });
+
+  it('L22 PATCH a bad emoji → 400; emoji null → back to the default; absent → unchanged', async () => {
+    const l = (await o.post('/lists', { name: 'Costco', emoji: '🛍️' })).json;
+    for (const emoji of ['ab', '🛒🛒', 7]) {
+      const r = await o.patch(`/lists/${l.id}`, { name: 'Costco', emoji });
+      expect(r.status).toBe(400);
+      expect(r.json).toMatchObject({ error: 'invalid_input', message: 'Emoji must be a single emoji, like 🧹.' });
+    }
+    expect((await o.post('/lists', { name: 'Bad', emoji: 'x' })).status).toBe(400);
+    expect((await o.patch(`/lists/${l.id}`, { name: 'Costco run' })).json.emoji).toBe('🛍️');
+    expect((await o.patch(`/lists/${l.id}`, { name: 'Costco run', emoji: null })).json).toMatchObject({ name: 'Costco run', emoji: null });
   });
 });
