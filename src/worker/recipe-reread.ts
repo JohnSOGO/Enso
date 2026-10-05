@@ -5,10 +5,11 @@
 import type { RecipeRow } from '../shared/recipes';
 import { COMMENTS_LOOKED_AT, cleanRecipeReading, creatorComments, sourcesOf, type RecipeReading, type Screenshot, type VideoText } from '../shared/recipe-reading';
 import type { RecipeSource } from '../shared/vocab';
-import { nowIso, randomBase32, run } from './db';
+import { nowIso, run } from './db';
 import { lookUpComments, lookUpVideo } from './youtube';
 import { readRecipe } from './recipe-reader';
 import { countRecipeRead } from './recipe-reads';
+import { replacePhoto } from './photo-store';
 
 export type RereadOutcome =
   | { ok: true }
@@ -25,10 +26,8 @@ export async function rereadRecipe(db: D1Database, keys: { yt: string; ai: strin
 
 /** ⚑ Q174 — the first screenshot of a successful read becomes the recipe's picture; the one it replaces is deleted. */
 async function keepPicture(db: D1Database, photos: R2Bucket, row: RecipeRow, shot: Screenshot) {
-  const key = `recipes/${row.id}/${randomBase32(16).toLowerCase()}.jpg`;
-  await photos.put(key, Uint8Array.from(atob(shot.data), (ch) => ch.charCodeAt(0)), { httpMetadata: { contentType: shot.type } });
-  await run(db, 'UPDATE recipes SET photo_key = ? WHERE id = ?', key, row.id);
-  if (row.photo_key) await photos.delete(row.photo_key);
+  await replacePhoto(photos, 'recipes', row.id, Uint8Array.from(atob(shot.data), (ch) => ch.charCodeAt(0)), shot.type, row.photo_key,
+    (key) => run(db, 'UPDATE recipes SET photo_key = ? WHERE id = ?', key, row.id));
 }
 
 async function rereadVideo(db: D1Database, keys: { yt: string; ai: string }, row: RecipeRow,

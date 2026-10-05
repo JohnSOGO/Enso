@@ -4,10 +4,11 @@ import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { askedOf, balancesOf, messStatus, parseMessInput, type Mess, type MessRow } from '../../shared/messes';
 import { MESS_SETTLE, isOneOf } from '../../shared/vocab';
-import { activeMemberIds, all, first, newId, nowIso, randomBase32 } from '../db';
+import { activeMemberIds, all, first, newId, nowIso } from '../db';
 import { body, fail, photoBody } from '../http';
 import { requireMember, requireOwner } from '../session';
 import { askAbout, deniedIdsOf, moveToDiscuss } from '../mess-asks';
+import { putPhoto, servePhoto } from '../photo-store';
 
 const GONE = 'That mess no longer exists.';
 const ANSWERABLE = ['open', 'discuss'];
@@ -57,8 +58,7 @@ messes.post('/messes', requireMember, async (c) => {
   const photo = await photoBody(c);
   if (photo instanceof Response) return photo;
   const id = newId('mes'), now = nowIso();
-  const key = `messes/${id}/${randomBase32(16).toLowerCase()}.jpg`;
-  await c.env.PHOTOS.put(key, photo.bytes, { httpMetadata: { contentType: photo.type } });
+  const key = await putPhoto(c.env.PHOTOS, 'messes', id, photo.bytes, photo.type);
   await db.prepare('INSERT INTO messes (id, reported_by, chore_id, note, photo_key, created_at) VALUES (?, ?, ?, ?, ?, ?)')
     .bind(id, c.get('member').id, input.choreId, input.note, key, now).run();
   await askAbout(c.env, (await loadRow(db, id))!, now);
@@ -68,12 +68,7 @@ messes.post('/messes', requireMember, async (c) => {
 messes.get('/messes/:id/photo', requireMember, async (c) => {
   const m = await loadMess(c);
   if (m instanceof Response) return m;
-  const obj = m.photo_key ? await c.env.PHOTOS.get(m.photo_key) : null;
-  if (!obj) return fail(c, 404, 'not_found', 'That photo no longer exists.');
-  return c.body(obj.body, 200, {
-    'Content-Type': obj.httpMetadata?.contentType ?? 'application/octet-stream',
-    'Cache-Control': 'private, max-age=3600',
-  });
+  return servePhoto(c, c.env.PHOTOS, m.photo_key, 'That photo no longer exists.');
 });
 
 /** That was me / Not me: an answerable mess, and not its reporter. */

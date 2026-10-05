@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-05 — One owner for private photos in R2 (placement-advisor)
+
+- **Ask:** steward backlog item 4 (approved): one `photo-store.ts` for putPhoto, replacePhoto and the photo response (§7C.3, §7A.3, §7B.6, §7B.7, §7E.2b). Behavior-preserving.
+- **Verdict:** `src/worker/photo-store.ts` [NEW row]; six callers [EXISTING, shrink].
+- **Flow stage:** persist (R2), plus the HTTP serve of a stored object.
+- **Why:** key format, put, replace order and private serve headers copied six times; the recipe picture had two writers that could drift. Rejected: a delete wrapper; a recipe-picture module; servePhoto in http.ts; a raw Response.
+- **Caps:** photo-store.ts 35/300; every caller shrinks (none pinned, all under the 300 global cap).
+
+## 2026-10-05 — Private photos to photo-store.ts (reorganizer)
+
+- **Trigger:** steward backlog item 4: the R2 photo key, put, replace and private serve copied across six worker files.
+- **Seam moved:** the 5 key templates, 5 puts, 4 replace sequences (thing-photos, item-photos, recipe-photos, recipe-reread keepPicture; each keeps its own UPDATE as `save`) and the 5 serve blocks, from `routes/thing-photos.ts`, `routes/item-photos.ts`, `routes/recipe-photos.ts`, `routes/chore-areas.ts`, `routes/messes.ts` and `recipe-reread.ts` to `src/worker/photo-store.ts` [NEW row]
+- **Room opened:** thing-photos 86 → 80, item-photos 81 → 75, recipe-photos 48 → 42, chore-areas 142 → 137, messes 149 → 144, recipe-reread 79 → 78 lines; none pinned, global cap 300 unchanged; photo-store.ts 35/300.
+- **Behavior:** preserved — typecheck, npm test (71 files, 659 tests, unchanged) and arch:audit green (nothing in the warning band); same keys, put metadata, put → UPDATE → old delete order, 404 texts, Content-Type and `private, max-age=3600`; every UPDATE, the base64 decode and every bare PHOTOS.delete on row delete stay with their callers.
+- **Restraint:** no dropPhotos wrapper, no recipe-picture module, servePhoto kept out of http.ts and still answers through `c.body(...)`; lists.ts, things.ts, chores.ts and mess-asks.ts untouched.
+
 ## 2026-10-05 — One owner for writing deliveries (placement-advisor)
 
 - **Ask:** steward backlog item 3 (approved): one owner for INSERT INTO deliveries and the ops-ping count (§9.4, §5.7, §6.6, §7B.7, §9.3). Behavior-preserving.

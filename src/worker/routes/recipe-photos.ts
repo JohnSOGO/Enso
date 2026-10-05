@@ -4,9 +4,10 @@
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import type { RecipeRow } from '../../shared/recipes';
-import { first, nowIso, randomBase32, run } from '../db';
+import { first, nowIso, run } from '../db';
 import { fail, photoBody } from '../http';
 import { requireMember } from '../session';
+import { replacePhoto, servePhoto } from '../photo-store';
 
 export const recipePhotos = new Hono<AppEnv>();
 
@@ -19,10 +20,8 @@ recipePhotos.put('/recipes/:id/photo', requireMember, async (c) => {
   if (r instanceof Response) return r;
   const photo = await photoBody(c);
   if (photo instanceof Response) return photo;
-  const key = `recipes/${r.id}/${randomBase32(16).toLowerCase()}.jpg`;
-  await c.env.PHOTOS.put(key, photo.bytes, { httpMetadata: { contentType: photo.type } });
-  await run(c.env.DB, 'UPDATE recipes SET photo_key = ?, updated_at = ? WHERE id = ?', key, nowIso(), r.id);
-  if (r.photo_key) await c.env.PHOTOS.delete(r.photo_key); // replacing deletes the old object
+  await replacePhoto(c.env.PHOTOS, 'recipes', r.id, photo.bytes, photo.type, r.photo_key,
+    (key) => run(c.env.DB, 'UPDATE recipes SET photo_key = ?, updated_at = ? WHERE id = ?', key, nowIso(), r.id));
   return c.body(null, 204);
 });
 
@@ -39,10 +38,5 @@ recipePhotos.delete('/recipes/:id/photo', requireMember, async (c) => {
 recipePhotos.get('/recipes/:id/photo', requireMember, async (c) => {
   const r = await loadRecipe(c);
   if (r instanceof Response) return r;
-  const obj = r.photo_key ? await c.env.PHOTOS.get(r.photo_key) : null;
-  if (!obj) return fail(c, 404, 'not_found', 'This recipe has no picture.');
-  return c.body(obj.body, 200, {
-    'Content-Type': obj.httpMetadata?.contentType ?? 'application/octet-stream',
-    'Cache-Control': 'private, max-age=3600',
-  });
+  return servePhoto(c, c.env.PHOTOS, r.photo_key, 'This recipe has no picture.');
 });
