@@ -102,6 +102,8 @@ export interface RecipeRow {
   video_id: string | null;
   video_title: string | null;
   channel: string | null;
+  /** The cleaned link a page recipe was read from (§7E.6); NULL for a video or a typed recipe. */
+  link: string | null;
   ingredients: string;
   steps: string;
   servings: string | null;
@@ -123,6 +125,7 @@ export interface Recipe {
   videoId: string | null;
   videoTitle: string | null;
   channel: string | null;
+  link: string | null;
   watchUrl: string | null;
   thumbnailUrl: string | null;
   ingredients: string[];
@@ -154,7 +157,7 @@ export function recipeFromRow(r: RecipeRow, emojis: readonly RecipeEmojiRow[] = 
   const strings = (text: string) => jsonList(text).filter((x): x is string => typeof x === 'string');
   const listed = jsonList(r.source);
   return {
-    id: r.id, title: r.title, videoId: r.video_id, videoTitle: r.video_title, channel: r.channel,
+    id: r.id, title: r.title, videoId: r.video_id, videoTitle: r.video_title, channel: r.channel, link: r.link ?? null,
     watchUrl: r.video_id ? watchUrl(r.video_id) : null, thumbnailUrl: r.video_id ? thumbnailUrl(r.video_id) : null,
     ingredients: strings(r.ingredients), steps: strings(r.steps), servings: r.servings, time: r.time_text,
     found: r.found === 1, source: RECIPE_SOURCE.filter((s) => listed.includes(s)),

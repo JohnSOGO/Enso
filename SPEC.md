@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.51 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.52 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -227,6 +227,7 @@ Enso/
 │   │   ├── sun.ts          # §7.7 sunset per local date and place (NOAA)
 │   │   ├── recipes.ts      # §7E recipe rules: limits, YouTube link → video id, typed input, the wire
 │   │   ├── recipe-reading.ts # §7E.2, §7E.2b, §7E.2c reading a video: sources, creator's comments, transcript, cleaning a reading, captions from home
+│   │   ├── recipe-link.ts  # §7E.6 any link: its kind (video or page, cleaned), the site's name, the look-up and fill prompts
 │   │   ├── phone-login.ts  # §6.6 sign in with my phone: limits, number matching, request transitions, notice texts
 │   │   └── engine.ts       # §5
 │   └── worker/
@@ -243,6 +244,7 @@ Enso/
 │       ├── recipe-reread.ts # §7E.2b re-reading a recipe in place
 │       ├── claude.ts       # the one Claude API call (§7C.4, §7E)
 │       ├── recipe-reader.ts # §7E the recipe prompt + schema
+│       ├── recipe-link-reader.ts # §7E.6 a page: fetched, looked up, filled with the recipe schema
 │       ├── youtube.ts      # §7E YouTube Data API videos.list + commentThreads.list
 │       ├── youtube-captions.ts # §7E the unofficial captions attempt
 │       ├── tick.ts         # loads rows, calls engine, writes results
@@ -359,7 +361,7 @@ export const HOUSE_STATE  = ['ok', 'failing', 'not_configured', 'untried'] as co
 export const MACHINE      = ['washer', 'dryer'] as const;                        // §7D, in load order
 export const MACHINE_STATE = ['free', 'running', 'done'] as const;               // §7D, derived, never stored
 export const SUN_EVENT    = ['sunset'] as const;                                 // §7.7 events.start_sun
-export const RECIPE_SOURCE = ['description', 'captions', 'transcript', 'comments', 'typed'] as const; // §7E what a recipe was read from ('transcript': pasted, §7E.2b)
+export const RECIPE_SOURCE = ['description', 'captions', 'transcript', 'comments', 'page', 'typed'] as const; // §7E what a recipe was read from ('transcript': pasted, §7E.2b; 'page': any other link, §7E.6)
 export const CAPTIONS_FAILURE = ['blocked', 'none', 'failed'] as const;         // §7E why captions couldn't be read
 export const SPEAKER_KIND = ['echo', 'satellite'] as const;                      // §9.2a a house speaker, from its HA entity id
 export const IDENTIFY_FAILURE = ['off', 'failed'] as const;                     // §7A.3 why SogoAI gave no reading
@@ -387,6 +389,7 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `free` / `running` / `done` | A machine's state (§7D): no load / a load, before done-at / a load, done-at passed — derived from the row and `now` |
 | `sunset` | An event whose start is the day's local sunset (§7.7, `events.start_sun`); there is no sunrise |
 | `description` / `captions` | A recipe was read from the video's description / its captions (§7E); a recipe can carry both |
+| `page` | A recipe read from a link that is not a YouTube video: a Facebook reel or post, a recipe site, any web page (§7E.6) |
 | `typed` | A recipe typed by hand, with no video (§7E) |
 | `blocked` / `none` / `failed` | Why a video's captions couldn't be read (§7E): YouTube refused the keyless request / the video has no captions / anything else (network, an unreadable answer) |
 | `off` / `failed` (identify) | Why SogoAI gave no reading of a snapped item (§7A.3): `IDENTIFY_MODEL` isn't set on SogoAI / LM Studio failed or answered something unreadable |
@@ -1260,6 +1263,22 @@ CREATE INDEX idx_chore_area_photos_area ON chore_area_photos(area_id, created_at
 Additive only. Areas are deleted outright (they are reference, not history): `DELETE /chore-areas/{id}` and
 deleting their chore remove the rows and the R2 objects. **Migration check (CA-M):** rows written under 0001–0028
 survive 0029 unchanged; `PRAGMA foreign_key_check` is empty.
+
+### 4.2zc Schema change — `migrations/0030_recipe_links.sql`
+
+Asked by MojoSOGO 2026-10-05: recipes from Facebook links and any web page, not only YouTube (§7E.6).
+
+```sql
+-- §7E.6 — a recipe read from a link that is not a YouTube video. Additive only.
+ALTER TABLE recipes ADD COLUMN link TEXT;  -- recipeLinkOf's cleaned link; NULL for a video or a typed recipe
+-- One live recipe per link (§7E.6): a second paste of the same link is 409 duplicate.
+CREATE UNIQUE INDEX uq_recipe_link ON recipes(link) WHERE deleted_at IS NULL AND link IS NOT NULL;
+```
+
+A link recipe keeps `video_id` and `video_title` NULL and its site's name ("Facebook", "allrecipes.com") in
+`channel`. **Migration check (RL-M):** rows written under 0001–0029 survive 0030 unchanged, existing recipes
+have `link` NULL; a second live recipe for one link is refused by `uq_recipe_link`, a soft-deleted one does not
+block it.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -2659,7 +2678,9 @@ can edit them.
 
 Decided by MojoSOGO 2026-10-03. The household finds dishes on YouTube; a recipe in the app keeps
 what to buy and what to do, next to the video. **Paste a YouTube link** and the Worker reads the
-recipe out of the video's own text, or **type one by hand**. Recipes are household-shared: anyone
+recipe out of the video's own text, or **type one by hand**. Since v1.29.0 (asked by MojoSOGO
+2026-10-05) **any link** works too — a Facebook reel or post, a recipe site, any web page — and the
+kind of link is detected, never chosen (§7E.6). Recipes are household-shared: anyone
 may add, edit or delete any recipe ⚑ Q66. Their own tab, 🍳 Recipes (§8.12).
 
 ### 7E.1 A recipe
@@ -2684,8 +2705,10 @@ may add, edit or delete any recipe ⚑ Q66. Their own tab, 🍳 Recipes (§8.12)
   `typed` for one typed by hand. **captions_error** — when the
   captions attempt failed, its reason. **comments_error** — when reading the comments failed (quota
   or otherwise), its reason (§4.2r).
-- **One live recipe per video** (`uq_recipe_video`). A typed recipe has no video and cannot be
-  given one in v1 ⚑ Q68. Delete is soft (`deleted_at`).
+- **Link** (§7E.6): a recipe read from any other link keeps that link (`recipeLinkOf`'s cleaned form),
+  its site's name in `channel`, and no video. Its `source` is `page`.
+- **One live recipe per video** (`uq_recipe_video`) and **one per link** (`uq_recipe_link`). A typed
+  recipe has no video and cannot be given one in v1 ⚑ Q68. Delete is soft (`deleted_at`).
 - `youtubeVideoId(text)` → the id or null. It accepts `https://`, `http://` or no scheme, and
   the hosts `youtube.com`, `www.`, `m.` and `music.youtube.com` (`/watch?v=ID`, `/shorts/ID`,
   `/embed/ID`, `/live/ID`) and `youtu.be/ID`. Every other query parameter (`&t=42s`, `?si=…`,
@@ -2786,8 +2809,8 @@ no migration ⚑ Q93 (§12).
 
 1. signed in (401);
 2. a live recipe with that id → else 404 `not_found`;
-3. the recipe has a `video_id` → else 400 `invalid_input` "Only a recipe read from a video takes a
-   transcript.";
+3. the recipe has a `video_id` or a `link` (§7E.6) → else 400 `invalid_input` "Only a recipe read
+   from a video or a link takes a transcript.";
 4. `parseScreenshots(screenshots)` accepts them (too many, HEIC or another type, damaged, too large →
    400); `text`, when given, is a string of at most **`PASTED_MAX` = 100 000** characters ⚑ Q89 (else
    400); and there is **at least one screenshot or a `cleanTranscript(text)` that is not null** → else
@@ -2795,9 +2818,10 @@ no migration ⚑ Q93 (§12).
    **before any read is spent** and before any fetch;
 5. the daily cap, shared with from-video (`RECIPE_READS_PER_DAY`, one count of `recipe_reads`) →
    429 `rate_limited`;
-6. `YOUTUBE_API_KEY` **and** `ANTHROPIC_API_KEY` present → else 503 `recipe_reading_off`, before any
-   fetch;
-7. the YouTube lookup and the creator's comments, side by side — **re-fetched**, since neither the
+6. `YOUTUBE_API_KEY` (a video recipe only) **and** `ANTHROPIC_API_KEY` present → else 503
+   `recipe_reading_off`, before any fetch;
+7. **a link recipe** (§7E.6) skips this step: nothing is fetched ⚑ Q169, and Claude is given the recipe's
+   title, its site and what was given. **A video recipe:** the YouTube lookup and the creator's comments, side by side — **re-fetched**, since neither the
    description nor the comments are stored ⚑ Q84 (2 quota units). A failed lookup → 404
    `video_unavailable` / 502 `youtube_failed` and **nothing changes**; a comments failure is never
    fatal (as §7E.2 step 8). **No captions attempt** — that is what failed;
@@ -2994,6 +3018,76 @@ clear it later. It is personal: the row shows **mine**; the recipe view shows **
 | RE8 | `byMyEmoji` on groups of 2, 1, 1 (the two 1s with different newest) and unrated ones; equal groups with an equal newest | biggest first; ties by newest, then emoji; newest first within; unrated last, newest first |
 | RE9 | `usedEmojis` on 14 distinct emojis across members, one used three times | that one first, ties by the string, 12 at most |
 | RE-M | migration check (§4.2q) | earlier rows intact; the PK refuses a second row for one member and recipe |
+
+### 7E.6 Reading any link — `POST /recipes/from-link { url }`
+
+Asked by MojoSOGO 2026-10-05: "Recipe should also tolerate links from Facebook like
+https://www.facebook.com/reel/1437627654879504/?fs=e&s=TIeQ9V&mibextid=wwXIfr … Autodetect link type. And if
+I give a generic web page should also import." The rules live in `src/shared/recipe-link.ts` (pure); the
+reading in `src/worker/recipe-link-reader.ts`.
+
+**What kind of link** — `recipeLinkOf(text)` (pure) decides, in order:
+
+1. `youtubeVideoId(text)` → `{ kind: 'video', videoId }`: read as §7E.2, unchanged;
+2. `readableLink(text)` (§7C.4b: a public `http(s)` host, never an IP, localhost or a home name) →
+   `{ kind: 'page', link }`, where `link` is **cleaned** ⚑ Q167: the fragment dropped; on Facebook's hosts
+   (`facebook.com`, `www.`, `m.`, `web.`, `mbasic.`) the host becomes `www.facebook.com` and every query
+   parameter is dropped but `v`, `id`, `story_fbid` and `fbid` (the share junk `fs`, `s`, `mibextid`,
+   `rdid`, `share_url` goes); elsewhere tracking parameters are dropped (`utm_*`, `fbclid`, `gclid`,
+   `mibextid`, `igsh`, `igshid`, `si`) and the rest kept. The cleaned link is what is stored and matched;
+3. anything else → null.
+
+`siteName(link)` names the site for `channel` and the view ⚑ Q168: Facebook, Instagram, TikTok, Pinterest
+by host; otherwise the host without `www.`.
+
+**`POST /recipes/from-link { url }`** — the one route the PWA calls; `POST /recipes/from-video` is the same
+handler (a phone still running an older app keeps working). **Check order:**
+
+1. signed in (401);
+2. `recipeLinkOf(url)` → null: 400 `invalid_input` "That isn't a link that can be read."; a video: §7E.2
+   from step 3;
+3. a live recipe with that `link` → **409 `duplicate`** `{ error, message: "That link is already in
+   Recipes: “…”.", recipeId }`; no read spent, nothing fetched;
+4. the daily cap, shared with videos (`RECIPE_READS_PER_DAY`) → 429 `rate_limited`;
+5. `ANTHROPIC_API_KEY` present (YouTube's key is not needed) → else 503 `recipe_reading_off` "Reading
+   recipes from links isn't set up yet.", before any fetch;
+6. the page, as §7C.4b fetches it (`fetchPage`, `pageExtract`): its title, meta tags, JSON-LD (a recipe
+   site's `Recipe` block) and text. A failure (Facebook's login wall, a 403, a timeout) is **kept for the
+   prompt, never fatal**;
+7. count the read;
+8. the look-up (`askClaudeResearch`, web fetch ≤ `RECIPE_LINK_FETCHES_MAX` = 2, web search ≤
+   `RECIPE_LINK_SEARCHES_MAX` = 3): find the recipe **this link** gives — the page's recipe, or a post's
+   or reel's caption, or the creator's own recipe for this same dish where the post points to it (their
+   site, a pinned comment) ⚑ Q170 — as plain notes. Never another creator's recipe for the dish, never
+   general cooking knowledge, never invented from the title; when it can't be found the notes say so.
+   Refusal → 422 `recipe_refused` "Couldn't read a recipe from that link."; failure → 502
+   `recipe_reading_failed` with the reason;
+9. the fill (`askClaude` with §7E.2's recipe schema) from the page and the notes, same refusal / failure;
+10. `cleanRecipeReading(raw, fallback)`, where the fallback title is the page's `og:title` or `<title>`,
+    else "Recipe from {site}";
+11. INSERT: `link`, `channel` = `siteName(link)`, no video, `source` = `sourcesOf` with the notes offered
+    as `page` (`VideoText.page`), errors NULL (a unique-index race → 409 `duplicate`);
+12. → **201** the recipe.
+
+A link whose recipe can't be found is still saved, `found` false: the view says **"Recipe not found at that
+link — open it"** with a 🔗 link, and offers **the transcript, by hand** (§7E.2b) for screenshots of the
+post's caption or the recipe.
+
+**Privacy:** the link and what the page says go to Anthropic, which may fetch the link and search the web
+for it (as §7C.4b).
+
+| # | Setup / call | Expected |
+|---|---|---|
+| RL1 | `recipeLinkOf` on a YouTube link, the Facebook reel link above, `m.facebook.com/watch?v=1&mibextid=x`, a recipe site with `?utm_source=x&id=7#top`, `localhost`, an IP, "hello" | video; `https://www.facebook.com/reel/1437627654879504/`; `https://www.facebook.com/watch?v=1`; the site link with `id=7` only; null; null; null |
+| RL2 | `siteName` on Facebook, Instagram, `www.allrecipes.com` | Facebook; Instagram; allrecipes.com |
+| RL3 | from-link with a recipe page (JSON-LD `Recipe`; fake site and Claude) | 201; ingredients and steps saved; `link` cleaned, `channel` the site, no video; source `page`; one read counted; the look-up has web search (3) and web fetch (2) and the page's JSON-LD |
+| RL4 | from-link where the page answers 403 (a login wall) | still read: the look-up is told why; saved |
+| RL5 | the same link pasted again (another tracking parameter) | 409 `duplicate` with its `recipeId`; no read; nothing fetched |
+| RL6 | from-link with the Anthropic key empty (YouTube's key set or not); at the cap; an unreadable link | 503 / 429 / 400, nothing fetched, no read counted |
+| RL7 | Claude finds no recipe; a refusal; a failure | saved `found: false` with the page's title; 422; 502 |
+| RL8 | from-video with a page link | the same as from-link |
+| RL9 | a transcript (text or a screenshot) on a link recipe | 200; re-read with nothing fetched but Claude; source `transcript`; YouTube's key not needed |
+| RL-M | migration check (§4.2zc) | as written there |
 
 ## 7F. Movies & shows — `src/shared/shows.ts` (pure) — asked by MojoSOGO 2026-10-05
 
@@ -3560,24 +3654,26 @@ Pumpkin patch        📅 Sat Oct 12
 ### 8.12 Recipes (the 🍳 tab)
 
 ```
-[ Paste a YouTube link…          ] [Read it]
+[ Paste a recipe link…          ] [Read it]
 [ ＋ Type a recipe ]
 [thumb] Chicken tikka masala
 [thumb] Sourdough focaccia        [watch it]
         Lentil soup
 ```
 
-- **Paste box** (`type="url"`, 16 px) and **Read it** → `POST /recipes/from-video`. While it
-  works: "Reading the video…" (it can take a while). The new recipe is **saved at once** and its
+- **Paste box** (`type="url"`, 16 px), "Paste a recipe link…" (YouTube, Facebook or any page; the kind
+  is detected, §7E.6) and **Read it** → `POST /recipes/from-link`. While it works: "Reading the link…"
+  (it can take a while). The new recipe is **saved at once** and its
   view opens with its source note; ✎ fixes anything wrong ⚑ Q61. A refusal or failure shows in
   place (`role="alert"`) with the server's message.
-- **A link already read** (409 `duplicate`) opens the existing recipe instead ⚑ Q63.
+- **A link already read** (409 `duplicate`) opens the existing recipe instead ⚑ Q63 (matched by video,
+  or by `recipeLinkOf`'s cleaned link).
 - **Newest | By emoji** — two chips above the rows ⚑ Q74. Newest is the server's order; By emoji
   orders them with `byMyEmoji` (§7E.5) — the PWA never sorts any other way. The choice is
   remembered on that phone (`localStorage` `enso.recipeSort`; blocked storage means Newest).
 - **Rows**, newest first ⚑ Q62: a small thumbnail (64×36, hotlinked, `loading="lazy"`,
   `referrerPolicy="no-referrer"`; a typed recipe keeps the slot empty), the dish's name on one line,
-  and a **watch it** badge when a video's recipe has `found` false (a typed recipe has no video to
+  and a **watch it** badge when a video's recipe has `found` false (**open it** for a link's, §7E.6) (a typed recipe has no video to
   watch, so never shows it). **My emoji** (§7E.5), when I've given one, sits before the dish's
   name. Tapping a row opens the **recipe view**.
 - **＋ Type a recipe** opens the **recipe form** empty.
@@ -3596,13 +3692,17 @@ Pumpkin patch        📅 Sat Oct 12
     hand" / "Nothing in the video's text to read", plus "· captions couldn't be read: {reason}" and
     "· comments couldn't be read: {reason}" when those happened;
   - `found` false: **"Recipe not in the video's text — watch it"** above the ▶ link;
+  - **a link recipe** (§7E.6) has no thumbnail: `found` false reads **"Recipe not found at that link —
+    open it"**, then **🔗 Open on {site}** (the link, a new tab); the source note reads "From the linked
+    page";
   - **The transcript, by hand** (`RecipeTranscript.tsx`, §7E.2b), under the source note, only on a
-    video recipe that is "watch it" or whose `captionsError` is set ⚑ Q87 (never on the paste-a-link
+    video or link recipe that is "watch it" / "open it" or whose `captionsError` is set ⚑ Q87 (never on the paste-a-link
     step ⚑ Q91): **📷 Add transcript screenshots** — a file input (`accept="image/*"`, `multiple`; on
     the iPhone it offers Photo Library or Take Photo), each picture shrunk to a JPEG like a thing's
     photo (§8.11, the same HEIC handling), up to 4 ⚑ Q92 (more are left out, and it says so), shown as
     thumbnails each with a ✕ (44 px); the hint "On YouTube: ⋯ → Show transcript, then screenshot it."
-    ⚑ Q90; below it **or paste the text**, collapsed, which opens a box that grows to fit (`Grow`,
+    ⚑ Q90 (on a link recipe: "Screenshot the post's caption or the recipe, then add it here.", and the
+    button reads 📷 Add screenshots); below it **or paste the text**, collapsed, which opens a box that grows to fit (`Grow`,
     16 px, line breaks kept) ⚑ Q94; and, once there is a screenshot or text, **Read it** → `POST
     /recipes/{id}/transcript`. While it works: "Reading…". When the recipe already has ingredients or
     steps it says "This replaces the ingredients and steps shown." A refusal shows in place
@@ -4338,11 +4438,12 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | POST | `/shows/look-up` | member | `{ title, year?, kind? }` or `{ url }` → `ShowReading` (§7F.2); nothing stored; 400 / 429 / 503 `show_lookup_off` / 422 `show_refused` / 502 `show_lookup_failed` |
 | POST | `/shows/look-up-photo` | member | raw image body → `ShowReading`; the picture is never stored; errors as look-up |
 | POST | `/things/read-link` | member | `{ url }` → the same reading as read-photo; nothing stored; 400 / 429 / 503 `link_reading_off` / 422 `link_refused` / 502 `link_reading_failed` per §7C.4b |
-| GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, commentsError, createdBy, createdAt, updatedAt, emojis: RecipeEmoji[] }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed; `RecipeEmoji = { memberId, emoji }`, §7E.5) (§7E) |
+| GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, link, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, commentsError, createdBy, createdAt, updatedAt, emojis: RecipeEmoji[] }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed or a link; `link` the page a link recipe was read from, §7E.6; `RecipeEmoji = { memberId, emoji }`, §7E.5) (§7E) |
 | POST | `/recipes` | member | `{ title, ingredients, steps, servings?, time? }` → recipe (201), typed by hand; 400 `invalid_input` |
 | GET/PATCH/DELETE | `/recipes/{id}` | member | GET → recipe; PATCH the POST fields, all optional, merged → recipe (found recomputed); DELETE → 204 (soft); 404 when gone |
 | PUT/DELETE | `/recipes/{id}/emoji` | member (their own) | PUT `{ emoji }` → recipe (200), my emoji set (upsert); DELETE → recipe (200), mine cleared; 400 `invalid_input` (`emojiError`); 404 when the recipe is gone; `updatedAt` untouched (§7E.5) |
-| POST | `/recipes/from-video` | member | `{ url }` → recipe (201); 400 / 409 `duplicate` (+ `recipeId`) / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed`, in the §7E.2 order |
+| POST | `/recipes/from-link` | member | `{ url }` → recipe (201): any link, its kind detected (§7E.6); a YouTube video as from-video; a page: 400 / 409 `duplicate` (+ `recipeId`) / 429 / 503 `recipe_reading_off` / 422 `recipe_refused` / 502 `recipe_reading_failed`, in the §7E.6 order |
+| POST | `/recipes/from-video` | member | the same handler as from-link (kept for older apps). For a video: `{ url }` → recipe (201); 400 / 409 `duplicate` (+ `recipeId`) / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed`, in the §7E.2 order |
 | POST | `/recipes/{id}/transcript` | member | `{ screenshots?: { type, data }[] (≤ 4, base64), text? (≤ PASTED_MAX) }`, at least one → recipe (200), re-read from the pasted transcript; 404 / 400 `invalid_input` / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed` / 422 `no_recipe` (nothing changed), in the §7E.2b order |
 | GET | `/lists` | member | → `{ id, name, emoji, createdBy, openCount }[]`, by name (§7A); `emoji` null = the default |
 | POST | `/lists` | member | `{ name, emoji? }` → list (201); 409 `duplicate`; 400 at `LISTS_MAX` or a bad emoji |
@@ -4873,6 +4974,10 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q165 | Ticking expectations (§8.15) | ⚑ Only to walk through the job while the sheet is open; never saved, cleared when it closes |
 | Q166 | Where chores live (§8.1, §8.15) | ⚑ Their own 🧹 Chores tab between Alarms and Lists: Today on top, All chores under it; they left Alarms and the Lists popup |
 | Q142 | Where "Fill in from this link" sits | ⚑ A full-width button right under the Link field, only when the field holds a usable link; reading starts on the tap, never on paste |
+| Q167 | A link's duplicate key (§7E.6) | ⚑ The cleaned link: no fragment; Facebook links on `www.facebook.com` keeping only `v`, `id`, `story_fbid`, `fbid`; elsewhere `utm_*`, `fbclid`, `gclid`, `mibextid`, `igsh`, `igshid`, `si` dropped and the rest kept |
+| Q168 | A link recipe's picture and name (§7E.6, §8.12) | ⚑ No thumbnail (nothing stored or hotlinked); the site's name (Facebook, Instagram, TikTok, Pinterest, else the host) in place of the channel |
+| Q169 | The transcript, by hand, on a link recipe (§7E.2b) | ⚑ Offered like a video's; nothing is re-fetched — Claude reads the screenshots or text with the recipe's title and site |
+| Q170 | Where a link's recipe may come from (§7E.6) | ⚑ The page, the post's or reel's caption, or the creator's own recipe for that dish where the post points to it; never another creator's |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5085,6 +5190,14 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Recipes from any link** (v1.29.0, §7E.6, §4.2zc; asked by MojoSOGO 2026-10-05; RL1–RL9, RL-M): the paste box
+takes any link and detects its kind — a YouTube video reads as before; a Facebook reel or post, a recipe site or
+any page is fetched (a login wall kept, never fatal) and looked up by Claude with web fetch and search, then
+filled with the recipe schema. The link is cleaned of share and tracking junk and is the duplicate key.
+`/recipes/from-video` is now the same handler as `/recipes/from-link`. Migration 0030. Q167–Q170 are ⚑ defaults.
+Tests reach only fakes. **Still owed:** apply 0030 in production; the Facebook reel from the ask read on the
+deployed URL (Facebook may show the Worker a login wall; then Claude's own fetch and search are what is left,
+and the screenshots fallback).
 **Chores tab + what done looks like** (v1.28.0, §7B.6, §8.15, §4.2zb; asked by MojoSOGO 2026-10-05; CA1–CA8,
 CA-M): chores have their own 🧹 tab (Today, All chores) and left Alarms and the Lists popup; each chore has a
 **What done looks like** sheet of areas with photos and expectations, editable by anyone. Migration 0029. Q163–Q166

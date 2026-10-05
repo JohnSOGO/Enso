@@ -2,7 +2,8 @@
 // note with any "captions / comments couldn't be read" marker, ingredients with pick boxes → Add to Shopping (one
 // POST /lists/{SHOPPING_LIST_ID}/items per ingredient, in order; the summary inside ⚑ Q69), the steps, ✎;
 // under the title everyone's emoji ("Shelly 🌶 · John ⭐", ⚑ Q73) and RecipeEmoji, mine (§7E.5); under the source note
-// RecipeTranscript on a "watch it" video recipe or one whose captions couldn't be read (§7E.2b ⚑ Q87).
+// RecipeTranscript on a "watch it" video recipe or one whose captions couldn't be read (§7E.2b ⚑ Q87); a link recipe
+// (§7E.6) shows 🔗 Open on {site} in place of the thumbnail and ▶, and takes screenshots too (⚑ Q169).
 import { useState } from 'react';
 import { Modal } from './Modal';
 import { RecipeEmoji } from './RecipeEmoji';
@@ -17,6 +18,7 @@ import s from './Recipes.module.css';
 /** How the source note names each thing a recipe was read from (⚑ Q81). */
 export const READ_FROM: Record<Exclude<RecipeSource, 'typed'>, string> = {
   description: 'description', captions: 'captions', transcript: 'the transcript you added', comments: "the creator's comment",
+  page: 'linked page',
 };
 
 /** "A", "A and B", "A, B and C". */
@@ -27,7 +29,7 @@ function sourceNote(r: Recipe): string {
   if (r.source.includes('typed')) return 'Typed by hand';
   const read = r.source.length
     ? `From the ${andList(r.source.filter((x): x is keyof typeof READ_FROM => x !== 'typed').map((x) => READ_FROM[x]))}`
-    : "Nothing in the video's text to read";
+    : r.link ? 'Nothing on the linked page to read' : "Nothing in the video's text to read";
   return [read, r.captionsError && `captions couldn't be read: ${r.captionsError}`,
     r.commentsError && `comments couldn't be read: ${r.commentsError}`].filter(Boolean).join(' · ');
 }
@@ -95,9 +97,17 @@ export function RecipeView({ recipe: r, recipes, onChange, onEdit, onClose }: Pr
           {r.channel && <span className="muted"> · {r.channel}</span>}
         </>
       )}
+      {r.link && (
+        <>
+          {!r.found && <p className={s.missing}>Recipe not found at that link — open it</p>}
+          <a className={`go ${s.watch}`} style={{ padding: '0 12px' }} href={r.link} target="_blank" rel="noopener noreferrer">
+            🔗 Open on {r.channel ?? 'the web'}
+          </a>
+        </>
+      )}
       {(r.servings || r.time) && <p>{[r.servings && `Serves: ${r.servings}`, r.time && `Time: ${r.time}`].filter(Boolean).join(' · ')}</p>}
       <p className={`muted ${s.note}`}>{sourceNote(r)}</p>
-      {r.videoId && (!r.found || r.captionsError) && <RecipeTranscript recipe={r} onChange={onChange} />}
+      {(r.videoId || r.link) && (!r.found || r.captionsError) && <RecipeTranscript recipe={r} onChange={onChange} />}
 
       {r.ingredients.length > 0 && (
         <>
