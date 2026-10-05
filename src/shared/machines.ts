@@ -13,6 +13,10 @@ export const MACHINE_CHANNELS: readonly Channel[] = ['push', 'house'];
 export const machineAlertConfig = (): AlertConfig =>
   ({ channels: [...MACHINE_CHANNELS], renotifyMin: MACHINE_RENOTIFY_MIN, maxAlerts: MACHINE_MAX_ALERTS });
 
+/** §7D.3, §7D.5 — a machine fire's audience and alert: nobody named, every speaker, waiting for the alert hours. */
+export const machineAlert = (quietUntil: string | null): { assignedTo: string[]; allSpeakers: boolean; cfg: AlertConfig } =>
+  ({ assignedTo: [], allSpeakers: true, cfg: { ...machineAlertConfig(), ...(quietUntil ? { quietUntil } : {}) } });
+
 export const MACHINE_LABEL: Record<MachineId, string> = { washer: 'Washer', dryer: 'Dryer' };
 const lower = (id: MachineId) => MACHINE_LABEL[id].toLowerCase();
 

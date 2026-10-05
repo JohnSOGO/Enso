@@ -2,7 +2,8 @@
 // mess (deliveries.mess_id), shared by routes/messes.ts and tick. The rules (when, whom, the words) are
 // src/shared/messes.ts.
 import type { Env } from './env';
-import { activeMemberIds, all, first, newId } from './db';
+import { activeMemberIds, all, first } from './db';
+import { pushDelivery } from './deliveries';
 import { sendPushDeliveries } from './push';
 import {
   MESS_ASK_TITLE, MESS_DISCUSS_TITLE, MESS_PHOTO_KEEP_DAYS, askMessage, askedOf, discussDue, discussMessage, nudgeDue,
@@ -24,12 +25,6 @@ async function wordsOf(db: D1Database, m: MessRow) {
 export const deniedIdsOf = async (db: D1Database, messId: string) =>
   (await all<{ member_id: string }>(db, 'SELECT member_id FROM mess_denials WHERE mess_id = ?', messId)).map((d) => d.member_id);
 
-function pushRow(db: D1Database, id: string, m: MessRow, memberId: string, n: number, title: string, message: string, now: string) {
-  return db.prepare(
-    `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, title, mess_id, status, created_at, updated_at)
-     VALUES (?, NULL, ?, 'push', ?, ?, ?, ?, 'queued', ?, ?)`).bind(id, n, memberId, message, title, m.id, now, now);
-}
-
 /** Moves an open mess to To talk about and tells each active admin, once (the write is conditional). */
 export async function moveToDiscuss(env: Env, m: MessRow, now: string): Promise<void> {
   const db = env.DB;
@@ -39,9 +34,10 @@ export async function moveToDiscuss(env: Env, m: MessRow, now: string): Promise<
   const admins = await all<{ id: string }>(db, `SELECT id FROM members WHERE role = 'owner' AND disabled_at IS NULL`);
   if (!admins.length) return;
   const w = await wordsOf(db, m);
-  const ids = admins.map(() => newId('dlv'));
-  await db.batch(admins.map((a, i) => pushRow(db, ids[i], m, a.id, 1, MESS_DISCUSS_TITLE, discussMessage(w.name, w.chore, m.note), now)));
-  await sendPushDeliveries(env, ids, now);
+  const rows = admins.map((a) =>
+    pushDelivery(db, { memberId: a.id, message: discussMessage(w.name, w.chore, m.note), title: MESS_DISCUSS_TITLE, messId: m.id }, now));
+  await db.batch(rows.map((r) => r.stmt));
+  await sendPushDeliveries(env, rows.map((r) => r.id), now);
 }
 
 /** One open mess: To talk about when due, else the next ask to each member who is due one. */
@@ -54,9 +50,11 @@ export async function askAbout(env: Env, m: MessRow, now: string, activeIds?: st
   const due = asked.filter((id) => nudgeDue(m.created_at, sent.get(id) ?? 0, now));
   if (!due.length) return;
   const w = await wordsOf(db, m);
-  const ids = due.map(() => newId('dlv'));
-  await db.batch(due.map((id, i) => pushRow(db, ids[i], m, id, (sent.get(id) ?? 0) + 1, MESS_ASK_TITLE, askMessage(w.name, w.chore, m.note), now)));
-  await sendPushDeliveries(env, ids, now);
+  const rows = due.map((id) => pushDelivery(db, {
+    memberId: id, message: askMessage(w.name, w.chore, m.note), title: MESS_ASK_TITLE, messId: m.id, alertNumber: (sent.get(id) ?? 0) + 1,
+  }, now));
+  await db.batch(rows.map((r) => r.stmt));
+  await sendPushDeliveries(env, rows.map((r) => r.id), now);
 }
 
 /** Tick (§7B.7): every open mess is asked about; photos past MESS_PHOTO_KEEP_DAYS are deleted. */

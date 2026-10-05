@@ -5,9 +5,11 @@
 import type { RecipeRow } from '../shared/recipes';
 import { COMMENTS_LOOKED_AT, cleanRecipeReading, creatorComments, sourcesOf, type RecipeReading, type Screenshot, type VideoText } from '../shared/recipe-reading';
 import type { RecipeSource } from '../shared/vocab';
-import { nowIso, randomBase32, run } from './db';
+import { nowIso, run } from './db';
 import { lookUpComments, lookUpVideo } from './youtube';
 import { readRecipe } from './recipe-reader';
+import { countRecipeRead } from './recipe-reads';
+import { replacePhoto } from './photo-store';
 
 export type RereadOutcome =
   | { ok: true }
@@ -24,10 +26,8 @@ export async function rereadRecipe(db: D1Database, keys: { yt: string; ai: strin
 
 /** ⚑ Q174 — the first screenshot of a successful read becomes the recipe's picture; the one it replaces is deleted. */
 async function keepPicture(db: D1Database, photos: R2Bucket, row: RecipeRow, shot: Screenshot) {
-  const key = `recipes/${row.id}/${randomBase32(16).toLowerCase()}.jpg`;
-  await photos.put(key, Uint8Array.from(atob(shot.data), (ch) => ch.charCodeAt(0)), { httpMetadata: { contentType: shot.type } });
-  await run(db, 'UPDATE recipes SET photo_key = ? WHERE id = ?', key, row.id);
-  if (row.photo_key) await photos.delete(row.photo_key);
+  await replacePhoto(photos, 'recipes', row.id, Uint8Array.from(atob(shot.data), (ch) => ch.charCodeAt(0)), shot.type, row.photo_key,
+    (key) => run(db, 'UPDATE recipes SET photo_key = ? WHERE id = ?', key, row.id));
 }
 
 async function rereadVideo(db: D1Database, keys: { yt: string; ai: string }, row: RecipeRow,
@@ -36,7 +36,7 @@ async function rereadVideo(db: D1Database, keys: { yt: string; ai: string }, row
   const [video, comments] = await Promise.all([lookUpVideo(videoId, keys.yt), lookUpComments(videoId, keys.yt, COMMENTS_LOOKED_AT)]);
   if (!video.ok && video.kind === 'not_found') return { ok: false, kind: 'video_unavailable', reason: video.reason };
   if (!video.ok) return { ok: false, kind: 'youtube_failed', reason: video.reason };
-  await run(db, 'INSERT INTO recipe_reads (at, member_id) VALUES (?, ?)', now, countFor);
+  await countRecipeRead(db, now, countFor);
 
   const read: VideoText = {
     description: video.description, transcript: null, ...given,
@@ -64,7 +64,7 @@ const save = (db: D1Database, id: string, reading: RecipeReading, source: Recipe
  *  recipe's title and, for a link, its site. */
 async function rereadLink(db: D1Database, aiKey: string, row: RecipeRow, given: Pick<VideoText, 'pasted' | 'screenshots'>,
   countFor: string, now: string): Promise<RereadOutcome> {
-  await run(db, 'INSERT INTO recipe_reads (at, member_id) VALUES (?, ?)', now, countFor);
+  await countRecipeRead(db, now, countFor);
   const read: VideoText = { description: null, transcript: null, comments: null, ...given };
   const res = await readRecipe({
     apiKey: aiKey, title: row.title, channel: null, site: row.link ? row.channel : null, ...read, transcript: given.pasted ?? null,

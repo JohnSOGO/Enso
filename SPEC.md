@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.60 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.61 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -243,6 +243,7 @@ Enso/
 │       │                   # days off, /push/*, /status) · announce.ts ·
 │       │                   # lists.ts (§7A) · item-photos.ts (§7A.3) · machines.ts (§7D) ·
 │       │                   # recipes.ts (§7E) · phone-login.ts (§6.6)
+│       ├── recipe-reads.ts # §7E.2, §7E.6 reading a new recipe + the daily read budget
 │       ├── recipe-reread.ts # §7E.2b re-reading a recipe in place
 │       ├── claude.ts       # the one Claude API call (§7C.4, §7E)
 │       ├── recipe-reader.ts # §7E the recipe prompt + schema
@@ -3055,11 +3056,11 @@ Worker asks SogoAI **in-line**, inside `POST /recipes/from-video`, through Cloud
 saves it complete. Nothing is pending, and nothing is re-read later.
 
 The rules (pure) are `src/shared/recipe-reading.ts`; the call is `src/worker/home-captions.ts`; the
-decision to ask is the from-video route.
+decision to ask is the from-video read in `src/worker/recipe-reads.ts`.
 
 **When** — in §7E.2 step 7, `wantsHomeCaptions(failure)` is true **only** for kind `blocked` ⚑ Q95;
 `none` and `failed` never ask (they would fail at home too), nor does the transcript route; there is no
-backfill of older recipes and no "try from home" button ⚑ Q102. The route's file-local
+backfill of older recipes and no "try from home" button ⚑ Q102. `recipe-reads.ts`'s file-local
 `captionsFor(videoId, env)`:
 
 1. `readCaptions(videoId)` — read → its text; a failure that is not `blocked` → that failure, kept;
@@ -5467,6 +5468,12 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Steward pass 1, items 1–5** (v1.33.1; approved by MojoSOGO 2026-10-05; behavior unchanged): the first
+code-steward pass's top five, each placed by the placement-advisor and moved by the reorganizer in its own commit.
+New owners `src/worker/recipe-reads.ts` (the recipe read pipelines and budget; `routes/recipes.ts` 274 → 229),
+`fire-rows.ts` (fire and chore-run rows and `sourceOf`; `tick.ts` 257 → 108), `deliveries.ts` (every deliveries
+INSERT and the founder-ping count, now under test), `photo-store.ts` (private R2 photos); the mess permissions
+moved into `src/shared/messes.ts`, shared by the route and the PWA. Report: `steward/2026-10-05-first-pass.md`.
 **Whose mess?** (v1.33.0, §7B.7, §8.15a, §4.2ze; asked by MojoSOGO 2026-10-05, after an AREC; MS1–MS14, MS-M):
 📸 Report a mess in the Chores tab, That was me / Not me asked by push up to 4 times 15 min apart and by an in-app
 banner, To talk about for unclaimed messes with the outcome recorded by an admin, and a Balances card of who owes

@@ -6,7 +6,8 @@ import type { AppEnv } from '../env';
 import { announceError, announceMessage } from '../../shared/announce';
 import { audience } from '../../shared/optins';
 import type { Channel } from '../../shared/vocab';
-import { activeMemberIds, all, newId, nowIso } from '../db';
+import { activeMemberIds, all, nowIso } from '../db';
+import { houseDelivery, pushDelivery } from '../deliveries';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
 import { sendPushDeliveries } from '../push';
@@ -32,21 +33,17 @@ announce.post('/announce', requireMember, async (c) => {
   // §9.2a: for every active member, so on everyone's ticked speakers together; none ticked → not spoken.
   const speakers = channels.includes('house') ? await deliverySpeakers(db, await activeMemberIds(db)) : [];
   if (speakers === null || speakers.length) {
-    const id = houseId = newId('dlv');
-    ids.push(id);
-    stmts.push(db.prepare(
-      `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, status, speakers, created_at, updated_at)
-       VALUES (?, NULL, 1, 'house', NULL, ?, 'queued', ?, ?, ?)`).bind(id, message, speakers && JSON.stringify(speakers), now, now));
+    const d = houseDelivery(db, { message, speakers }, now);
+    ids.push(houseId = d.id);
+    stmts.push(d.stmt);
   }
   if (channels.includes('push')) {
     const aud = audience({ optional: false, assignedTo: [], activeIds: await activeMemberIds(db), onIds: [], channels });
     for (const memberId of aud.push.filter((id) => id !== me.id)) {
-      const id = newId('dlv');
-      ids.push(id);
-      pushIds.push(id);
-      stmts.push(db.prepare(
-        `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, status, created_at, updated_at)
-         VALUES (?, NULL, 1, 'push', ?, ?, 'queued', ?, ?)`).bind(id, memberId, message, now, now));
+      const d = pushDelivery(db, { memberId, message }, now);
+      ids.push(d.id);
+      pushIds.push(d.id);
+      stmts.push(d.stmt);
     }
   }
   // Nothing would be sent — say why rather than succeed with nothing sent.

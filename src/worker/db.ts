@@ -40,10 +40,14 @@ export async function householdTz(db: D1Database): Promise<string> {
   return (await first<{ timezone: string }>(db, 'SELECT timezone FROM settings WHERE id = 1'))!.timezone;
 }
 
+/** §4.2o — the household place, or null unless both coordinates are set. */
+export const placeOf = (lat: number | null | undefined, lon: number | null | undefined): Place | null =>
+  lat != null && lon != null ? { lat, lon } : null;
+
 /** The household's own place (§7.7), or null when none is set. */
 export async function householdPlace(db: D1Database): Promise<Place | null> {
   const at = await first<{ lat: number | null; lon: number | null }>(db, 'SELECT latitude AS lat, longitude AS lon FROM settings WHERE id = 1');
-  return at && at.lat !== null && at.lon !== null ? { lat: at.lat, lon: at.lon } : null;
+  return at ? placeOf(at.lat, at.lon) : null;
 }
 
 /** The ids of every member not disabled. */

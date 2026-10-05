@@ -12,7 +12,7 @@ import { addDays, addMinutes, utcToLocal } from '../../shared/time';
 import { activeMemberIds, all, first, newId, nowIso } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
-import { choreRunInserts, insertFire, loadChoreRun, updateChoreRun, updateFire } from '../tick';
+import { choreRunInserts, insertFire, loadChoreRun, updateChoreRun, updateFire } from '../fire-rows';
 import { areaCounts, choreAreaDeletes } from './chore-areas';
 
 const householdTz = async (db: D1Database) => (await first<{ timezone: string }>(db, 'SELECT timezone FROM settings WHERE id = 1'))!.timezone;

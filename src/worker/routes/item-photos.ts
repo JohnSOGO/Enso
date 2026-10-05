@@ -6,12 +6,13 @@ import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { READS_PER_DAY } from '../../shared/things';
 import { cleanItemName, type ItemReading } from '../../shared/item-reading';
-import { nowIso, randomBase32, run } from '../db';
+import { nowIso, run } from '../db';
 import { fail, photoBody } from '../http';
 import { requireMember } from '../session';
 import { homeCaptionsConfigOf, identifyFromHome } from '../home-captions';
 import { readItemPhoto } from '../photo-reader';
 import { spendPhotoRead } from '../photo-reads';
+import { replacePhoto, servePhoto } from '../photo-store';
 import { ITEM_GONE, loadItem } from './lists';
 
 const NO_PHOTO = 'This item has no photo.';
@@ -53,21 +54,14 @@ itemPhotos.put('/list-items/:id/photo', requireMember, async (c) => {
   if (!item) return fail(c, 404, 'not_found', ITEM_GONE);
   const photo = await photoBody(c);
   if (photo instanceof Response) return photo;
-  const key = `list-items/${item.id}/${randomBase32(16).toLowerCase()}.jpg`;
-  await c.env.PHOTOS.put(key, photo.bytes, { httpMetadata: { contentType: photo.type } });
-  await run(c.env.DB, 'UPDATE list_items SET photo_key = ?, updated_at = ? WHERE id = ?', key, nowIso(), item.id);
-  if (item.photo_key) await c.env.PHOTOS.delete(item.photo_key); // replacing deletes the old object
+  await replacePhoto(c.env.PHOTOS, 'list-items', item.id, photo.bytes, photo.type, item.photo_key,
+    (key) => run(c.env.DB, 'UPDATE list_items SET photo_key = ?, updated_at = ? WHERE id = ?', key, nowIso(), item.id));
   return c.body(null, 204);
 });
 
 itemPhotos.get('/list-items/:id/photo', requireMember, async (c) => {
   const item = await loadItem(c.env.DB, c.req.param('id'));
-  const obj = item?.photo_key ? await c.env.PHOTOS.get(item.photo_key) : null;
-  if (!obj) return fail(c, 404, 'not_found', NO_PHOTO);
-  return c.body(obj.body, 200, {
-    'Content-Type': obj.httpMetadata?.contentType ?? 'application/octet-stream',
-    'Cache-Control': 'private, max-age=3600',
-  });
+  return servePhoto(c, c.env.PHOTOS, item?.photo_key, NO_PHOTO);
 });
 
 itemPhotos.delete('/list-items/:id/photo', requireMember, async (c) => {

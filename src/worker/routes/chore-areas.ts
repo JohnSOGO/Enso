@@ -3,9 +3,10 @@
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { AREAS_MAX, AREA_PHOTOS_MAX, parseAreaInput, type ChoreArea } from '../../shared/chore-areas';
-import { all, first, newId, nowIso, randomBase32, run } from '../db';
+import { all, first, newId, nowIso, run } from '../db';
 import { body, fail, photoBody } from '../http';
 import { requireMember } from '../session';
+import { putPhoto, servePhoto } from '../photo-store';
 
 interface AreaRow { id: string; chore_id: string; name: string; expectations: string; position: number; updated_at: string }
 interface PhotoRow { id: string; area_id: string; photo_key: string }
@@ -101,8 +102,7 @@ choreAreas.post('/chore-areas/:id/photos', requireMember, async (c) => {
   if (n >= AREA_PHOTOS_MAX) return fail(c, 400, 'invalid_input', `An area has at most ${AREA_PHOTOS_MAX} photos.`);
   const photo = await photoBody(c);
   if (photo instanceof Response) return photo;
-  const key = `chore-areas/${a.id}/${randomBase32(16).toLowerCase()}.jpg`, now = nowIso();
-  await c.env.PHOTOS.put(key, photo.bytes, { httpMetadata: { contentType: photo.type } });
+  const key = await putPhoto(c.env.PHOTOS, 'chore-areas', a.id, photo.bytes, photo.type), now = nowIso();
   await db.batch([
     db.prepare('INSERT INTO chore_area_photos (id, area_id, photo_key, created_at) VALUES (?, ?, ?, ?)').bind(newId('cap'), a.id, key, now),
     db.prepare('UPDATE chore_areas SET updated_at = ? WHERE id = ?').bind(now, a.id),
@@ -121,12 +121,7 @@ async function loadPhoto(c: Context<AppEnv>): Promise<PhotoRow | Response> {
 choreAreas.get('/chore-area-photos/:id', requireMember, async (c) => {
   const p = await loadPhoto(c);
   if (p instanceof Response) return p;
-  const obj = await c.env.PHOTOS.get(p.photo_key);
-  if (!obj) return fail(c, 404, 'not_found', 'That photo no longer exists.');
-  return c.body(obj.body, 200, {
-    'Content-Type': obj.httpMetadata?.contentType ?? 'application/octet-stream',
-    'Cache-Control': 'private, max-age=3600',
-  });
+  return servePhoto(c, c.env.PHOTOS, p.photo_key, 'That photo no longer exists.');
 });
 
 choreAreas.delete('/chore-area-photos/:id', requireMember, async (c) => {

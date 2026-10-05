@@ -13,6 +13,7 @@ import {
 import type { LoginRequestStatus, NoticeKind } from '../../shared/vocab';
 import { first, newId, nowIso, run } from '../db';
 import { body, fail, str } from '../http';
+import { pushDelivery } from '../deliveries';
 import { sendPushDeliveries } from '../push';
 import { requireMember, sha256hex, startSession } from '../session';
 
@@ -33,11 +34,8 @@ const hex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart
 
 /** One fire-less push delivery that is a sign-in notice (§6.6), written, then sent. Never a house row. */
 async function sendNotice(env: Env, memberId: string, notice: NoticeKind, message: string, url: string | null, now: string) {
-  const id = newId('dlv');
-  await env.DB.prepare(
-    `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, title, notice, url, status, created_at, updated_at)
-     VALUES (?, NULL, 1, 'push', ?, ?, ?, ?, ?, 'queued', ?, ?)`)
-    .bind(id, memberId, message, NOTICE_TITLE, notice, url, now, now).run();
+  const { id, stmt } = pushDelivery(env.DB, { memberId, message, title: NOTICE_TITLE, notice, url }, now);
+  await stmt.run();
   await sendPushDeliveries(env, [id], now);
 }
 

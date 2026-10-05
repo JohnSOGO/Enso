@@ -7,6 +7,101 @@ carry its result.
 
 ---
 
+## 2026-10-05 — Mess permissions into the shared rules (placement-advisor)
+
+- **Ask:** steward backlog item 5 (approved): move the who-can-answer, settle, delete and decide checks out of `routes/messes.ts` into `src/shared/messes.ts`; the route and Messes.tsx import them (§7B.7, §8.15a). Behavior-preserving.
+- **Verdict:** `src/shared/messes.ts` [EXISTING, row widened]; routes/messes.ts and Messes.tsx [EXISTING, call it].
+- **Flow stage:** rules (moved out of route and render).
+- **Why:** permission decisions in a route, and the answerable rule restated in the route twice, the PWA and askedOf. One pure home lets server and PWA agree by construction. Rejected: HTTP codes in shared; changing the admin select gate; MessBanner (already server-driven).
+- **Caps:** shared/messes.ts 115/300, routes/messes.ts 143/300, Messes.tsx 146/300 (none pinned).
+
+## 2026-10-05 — Mess permissions: isAnswerable, isDecidable, canSettle, canDelete, decideError (reorganizer)
+
+- **Trigger:** steward backlog item 5: permission rules for messes restated in `routes/messes.ts`, `Messes.tsx` and `askedOf`.
+- **Seam moved:** who may answer, decide, settle or delete a mess, from `src/worker/routes/messes.ts` (ANSWERABLE, the decide status list, the settle and delete checks, the decide member checks) and `frontend/src/components/Messes.tsx` (answerable, the settle and delete button gates) to `src/shared/messes.ts` [EXISTING row, widened]. `askedOf` now uses isAnswerable.
+- **Room opened:** routes/messes.ts: 144 → 143 lines; Messes.tsx: 146 → 146; shared/messes.ts: 91 → 115. No pins; caps stay GLOBAL_FILE_CAP 300.
+- **Behavior:** preserved — typecheck (all four projects, frontend included), npm test (662, the 659 existing unchanged plus 3 new unit tests) and arch:audit green; every HTTP status, code, message and check order unchanged (answerable keeps its reporter 400 before the 409; settle 409 before 403; decide 409, then the null branch, then the 400s); HTTP codes stay in the route.
+- **Restraint:** no MessBanner, MessReport, mess-asks.ts or vocab.ts change; the admin Whose was it? select stays gated on admin only; the route's `answerable()` wrapper kept for its reporter check.
+
+## 2026-10-05 — One owner for private photos in R2 (placement-advisor)
+
+- **Ask:** steward backlog item 4 (approved): one `photo-store.ts` for putPhoto, replacePhoto and the photo response (§7C.3, §7A.3, §7B.6, §7B.7, §7E.2b). Behavior-preserving.
+- **Verdict:** `src/worker/photo-store.ts` [NEW row]; six callers [EXISTING, shrink].
+- **Flow stage:** persist (R2), plus the HTTP serve of a stored object.
+- **Why:** key format, put, replace order and private serve headers copied six times; the recipe picture had two writers that could drift. Rejected: a delete wrapper; a recipe-picture module; servePhoto in http.ts; a raw Response.
+- **Caps:** photo-store.ts 35/300; every caller shrinks (none pinned, all under the 300 global cap).
+
+## 2026-10-05 — Private photos to photo-store.ts (reorganizer)
+
+- **Trigger:** steward backlog item 4: the R2 photo key, put, replace and private serve copied across six worker files.
+- **Seam moved:** the 5 key templates, 5 puts, 4 replace sequences (thing-photos, item-photos, recipe-photos, recipe-reread keepPicture; each keeps its own UPDATE as `save`) and the 5 serve blocks, from `routes/thing-photos.ts`, `routes/item-photos.ts`, `routes/recipe-photos.ts`, `routes/chore-areas.ts`, `routes/messes.ts` and `recipe-reread.ts` to `src/worker/photo-store.ts` [NEW row]
+- **Room opened:** thing-photos 86 → 80, item-photos 81 → 75, recipe-photos 48 → 42, chore-areas 142 → 137, messes 149 → 144, recipe-reread 79 → 78 lines; none pinned, global cap 300 unchanged; photo-store.ts 35/300.
+- **Behavior:** preserved — typecheck, npm test (71 files, 659 tests, unchanged) and arch:audit green (nothing in the warning band); same keys, put metadata, put → UPDATE → old delete order, 404 texts, Content-Type and `private, max-age=3600`; every UPDATE, the base64 decode and every bare PHOTOS.delete on row delete stay with their callers.
+- **Restraint:** no dropPhotos wrapper, no recipe-picture module, servePhoto kept out of http.ts and still answers through `c.body(...)`; lists.ts, things.ts, chores.ts and mess-asks.ts untouched.
+
+## 2026-10-05 — One owner for writing deliveries (placement-advisor)
+
+- **Ask:** steward backlog item 3 (approved): one owner for INSERT INTO deliveries and the ops-ping count (§9.4, §5.7, §6.6, §7B.7, §9.3). Behavior-preserving.
+- **Verdict:** `src/worker/deliveries.ts` [NEW row]; tick, announce, ops, phone-login and mess-asks [EXISTING, shrink].
+- **Flow stage:** persist.
+- **Why:** 7 statements in 5 files for one table, plus a ping count by elimination, so the next fire-less titled push would silently use up the hourly limit. Writers and predicate in one file, with a test pinning which rows count. Rejected: a marker column (spec and schema change, to MojoSOGO separately); folding into push.ts; status UPDATEs.
+- **Caps:** deliveries.ts 45/300; tick.ts 111 → 108, pin lowered 151 → 148 (108 + WORKING_BUFFER); ops.ts 56 → 52, announce.ts 64 → 61, phone-login.ts 148 → 146, mess-asks.ts 76 → 74 (all /300).
+
+## 2026-10-05 — Deliveries writers to deliveries.ts (reorganizer)
+
+- **Trigger:** steward backlog item 3; placement-advisor verdict "One owner for writing deliveries" (seven INSERTs for one table in five files, and the ping limit counted by elimination in a route).
+- **Seam moved:** the push and house deliveries INSERTs (pushDelivery, houseDelivery → { id, stmt }) from `tick.ts`, `routes/announce.ts`, `routes/ops.ts`, `routes/phone-login.ts` and `mess-asks.ts`, and the founder-ping COUNT (opsPingsSince, SQL text unchanged) from `routes/ops.ts`, to `src/worker/deliveries.ts` [NEW row]
+- **Room opened:** tick.ts: 111 → 108 lines; cap 151 → 148. ops 56 → 52, announce 64 → 61, phone-login 148 → 146, mess-asks 76 → 74.
+- **Behavior:** preserved — typecheck, npm test (71 files, 659 tests; the 658 existing unchanged) and arch:audit green; columns omitted before are written as explicit NULL (every added column defaults NULL), alert_number 1 for fire-less rows as before, same status, timestamps, batching and send order; new test/deliveries.test.ts pins that a founder ping counts and an announcement, a sign-in notice and a mess ask do not.
+- **Restraint:** writers and the one predicate only; push.ts and house.ts status UPDATEs, the mess-ask per-member COUNT and the migrations untouched; no kind column.
+
+## 2026-10-05 — Fire rows out of the orchestrator (placement-advisor)
+
+- **Ask:** steward backlog item 2 (approved): move insertFire, updateFire, choreRunInserts, updateChoreRun, loadChoreRun and sourceOf out of `tick.ts`; move the machine every-speaker rule to shared; fold placeOf into the householdPlace rule (§5.6, §7B.3, §7D.3, §4.2o). Behavior-preserving.
+- **Verdict:** `src/worker/fire-rows.ts` [NEW row]; `src/shared/machines.ts` (machineAlert) and `src/worker/db.ts` (placeOf) [EXISTING].
+- **Flow stage:** persist (rows) and rules (the machine alert shape).
+- **Why:** three routes imported from the cron orchestrator, an inverted dependency on a hub at 86%. The every-speaker decision sat in orchestration (`9ae12ab`). The place null rule was written twice. Rejected: AlertConfig.allSpeakers (leaks speakers into the engine); changing machineAlertConfig's shape; dropping the reminder JOIN; moving the deliveries inserts here (item 3).
+- **Caps:** tick.ts 257 → 111, pinned at 111 + WORKING_BUFFER = 151; fire-rows.ts 147/300; machines.ts 232/300; db.ts 55/300.
+
+## 2026-10-05 — Fire and chore-run rows to fire-rows.ts (reorganizer)
+
+- **Trigger:** steward backlog item 2; placement-advisor verdict "Fire rows out of the orchestrator" (routes importing row writers from the 257/300 cron hub).
+- **Seam moved:** SourceRow, Source, insertFire, updateFire, loadChoreRun, choreRunInserts, updateChoreRun and sourceOf from `src/worker/tick.ts` to `src/worker/fire-rows.ts` [NEW row]; the machine branch's audience/config to `src/shared/machines.ts` machineAlert(quietUntil) [EXISTING]; tick's local placeOf to `src/worker/db.ts` placeOf, which householdPlace now uses [EXISTING]. routes/alerts.ts, chores.ts and machines.ts import from fire-rows.ts; no re-export from tick.
+- **Room opened:** tick.ts: 257 → 111 lines; cap 300 (global) → 151 (111 + WORKING_BUFFER).
+- **Behavior:** preserved — typecheck, npm test (70 files, 658 tests, unchanged) and arch:audit green; every SQL string moved byte-for-byte, tick's single settings SELECT and sourceOf's reminder JOIN kept, machineAlertConfig unchanged, machineAlert returns the same `{ assignedTo: [], allSpeakers: true, cfg }` spread, householdPlace still null when the settings row or either coordinate is missing.
+- **Restraint:** the two deliveries INSERTs and step 2's audience call stay in tick (item 3 owns the deliveries writers); no engine, house, speaker-choices or event-rows change; SPEC's §2 tree line for tick.ts left as is (outside the write boundary, still true).
+
+## 2026-10-05 — Recipe read pipelines and budget out of the route (placement-advisor)
+
+- **Ask:** steward backlog item 1 (approved by MojoSOGO): move the from-video and page read pipelines, captionsFor and the recipe-read budget out of `routes/recipes.ts` (§7E.2, §7E.2c, §7E.6). Behavior-preserving.
+- **Verdict:** `src/worker/recipe-reads.ts` [NEW row]; `routes/recipes.ts` and `recipe-reread.ts` [EXISTING, shrink]. Reorganizer, own commit.
+- **Flow stage:** persist (the read and count) out of route; the route keeps validation, row persistence and the HTTP mapping.
+- **Why:** the route is at 274/300 with four concerns, 4 copies of the recipe_reads INSERT and 3 copies of the error mapping. The pipelines follow recipe-reread.ts's shape: the caller's checks first, then outcome kinds, never HTTP. Rejected: raising the cap; merging the budget into photo-reads.ts (a different table and cap); folding recipe-reread.ts in (a different contract); moving `insert` out.
+- **Caps:** routes/recipes.ts 274 → 229, pinned at 229 + WORKING_BUFFER (269); recipe-reads.ts 97/300; recipe-reread.ts 79/300.
+
+## 2026-10-05 — Recipe read pipelines to recipe-reads.ts (reorganizer)
+
+- **Trigger:** steward backlog item 1: `routes/recipes.ts` at 274/300 carrying CRUD, two read pipelines, the budget and three copies of the error mapping.
+- **Seam moved:** the from-video and page read pipelines (YouTube, captionsFor with SogoAI in-line, comments, count, Claude / recipe-link-reader.ts, clean) and the recipe-read budget (recipeReadsUsedUp, countRecipeRead) from `src/worker/routes/recipes.ts` to `src/worker/recipe-reads.ts` [NEW row]; `recipe-reread.ts`'s two INSERTs now call countRecipeRead; the route's three outcome mappings folded into one file-local readFailed (noun video / link / transcript), every string unchanged.
+- **Room opened:** routes/recipes.ts: 274 → 229 lines; cap 300 (global) → 269 (229 + WORKING_BUFFER).
+- **Behavior:** preserved — typecheck, npm test (658/658, unchanged) and arch:audit green; check orders (duplicate, cap, keys in the route; YouTube, captions ∥ comments, count, Claude in the pipeline), every status, code and message, the recipe_reads and recipes rows and the unique-constraint race catch unchanged.
+- **Restraint:** `insert`, `answer`, toRecipes, the duplicate checks, the 429 text and readingOff stay in the route; recipe-reread.ts gets only the count call (keepPicture is item 4's); no new shared rule.
+
+## 2026-10-05 — Steward pass, whole tree (code-steward)
+
+- **Run:** first steward pass on Ensō, at the v1.33.0 milestone, on the first day placement is enforced.
+- **Verdict:** REAL DEBT, concentrated in five places; no file over its cap, layering clean.
+- **Top finding:** `routes/recipes.ts` 274/300 (91%), the top hotspot; extract the read pipelines (the seam named
+  2026-10-05, not taken).
+- **Handoffs:** items 1–5 (recipe-reads.ts, fire-rows.ts, deliveries.ts, photo-store.ts, mess rules into
+  shared/messes.ts) approved by MojoSOGO and done above; items 6–10 left for when those files are next touched.
+- **Placement audit:** 14 code commits from before enforcement have no receipt (`1e478e6`, `0a6ad57`, `a93d113`,
+  `77c4ef5`, `68786f3`, `54e09db`, `9c52930`, `9ae12ab`, `11753e9`, `52bc6c1`, `ebcccbe`, `0ecf855`, `b353be1`,
+  `3e88d17`); two questionable placements (recipe picture's second writer, machine speaker rule in tick) fixed by
+  items 4 and 2.
+
+---
+
 ## 2026-10-05 — Whose mess? (placement-advisor)
 
 - **Ask:** mess reports in Chores. Members answer That was me or Not me. Asks go by push up to 4 times, 15 min

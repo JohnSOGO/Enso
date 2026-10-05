@@ -5,12 +5,13 @@ import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { READS_PER_DAY, URL_MAX, cleanPhotoReading } from '../../shared/things';
 import { readableLink } from '../../shared/link-reading';
-import { householdPlace, nowIso, randomBase32, run } from '../db';
+import { householdPlace, nowIso, run } from '../db';
 import { body, fail, photoBody } from '../http';
 import { requireMember } from '../session';
 import { readPhoto } from '../photo-reader';
 import { readLink } from '../link-reader';
 import { spendPhotoRead } from '../photo-reads';
+import { replacePhoto, servePhoto } from '../photo-store';
 import { loadThing } from './things';
 
 export const thingPhotos = new Hono<AppEnv>();
@@ -57,22 +58,15 @@ thingPhotos.put('/things/:id/photo', requireMember, async (c) => {
   if (t instanceof Response) return t;
   const photo = await photoBody(c);
   if (photo instanceof Response) return photo;
-  const key = `things/${t.id}/${randomBase32(16).toLowerCase()}.jpg`;
-  await c.env.PHOTOS.put(key, photo.bytes, { httpMetadata: { contentType: photo.type } });
-  await run(c.env.DB, 'UPDATE things SET photo_key = ?, updated_at = ? WHERE id = ?', key, nowIso(), t.id);
-  if (t.photo_key) await c.env.PHOTOS.delete(t.photo_key); // replacing deletes the old object
+  await replacePhoto(c.env.PHOTOS, 'things', t.id, photo.bytes, photo.type, t.photo_key,
+    (key) => run(c.env.DB, 'UPDATE things SET photo_key = ?, updated_at = ? WHERE id = ?', key, nowIso(), t.id));
   return c.body(null, 204);
 });
 
 thingPhotos.get('/things/:id/photo', requireMember, async (c) => {
   const t = await loadThing(c);
   if (t instanceof Response) return t;
-  const obj = t.photo_key ? await c.env.PHOTOS.get(t.photo_key) : null;
-  if (!obj) return fail(c, 404, 'not_found', 'This thing has no photo.');
-  return c.body(obj.body, 200, {
-    'Content-Type': obj.httpMetadata?.contentType ?? 'application/octet-stream',
-    'Cache-Control': 'private, max-age=3600',
-  });
+  return servePhoto(c, c.env.PHOTOS, t.photo_key, 'This thing has no photo.');
 });
 
 thingPhotos.delete('/things/:id/photo', requireMember, async (c) => {

@@ -1,5 +1,5 @@
 // SPEC §7B.7 — whose mess? A mess someone cleaned up: who is asked, when they are asked again, when it goes to To
-// talk about, who owes whom, the push texts and the wire type. Pure; imports only vocab and time.
+// talk about, who may answer, decide, settle or delete it, who owes whom, the push texts and the wire type. Pure; imports only vocab and time.
 import type { MessSettle, MessStatus } from './vocab';
 import { addMinutes } from './time';
 
@@ -47,10 +47,34 @@ export function parseMessInput(b: { note?: unknown; choreId?: unknown }): { note
   return { note: note || null, choreId: (b.choreId as string | null | undefined) || null };
 }
 
+/** Whether That was me / Not me can still be said, and the reporter may still delete it: open or on To talk about. */
+export const isAnswerable = (s: MessStatus): boolean => s === 'open' || s === 'discuss';
+
+/** Whether an admin can still record whose it was: open, on To talk about, or owed. */
+export const isDecidable = (s: MessStatus): boolean => isAnswerable(s) || s === 'owed';
+
+/** Who is asking: the member and whether they are an admin. */
+export interface MessViewer { id: string; admin: boolean }
+type MessFacts = { status: MessStatus; reportedBy: string };
+
+/** Paid back / Let it go: an owed mess, by the one owed or an admin. */
+export const canSettle = (m: MessFacts, viewer: MessViewer): boolean =>
+  m.status === 'owed' && (viewer.id === m.reportedBy || viewer.admin);
+
+/** Delete: an admin, or the reporter before anyone answers. */
+export const canDelete = (m: MessFacts, viewer: MessViewer): boolean =>
+  viewer.admin || (viewer.id === m.reportedBy && isAnswerable(m.status));
+
+/** An admin's Whose was it? choice (a member, not null) → the refusal text, or null when it can be recorded. */
+export function decideError(memberId: unknown, reportedBy: string, activeIds: readonly string[]): string | null {
+  if (typeof memberId !== 'string' || !activeIds.includes(memberId)) return 'memberId must be an active member, or null for nobody\'s.';
+  if (memberId === reportedBy) return 'The one who cleaned it up can\'t owe themselves.';
+  return null;
+}
+
 /** Who still has to answer: while open or on To talk about, the active members but the reporter who haven't said Not me. */
 export function askedOf(m: Parameters<typeof messStatus>[0] & Pick<MessRow, 'reported_by'>, activeIds: readonly string[], deniedIds: readonly string[]): string[] {
-  const s = messStatus(m);
-  if (s !== 'open' && s !== 'discuss') return [];
+  if (!isAnswerable(messStatus(m))) return [];
   return activeIds.filter((id) => id !== m.reported_by && !deniedIds.includes(id));
 }
 

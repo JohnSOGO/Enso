@@ -1,10 +1,11 @@
-// SPEC §7B.7 — the pure rules of whose mess: state, input, who is asked, when, To talk about, balances, the words.
+// SPEC §7B.7 — the pure rules of whose mess: state, input, who is asked, when, To talk about, who may act, balances, the words.
 import { describe, expect, it } from 'vitest';
 import {
-  DISCUSS_AFTER_H, MESS_NOTE_MAX, NUDGES_MAX, NUDGE_EVERY_MIN, askMessage, askedOf, balancesOf, discussDue, discussMessage,
-  messStatus, nudgeDue, parseMessInput,
+  DISCUSS_AFTER_H, MESS_NOTE_MAX, NUDGES_MAX, NUDGE_EVERY_MIN, askMessage, askedOf, balancesOf, canDelete, canSettle, decideError,
+  discussDue, discussMessage, isAnswerable, isDecidable, messStatus, nudgeDue, parseMessInput,
 } from '../src/shared/messes';
 import { addMinutes } from '../src/shared/time';
+import { MESS_STATUS } from '../src/shared/vocab';
 
 const T = '2026-10-05T10:00:00.000Z';
 const row = (over: Partial<Parameters<typeof messStatus>[0] & { reported_by: string }> = {}) =>
@@ -31,6 +32,32 @@ describe('§7B.7 messes — rules', () => {
     expect(askedOf(row(), ['A', 'B', 'C'], ['C'])).toEqual(['B']);
     expect(askedOf(row({ discuss_at: T }), ['A', 'B', 'C'], [])).toEqual(['B', 'C']);
     expect(askedOf(row({ claimed_by: 'B' }), ['A', 'B', 'C'], [])).toEqual([]);
+  });
+
+  it('who may act: answer while open or discuss; decide also while owed; settle owed by the one owed or an admin', () => {
+    expect(MESS_STATUS.map(isAnswerable)).toEqual([true, true, false, false, false]);
+    expect(MESS_STATUS.map(isDecidable)).toEqual([true, true, true, false, false]);
+    const owed = { status: 'owed' as const, reportedBy: 'A' };
+    expect(canSettle(owed, { id: 'A', admin: false })).toBe(true);
+    expect(canSettle(owed, { id: 'B', admin: true })).toBe(true);
+    expect(canSettle(owed, { id: 'B', admin: false })).toBe(false);
+    expect(canSettle({ ...owed, status: 'open' }, { id: 'A', admin: true })).toBe(false);
+  });
+
+  it('delete: an admin always, the reporter only before anyone answers', () => {
+    const viewerA = { id: 'A', admin: false };
+    expect(canDelete({ status: 'open', reportedBy: 'A' }, viewerA)).toBe(true);
+    expect(canDelete({ status: 'discuss', reportedBy: 'A' }, viewerA)).toBe(true);
+    expect(canDelete({ status: 'owed', reportedBy: 'A' }, viewerA)).toBe(false);
+    expect(canDelete({ status: 'open', reportedBy: 'B' }, viewerA)).toBe(false);
+    expect(canDelete({ status: 'settled', reportedBy: 'B' }, { id: 'A', admin: true })).toBe(true);
+  });
+
+  it('decide: an active member who is not the reporter, else the refusal text', () => {
+    expect(decideError('B', 'A', ['A', 'B'])).toBeNull();
+    expect(decideError('C', 'A', ['A', 'B'])).toBe("memberId must be an active member, or null for nobody's.");
+    expect(decideError(5, 'A', ['A', 'B'])).toBe("memberId must be an active member, or null for nobody's.");
+    expect(decideError('A', 'A', ['A', 'B'])).toBe("The one who cleaned it up can't owe themselves.");
   });
 
   it(`asks: at most ${NUDGES_MAX}, ${NUDGE_EVERY_MIN} min apart from the report`, () => {
