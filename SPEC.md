@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.49 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.50 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -212,7 +212,8 @@ Enso/
 │   ├── 0021_drop_captions_job.sql   # §4.2t
 │   ├── 0022_delivery_title.sql      # §4.2u
 │   ├── 0023_list_item_photo.sql     # §4.2v
-│   └── 0025_phone_login.sql         # §4.2x
+│   ├── 0025_phone_login.sql         # §4.2x
+│   └── 0028_machine_hours.sql       # §4.2za
 ├── src/
 │   ├── shared/             # pure TS, no I/O — imported by worker and frontend
 │   │   ├── vocab.ts        # §3
@@ -1213,6 +1214,21 @@ ALTER TABLE lists ADD COLUMN emoji TEXT;  -- one emoji (emojiError, §7.6) or NU
 Additive only. **Migration check (LE-M):** rows written under 0001–0026 survive unchanged with `emoji` NULL;
 `PRAGMA foreign_key_check` is empty.
 
+### 4.2za Schema change — `migrations/0028_machine_hours.sql`
+
+Asked by MojoSOGO 2026-10-05: the machines' alerts sound only in their hours (§7D.5).
+
+```sql
+-- §7D.5 — the machines' alert hours, household local HH:MM; both ends NULL = any time that day.
+ALTER TABLE settings ADD COLUMN machine_weekday_from TEXT DEFAULT '17:30';
+ALTER TABLE settings ADD COLUMN machine_weekday_to   TEXT DEFAULT '20:30';
+ALTER TABLE settings ADD COLUMN machine_weekend_from TEXT DEFAULT '09:00';
+ALTER TABLE settings ADD COLUMN machine_weekend_to   TEXT DEFAULT '21:00';
+```
+
+Additive only; the existing settings row takes the defaults. Checked by L21 (`GET /machines/hours` reads
+`DEFAULT_MACHINE_HOURS` after the migration).
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1331,6 +1347,11 @@ new fire. It also catches a renotify that would fall after the window closes, an
 `scheduled` fire seen outside the window (an outage, or a window edited after the fire was
 planned — a PATCH does not re-plan the open fire). A `scheduled` fire not yet due is left
 alone even outside the window; it is judged when it comes due.
+
+**Rule 0b — quiet hours** (§7D.5): when the source's `AlertConfig.quietUntil` is set (it may not
+sound now), a step that would alert instead puts the fire back to `scheduled`, `due_at =
+quietUntil`, `alert_count 0`, `last_alerted_at` null — the snooze shape, no alert. A step that
+would not alert (not yet due, or ringing silently past `maxAlerts`) is unchanged.
 
 After `maxAlerts` a fire stays `ringing` **silently**. It remains visible in the
 app's Ringing bar (§8.2) until someone acts.
@@ -2507,6 +2528,20 @@ deferred.
 - Phone notifications have **no buttons** for a machine (`pushActions('machine') = []`);
   tapping one opens the app.
 
+### 7D.5 Alert hours
+
+Decided by MojoSOGO 2026-10-05: machine alerts sound only **weekdays 5:30pm–8:30pm** and
+**weekends 9:00am–9:00pm** (household local; Saturday and Sunday are the weekend), and an admin
+can edit them.
+- `MachineHours = { weekday, weekend }`, each `{ from, to }` (HH:MM, `from < to`, same day) or
+  `null` = any time that day. Defaults `DEFAULT_MACHINE_HOURS`; stored on `settings` (§4.2za).
+- `machineQuietUntil(hours, tz, now)` → `null` when `from ≤ local < to` (or that day is any
+  time), else the next opening (the next day's `from`, or its midnight when that day is any time).
+- `tick` passes it as `quietUntil` (§5.3 rule 0b) ⚑ Q162: an alert outside the hours **waits**
+  and the reminders start over at the opening (4 alerts, every 15 min). Nothing is dropped; the
+  card still reads DONE — waiting, and Still loaded / Done now work at any hour (their new fire
+  waits too). A waited fire is due after done-at, so it speaks the Still loaded wording (§7D.3).
+
 ### 7D.4 Acceptance (M4l — each row is a test)
 
 | # | Setup / call | Expected |
@@ -2528,6 +2563,9 @@ deferred.
 | L16 | `doneNowMachine` on a free washer for A / a running dryer / a done one; `parseDoneNow` | A's load done now, a fire due now / done-at now, old fire `superseded` / `busy`; owner required only when free |
 | L17 | Done now on a free washer for A, then tick | washer done for A; alert 1 to A's phone + house, `A, your laundry in the washer is done`; again → `busy`; a running dryer's Done now closes its fire `superseded` |
 | L18 (HS11) | a machine alert while A ticked only Game Room; HA lists Game Room, Everywhere, Toasty, the Voice PE; then HA down | the house row's speakers are Game Room, Toasty, the Voice PE; then NULL (the defaults) |
+| L19 | `machineQuietUntil`, defaults, Los Angeles: Mon 18:00 / 17:29 / 20:30; Fri 21:00; Sat 12:00; Sun 21:00; weekend any time: Fri 22:00, Sat 03:00; both any time | null / Mon 17:30 / Tue 17:30; Sat 09:00; null; Mon 17:30; Sat 00:00, null; null |
+| L20 | `stepFire` with `quietUntil`: a due scheduled fire; a ringing fire due its renotify; not yet due; silent past max | scheduled at quietUntil, count 0, no alert (twice); unchanged; unchanged |
+| L21 | `GET /machines/hours` after 0028; an admin PATCHes; a member PATCHes; from ≥ to | the defaults; saved and read back; 403; 400 with a message |
 | L13 | migration check (§4.2m) | fires and deliveries intact after 0014; machines seeded; CHECK refuses a machine fire without `machine_id` |
 
 ---
@@ -3157,7 +3195,8 @@ actions on a second line. At 320 px:
 
 ```
 Machines
-Wash, move to the dryer, fold. Whoever's load it is hears when it's done.
+Wash, move to the dryer, fold. Everyone hears when it's done.
+🔔 Alerts sound weekdays 5:30pm–8:30pm, weekends 9:00am–9:00pm; outside those hours they wait. [Edit hours]
 ┌──────────────────────────────────────┐
 │ 🫧 Washer  DONE — waiting   Kai·14:05 │
 │ [Move to dryer] [Still loaded] [Clear]│
@@ -3173,6 +3212,9 @@ Wash, move to the dryer, fold. Whoever's load it is hears when it's done.
 | running | [Done now] [Clear] | [Done now] [Clear] |
 | done | **[Move to dryer]** [Still loaded] [Clear] | **[Fold & out]** [Still loaded] [Clear] |
 
+- **Alert hours** (§7D.5): one line under the heading. **Edit hours** (admins only) opens
+  "Machine alert hours": Weekdays and Weekends, each two `<input type="time">` fields (16 px);
+  both empty = any time. Save refuses from ≥ to inside the box.
 - **Done now** (⚑ Q160) is for a load the app missed. On a free machine it opens the chooser
   titled "The washer is done": *Whose load?* (me preselected), then **[It's done]**. On a
   running machine it is one tap. Either way the done alerts start at once.
@@ -4125,6 +4167,7 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | POST | `/machines/{id}/start` | member | `{ ownerId, minutes }` → `Machine[]`; 409 `busy` when not free (§7D.2) |
 | POST | `/machines/{id}/move` | member | `{ minutes }` → `Machine[]`; 409 `busy` / `not_done` / `invalid_state` |
 | POST | `/machines/{id}/finish` | member | Fold & out → `Machine[]`; 409 `not_done` / `invalid_state` |
+| GET / PATCH | `/machines/hours` | GET member / PATCH owner | `MachineHours` `{ weekday, weekend }`, each `{ from, to }` or null → the saved hours; 400 `invalid_input` (§7D.5) |
 | POST | `/machines/{id}/done` | member | Done now `{ ownerId? }` (required when free) → `Machine[]`; 409 `busy` when already done, 400 `invalid_input` (§7D.2) |
 | POST | `/machines/{id}/remind` | member | Still loaded → `Machine[]`; 409 `not_done` (§7D.2) |
 | POST | `/machines/{id}/clear` | member | → `Machine[]`; 409 `already_free`. Every `/machines` write: 404 for an unknown machine, 400 `invalid_input`, 409 `conflict` when another tap changed the machine first |
@@ -4678,6 +4721,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q159 | A done load nobody has moved (§7D.2, §8.5) | ⚑ A done washer or dryer offers **Still loaded**: the reminders start over now (alert 1, then every 15 min, 4 in all, Phone + House), saying "… is still in the washer — move it to the dryer" / "… still in the dryer — take it out". Move, Fold & out or Clear stops them as before |
 | Q160 | A load nobody started in the app, or one that finished early (§7D.2, §8.5) | ⚑ A free or running machine offers **Done now**: free asks whose load; the machine shows DONE — waiting and the done alerts ring at once, then Still loaded works as usual |
 | Q161 | Machine alerts on "all devices" (§7D.3) | Everyone's phones and every speaker HA lists (decided by MojoSOGO 2026-10-05); ⚑ the `Everywhere` group is left out so each Echo speaks once; HA unreadable → the default speakers |
+| Q162 | A machine alert outside its hours (§7D.5) | ⚑ It waits and the reminders start over when the hours open (not dropped); only admins edit the hours, on the Machines section |
 | Q142 | Where "Fill in from this link" sits | ⚑ A full-width button right under the Link field, only when the field holds a usable link; reading starts on the tap, never on paste |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
@@ -4891,6 +4935,9 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Machine alert hours** (v1.27.0, §7D.5, §5.3 rule 0b, §4.2za; asked by MojoSOGO 2026-10-05; L19–L21): washer and dryer
+alerts sound only weekdays 5:30–8:30pm and weekends 9am–9pm, editable by admins on the Machines section; outside
+them an alert waits and the reminders start over at the opening. Migration 0028. Q162 is a ⚑ default.
 **Machine alerts to all devices** (v1.26.0, §7D.3; asked by MojoSOGO 2026-10-05; L4, HS11): washer and dryer
 alerts push every active member and are spoken on every speaker HA lists (Everywhere left out), whatever anyone
 ticked. Q161's Everywhere rule is a ⚑ default.

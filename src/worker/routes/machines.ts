@@ -1,15 +1,15 @@
-// SPEC §7D, §10 — the laundry loop: /machines and its six transitions, one batch each.
+// SPEC §7D, §10 — the laundry loop: /machines and its six transitions, one batch each; its alert hours (§7D.5).
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { MACHINE } from '../../shared/vocab';
 import type { FireRow } from '../../shared/engine';
 import {
-  MACHINE_LABEL, clearMachine, doneNowMachine, finishMachine, isMachineId, machineState, moveMachine, nextMachine, parseDoneNow, parseMove, parseStart,
+  MACHINE_LABEL, clearMachine, doneNowMachine, machineHoursOf, parseMachineHours, finishMachine, isMachineId, machineState, moveMachine, nextMachine, parseDoneNow, parseMove, parseStart,
   refusalText, remindMachine, startMachine, type MachineChange, type MachineResult, type MachineRow,
 } from '../../shared/machines';
-import { all, nowIso } from '../db';
+import { all, first, nowIso } from '../db';
 import { body, fail } from '../http';
-import { requireMember } from '../session';
+import { requireMember, requireOwner } from '../session';
 import { activeMemberIds, insertFire, updateFire } from '../tick';
 
 const loadRows = (db: D1Database) => all<MachineRow>(db, 'SELECT * FROM machines');
@@ -74,6 +74,18 @@ async function load(c: Context<AppEnv>) {
 }
 
 export const machines = new Hono<AppEnv>();
+
+const hoursView = async (db: D1Database) => machineHoursOf((await first<Parameters<typeof machineHoursOf>[0]>(db, 'SELECT * FROM settings WHERE id = 1'))!);
+
+machines.get('/machines/hours', requireMember, async (c) => c.json(await hoursView(c.env.DB)));
+
+machines.patch('/machines/hours', requireMember, requireOwner, async (c) => {
+  const h = parseMachineHours(await body(c));
+  if (typeof h === 'string') return fail(c, 400, 'invalid_input', h);
+  await c.env.DB.prepare(`UPDATE settings SET machine_weekday_from = ?, machine_weekday_to = ?, machine_weekend_from = ?, machine_weekend_to = ?
+    WHERE id = 1`).bind(h.weekday?.from ?? null, h.weekday?.to ?? null, h.weekend?.from ?? null, h.weekend?.to ?? null).run();
+  return c.json(await hoursView(c.env.DB));
+});
 
 machines.get('/machines', requireMember, async (c) => c.json(machinesView(await loadRows(c.env.DB), nowIso())));
 

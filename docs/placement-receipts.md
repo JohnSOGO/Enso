@@ -7,6 +7,18 @@ carry its result.
 
 ---
 
+## 2026-10-05 — Machine alert hours (coordinating session)
+
+- **Ask:** washer/dryer alerts sound only in editable hours (weekdays 17:30–20:30, weekends 09:00–21:00).
+- **Verdict:** `frontend/src/components/MachineHours.tsx` [NEW] (the hours line + admin modal). Edits to existing
+  owners: `src/shared/machines.ts` (hours, machineQuietUntil, parse — pure), `src/shared/engine.ts` (generic
+  `AlertConfig.quietUntil`, rule 0b — the engine still imports nothing of machines), `tick.ts` (sourceOf passes
+  it), `routes/machines.ts` (GET/PATCH /machines/hours), `Machines.tsx` (mounts the line), migration 0028.
+- **Why:** the hours are the machines' rule, so they live with the laundry loop; the engine gets only a
+  kind-free "not before" so it stays ignorant of machines. The modal is its own view, keeping Machines.tsx small.
+- **Caps:** no pinned file touched. **Reorganizer:** none needed. No `placement-advisor` agent exists here, so the
+  coordinating session placed it.
+
 ## 2026-10-05 — Lists popup with emojis (coordinating session)
 
 - **Ask:** the Lists tab picker becomes a popup of buttons with an emoji per list, opened by tapping the tab;
