@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-05 — One owner for writing deliveries (placement-advisor)
+
+- **Ask:** steward backlog item 3 (approved): one owner for INSERT INTO deliveries and the ops-ping count (§9.4, §5.7, §6.6, §7B.7, §9.3). Behavior-preserving.
+- **Verdict:** `src/worker/deliveries.ts` [NEW row]; tick, announce, ops, phone-login and mess-asks [EXISTING, shrink].
+- **Flow stage:** persist.
+- **Why:** 7 statements in 5 files for one table, plus a ping count by elimination, so the next fire-less titled push would silently use up the hourly limit. Writers and predicate in one file, with a test pinning which rows count. Rejected: a marker column (spec and schema change, to MojoSOGO separately); folding into push.ts; status UPDATEs.
+- **Caps:** deliveries.ts 45/300; tick.ts 111 → 108, pin lowered 151 → 148 (108 + WORKING_BUFFER); ops.ts 56 → 52, announce.ts 64 → 61, phone-login.ts 148 → 146, mess-asks.ts 76 → 74 (all /300).
+
+## 2026-10-05 — Deliveries writers to deliveries.ts (reorganizer)
+
+- **Trigger:** steward backlog item 3; placement-advisor verdict "One owner for writing deliveries" (seven INSERTs for one table in five files, and the ping limit counted by elimination in a route).
+- **Seam moved:** the push and house deliveries INSERTs (pushDelivery, houseDelivery → { id, stmt }) from `tick.ts`, `routes/announce.ts`, `routes/ops.ts`, `routes/phone-login.ts` and `mess-asks.ts`, and the founder-ping COUNT (opsPingsSince, SQL text unchanged) from `routes/ops.ts`, to `src/worker/deliveries.ts` [NEW row]
+- **Room opened:** tick.ts: 111 → 108 lines; cap 151 → 148. ops 56 → 52, announce 64 → 61, phone-login 148 → 146, mess-asks 76 → 74.
+- **Behavior:** preserved — typecheck, npm test (71 files, 659 tests; the 658 existing unchanged) and arch:audit green; columns omitted before are written as explicit NULL (every added column defaults NULL), alert_number 1 for fire-less rows as before, same status, timestamps, batching and send order; new test/deliveries.test.ts pins that a founder ping counts and an announcement, a sign-in notice and a mess ask do not.
+- **Restraint:** writers and the one predicate only; push.ts and house.ts status UPDATEs, the mess-ask per-member COUNT and the migrations untouched; no kind column.
+
 ## 2026-10-05 — Fire rows out of the orchestrator (placement-advisor)
 
 - **Ask:** steward backlog item 2 (approved): move insertFire, updateFire, choreRunInserts, updateChoreRun, loadChoreRun and sourceOf out of `tick.ts`; move the machine every-speaker rule to shared; fold placeOf into the householdPlace rule (§5.6, §7B.3, §7D.3, §4.2o). Behavior-preserving.

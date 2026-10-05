@@ -21,7 +21,7 @@ export const CEILINGS: Record<string, number> = {
   'frontend/src/components/EventForm.tsx': 183 + WORKING_BUFFER,
   'src/worker/routes/events.ts': 107 + WORKING_BUFFER,
   'src/worker/routes/recipes.ts': 229 + WORKING_BUFFER,
-  'src/worker/tick.ts': 111 + WORKING_BUFFER,
+  'src/worker/tick.ts': 108 + WORKING_BUFFER,
 };
 
 /** Layering bans: files under `from` must not import anything matching `banned`. */

@@ -7,7 +7,8 @@ import type { SunEvent } from '../shared/vocab';
 import type { Recurrence } from '../shared/recurrence';
 import { addMinutes } from '../shared/time';
 import type { Env } from './env';
-import { activeMemberIds, all, first, newId, parseJson, placeOf } from './db';
+import { activeMemberIds, all, first, parseJson, placeOf } from './db';
+import { houseDelivery, pushDelivery } from './deliveries';
 import { choreRunInserts, insertFire, sourceOf, updateFire } from './fire-rows';
 import { sendPushDeliveries } from './push';
 import { allHouseSpeakers, sendHouseDeliveries } from './house';
@@ -68,7 +69,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
     if (alert) {
       summary.alerts++;
       const message = alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sunsetAt);
-      const base = [next.id, next.alert_count] as const;
+      const base = { fireId: next.id, alertNumber: next.alert_count };
       // §5.7, §7.5: who it is for. Nobody → the fire still steps, nothing is delivered.
       const aud = audience({
         optional: src.optional ?? false, assignedTo: src.assignedTo, activeIds: await activeMemberIds(db),
@@ -76,20 +77,16 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
       });
       if (src.cfg.channels.includes('push')) {
         for (const memberId of aud.push) {
-          const id = newId('dlv');
-          newDeliveryIds.push(id);
-          stmts.push(db.prepare(
-            `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, status, created_at, updated_at)
-             VALUES (?, ?, ?, 'push', ?, ?, 'queued', ?, ?)`).bind(id, ...base, memberId, message, now, now));
+          const d = pushDelivery(db, { ...base, memberId, message }, now);
+          newDeliveryIds.push(d.id);
+          stmts.push(d.stmt);
         }
       }
       // §9.2a: on the speakers of everyone it is for — none ticked by any of them → not spoken (§7D.3: a machine, every speaker).
       const speakers = !(src.cfg.channels.includes('house') && aud.house) ? []
         : src.allSpeakers ? (everySpeakerNow ??= allHouseSpeakers(env), await everySpeakerNow) : await deliverySpeakers(db, aud.push);
       if (speakers === null || speakers.length) {
-        stmts.push(db.prepare(
-          `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, status, speakers, created_at, updated_at)
-           VALUES (?, ?, ?, 'house', NULL, ?, 'queued', ?, ?, ?)`).bind(newId('dlv'), ...base, message, speakers && JSON.stringify(speakers), now, now));
+        stmts.push(houseDelivery(db, { ...base, message, speakers }, now).stmt);
       }
       summary.deliveries += stmts.length - 1;
       if (fire.state === 'scheduled' && fire.kind === 'reminder') {

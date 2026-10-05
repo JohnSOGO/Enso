@@ -5,7 +5,8 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { OPS_NOTIFY_PER_HOUR, opsNotifyError, opsTitle, opsWindowStart } from '../../shared/ops';
-import { all, first, newId, nowIso } from '../db';
+import { all, first, nowIso } from '../db';
+import { opsPingsSince, pushDelivery } from '../deliveries';
 import { body, fail } from '../http';
 import { sendPushDeliveries } from '../push';
 import { FOUNDER_SQL } from './members';
@@ -36,18 +37,13 @@ ops.post('/ops/notify', async (c) => {
   if (!founder) return fail(c, 409, 'no_recipients', 'There is no founder to ping yet.');
   const now = nowIso();
 
-  const recent = (await first<{ n: number }>(db,
-    `SELECT COUNT(*) AS n FROM deliveries
-      WHERE channel = 'push' AND fire_id IS NULL AND title IS NOT NULL AND notice IS NULL AND mess_id IS NULL AND created_at >= ?`, opsWindowStart(now)))!.n;
+  const recent = await opsPingsSince(db, opsWindowStart(now));
   if (recent >= OPS_NOTIFY_PER_HOUR) {
     return fail(c, 429, 'rate_limited', `At most ${OPS_NOTIFY_PER_HOUR} pings an hour — try again later.`);
   }
 
-  const id = newId('dlv');
-  await db.prepare(
-    `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, title, status, created_at, updated_at)
-     VALUES (?, NULL, 1, 'push', ?, ?, ?, 'queued', ?, ?)`)
-    .bind(id, founder, (b.text as string).trim(), opsTitle(b.title), now, now).run();
+  const { id, stmt } = pushDelivery(db, { memberId: founder, message: (b.text as string).trim(), title: opsTitle(b.title) }, now);
+  await stmt.run();
   await sendPushDeliveries(c.env, [id], now);
 
   const deliveries = await all<{ id: string; status: string; detail: string | null }>(db,
