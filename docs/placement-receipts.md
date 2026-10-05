@@ -1,7 +1,7 @@
 # Placement receipts
 
-One entry per full-path placement decision (new owner row, extract, or
-bless-and-raise), newest first. Light-path placements go in the commit message only.
+One entry per placement-advisor verdict (every code change since 2026-10-05), plus
+reorganizer and code-steward runs, newest first.
 The receipt records the decision; `docs/module-ownership.md` and `scripts/arch.ts`
 carry its result.
 

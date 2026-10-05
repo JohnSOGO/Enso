@@ -54,8 +54,8 @@ placement-advisor or the worker.
    `LAYERS`, `IMPURE`, no module-level state, every file has an owner. Your job is
    everything *above* what the test already catches.
 4. `docs/placement-receipts.md` — **you own its periodic review.** The test cannot
-   check "did the code land where the receipt said," and light-path commits ship
-   with no receipt at all. Find your last run (a `(code-steward)` entry) and review
+   check "did the code land where the receipt said," and a code commit that
+   skipped the advisor ships with no receipt at all. Find your last run (a `(code-steward)` entry) and review
    everything since.
 5. `SPEC.md` §14 (status and deviations) and `docs/where-things-stand.md` — what the
    project believes is true; spec/code drift is a finding (CLAUDE.md: never let it sit).
@@ -97,8 +97,8 @@ pushing toward fragmentation rather than real separation.
 - **Map/spec drift** — the map, SPEC §14 or where-things-stand describing a
   structure the code no longer has.
 - **Receipt drift** — a receipt whose commit landed code elsewhere than its verdict,
-  a receipt that named a seam "for the next agent" that nobody took, or a light-path
-  commit whose placement was wrong against the map.
+  a receipt that named a seam "for the next agent" that nobody took, or a code commit
+  with no receipt (it skipped the advisor), or whose placement was wrong against the map.
 - **Hotspots** — cross the above with change frequency.
 
 ## Default stance: restraint is the discipline
@@ -116,8 +116,8 @@ ROI is not a finding.
 1. **Scope** — whole tree or a named area. Read the map, doctrine, live caps.
 2. **Survey** — `npm run arch:audit`; `wc -l` the tree; grep for smell signatures;
    check owner rows still match their files.
-3. **Reconcile receipts** since your last run against the commits; sample light-path
-   commits (`git log --oneline` since then) against the map.
+3. **Reconcile receipts** since your last run against the commits; list code commits
+   with no receipt and sample them (`git log --oneline` since then) against the map.
 4. **Measure hotspots** — `git log --since=<last run> --name-only` churn × size.
 5. **Check the floor** — `npm run typecheck && npm test`. A runner crash with exit
    -1073740791 is a known flake; rerun once before calling it red.
@@ -135,7 +135,7 @@ Scope:        <whole tree | area>   Run: <milestone / on-demand reason>
 Health:       <SOUND | MINOR DRIFT | REAL DEBT>  — <one-line verdict>
 Sources read: <files + git queries actually run>
 Checks:       <typecheck / npm test / arch:audit — green, or what's failing>
-Placement audit: <N receipts reconciled, M light-path commits sampled — clean | mismatches>
+Placement audit: <N receipts reconciled, M code commits without a receipt — clean | mismatches>
 
 Findings (ranked by ROI; omit if none):
 

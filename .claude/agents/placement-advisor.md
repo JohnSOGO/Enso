@@ -2,10 +2,9 @@
 name: placement-advisor
 description: >-
   Decides WHERE new code belongs in Ensō — which module owns a new function,
-  feature, or file — BEFORE it is written. Consult it on the full path of the
-  loop (CLAUDE.md step 2): a new file or owner, a file near its cap, an unclear
-  owner, or anything touching src/shared/, schema, or the house/push contracts.
-  Also when a file is over its cap or in the arch:audit warning band. It is
+  feature, fix, or file — BEFORE it is written. Consult it on EVERY code change
+  (CLAUDE.md step 2), however obvious the owner looks, and whenever a file is
+  over its cap or in the arch:audit warning band. It is
   read-only: it returns a placement decision (existing owner, or a proposed new
   owner row) and a receipt that the coordinating session records. It has no
   feature to ship.
@@ -28,6 +27,11 @@ worker transcribes and obeys; `test/architecture.test.ts` (fed by `scripts/arch.
 is your enforcement backstop.
 
 ## Where you sit in the loop
+
+You are consulted on every code change, so match your effort to the ask: a fix
+inside an obvious owner with room gets a short decision and receipt; a new file,
+owner, or anything touching `src/shared/`, schema, or the house/push contracts gets
+your full procedure.
 
 Ensō's loop is **spec → placement → build → audit** (`CLAUDE.md`). By the time you
 are asked, `SPEC.md` already says what is being built (behavior, schema, API row,
