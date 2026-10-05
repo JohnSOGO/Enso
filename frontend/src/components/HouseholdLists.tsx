@@ -1,5 +1,5 @@
-// SPEC §8.8 — the 🛒 Lists tab: the list picker (Today + Things to do + Movies & shows + every list + ＋ New list…,
-// ⋯ options), composing ChoresToday, ThingsToDo (§8.11), Shows (§8.14) and HouseholdListOptions, and the list panel (add box with ItemPhoto's 📷,
+// SPEC §8.8 — the 🛒 Lists tab: the list button and its ListPicker popup (Today + Things to do + Movies & shows + every
+// list with its emoji + ＋ New list…, opened by each tap of the tab), ⋯ options, composing ChoresToday, ThingsToDo (§8.11), Shows (§8.14) and HouseholdListOptions, and the list panel (add box with ItemPhoto's 📷,
 // rows, Done). Every list behaves the same (Q24). The server decides added / existing / reopened and who may manage
 // a list (§7A.1); this screen shows what it returns. A snapped photo waits here until Add, then is saved (§7A.3).
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
@@ -8,6 +8,7 @@ import { ThingsToDo } from './ThingsToDo';
 import { Shows } from './Shows';
 import { ItemForm, type Item } from './HouseholdListItemForm';
 import { ListOptions, NewListForm, type ListSummary } from './HouseholdListOptions';
+import { ListPicker, pickerEntries } from './ListPicker';
 import { ItemPhoto, type Snap } from './ItemPhoto';
 import { errorText, get, patch, post, upload } from '../api';
 import { useApp } from '../state';
@@ -23,8 +24,6 @@ const STORE_KEY = 'enso.list';
 const TODAY = 'today';
 const THINGS = 'things';
 const SHOWS = 'shows';
-/** The picker's "＋ New list…" option — never a list id (those start 'lst_'). */
-const NEW_LIST = 'new';
 
 function remembered(): string | null {
   try { return localStorage.getItem(STORE_KEY); } catch { return null; }
@@ -35,8 +34,8 @@ const byName = (a: ListSummary, b: ListSummary) => a.name.toLowerCase().localeCo
 /** §8.8 ⚑ Q117 — under a name read from a snapped photo. */
 const SNAP_HINT = 'Read from your photo — check it.';
 
-/** The shell: the list picker, ⋯ options, and the chosen view. */
-export function HouseholdLists() {
+/** The shell: the list button and popup, ⋯ options, and the chosen view. `pickRequest` > 0 changes on each tab tap (⚑ Q158). */
+export function HouseholdLists({ pickRequest }: { pickRequest: number }) {
   const { me, version } = useApp();
   const [lists, setLists] = useState<ListSummary[] | null>(null);
   const [thingsOpen, setThingsOpen] = useState<number | null>(null);
@@ -45,6 +44,8 @@ export function HouseholdLists() {
   const [choice, setChoice] = useState<string | null>(remembered);
   const [creating, setCreating] = useState(false);
   const [managing, setManaging] = useState(false);
+  const [picking, setPicking] = useState(pickRequest > 0);
+  useEffect(() => { if (pickRequest > 0) setPicking(true); }, [pickRequest]);
 
   const loadLists = useCallback(() => {
     get<ListSummary[]>('/lists').then((l) => { setLists(l); setError(null); }).catch((e) => setError(errorText(e)));
@@ -61,10 +62,12 @@ export function HouseholdLists() {
     : lists.find((l) => l.id === choice) ?? lists.find((l) => l.id === SHOPPING_LIST_ID) ?? lists[0];
   const view = special ? choice : current?.id ?? '';
 
-  function pick(v: string) {
-    if (v === NEW_LIST) setCreating(true); // the picker stays on the current view until a list is created
-    else setChoice(v);
-  }
+  const entries = pickerEntries(lists ?? [], [
+    { value: TODAY, emoji: '🧹', label: 'Today — chores' },
+    { value: THINGS, emoji: '✅', label: 'Things to do', count: thingsOpen },
+    { value: SHOWS, emoji: '🎬', label: 'Movies & shows', count: showsWant },
+  ]);
+  const shown = entries.find((e) => e.value === view);
 
   function created(l: ListSummary) {
     setLists((all) => [...(all ?? []), l].sort(byName));
@@ -76,17 +79,12 @@ export function HouseholdLists() {
   return (
     <div className={s.screen}>
       <div className={s.picker}>
-        <label className={s.pickerLabel}>
-          <span>List</span>
-          <select value={view} onChange={(e) => pick(e.target.value)}>
-            {view === '' && <option value="" disabled>{lists === null ? 'Loading…' : 'No lists'}</option>}
-            <option value={TODAY}>Today — chores</option>
-            <option value={THINGS}>Things to do{thingsOpen === null ? '' : ` (${thingsOpen})`}</option>
-            <option value={SHOWS}>Movies &amp; shows{showsWant === null ? '' : ` (${showsWant})`}</option>
-            {(lists ?? []).map((l) => <option key={l.id} value={l.id}>{l.name} ({l.openCount})</option>)}
-            <option value={NEW_LIST}>＋ New list…</option>
-          </select>
-        </label>
+        <button className={s.chosen} aria-haspopup="dialog" onClick={() => setPicking(true)}>
+          <span aria-hidden className={s.pickEmoji}>{shown?.emoji ?? '🛒'}</span>
+          <span className={s.pickName}>{shown?.label ?? (lists === null ? 'Loading…' : 'No lists')}</span>
+          {shown?.count != null && <span className={`muted ${s.pickCount}`}>{shown.count}</span>}
+          <span aria-hidden className="muted">▾</span>
+        </button>
         {current && canManageList(current.createdBy, me) && (
           <button className={s.more} aria-label="List options" title="List options" onClick={() => setManaging(true)}>⋯</button>
         )}
@@ -98,7 +96,13 @@ export function HouseholdLists() {
         : view === THINGS ? <ThingsToDo />
         : view === SHOWS ? <Shows onChanged={loadLists} />
         : current ? <ListPanel key={current.id} list={current} onItemsChanged={loadLists} />
-        : lists && <p className="muted">No lists yet. Choose ＋ New list… to make one.</p>}
+        : lists && <p className="muted">No lists yet. Tap the list button, then ＋ New list…, to make one.</p>}
+
+      {picking && (
+        <ListPicker entries={entries} chosen={view} onClose={() => setPicking(false)}
+          onPick={(v) => { setChoice(v); setPicking(false); }}
+          onNew={() => { setPicking(false); setCreating(true); }} />
+      )}
 
       {creating && <NewListForm onClose={() => setCreating(false)} onCreated={created} />}
       {managing && current && (

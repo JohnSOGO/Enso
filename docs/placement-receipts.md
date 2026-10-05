@@ -7,6 +7,21 @@ carry its result.
 
 ---
 
+## 2026-10-05 — Lists popup with emojis (coordinating session)
+
+- **Ask:** the Lists tab picker becomes a popup of buttons with an emoji per list, opened by tapping the tab;
+  the last list stays the default.
+- **Verdict:** `frontend/src/components/ListPicker.tsx` [NEW] (the popup; no state). Edits to existing owners:
+  `src/shared/lists.ts` (defaultListEmoji, listEmoji — pure), `routes/lists.ts` (emoji on POST/PATCH, checked by
+  `shared/emoji.ts` emojiError), `HouseholdLists.tsx` (list button, opens the popup), `HouseholdListOptions.tsx`
+  (Emoji field), `App.tsx` (each Lists tap bumps a counter), migration 0027.
+- **Why:** HouseholdLists.tsx was at 235/300; the popup is its own view, so it gets its own file rather than
+  pushing the shell into the warning band. The emoji rule reuses the event emoji rule instead of a new one.
+- **Caps:** no pinned file touched. **Reorganizer:** none needed. No `placement-advisor` agent exists in this
+  checkout; placed by the coordinating session.
+
+---
+
 ## 2026-10-05 — Movies & shows (placement-advisor; feature/movies-shows)
 
 - **Ask:** place §7F: a shared watch list (want / watched), looked up by title, link or picture with Claude's web

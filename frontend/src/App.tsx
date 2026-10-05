@@ -48,6 +48,8 @@ function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boo
     try { const t = localStorage.getItem('enso.tab') as Tab; return TABS.includes(t) ? t : 'calendar'; } catch { return 'calendar'; }
   });
   const [overlay, setOverlay] = useState<Overlay>(null);
+  /** §8.8 ⚑ Q158: each tap of 🛒 Lists asks the Lists tab to open its popup; 0 = the app opened on Lists (no popup). */
+  const [listsTap, setListsTap] = useState(0);
   useEffect(() => { try { localStorage.setItem('enso.tab', tab); } catch { /* storage may be blocked */ } }, [tab]);
 
   const house = status ? HOUSE_BADGE[status.house.state] : undefined;
@@ -75,7 +77,7 @@ function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boo
         {tab === 'calendar' && <Calendar onOpenDay={(date, data) => setOverlay({ kind: 'day', date, data })} />}
         {tab === 'alarms' && <Alarms onEditAlarm={(alarm) => setOverlay({ kind: 'alarm', alarm })} onEditTimer={(timer) => setOverlay({ kind: 'timer', timer })}
           onEditChore={(chore) => setOverlay({ kind: 'chore', chore })} />}
-        {tab === 'lists' && <HouseholdLists />}
+        {tab === 'lists' && <HouseholdLists pickRequest={listsTap} />}
         {tab === 'recipes' && <Recipes />}
         {tab === 'settings' && <Settings onLogout={onLogout} />}
       </main>
@@ -84,7 +86,7 @@ function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boo
       )}
       <nav className={s.tabs} aria-label="Sections">
         {NAV.map(([id, icon, label]) => (
-          <button key={id} className={tab === id ? s.active : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id)}>
+          <button key={id} className={tab === id ? s.active : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => { setTab(id); if (id === 'lists') setListsTap((n) => n + 1); }}>
             <span aria-hidden className={s.icon}>{icon}</span>{label}
           </button>
         ))}

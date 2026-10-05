@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.45 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.46 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1201,6 +1201,18 @@ survive unchanged; `shows` exists empty; `PRAGMA foreign_key_check` is empty.
 A schema change is always a **new** numbered migration plus a §4.2x section here.
 An applied migration is never edited.
 
+### 4.2z Schema change — `migrations/0027_list_emoji.sql`
+
+Asked by MojoSOGO 2026-10-05: each list shows an emoji in the Lists picker (§8.8).
+
+```sql
+-- §7A.1 — a list's own emoji; NULL = the default picked from its name (defaultListEmoji).
+ALTER TABLE lists ADD COLUMN emoji TEXT;  -- one emoji (emojiError, §7.6) or NULL
+```
+
+Additive only. **Migration check (LE-M):** rows written under 0001–0026 survive unchanged with `emoji` NULL;
+`PRAGMA foreign_key_check` is empty.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1958,6 +1970,13 @@ is done in JS with `itemKey` — never with SQLite `lower()`/`NOCASE`, which fol
   `itemKey(name)` must be unique among non-deleted lists → otherwise 409 `duplicate`,
   "There is already a list called “Shopping”."
 - At most `LISTS_MAX` (30) lists — a 31st is refused with a message.
+- **Emoji** (asked by MojoSOGO 2026-10-05): a list may have its own emoji — one emoji by the event rule
+  (`emojiError`, §7.6) — or none (`null`). None shows `defaultListEmoji(name)`: the first keyword found in the
+  name, else 📋 ⚑ Q157 (shopping / grocer / store / market → 🛒, wish / gift / birthday / christmas → 🎁,
+  hardware / tool / fix / repair → 🔨, garden / plant → 🌱, pharmacy / medicine → 💊, pack / trip / travel /
+  camp → 🧳, book → 📚, pet / dog / cat → 🐾, school / kid → 🎒, meal / food / cook → 🍽️, clean → 🧽,
+  house / home → 🏠). `listEmoji(list)` is the one function both the PWA and tests use. The same rules for who
+  may rename a list decide who may change its emoji.
 - **Any member may create a list.** **Rename or delete:** its creator or an admin; the two
   seeded lists (no creator): admins only. ⚑ DEFAULT
 - **Delete** is a soft delete. Its items go with it: they are no longer reachable
@@ -2012,6 +2031,8 @@ is done in JS with `itemKey` — never with SQLite `lower()`/`NOCASE`, which fol
 | L17 | assign an item to member M, then to `null` | `assigneeId` M, then null |
 | L18 | a member renames or deletes the seeded Shopping list | 403; an admin may |
 | L19 | name "" / 41 characters / a 31st list | 400 `invalid_input` with a message |
+| L21 | POST `/lists { name: "Costco", emoji: "🛍️" }` | 201 with `emoji` "🛍️"; `GET /lists` carries it; a list made without one has `emoji` null |
+| L22 | PATCH `/lists/{id} { name, emoji: "ab" }` / `{ name, emoji: null }` | 400 `invalid_input` "Emoji must be a single emoji, like 🧹." / 200, `emoji` null (back to the default) |
 | L20 | migration check (§4.2f) | items on the old `shopping`/`wishlist` lists, and wish-list owners, are on `lst_shopping`/`lst_wishlist` with the same assignee |
 
 ### 7A.3 Snap an item — a photo kept with a list item
@@ -3187,29 +3208,37 @@ Time      Chore            Days        This week
 
 ### 8.8 Lists screen
 
-The **🛒 Lists** tab. At the top, a **list picker** — a native `<select>` labelled
-"List" (the phone's own picker, not a row of buttons):
+The **🛒 Lists** tab. At the top, a **list button** showing the chosen list with its emoji and count,
+and **⋯** beside it. Asked by MojoSOGO 2026-10-05: there are too many lists for the phone's wheel, so the
+picker is a **popup of buttons** (a titled "Lists" modal):
 
 ```
-List [ Shopping (3)          ▾ ] [⋯]
-      Today — chores
-      Things to do (4)
-      Movies & shows (6)
-      Shopping (3)
-      Wish list (5)
-      Hardware store (1)
-      ＋ New list…
+[ 🛒 Shopping (3)           ▾ ] [⋯]
+
+┌ Lists ─────────────────────── ✕ ┐
+│ [🧹 Today — chores] [✅ Things to do (4)] │
+│ [🎬 Movies & shows (6)] [🛒 Shopping (3)]│
+│ [🎁 Wish list (5)]  [🔨 Hardware store (1)]│
+│ [＋ New list…]                   │
+└─────────────────────────────────┘
 ```
 
-- Options: **Today — chores** first, **Things to do** second (§8.11), **Movies & shows** third (§8.14), then every list by name with its open-item count,
-  then **＋ New list…**. Choosing **＋ New list…** opens the **new list** form (name,
-  Create; errors inside the dialog); after creating, the picker switches to it.
-- **⋯** (accessible name "List options") next to the picker opens **Rename** / **Delete
-  list** for the chosen list, shown only to those allowed (§7A.1) and never for Today.
-  Delete asks first and says how many open items go with it.
+- **Tapping 🛒 Lists in the bottom tab bar opens the popup** ⚑ Q158 — from another tab, and again while on
+  Lists. Opening the app on the Lists tab (the tab is remembered) shows the remembered list with no popup.
+  Tapping the list button opens it too.
+- Buttons in a two-column grid (one column under 360 px), each ≥ 44 px, emoji then name then the open count:
+  **🧹 Today — chores** first, **✅ Things to do** second (§8.11), **🎬 Movies & shows** third (§8.14) ⚑ Q157,
+  then every list by name with `listEmoji` (§7A.1), then **＋ New list…**. The chosen list's button is marked
+  (`aria-pressed`, accent border), so the remembered list is the default: closing the popup (✕, Escape, a tap
+  outside) stays on it. Tapping a button opens that list and closes the popup.
+- **＋ New list…** opens the **new list** form (Name, Emoji — optional, placeholder shows the default for the
+  name typed — Create; errors inside the dialog); after creating, that list opens.
+- **⋯** (accessible name "List options") next to the list button opens **Rename**, **Emoji** (empty = the
+  default from the name) and **Delete list** for the chosen list, shown only to those allowed (§7A.1) and never
+  for Today, Things to do or Movies & shows. Delete asks first and says how many open items go with it.
 - The choice is remembered per device (by list id), written only when someone picks. If
   the remembered list no longer exists — including the old toggle's `shopping`/`wishlist`
-  values — the picker shows **Shopping** (or the first list, if Shopping was deleted).
+  values — the list button shows **Shopping** (or the first list, if Shopping was deleted).
 - Errors: a missing list is 404 "That list no longer exists."; a refused rename/delete is
   403 naming who may ("Only the person who made this list or an admin…", or "Only an
   admin…" for a seeded list). A list's name is trimmed before its length is checked. The list refetches when the tab opens, on focus, and
@@ -4104,10 +4133,10 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | PUT/DELETE | `/recipes/{id}/emoji` | member (their own) | PUT `{ emoji }` → recipe (200), my emoji set (upsert); DELETE → recipe (200), mine cleared; 400 `invalid_input` (`emojiError`); 404 when the recipe is gone; `updatedAt` untouched (§7E.5) |
 | POST | `/recipes/from-video` | member | `{ url }` → recipe (201); 400 / 409 `duplicate` (+ `recipeId`) / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed`, in the §7E.2 order |
 | POST | `/recipes/{id}/transcript` | member | `{ screenshots?: { type, data }[] (≤ 4, base64), text? (≤ PASTED_MAX) }`, at least one → recipe (200), re-read from the pasted transcript; 404 / 400 `invalid_input` / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed` / 422 `no_recipe` (nothing changed), in the §7E.2b order |
-| GET | `/lists` | member | → `{ id, name, createdBy, openCount }[]`, by name (§7A) |
-| POST | `/lists` | member | `{ name }` → list (201); 409 `duplicate`; 400 at `LISTS_MAX` |
-| PATCH/DELETE | `/lists/{id}` | creator or admin (seeded lists: admin) | PATCH `{ name }` → list; DELETE → 204 (and its items' photos, §7A.3) |
-| GET | `/lists/{id}` | member | → `{ list: { id, name, createdBy }, open: Item[], checked: Item[] }` (§7A.1); `Item = { id, listId, text, note, assigneeId, createdBy, createdAt, checkedAt, checkedBy, hasPhoto, updatedAt }` |
+| GET | `/lists` | member | → `{ id, name, emoji, createdBy, openCount }[]`, by name (§7A); `emoji` null = the default |
+| POST | `/lists` | member | `{ name, emoji? }` → list (201); 409 `duplicate`; 400 at `LISTS_MAX` or a bad emoji |
+| PATCH/DELETE | `/lists/{id}` | creator or admin (seeded lists: admin) | PATCH `{ name, emoji? }` (absent = unchanged, null = the default) → list; DELETE → 204 (and its items' photos, §7A.3) |
+| GET | `/lists/{id}` | member | → `{ list: { id, name, emoji, createdBy }, open: Item[], checked: Item[] }` (§7A.1); `Item = { id, listId, text, note, assigneeId, createdBy, createdAt, checkedAt, checkedBy, hasPhoto, updatedAt }` |
 | POST | `/lists/{id}/items` | member | `{ text, note?, assigneeId? }` → `{ item, result: "added" \| "existing" \| "reopened" }`, 201 when added, else 200 |
 | PATCH | `/list-items/{id}` | member | `{ text?, note?, assigneeId?, checked?: boolean }` → item; 409 `duplicate` on a key clash |
 | DELETE | `/list-items/{id}` | member | → 204 (and its photo, §7A.3) |
@@ -4616,6 +4645,8 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q154 | Who may change a show | ⚑ Anyone in the household: add, edit, mark watched, delete |
 | Q155 | The row's way to watch | ⚑ The best option: theater, then stream, tv, rent, buy |
 | Q156 | Comments read for a YouTube link | ⚑ The top 20 by relevance (one quota unit), plus the title, channel and description; replies not read; other sites' comments only if Claude's own page fetch shows them |
+| Q157 | Lists' emojis | ⚑ A list without its own shows one picked from its name (keyword table in §7A.1, else 📋); Today 🧹, Things to do ✅, Movies & shows 🎬 are fixed |
+| Q158 | When the Lists popup opens | ⚑ On every tap of the bottom tab's 🛒 Lists (and the list button), not when the app opens on Lists; closing it stays on the remembered list |
 | Q142 | Where "Fill in from this link" sits | ⚑ A full-width button right under the Link field, only when the field holds a usable link; reading starts on the tap, never on paste |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
@@ -4829,6 +4860,10 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Lists popup** (v1.23.0, §8.8, §7A.1; asked by MojoSOGO 2026-10-05; L21–L22 and LE-M): tapping 🛒 Lists in the tab
+bar opens a popup of buttons, one per list with its emoji and open count, the remembered list marked; the old
+`<select>` is gone. Lists gain an emoji (migration 0027, §4.2z), set in the new-list form and ⋯ options, else picked
+from the name. Checked locally at 375 px (two columns, names wrap to two lines, the remembered list marked). Q157–Q158 are ⚑ defaults awaiting MojoSOGO.
 **M4x Movies & shows** (v1.22.0, §7F, §8.14; asked by MojoSOGO 2026-10-05; 596 tests incl. W1–W14 and W-M): Lists →
 **Movies & shows** — type a title, paste a link or snap a picture, and **Find** has Claude look it up (web search ≤ 5
 with `user_location` country US, web fetch ≤ 3) and fill the show form: Rotten Tomatoes critics / audience, how to watch
