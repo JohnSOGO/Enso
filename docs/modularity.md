@@ -64,5 +64,7 @@ the decision is made earlier, calmly.
 | Worker | Builds to the spec, inside the named owner | Moves code to a new home on its own |
 | `code-steward` | At milestones: audits the whole tree, returns a ranked backlog | Refactors, or invents churn |
 
+The three agents are defined in `.claude/agents/` (adapted from SogoTable's).
+
 Light path (owner obvious, no cap pressure, no new file): name the owner from the map in
 the commit message and build. When unsure which path, it is the full path.

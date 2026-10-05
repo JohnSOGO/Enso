@@ -37,6 +37,11 @@ If the code and the spec disagree, that's a bug in one of them. Decide which, co
 the spec first, then make the code match. Never let the drift sit. Run `code-steward`
 at each milestone.
 
+The three agents (`placement-advisor`, `reorganizer`, `code-steward`) are defined in
+`.claude/agents/` and run as subagents (the Agent tool). In the project app, the thread
+doing the work is the coordinating session: it calls them itself, never skips them on
+the full path, and records each receipt they return.
+
 ## Wu wei — act without forcing
 
 Go with the grain of what is already here.
