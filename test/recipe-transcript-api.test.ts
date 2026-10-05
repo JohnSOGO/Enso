@@ -87,7 +87,7 @@ describe('M4r transcript — R17 refusals, in order', () => {
   it('a typed recipe → 400; a deleted or unknown one → 404; nothing fetched', async () => {
     const heard = fakeWorld(happy());
     const typed = await saved({ video_id: null, source: '["typed"]', captions_error: null });
-    expect((await transcript(typed, { text: PASTED })).json).toMatchObject({ error: 'invalid_input', message: 'Only a recipe read from a video takes a transcript.' });
+    expect((await transcript(typed, { text: PASTED })).json).toMatchObject({ error: 'invalid_input', message: 'Only a recipe read from a video or a link takes a transcript.' });
     expect((await transcript('rcp_nope', { text: PASTED })).status).toBe(404);
     expect(heard).toEqual([]);
   });

@@ -156,7 +156,7 @@ describe('parseRecipeInput', () => {
 
 describe('the clash and the wire shape', () => {
   const row = (over: Partial<RecipeRow> = {}): RecipeRow => ({
-    id: 'rcp_1', title: 'Soup', video_id: ID, video_title: 'Soup video', channel: 'Chef', ingredients: '["1 onion"]', steps: '["Chop"]',
+    id: 'rcp_1', title: 'Soup', video_id: ID, video_title: 'Soup video', channel: 'Chef', link: null, ingredients: '["1 onion"]', steps: '["Chop"]',
     servings: '2', time_text: '1 h', found: 1, source: '["description","captions"]', captions_error: null, comments_error: null, created_by: 'mem_1',
     created_at: 't', updated_at: 't', deleted_at: null, ...over,
   });
@@ -181,13 +181,13 @@ describe('the clash and the wire shape', () => {
 describe("M4p each person's emoji (§7E.5)", () => {
   const ME = 'mem_me', YOU = 'mem_you';
   const rec = (id: string, createdAt: string, mine: string | null, yours: string | null = null): Recipe => ({
-    id, title: id, videoId: null, videoTitle: null, channel: null, watchUrl: null, thumbnailUrl: null, ingredients: [], steps: [],
+    id, title: id, videoId: null, videoTitle: null, channel: null, link: null, watchUrl: null, thumbnailUrl: null, ingredients: [], steps: [],
     servings: null, time: null, found: false, source: ['typed'], captionsError: null, commentsError: null, createdBy: ME, createdAt, updatedAt: createdAt,
     emojis: [...(mine ? [{ memberId: ME, emoji: mine }] : []), ...(yours ? [{ memberId: YOU, emoji: yours }] : [])],
   });
 
   it("recipeFromRow keeps only its own recipe's emojis; none by default", () => {
-    const row = { id: 'rcp_1', title: 'Soup', video_id: null, video_title: null, channel: null, ingredients: '[]', steps: '[]',
+    const row = { id: 'rcp_1', title: 'Soup', video_id: null, video_title: null, channel: null, link: null, ingredients: '[]', steps: '[]',
       servings: null, time_text: null, found: 0, source: '["typed"]', captions_error: null, comments_error: null, created_by: ME, created_at: 't',
       updated_at: 't', deleted_at: null } satisfies RecipeRow;
     expect(recipeFromRow(row).emojis).toEqual([]);

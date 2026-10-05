@@ -7,6 +7,23 @@ carry its result.
 
 ---
 
+## 2026-10-05 — Recipes from any link (coordinating session)
+
+- **Ask:** recipe import takes Facebook reels and any web page; the link's kind is detected (§7E.6).
+- **Verdict:** `src/shared/recipe-link.ts` [NEW] (recipeLinkOf, siteName, the prompts — pure; kept out of
+  `recipe-reading.ts`, which is about videos and would have reached the band); `src/worker/recipe-link-reader.ts`
+  [NEW] (the page, look-up and fill, mirroring `link-reader.ts`); `migrations/0030_recipe_links.sql` [NEW]. Small
+  edits to existing owners: `recipes.ts` (row/wire `link`), `recipe-reading.ts` (`VideoText.page`), `vocab.ts`
+  (`page`), `recipe-reader.ts` (exports its schema; a post's prompt intro), `recipe-reread.ts` (the link branch),
+  `routes/recipes.ts` (the from-link handler), the three recipe screens.
+- **Placed by:** the coordinating session itself; no placement-advisor runs in the project app. The page
+  pipeline's D1 work stays in the route, as from-video's does.
+- **Caps:** `routes/recipes.ts` is now 275/300, newly in the warning band. The seam for the next agent: move
+  the two read pipelines (from-video, the page) to a `recipe-reads.ts` beside `recipe-reread.ts`, the route
+  keeping only the mapping.
+
+---
+
 ## 2026-10-05 — Chores tab and what done looks like (coordinating session)
 
 - **Ask:** chores get their own section, and each chore a "what done looks like" with specific areas, pictures and

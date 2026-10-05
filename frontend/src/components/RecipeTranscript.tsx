@@ -1,4 +1,4 @@
-// SPEC §8.12, §7E.2b — the video's transcript, given by hand, on a video recipe that is "watch it" or whose
+// SPEC §8.12, §7E.2b — the transcript, given by hand, on a video or link recipe (§7E.6) that is "watch it" or whose
 // captions couldn't be read: 📷 screenshots of YouTube's transcript panel (1–SCREENSHOTS_MAX, shrunk to JPEG on
 // the phone like a thing's photo, read and never stored), or — collapsed below — its text pasted into a box that
 // grows. Read it → POST /recipes/{id}/transcript; the refusal shows in place; the re-read recipe goes back to
@@ -79,9 +79,11 @@ export function RecipeTranscript({ recipe: r, onChange }: { recipe: Recipe; onCh
       <input ref={input} type="file" accept="image/*" multiple className="visually-hidden" tabIndex={-1} aria-hidden
         onChange={(e) => { picked([...(e.target.files ?? [])]); e.target.value = ''; }} />
       <button type="button" disabled={busy || shots.length >= SCREENSHOTS_MAX} onClick={() => input.current?.click()}>
-        {shots.length ? '📷 Add another screenshot' : '📷 Add transcript screenshots'}
+        {shots.length ? '📷 Add another screenshot' : r.link ? '📷 Add screenshots' : '📷 Add transcript screenshots'}
       </button>
-      <p className={`muted ${s.hint}`}>On YouTube: ⋯ → Show transcript, then screenshot it.</p>
+      <p className={`muted ${s.hint}`}>
+        {r.link ? "Screenshot the post's caption or the recipe, then add it here." : 'On YouTube: ⋯ → Show transcript, then screenshot it.'}
+      </p>
       {shots.length > 0 && (
         <ul className={s.shots}>
           {shots.map((x, i) => (

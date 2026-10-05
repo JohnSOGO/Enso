@@ -24,15 +24,16 @@ export const UNTITLED_VIDEO = 'Recipe from YouTube';
 // ---- §7E.2 reading a video ----
 
 /** What a video offered to be read; `comments` is the creator's own (creatorComments); `pasted` and `screenshots`
- *  are a transcript given by hand (cleanTranscript, parseScreenshots, §7E.2b). */
+ *  are a transcript given by hand (cleanTranscript, parseScreenshots, §7E.2b); `page` is a link's look-up notes (§7E.6). */
 export interface VideoText {
   description: string | null; transcript: string | null; comments: string | null; pasted?: string | null; screenshots?: readonly Screenshot[];
+  page?: string | null;
 }
 
 const has = (v: string | null | undefined) => !!v?.trim();
 const OFFERED: Partial<Record<RecipeSource, (t: VideoText) => boolean>> = {
   description: (t) => has(t.description), captions: (t) => has(t.transcript),
-  transcript: (t) => has(t.pasted) || !!t.screenshots?.length, comments: (t) => has(t.comments),
+  transcript: (t) => has(t.pasted) || !!t.screenshots?.length, comments: (t) => has(t.comments), page: (t) => has(t.page),
 };
 
 /** What a reading was given: the description when it had text, the captions when a transcript was read, a

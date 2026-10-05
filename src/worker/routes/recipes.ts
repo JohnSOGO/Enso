@@ -1,4 +1,5 @@
-// SPEC §7E, §10 — recipes: CRUD, reading one from a YouTube video, and re-reading one from its transcript, pasted or
+// SPEC §7E, §10 — recipes: CRUD, reading one from any link (§7E.6: its kind detected; a page through recipe-link-reader.ts)
+// or a YouTube video, and re-reading one from its transcript, pasted or
 // screenshotted (§7E.2b; screenshots are read, never stored). Every rule (limits, the link → id,
 // whose comments are the creator's, when to ask Claude, cleaning the answer, found, the clash) is src/shared/recipes.ts or,
 // for reading a video, src/shared/recipe-reading.ts; the fetching is
@@ -9,8 +10,9 @@
 import { Hono, type Context } from 'hono';
 import type { AppEnv, Env } from '../env';
 import {
-  isFound, parseRecipeInput, recipeFromRow, recipeVideoClash, youtubeVideoId, type Recipe, type RecipeEmojiRow, type RecipeInput, type RecipeRow,
+  isFound, parseRecipeInput, recipeFromRow, recipeVideoClash, type Recipe, type RecipeEmojiRow, type RecipeInput, type RecipeRow,
 } from '../../shared/recipes';
+import { recipeLinkOf, siteName } from '../../shared/recipe-link';
 import {
   COMMENTS_LOOKED_AT, HOME_CAPTIONS_OFF, PASTED_MAX, RECIPE_READS_PER_DAY, cleanRecipeReading, cleanTranscript, creatorComments,
   hasRecipeText, homeCaptionsError, parseScreenshots, sourcesOf, wantsHomeCaptions,
@@ -24,6 +26,7 @@ import { requireMember } from '../session';
 import { lookUpComments, lookUpVideo } from '../youtube';
 import { readCaptions } from '../youtube-captions';
 import { readRecipe } from '../recipe-reader';
+import { readRecipeLink } from '../recipe-link-reader';
 import { rereadRecipe } from '../recipe-reread';
 import { homeCaptionsConfigOf, readCaptionsFromHome } from '../home-captions';
 
@@ -50,9 +53,10 @@ const answer = async (c: Context<AppEnv>, id: string, status: 200 | 201 = 200) =
   c.json((await toRecipes(c.env.DB, [(await loadRow(c.env.DB, id))!]))[0], status);
 
 const duplicate = (c: Context<AppEnv>, r: RecipeRow) =>
-  c.json({ error: 'duplicate', message: `That video is already in Recipes: “${r.title}”.`, recipeId: r.id }, 409);
+  c.json({ error: 'duplicate', message: `That ${r.link ? 'link' : 'video'} is already in Recipes: “${r.title}”.`, recipeId: r.id }, 409);
 
-interface Video { id: string; title: string | null; channel: string | null }
+/** Where a read recipe came from: a YouTube video, or a page's cleaned link and its site's name (§7E.6). */
+type From = { video: { id: string; title: string | null; channel: string | null } } | { link: string; site: string };
 
 /** The daily cap (§7E.2 step 4, §7E.2b step 5): today's video reads, in the household's day, are used up → 429. */
 async function readsUsedUp(c: Context<AppEnv>, now: string): Promise<Response | null> {
@@ -75,17 +79,18 @@ async function captionsFor(videoId: string, env: Env): Promise<{ text: string } 
   return home.ok ? { text: home.text } : { error: homeCaptionsError(home.reason) };
 }
 
-const readingOff = (c: Context<AppEnv>) => fail(c, 503, 'recipe_reading_off', "Reading recipes from videos isn't set up yet.");
+const readingOff = (c: Context<AppEnv>, what = 'videos') => fail(c, 503, 'recipe_reading_off', `Reading recipes from ${what} isn't set up yet.`);
 
 /** Why the captions and the creator's comments couldn't be read (NULL when they were, or weren't tried). */
 interface ReadErrors { captions: string | null; comments: string | null }
 
-function insert(db: D1Database, id: string, f: RecipeInput, video: Video | null, source: RecipeSource[],
+function insert(db: D1Database, id: string, f: RecipeInput, from: From | null, source: RecipeSource[],
   errors: ReadErrors, me: string, now: string) {
+  const video = from && 'video' in from ? from.video : null, page = from && 'link' in from ? from : null;
   return run(db,
-    `INSERT INTO recipes (id, title, video_id, video_title, channel, ingredients, steps, servings, time_text, found, source,
-       captions_error, comments_error, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    id, f.title, video?.id ?? null, video?.title ?? null, video?.channel ?? null, JSON.stringify(f.ingredients),
+    `INSERT INTO recipes (id, title, video_id, video_title, channel, link, ingredients, steps, servings, time_text, found, source,
+       captions_error, comments_error, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    id, f.title, video?.id ?? null, video?.title ?? null, video?.channel ?? page?.site ?? null, page?.link ?? null, JSON.stringify(f.ingredients),
     JSON.stringify(f.steps), f.servings, f.time, isFound(f) ? 1 : 0, JSON.stringify(source), errors.captions, errors.comments,
     me, now, now);
 }
@@ -105,11 +110,43 @@ recipes.post('/recipes', requireMember, async (c) => {
   return answer(c, id, 201);
 });
 
-recipes.post('/recipes/from-video', requireMember, async (c) => {
+/** §7E.6 — any link: its kind detected; a page is read here, a video below (§7E.2). */
+async function fromLink(c: Context<AppEnv>): Promise<Response> {
+  const kind = recipeLinkOf((await body(c)).url);
+  if (!kind) return fail(c, 400, 'invalid_input', "That isn't a link that can be read.");
+  if (kind.kind === 'video') return fromVideo(c, kind.videoId);
+  // §7E.6 check order: link → duplicate → daily cap → key → the page → count → look-up + fill → clean → save.
+  const db = c.env.DB, { link } = kind, site = siteName(link);
+  const clash = await first<RecipeRow>(db, `${LIVE} AND link = ?`, link);
+  if (clash) return duplicate(c, clash);
+  const now = nowIso();
+  const usedUp = await readsUsedUp(c, now);
+  if (usedUp) return usedUp;
+  const aiKey = c.env.ANTHROPIC_API_KEY;
+  if (!aiKey) return readingOff(c, 'links');
+  const me = c.get('member').id;
+  await run(db, 'INSERT INTO recipe_reads (at, member_id) VALUES (?, ?)', now, me);
+  const r = await readRecipeLink({ apiKey: aiKey, link, site });
+  if (!r.ok && r.kind === 'refused') return fail(c, 422, 'recipe_refused', "Couldn't read a recipe from that link.");
+  if (!r.ok) return fail(c, 502, 'recipe_reading_failed', `Couldn't read the recipe: ${r.reason}`);
+  const id = newId('rcp');
+  try {
+    await insert(db, id, cleanRecipeReading(r.raw, r.title), { link, site },
+      sourcesOf({ description: null, transcript: null, comments: null, page: r.notes }), { captions: null, comments: null }, me, now);
+  } catch (err) {
+    const won = await first<RecipeRow>(db, `${LIVE} AND link = ?`, link);
+    if (won) return duplicate(c, won); // another paste of the same link saved first (uq_recipe_link)
+    throw err;
+  }
+  return answer(c, id, 201);
+}
+
+recipes.post('/recipes/from-link', requireMember, fromLink);
+recipes.post('/recipes/from-video', requireMember, fromLink); // the same handler, for phones on an older app (§7E.6)
+
+async function fromVideo(c: Context<AppEnv>, videoId: string): Promise<Response> {
   // §7E.2 check order: link → duplicate → daily cap → keys → YouTube → captions + the creator's comments → count →
   // Claude → clean → save.
-  const videoId = youtubeVideoId((await body(c)).url);
-  if (!videoId) return fail(c, 400, 'invalid_input', "That isn't a YouTube video link.");
   const db = c.env.DB;
   const clash = recipeVideoClash(videoId, await all<RecipeRow>(db, `${LIVE} AND video_id IS NOT NULL`));
   if (clash) return duplicate(c, clash);
@@ -146,21 +183,21 @@ recipes.post('/recipes/from-video', requireMember, async (c) => {
   const reading = cleanRecipeReading(raw, video.title);
   const id = newId('rcp');
   try {
-    await insert(db, id, reading, { id: videoId, title: video.title, channel: video.channel }, sourcesOf(text), errors, me, now);
+    await insert(db, id, reading, { video: { id: videoId, title: video.title, channel: video.channel } }, sourcesOf(text), errors, me, now);
   } catch (err) {
     const won = recipeVideoClash(videoId, await all<RecipeRow>(db, `${LIVE} AND video_id = ?`, videoId));
     if (won) return duplicate(c, won); // another paste of the same link saved first (uq_recipe_video)
     throw err;
   }
   return answer(c, id, 201);
-});
+}
 
 recipes.post('/recipes/:id/transcript', requireMember, async (c) => {
   // §7E.2b check order: recipe → a video → the text → daily cap → keys → YouTube + the creator's comments (no
   // captions attempt) → count → Claude → clean → found, else nothing changes → save.
   const r = await loadRecipe(c);
   if (r instanceof Response) return r;
-  if (!r.video_id) return fail(c, 400, 'invalid_input', 'Only a recipe read from a video takes a transcript.');
+  if (!r.video_id && !r.link) return fail(c, 400, 'invalid_input', 'Only a recipe read from a video or a link takes a transcript.');
   const { text, screenshots: shots } = await body(c);
   const screenshots = parseScreenshots(shots);
   if (typeof screenshots === 'string') return fail(c, 400, 'invalid_input', screenshots);
@@ -173,9 +210,9 @@ recipes.post('/recipes/:id/transcript', requireMember, async (c) => {
   const usedUp = await readsUsedUp(c, now);
   if (usedUp) return usedUp;
   const { YOUTUBE_API_KEY: ytKey, ANTHROPIC_API_KEY: aiKey } = c.env;
-  if (!ytKey || !aiKey) return readingOff(c);
+  if ((r.video_id && !ytKey) || !aiKey) return readingOff(c, r.video_id ? 'videos' : 'links');
 
-  const out = await rereadRecipe(c.env.DB, { yt: ytKey, ai: aiKey }, r, { pasted, screenshots },
+  const out = await rereadRecipe(c.env.DB, { yt: ytKey ?? '', ai: aiKey }, r, { pasted, screenshots },
     c.get('member').id, now);
   if (out.ok) return answer(c, r.id);
   switch (out.kind) {

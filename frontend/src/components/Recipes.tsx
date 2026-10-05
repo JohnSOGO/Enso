@@ -1,4 +1,4 @@
-// SPEC §8.12 — the 🍳 Recipes tab: paste a YouTube link → POST /recipes/from-video (saved at once, then its
+// SPEC §8.12 — the 🍳 Recipes tab: paste any recipe link → POST /recipes/from-link (its kind detected, §7E.6; saved at once, then its
 // view opens ⚑ Q61; a link already read opens the existing recipe ⚑ Q63), ＋ Type a recipe, and the rows,
 // newest first (thumbnail, my emoji, dish, "watch it" when nothing was found ⚑ Q62), or By emoji (byMyEmoji,
 // §7E.5; the choice kept on this phone ⚑ Q74). Rules are the server's and shared/recipes.ts's (§7E).
@@ -8,7 +8,8 @@ import { RecipeForm } from './RecipeForm';
 import { ApiError, errorText, get, post } from '../api';
 import { useApp } from '../state';
 import { byMyEmoji, myEmoji } from '../../../src/shared/recipe-emoji';
-import { youtubeVideoId, type Recipe } from '../../../src/shared/recipes';
+import { recipeLinkOf } from '../../../src/shared/recipe-link';
+import type { Recipe } from '../../../src/shared/recipes';
 import ls from './Lists.module.css';
 import s from './Recipes.module.css';
 
@@ -42,11 +43,12 @@ export function Recipes() {
     e.preventDefault();
     setReading(true); setReadError(null);
     try {
-      const r = await post<Recipe>('/recipes/from-video', { url: link });
+      const r = await post<Recipe>('/recipes/from-link', { url: link });
       setLink(''); setOpen({ kind: 'view', recipe: r }); load();
     } catch (err) {
-      const existing = err instanceof ApiError && err.code === 'duplicate'
-        ? (await load())?.find((x) => x.videoId === youtubeVideoId(link)) : undefined;
+      const k = recipeLinkOf(link);
+      const existing = k && err instanceof ApiError && err.code === 'duplicate'
+        ? (await load())?.find((x) => (k.kind === 'video' ? x.videoId === k.videoId : x.link === k.link)) : undefined;
       if (existing) { setLink(''); setOpen({ kind: 'view', recipe: existing }); }
       else setReadError(errorText(err));
     } finally {
@@ -64,13 +66,13 @@ export function Recipes() {
 
   return (
     <div className={s.screen}>
-      {/* noValidate: a link pasted without https:// ("youtu.be/…") is fine (§7E.1); the server decides. */}
+      {/* noValidate: a link pasted without https:// ("youtu.be/…") is fine (§7E.1, §7E.6); the server decides. */}
       <form className={s.paste} onSubmit={read} noValidate>
-        <input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-label="YouTube link"
-          placeholder="Paste a YouTube link…" value={link} disabled={reading} onChange={(e) => setLink(e.target.value)} />
+        <input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-label="Recipe link"
+          placeholder="Paste a recipe link…" value={link} disabled={reading} onChange={(e) => setLink(e.target.value)} />
         <button className="primary" disabled={reading || !link.trim()}>{reading ? 'Reading…' : 'Read it'}</button>
       </form>
-      {reading && <p className="muted" role="status">Reading the video… this can take a little while.</p>}
+      {reading && <p className="muted" role="status">Reading the link… this can take a little while.</p>}
       {readError && <div role="alert" className="alert-error">{readError}</div>}
       <button className={s.add} onClick={() => setOpen({ kind: 'form', recipe: null })}>＋ Type a recipe</button>
       {error && <div role="alert" className="alert-error">{error}</div>}
@@ -92,7 +94,7 @@ export function Recipes() {
                   ? <img className={s.thumb} src={r.thumbnailUrl} alt="" loading="lazy" referrerPolicy="no-referrer" />
                   : <span className={s.thumb} aria-hidden />}
                 <span className={`${ls.title} ${s.text}`}>{myEmoji(r, me.id) && `${myEmoji(r, me.id)} `}{r.title}</span>
-                {!r.found && r.videoId && <span className="badge warn">watch it</span>}
+                {!r.found && (r.videoId || r.link) && <span className="badge warn">{r.videoId ? 'watch it' : 'open it'}</span>}
               </button>
             </li>
           ))}

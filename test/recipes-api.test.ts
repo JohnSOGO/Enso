@@ -54,7 +54,7 @@ describe('M4o from-video — checks before anything is fetched', () => {
 
   it('R3 an unreadable link → 400; no session → 401; nothing fetched', async () => {
     const heard = fakeWorld(happy());
-    expect((await readVideo('https://vimeo.com/123')).status).toBe(400);
+    expect((await readVideo('not a link')).status).toBe(400); // a vimeo link is a page now (§7E.6)
     expect((await readVideo(LINK, new Client())).status).toBe(401);
     expect(heard).toEqual([]);
   });
