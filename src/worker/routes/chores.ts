@@ -13,26 +13,27 @@ import { all, first, newId, nowIso } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
 import { activeMemberIds, choreRunInserts, insertFire, loadChoreRun, updateChoreRun, updateFire } from '../tick';
+import { areaCounts, choreAreaDeletes } from './chore-areas';
 
 const householdTz = async (db: D1Database) => (await first<{ timezone: string }>(db, 'SELECT timezone FROM settings WHERE id = 1'))!.timezone;
 const openFireOf = (db: D1Database, runId: string) =>
   first<FireRow>(db, `SELECT * FROM fires WHERE chore_run_id = ? AND state != 'closed'`, runId);
 
-function choreView(row: ChoreRow, today: string, active: string[]) {
+function choreView(row: ChoreRow, today: string, active: string[], areaCount: number) {
   const c = choreFromRow(row);
   return {
     id: c.id, title: c.title, doneMeans: c.done_means, days: c.days, timing: c.timing, time: c.time, nudge: c.nudge,
     people: c.people, steps: c.steps, channels: c.channels, renotifyMin: c.renotify_min, createdBy: row.created_by,
-    thisWeek: assigneeFor(c, today, active), nextWeek: assigneeFor(c, addDays(today, 7), active),
+    thisWeek: assigneeFor(c, today, active), nextWeek: assigneeFor(c, addDays(today, 7), active), areaCount,
   };
 }
 
-function runView(chore: Chore, run: ChoreRun, open: Pick<FireRow, 'due_at' | 'state'> | null) {
+function runView(chore: Chore, run: ChoreRun, open: Pick<FireRow, 'due_at' | 'state'> | null, areaCount: number) {
   return {
     id: run.id, choreId: chore.id, title: chore.title, doneMeans: chore.done_means, timing: chore.timing, time: chore.time,
     step: run.step, steps: chore.steps, assigneeId: run.assignee_id, personId: stepPerson(chore, run),
     doneAt: run.done_at, doneBy: run.done_by,
-    nextDueAt: open?.state === 'scheduled' ? open.due_at : null, ringing: open?.state === 'ringing',
+    nextDueAt: open?.state === 'scheduled' ? open.due_at : null, ringing: open?.state === 'ringing', areaCount,
   };
 }
 
@@ -78,7 +79,8 @@ chores.get('/chores', requireMember, async (c) => {
   const today = utcToLocal(nowIso(), await householdTz(c.env.DB)).date;
   const active = await activeMemberIds(c.env.DB);
   const rows = await all<ChoreRow>(c.env.DB, 'SELECT * FROM chores WHERE deleted_at IS NULL ORDER BY time, title');
-  return c.json(rows.map((r) => choreView(r, today, active)));
+  const counts = await areaCounts(c.env.DB);
+  return c.json(rows.map((r) => choreView(r, today, active, counts.get(r.id) ?? 0)));
 });
 
 chores.post('/chores', requireMember, async (c) => {
@@ -95,7 +97,7 @@ chores.post('/chores', requireMember, async (c) => {
     ).bind(id, ...choreColumns(input), input.max_alerts, today, c.get('member').id, now, now),
     ...choreRunInserts(db, { ...input, id, start_date: today }, tz, now, addMinutes(now, MATERIALIZE_AHEAD_H * 60), active),
   ]);
-  return c.json(choreView((await first<ChoreRow>(db, 'SELECT * FROM chores WHERE id = ?', id))!, today, active), 201);
+  return c.json(choreView((await first<ChoreRow>(db, 'SELECT * FROM chores WHERE id = ?', id))!, today, active, 0), 201);
 });
 
 chores.patch('/chores/:id', requireMember, async (c) => {
@@ -103,7 +105,7 @@ chores.patch('/chores/:id', requireMember, async (c) => {
   if (row instanceof Response) return row;
   const db = c.env.DB, now = nowIso(), tz = await householdTz(db);
   const active = await activeMemberIds(db), today = utcToLocal(now, tz).date;
-  const input = parseChoreInput({ ...choreView(row, today, active), ...(await body(c)) }, active);
+  const input = parseChoreInput({ ...choreView(row, today, active, 0), ...(await body(c)) }, active);
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   const chore: Chore = { ...input, id: row.id, start_date: row.start_date };
   const stmts = [db.prepare(
@@ -119,7 +121,8 @@ chores.patch('/chores/:id', requireMember, async (c) => {
   }
   stmts.push(...choreRunInserts(db, chore, tz, now, addMinutes(now, MATERIALIZE_AHEAD_H * 60), active));
   await db.batch(stmts);
-  return c.json(choreView((await first<ChoreRow>(db, 'SELECT * FROM chores WHERE id = ?', row.id))!, today, active));
+  const areaCount = (await areaCounts(db)).get(row.id) ?? 0;
+  return c.json(choreView((await first<ChoreRow>(db, 'SELECT * FROM chores WHERE id = ?', row.id))!, today, active, areaCount));
 });
 
 chores.delete('/chores/:id', requireMember, async (c) => {
@@ -127,13 +130,17 @@ chores.delete('/chores/:id', requireMember, async (c) => {
   if (row instanceof Response) return row;
   const db = c.env.DB, now = nowIso();
   // Soft delete; the runs stay (history). Every open fire of its runs closes `removed` (§7B.3).
+  // What done looks like goes outright: its areas, their photo rows, then the R2 objects (§7B.6).
+  const areas = await choreAreaDeletes(db, row.id);
   await db.batch([
+    ...areas.stmts,
     db.prepare('UPDATE chores SET deleted_at = ?, updated_at = ? WHERE id = ?').bind(now, now, row.id),
     db.prepare(
       `UPDATE fires SET state = 'closed', close_reason = 'removed', closed_at = ?
         WHERE state != 'closed' AND chore_run_id IN (SELECT id FROM chore_runs WHERE chore_id = ?)`,
     ).bind(now, row.id),
   ]);
+  if (areas.keys.length) await c.env.PHOTOS.delete(areas.keys);
   return c.json({ ok: true });
 });
 
@@ -148,9 +155,10 @@ chores.get('/chores/today', requireMember, async (c) => {
   const choreRows = await all<ChoreRow>(db,
     'SELECT * FROM chores WHERE id IN (SELECT chore_id FROM chore_runs WHERE date = ?)', today);
   const byId = new Map(choreRows.map((r) => [r.id, choreFromRow(r)]));
+  const counts = await areaCounts(db);
   const runs = rows
     .filter((r) => showsOnToday(byId.get(r.chore_id)!, r))
-    .map((r) => runView(byId.get(r.chore_id)!, r, r.open_state ? { due_at: r.open_due_at!, state: r.open_state } : null));
+    .map((r) => runView(byId.get(r.chore_id)!, r, r.open_state ? { due_at: r.open_due_at!, state: r.open_state } : null, counts.get(r.chore_id) ?? 0));
   return c.json({ date: today, runs });
 });
 
@@ -160,7 +168,7 @@ async function stepResponse(c: Context<AppEnv>, r: StepResult) {
     if (r.error === 'already_done') return fail(c, 409, 'already_done', 'Every step of this chore is already done.');
     return fail(c, 409, 'nothing_to_undo', 'No step of this chore has been done yet.');
   }
-  return c.json(runView(r.chore, r.run, await openFireOf(c.env.DB, r.run.id)));
+  return c.json(runView(r.chore, r.run, await openFireOf(c.env.DB, r.run.id), (await areaCounts(c.env.DB)).get(r.chore.id) ?? 0));
 }
 
 chores.post('/chore-runs/:id/done', requireMember, async (c) =>

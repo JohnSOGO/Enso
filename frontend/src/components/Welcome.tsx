@@ -22,8 +22,9 @@ export function Welcome({ me }: { me: Me }) {
     <Modal title={`Welcome, ${me.displayName} 👋`} onClose={gotIt} footer={<button className="primary" onClick={gotIt}>Got it</button>}>
       <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <li><span aria-hidden>📅</span> <b>Calendar</b> — what's happening</li>
-        <li><span aria-hidden>⏰</span> <b>Alarms</b> — alarms, timers and chores</li>
-        <li><span aria-hidden>🛒</span> <b>Lists → Today</b> — your chores for today</li>
+        <li><span aria-hidden>⏰</span> <b>Alarms</b> — alarms and timers</li>
+        <li><span aria-hidden>🧹</span> <b>Chores</b> — your chores today and what done looks like</li>
+        <li><span aria-hidden>🛒</span> <b>Lists</b> — shopping and the rest</li>
       </ul>
     </Modal>
   );

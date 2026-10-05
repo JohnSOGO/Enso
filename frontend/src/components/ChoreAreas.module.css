@@ -1,0 +1,18 @@
+/* SPEC §8.15 — a chore's What done looks like sheet and its area editor. Column boxes whose height comes from
+   content: children keep flex none / 1 1 auto, never basis 0 (§8 iPhone rules). */
+.doneMeans { margin-bottom: 14px; }
+.area { border-top: 1px solid var(--border); padding: 10px 0 12px; }
+.name { flex: 1; min-width: 0; font-size: 1rem; margin: 0; overflow-wrap: anywhere; }
+.edit { flex: none; min-width: 44px; min-height: 44px; }
+.photos { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 8px; }
+/* Small thumbnails, several to a row; one tapped to full size takes the whole row. */
+.photos button[aria-pressed='false'] img { max-height: 80px; }
+.photos > button[aria-pressed='true'], .photo:has(button[aria-pressed='true']) { flex-basis: 100%; }
+.photo { display: inline-flex; align-items: flex-start; gap: 2px; }
+.photo > button { min-width: 44px; min-height: 44px; flex: none; }
+.checks { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.check input { flex: none; width: 22px; height: 22px; }
+.check input:checked + span { color: var(--text-dim); text-decoration: line-through; }
+.editor { display: flex; flex-direction: column; gap: 8px; }
+.editor > * { flex: none; }

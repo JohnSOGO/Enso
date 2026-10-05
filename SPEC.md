@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.50 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.51 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -55,7 +55,7 @@ A calendar PWA for one household. It has three kinds of alert:
 |------|--------------|----------------|---------|
 | **Event reminder** | Fires before/at a calendar event. | On the calendar, inside the event | "Dentist" at 14:30, remind 30 min before |
 | **Scheduled alarm** | Fires at a set time on chosen **days of the week**, every week. Not a calendar entry. | **Alarms** tab, not drawn on the calendar | "Take out trash" Tue 19:00 · "Morning meds" every day 08:00 |
-| **Chore** | A job on chosen days, **rotating** weekly between people, either *at* a time (rings) or *by* a time (quiet). It can be a **loop** of steps that hand off. | **Alarms** tab (set up) · **Lists → Today** (tick off) | "Laundry": start the washer → move to dryer (60 min later) → fold & put away |
+| **Chore** | A job on chosen days, **rotating** weekly between people, either *at* a time (rings) or *by* a time (quiet). It can be a **loop** of steps that hand off. | **🧹 Chores** tab: Today (tick off), All chores (set up), What done looks like (§8.15) | "Laundry": start the washer → move to dryer (60 min later) → fold & put away |
 | **Rolling timer** ⚑ name | A countdown that **restarts when acknowledged**, not on a fixed clock. | **Alarms** tab | "Check on the dog", 60 min |
 
 **Why scheduled alarms are not calendar events:** a daily alarm drawn on the
@@ -1229,6 +1229,38 @@ ALTER TABLE settings ADD COLUMN machine_weekend_to   TEXT DEFAULT '21:00';
 Additive only; the existing settings row takes the defaults. Checked by L21 (`GET /machines/hours` reads
 `DEFAULT_MACHINE_HOURS` after the migration).
 
+### 4.2zb Schema change — `migrations/0029_chore_areas.sql`
+
+Asked by MojoSOGO 2026-10-05: each chore gets "an area for what done looks like with specific areas, pictures
+and a list of expectations" (§7B.6).
+
+```sql
+-- §7B.6 — what done looks like: a chore's named areas, each with a list of expectations and reference photos.
+CREATE TABLE chore_areas (
+  id           TEXT PRIMARY KEY,                       -- 'cha_' + 16 base32
+  chore_id     TEXT NOT NULL REFERENCES chores(id),
+  name         TEXT NOT NULL,                          -- 1–40 chars, e.g. "Sink"
+  expectations TEXT NOT NULL DEFAULT '[]',             -- JSON string[], 0–12, each 1–120 chars, in order
+  position     INTEGER NOT NULL,                       -- order within the chore: the order added
+  created_by   TEXT NOT NULL REFERENCES members(id),
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL
+);
+CREATE INDEX idx_chore_areas_chore ON chore_areas(chore_id, position);
+
+CREATE TABLE chore_area_photos (
+  id         TEXT PRIMARY KEY,                         -- 'cap_' + 16 base32
+  area_id    TEXT NOT NULL REFERENCES chore_areas(id),
+  photo_key  TEXT NOT NULL,                            -- R2 chore-areas/{areaId}/{random}.jpg; never on the wire
+  created_at TEXT NOT NULL
+);
+CREATE INDEX idx_chore_area_photos_area ON chore_area_photos(area_id, created_at);
+```
+
+Additive only. Areas are deleted outright (they are reference, not history): `DELETE /chore-areas/{id}` and
+deleting their chore remove the rows and the R2 objects. **Migration check (CA-M):** rows written under 0001–0028
+survive 0029 unchanged; `PRAGMA foreign_key_check` is empty.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -2282,6 +2314,59 @@ rejection is 400 `invalid_input` with a message naming the field.
 | C13 | migration check (§4.2e) | old fires and deliveries intact after 0006 |
 | C14 | delete a chore while a step wait is pending | that fire closes `removed`; nothing rings |
 
+### 7B.6 What done looks like — areas, pictures, expectations — `src/shared/chore-areas.ts` (pure)
+
+Asked by MojoSOGO 2026-10-05: "Chores needs its own section and an area for what done looks like with specific
+areas, pictures and a list of expectations." The one-line **Done means…** (§7B.4) stays as the summary; under it a
+chore can hold up to 8 **areas** — "Sink", "Counters", "Floor" — each with a list of **expectations** ("No dishes
+left in the sink", "Faucet wiped dry") and up to 4 **reference photos** of that area done right. Areas belong to the
+chore, not to a day's run: they say what done looks like every time. Nothing here changes turns, runs or fires.
+
+**The rules** (pure; imports nothing):
+
+- `AREAS_MAX` = 8 per chore, `AREA_NAME_MAX` = 40, `EXPECTATIONS_MAX` = 12 per area, `EXPECTATION_MAX` = 120,
+  `AREA_PHOTOS_MAX` = 4 per area ⚑ Q164.
+- `parseAreaInput(body, current?)` → `{ name, expectations }` or a message naming the field. `name` is trimmed,
+  1–`AREA_NAME_MAX`. `expectations` is a list of strings: each trimmed, empty ones dropped, each at most
+  `EXPECTATION_MAX`, at most `EXPECTATIONS_MAX` left; absent = `[]` on create, unchanged on edit (`current`).
+- `ChoreArea` — the wire type: `{ id, choreId, name, expectations: string[], photos: string[], updatedAt }`;
+  `photos` are photo ids, oldest first. A photo key is never on the wire.
+
+**Who:** anyone in the household may add, change or delete an area and its photos ⚑ Q163 — unlike the chore
+itself (creator or an admin), because whoever does the chore often knows best what done looks like.
+
+**The routes** — `src/worker/routes/chore-areas.ts`:
+
+- `GET /chores/{id}/areas` → `ChoreArea[]` by `position`. The chore deleted or unknown → 404 "That chore no longer exists."
+- `POST /chores/{id}/areas` `{ name, expectations? }` → 201 area, `position` = after the last. At `AREAS_MAX`
+  → 400 `invalid_input` "A chore has at most 8 areas."
+- `PATCH /chore-areas/{id}` `{ name?, expectations? }` → the area. `DELETE /chore-areas/{id}` → 204, its photos'
+  rows and R2 objects gone.
+- `POST /chore-areas/{id}/photos` the raw image (`photoBody`, §7C.3's limits) → 201 the area. R2 key
+  `chore-areas/{areaId}/{random}.jpg`, private. At `AREA_PHOTOS_MAX` → 400 `invalid_input` "An area has at most 4 photos."
+- `GET /chore-area-photos/{id}` → the image, `Cache-Control: private, max-age=3600` (a photo id is never reused,
+  so it is never stale). `DELETE /chore-area-photos/{id}` → 204, the row and the object gone.
+- An area or photo that is gone, or whose chore is deleted → 404 "That area no longer exists." / "That photo no
+  longer exists."
+- **Deleting a chore** (soft, §7B.3) deletes its areas and their photos outright, rows and R2 objects, in the same
+  request.
+- `GET /chores` and `GET /chores/today` carry `areaCount` on each chore / run, so the app knows when there is
+  something to show (§8.15).
+
+**Acceptance (M4y — each row is a test; fakes only):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| CA1 | POST an area `{ name: " Sink ", expectations: ["No dishes", " ", "Faucet dry"] }`; GET the chore's areas | 201 `{ name: "Sink", expectations: ["No dishes", "Faucet dry"], photos: [] }`; GET lists it; `areaCount` 1 on `/chores` and on today's run |
+| CA2 | a second area, then PATCH the first `{ name: "Kitchen sink" }` | areas in the order added; the PATCH keeps the expectations |
+| CA3 | name empty / 41 chars; 13 expectations; an expectation of 121 chars; a 9th area | 400 `invalid_input`, the message names the field |
+| CA4 | POST a photo, GET it, POST up to 4, then a 5th | the bytes round-trip with `private, max-age=3600`; the area lists 4 ids oldest first; the 5th is 400; no key in any answer |
+| CA5 | DELETE a photo; DELETE an area with photos | 204 and the object gone; 204, the area and every object of it gone |
+| CA6 | delete the chore | its areas' rows and objects gone; GET its areas → 404 |
+| CA7 | a member who is not the chore's creator adds, edits and deletes an area | allowed (⚑ Q163) |
+| CA8 | no session; a bad photo type | 401; 400 |
+| CA-M | migration check (§4.2zb) | rows written before 0029 survive; `foreign_key_check` empty |
+
 ---
 
 ## 7C. Things to do — `src/shared/things.ts` (pure)
@@ -3049,13 +3134,14 @@ only the grey backdrop):
 |  S   M   T   W   T   F   S          |
 |  ...continuous weeks...             |
 +-------------------------------------+
-| 📅 Calendar ⏰ Alarms 🛒 Lists 🍳 Recipes ⚙ Settings | <- bottom tab bar
+| 📅 Calendar ⏰ Alarms 🧹 Chores 🛒 Lists 🍳 Recipes ⚙ Settings | <- tab bar
 +-------------------------------------+
 ```
 
-- **Five tabs** (since v1.11.0, ⚑ Q60): 🍳 Recipes sits between Lists and Settings. The bar is a
-  grid with one equal column per tab (`grid-auto-flow: column`), icon above label, so all five
-  fit one line at 320 px without wrapping or truncating.
+- **Six tabs** (since v1.28.0, ⚑ Q166): **🧹 Chores** (§8.15) sits between Alarms and Lists; 🍳 Recipes
+  between Lists and Settings (v1.11.0, ⚑ Q60). The bar is a grid with one equal column per tab
+  (`grid-auto-flow: column`), icon above label, so all six fit one line at 320 px without wrapping or
+  truncating (labels .7rem).
 - The **＋** floating button appears on Calendar only and creates an event. The
   Alarms tab has its own **＋ Add** button in each section header.
 - **Status badges:**
@@ -3147,9 +3233,9 @@ Phone unticked** ⚑ Q36) and **Send** / **Cancel**. Send is disabled while the 
 blank or neither channel is ticked. A refusal from the server shows inside the box; on
 success the box closes (there is no toast in the app). What happens is §9.3.
 
-Then four sections — Scheduled, Rolling timers, **Machines**, Chores. Scheduled, Rolling
-timers and Chores are single-line lists (per the table rules), each with a **＋ Add** button
-in its header; Machines is two fixed cards and has no ＋ Add.
+Then three sections — Scheduled, Rolling timers, **Machines**. Scheduled and Rolling timers are
+single-line lists (per the table rules), each with a **＋ Add** button in its header; Machines is two
+fixed cards and has no ＋ Add. Chores moved to their own tab in v1.28.0 (§8.15).
 
 **Scheduled** — one row per alarm, sorted by time of day, then title:
 
@@ -3231,8 +3317,8 @@ Wash, move to the dryer, fold. Everyone hears when it's done.
   with `role="alert"`. Clear asks once ("Clear the washer? Nothing will ring.").
 - Done-at is household local time; the cards re-read `/machines` on every app refresh.
 
-**Chores** — the third section, with its own **＋ Add**. One line per chore, sorted
-by time:
+**The chore list** — on the 🧹 Chores tab since v1.28.0 (§8.15), under "All chores", with its own
+**＋ Add**. One line per chore, sorted by time:
 
 ```
 Time      Chore            Days        This week
@@ -3240,9 +3326,11 @@ Time      Chore            Days        This week
 19:00 by  🗑 Trash          Tue         Kai → Sam
 ```
 
-- `at`/`by` after the time; a superscript step count when there is more than one step.
+- `at`/`by` after the time; a superscript step count when there is more than one step; 📋 after the
+  title when the chore has areas (§7B.6).
 - **This week** = whose turn it is now; when people take turns, `→` the next person.
-- Tapping a row opens the **chore form** (modal):
+- Tapping a row opens the chore's **What done looks like** sheet (§8.15); its **✎ Edit chore** opens the
+  **chore form** (modal):
   - Title · **Done means…** (one line, e.g. "Bins at the curb, lids shut")
   - Days (chips Sun…Sat, plus "Every day" / "Weekdays")
   - **When:** ( ) **At** a time — it rings · ( ) **By** a time — quiet; ☐ nudge then
@@ -3253,7 +3341,8 @@ Time      Chore            Days        This week
     (optional) · who (whose turn / a member chip). **＋ Add step** (max 6). A new chore
     starts with one step named after the title.
   - Channels (☐ Phone ☐ House) · Repeat alert every (Off / 5 / 10 / 15 / 30 min) ·
-    Save / Cancel / Delete (creator or owner, like alarms).
+    Save / Cancel / Delete (creator or owner, like alarms). Delete asks "Delete chore "{title}" and what
+    done looks like for it?" (§7B.6).
 
 ### 8.6 Settings
 
@@ -3282,9 +3371,9 @@ picker is a **popup of buttons** (a titled "Lists" modal):
 [ 🛒 Shopping (3)           ▾ ] [⋯]
 
 ┌ Lists ─────────────────────── ✕ ┐
-│ [🧹 Today — chores] [✅ Things to do (4)] │
-│ [🎬 Movies & shows (6)] [🛒 Shopping (3)]│
-│ [🎁 Wish list (5)]  [🔨 Hardware store (1)]│
+│ [✅ Things to do (4)] [🎬 Movies & shows (6)]│
+│ [🛒 Shopping (3)]  [🎁 Wish list (5)]   │
+│ [🔨 Hardware store (1)]          │
 │ [＋ New list…]                   │
 └─────────────────────────────────┘
 ```
@@ -3293,7 +3382,8 @@ picker is a **popup of buttons** (a titled "Lists" modal):
   Lists. Opening the app on the Lists tab (the tab is remembered) shows the remembered list with no popup.
   Tapping the list button opens it too.
 - Buttons in a two-column grid (one column under 360 px), each ≥ 44 px, emoji then name then the open count:
-  **🧹 Today — chores** first, **✅ Things to do** second (§8.11), **🎬 Movies & shows** third (§8.14) ⚑ Q157,
+  **✅ Things to do** first (§8.11), **🎬 Movies & shows** second (§8.14) ⚑ Q157 (Today's chores moved to the
+  🧹 Chores tab in v1.28.0, §8.15; a device that remembered Today shows Shopping),
   then every list by name with `listEmoji` (§7A.1), then **＋ New list…**. The chosen list's button is marked
   (`aria-pressed`, accent border), so the remembered list is the default: closing the popup (✕, Escape, a tap
   outside) stays on it. Tapping a button opens that list and closes the popup.
@@ -3301,7 +3391,7 @@ picker is a **popup of buttons** (a titled "Lists" modal):
   name typed — Create; errors inside the dialog); after creating, that list opens.
 - **⋯** (accessible name "List options") next to the list button opens **Rename**, **Emoji** (empty = the
   default from the name) and **Delete list** for the chosen list, shown only to those allowed (§7A.1) and never
-  for Today, Things to do or Movies & shows. Delete asks first and says how many open items go with it.
+  for Things to do or Movies & shows. Delete asks first and says how many open items go with it.
 - The choice is remembered per device (by list id), written only when someone picks. If
   the remembered list no longer exists — including the old toggle's `shopping`/`wishlist`
   values — the list button shows **Shopping** (or the first list, if Shopping was deleted).
@@ -3309,28 +3399,6 @@ picker is a **popup of buttons** (a titled "Lists" modal):
   403 naming who may ("Only the person who made this list or an admin…", or "Only an
   admin…" for a seeded list). A list's name is trimmed before its length is checked. The list refetches when the tab opens, on focus, and
 every 30 s while visible (§10 Freshness).
-
-**Today** (chores, §7B) — a switch **Mine | Everyone** (default Mine; remembered):
-
-```
-☐ Laundry — 2/3 Move to dryer     rings 08:40   Sam
-   Lint filter cleaned, nothing left in the drum
-☐ Trash                           by 19:00      Kai
-   Bins at the curb, lids shut
-▸ Done today (2)
-```
-
-- One row per run of today; **Mine** = runs whose current step is mine (or whose turn
-  it is, when the step has no person of its own). Sorted by time.
-- Row: title, then `— n/m step title` for multi-step chores; when: `at 07:30`,
-  `by 19:00`, `rings 08:40` (a pending wait) or a red `ringing` badge; the person's
-  chip. **Done means** is the dim second line.
-- Tapping the row marks the **current step** done (≥ 44 px). A ↶ button (accessible
-  name "Undo last step of Laundry") appears on runs that have a step done.
-- **Done today** is collapsed by default; its rows show who finished (`doneBy`), are
-  not tappable (another Done would only be refused), and keep ↶ to undo the last step.
-- Nobody's turn shows as **anyone**.
-- Nothing from earlier days, nothing red except `ringing` (§1.0).
 
 **Any list** (all alike — Q24):
 
@@ -3628,8 +3696,9 @@ Sam        expired
 ```
   Welcome, Kai 👋
   📅 Calendar — what's happening
-  ⏰ Alarms — alarms, timers and chores
-  🛒 Lists → Today — your chores for today
+  ⏰ Alarms — alarms and timers
+  🧹 Chores — your chores today and what done looks like
+  🛒 Lists — shopping and the rest
             [ Got it ]
 ```
 
@@ -3717,6 +3786,73 @@ Hoosiers  1986            🍅 —    💵 Rent
   - Summary · Link (↗ beside it, as the thing form's) · Note — growing text fields as §8.11.
   - **Watched** (a want show) / **Want to see it again** (a watched one) — each saves and closes · Save / Cancel /
     **Delete** (asks first). A 409 `duplicate` shows inside the form.
+
+### 8.15 Chores (the 🧹 tab) — asked by MojoSOGO 2026-10-05
+
+"Chores needs its own section." The **🧹 Chores** tab holds everything about chores that used to be split between
+Alarms → Chores and Lists → Today ⚑ Q166: **Today** at the top (ticking off is the daily use), then **All chores**
+(the chore list of §8.5, with ＋ Add), and from either, a chore's **What done looks like** sheet.
+
+**Today** — a switch **Mine | Everyone** (default Mine; remembered):
+
+```
+☐ Laundry — 2/3 Move to dryer   rings 08:40  Sam  📋
+   Lint filter cleaned, nothing left in the drum
+☐ Trash                         by 19:00     Kai  📋
+   Bins at the curb, lids shut
+▸ Done today (2)
+```
+
+- One row per run of today; **Mine** = runs whose current step is mine (or whose turn
+  it is, when the step has no person of its own). Sorted by time.
+- Row: title, then `— n/m step title` for multi-step chores; when: `at 07:30`,
+  `by 19:00`, `rings 08:40` (a pending wait) or a red `ringing` badge; the person's
+  chip. **Done means** is the dim second line. **📋** (accessible name "What done looks like for Laundry",
+  ≥ 44 px) when the chore has a Done means or areas: it opens the sheet below.
+- Tapping the row marks the **current step** done (≥ 44 px). A ↶ button (accessible
+  name "Undo last step of Laundry") appears on runs that have a step done.
+- **Done today** is collapsed by default; its rows show who finished (`doneBy`), are
+  not tappable (another Done would only be refused), and keep ↶ to undo the last step.
+- Nobody's turn shows as **anyone**.
+- Nothing from earlier days, nothing red except `ringing` (§1.0).
+
+**All chores** — the chore list and chore form of §8.5, under the heading "All chores" with **＋ Add**.
+
+**What done looks like** — a sheet (modal) titled with the chore's title, opened by a row of All chores or a
+Today row's 📋:
+
+```
+┌ Kitchen ─────────────────────────── ✕ ┐
+│ Done means: counters clear, sink empty  │
+│                                         │
+│ Sink                                 ✎ │
+│ [photo] [photo]                         │
+│ ☐ No dishes left in the sink            │
+│ ☐ Faucet wiped dry                      │
+│                                         │
+│ Counters                             ✎ │
+│ ☐ Nothing on them but the toaster       │
+│                                         │
+│ [＋ Add an area]                         │
+├─────────────────────────────────────────┤
+│ [✎ Edit chore]                [Close]   │
+└─────────────────────────────────────────┘
+```
+
+- **Done means** first, when there is one; then each area in order: its name, its photos as thumbnails (tap for
+  full size, as §8.8's item photo), and its expectations as a checklist. With no areas: "Nothing here yet. Add an
+  area — a part of the job, with photos of it done right and what to check."
+- Ticking an expectation is only for walking through the job: ticks are kept while the sheet is open, never
+  saved ⚑ Q165.
+- **✎** on an area (accessible name "Edit Sink") and **＋ Add an area** (hidden at 8) open the **area editor** in
+  place of the sheet's body: Name (one line, `maxLength` 40), **Expectations** (a growing box, one per line,
+  the placeholder "One per line, e.g. No dishes left in the sink"), **Photos** (thumbnails each with ✕
+  "Remove photo n", and **📷 Add photo** while fewer than 4, shrunk as a thing's photo, §7C.3), then
+  **Save** / **Cancel**, and **Delete area** (asks first) for a saved one. Save sends the area (POST or PATCH),
+  then each new photo, then each removed photo's DELETE; a refusal shows inside the sheet and keeps the editor
+  open. Cancel with changes asks "Discard your changes?".
+- **✎ Edit chore** opens the chore form (§8.5) in place of the sheet.
+- Anyone in the household may change what done looks like ⚑ Q163.
 
 ### 8.7 Theme
 
@@ -4180,12 +4316,16 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | GET | `/status` | member | → `{ house: { state: HouseState, lastOkAt, lastFailedAt, lastError } (§9.2, derived, never stored), mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[] }` |
 | POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `no_recipients` (§9.3); 409 `no_speakers` (§9.2a); spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
 | POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 409 `no_recipients` (no founder yet) / 429 `rate_limited`, in that order |
-| GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek }` (`thisWeek`/`nextWeek` = member id or null) |
+| GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek, areaCount }` (`thisWeek`/`nextWeek` = member id or null; `areaCount` §7B.6) |
 | POST | `/chores` | member | `{ title, doneMeans?, days, timing, time, nudge?, people, steps, channels, renotifyMin? }` → chore (201) |
-| PATCH/DELETE | `/chores/{id}` | creator or owner | same fields, all optional; re-plans unstarted runs (§7B.3) |
-| GET | `/chores/today` | member | → `{ date, runs: Run[] }`; `Run = { id, choreId, title, doneMeans, timing, time, step, steps, assigneeId, personId, doneAt, doneBy, nextDueAt, ringing }` (`personId` = the current step's person) |
+| PATCH/DELETE | `/chores/{id}` | creator or owner | same fields, all optional; re-plans unstarted runs (§7B.3); DELETE also deletes its areas and their photos (§7B.6) |
+| GET | `/chores/today` | member | → `{ date, runs: Run[] }`; `Run = { id, choreId, title, doneMeans, timing, time, step, steps, assigneeId, personId, doneAt, doneBy, nextDueAt, ringing, areaCount }` (`personId` = the current step's person) |
 | POST | `/chore-runs/{id}/done` | member | advances one step (§7B.3) → run; 409 `already_done` when finished |
 | POST | `/chore-runs/{id}/undo` | member | → run; 409 `nothing_to_undo` at step 0 |
+| GET/POST | `/chores/{id}/areas` | member | GET → `ChoreArea[]` by position; POST `{ name, expectations? }` → area (201); 400 at 8 areas; 404 when the chore is gone (§7B.6) |
+| PATCH/DELETE | `/chore-areas/{id}` | member | PATCH `{ name?, expectations? }` → area; DELETE → 204 with its photos (§7B.6) |
+| POST | `/chore-areas/{id}/photos` | member | the raw image → area (201); 400 at 4 photos or a bad image (§7B.6) |
+| GET/DELETE | `/chore-area-photos/{id}` | member | GET → the image, `private, max-age=3600`; DELETE → 204 (§7B.6) |
 | GET | `/things` | member | → `{ open: Thing[], closed: Thing[] }` (closed = done/dropped, last 60 days); `Thing = { id, title, note, place, address, phone, cost, url, windowStart, windowEnd, remindStart, remindOn, channels, hasPhoto, status, plannedEventId, plannedDate, createdBy, updatedAt }` |
 | POST | `/things` | member | thing fields → thing (201) |
 | GET/PATCH/DELETE | `/things/{id}` | member | GET → thing; PATCH fields, all optional, incl. `status` → thing; DELETE → 204 (and its photo) |
@@ -4517,8 +4657,8 @@ Captured from v1.0-draft so nothing is lost:
 - Offline **editing** and conflict resolution. v1 offline = the cached app shell;
   actions need network, and buttons show disabled "offline".
 - Queued offline acks
-- Photos anywhere other than Things to do (§7C.3) and list items (§7A.3), the only two
-  attachments. A picture a show is looked up from (§7F.2) is read once and never stored, so it is not one. A recipe's video
+- Photos anywhere other than Things to do (§7C.3), list items (§7A.3) and a chore's areas (§7B.6), the
+  only three attachments. A picture a show is looked up from (§7F.2) is read once and never stored, so it is not one. A recipe's video
   thumbnail (§7E.1) is hotlinked from YouTube — not stored, not in R2, not an attachment — so it
   is not one. Transcript screenshots (§7E.2b) are read once and never stored — not in R2, not an
   attachment — so they are not one either ⚑ Q93.
@@ -4547,6 +4687,12 @@ Captured from v1.0-draft so nothing is lost:
 - A weekly re-check that pings the household when a wanted show leaves theaters or lands on a service.
 - Movie night: Plan it onto the calendar from a show (as a thing's Plan it), with showtimes for a theater.
 - Reading a video clip itself (frames), posters and trailers, and the household's own stars after watching.
+
+### 12.3 What done looks like — follow-ups (suggested 2026-10-05, not built, need MojoSOGO's word)
+
+- A photo of the job done, taken when the last step is ticked, kept with that day's run to compare with the areas.
+- Ticks on the expectations saved per run, so a parent can see what was checked.
+- Reordering areas by hand (they keep the order added).
 
 ### 12.1 Next — decided with MojoSOGO (2026-10-03), spec to be written before building
 
@@ -4577,7 +4723,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q9 | Can any member Done/Ack a fire assigned to someone else? | Yes |
 | Q10 | Can any member edit or delete any list item (not only their own)? | Yes — they are household lists |
 | Q11 | How long do bought / done items stay visible? | 30 days |
-| Q12 | Where do chores live? | Set up in **Alarms → Chores**; ticked off in **Lists → Today** (no fifth tab) |
+| Q12 | Where do chores live? | Set up in **Alarms → Chores**; ticked off in **Lists → Today** (no fifth tab). **Superseded by Q166** (v1.28.0): their own 🧹 Chores tab |
 | Q13 | When do turns change? | Every Sunday (weekly), counted from the week the chore was made |
 | Q14 | Unfinished chores from earlier days? | Drop off Today quietly; a still-ringing fire stays in the Ringing bar |
 | Q15 | Can anyone tick anyone's chore? | Yes — any member, like fires (Q9) |
@@ -4722,6 +4868,10 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q160 | A load nobody started in the app, or one that finished early (§7D.2, §8.5) | ⚑ A free or running machine offers **Done now**: free asks whose load; the machine shows DONE — waiting and the done alerts ring at once, then Still loaded works as usual |
 | Q161 | Machine alerts on "all devices" (§7D.3) | Everyone's phones and every speaker HA lists (decided by MojoSOGO 2026-10-05); ⚑ the `Everywhere` group is left out so each Echo speaks once; HA unreadable → the default speakers |
 | Q162 | A machine alert outside its hours (§7D.5) | ⚑ It waits and the reminders start over when the hours open (not dropped); only admins edit the hours, on the Machines section |
+| Q163 | Who may change what done looks like (§7B.6) | ⚑ Anyone in the household: add, edit and delete areas and their photos (the chore itself stays creator or admin) |
+| Q164 | How much a chore's done standard holds | ⚑ Up to 8 areas; each a name ≤ 40, up to 12 expectations ≤ 120 characters, and up to 4 photos |
+| Q165 | Ticking expectations (§8.15) | ⚑ Only to walk through the job while the sheet is open; never saved, cleared when it closes |
+| Q166 | Where chores live (§8.1, §8.15) | ⚑ Their own 🧹 Chores tab between Alarms and Lists: Today on top, All chores under it; they left Alarms and the Lists popup |
 | Q142 | Where "Fill in from this link" sits | ⚑ A full-width button right under the Link field, only when the field holds a usable link; reading starts on the tap, never on paste |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
@@ -4935,6 +5085,11 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Chores tab + what done looks like** (v1.28.0, §7B.6, §8.15, §4.2zb; asked by MojoSOGO 2026-10-05; CA1–CA8,
+CA-M): chores have their own 🧹 tab (Today, All chores) and left Alarms and the Lists popup; each chore has a
+**What done looks like** sheet of areas with photos and expectations, editable by anyone. Migration 0029. Q163–Q166
+are ⚑ defaults. Checked at 320 px in an emulated phone: the six tabs fit, the sheet and the area editor
+lay out. **Still owed:** apply 0029 in production; the same on the iPhone, with a real camera photo.
 **Machine alert hours** (v1.27.0, §7D.5, §5.3 rule 0b, §4.2za; asked by MojoSOGO 2026-10-05; L19–L21): washer and dryer
 alerts sound only weekdays 5:30–8:30pm and weekends 9am–9pm, editable by admins on the Machines section; outside
 them an alert waits and the reminders start over at the opening. Migration 0028. Q162 is a ⚑ default.
