@@ -1,13 +1,15 @@
 // SPEC §8.12 — the recipe form (modal): title, ingredients and steps one per line, servings, time; Save /
 // Cancel / Delete (asks). Fixes a read recipe or types a new one (no video, ⚑ Q68). Validation and found
 // are the server's (§7E.3); a video's own fields are not editable. An existing recipe can also be re-read from
-// screenshots or pasted text here (RecipeTranscript, ⚑ Q173); the re-read recipe is handed back as saved.
+// screenshots or pasted text here (RecipeTranscript, ⚑ Q173); the re-read recipe is handed back as saved. The
+// picture (⚑ Q175) is picked like a thing's photo, nothing read, and PUT or DELETEd after the fields on Save.
 import { useState } from 'react';
 import { Modal } from './Modal';
 import { Grow } from './Grow';
 import { RecipeTranscript } from './RecipeTranscript';
-import { del, errorText, patch, post } from '../api';
-import { RECIPE_TITLE_MAX, SERVINGS_MAX, TIME_MAX, type Recipe } from '../../../src/shared/recipes';
+import { PhotoField } from './PhotoField';
+import { apiUrl, del, errorText, get, patch, post, upload } from '../api';
+import { RECIPE_TITLE_MAX, SERVINGS_MAX, TIME_MAX, recipePhotoPath, type Recipe } from '../../../src/shared/recipes';
 import s from './Recipes.module.css';
 
 const formOf = (r: Recipe | null) => ({
@@ -23,7 +25,11 @@ export function RecipeForm({ recipe, onSaved, onDeleted, onClose }: Props) {
   const [f, setF] = useState(init);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const dirty = JSON.stringify(f) !== JSON.stringify(init);
+  /** The recipe as saved: a new one becomes saved when its POST succeeds, even if the picture then fails. */
+  const [saved, setSaved] = useState(recipe);
+  const [pending, setPending] = useState<Blob | null>(null);
+  const [removed, setRemoved] = useState(false);
+  const dirty = JSON.stringify(f) !== JSON.stringify(init) || !!pending || removed;
   const set = (k: keyof typeof f, v: string) => setF((x) => ({ ...x, [k]: v }));
 
   async function run(fn: () => Promise<void>) {
@@ -35,7 +41,16 @@ export function RecipeForm({ recipe, onSaved, onDeleted, onClose }: Props) {
       title: f.title, ingredients: linesOf(f.ingredients), steps: linesOf(f.steps),
       servings: f.servings.trim() || null, time: f.time.trim() || null,
     };
-    onSaved(recipe ? await patch<Recipe>(`/recipes/${recipe.id}`, b) : await post<Recipe>('/recipes', b));
+    const r = saved ? await patch<Recipe>(`/recipes/${saved.id}`, b) : await post<Recipe>('/recipes', b);
+    setSaved(r);
+    if (!pending && !removed) return onSaved(r);
+    try {
+      if (pending) await upload('PUT', `/recipes/${r.id}/photo`, pending);
+      else await del(`/recipes/${r.id}/photo`);
+    } catch (e) {
+      throw new Error(`Saved, but the picture didn't save: ${errorText(e)} Tap Save to try the picture again.`);
+    }
+    onSaved(await get<Recipe>(`/recipes/${r.id}`)); // hasPhoto and updatedAt after the picture change
   });
   const remove = () => {
     if (recipe && confirm(`Delete “${recipe.title}”?`)) run(async () => { await del(`/recipes/${recipe.id}`); onDeleted(); });
@@ -48,6 +63,9 @@ export function RecipeForm({ recipe, onSaved, onDeleted, onClose }: Props) {
         <button onClick={onClose} disabled={busy}>Cancel</button>
         {recipe && <button className="danger" disabled={busy} onClick={remove}>Delete</button>}
       </>}>
+      <PhotoField savedSrc={recipe?.hasPhoto && !removed ? apiUrl(recipePhotoPath(recipe)) : null} pending={pending}
+        alt="The recipe's picture" onPick={(p) => { setPending(p); setRemoved(false); }}
+        onRemove={() => { setPending(null); setRemoved(!!recipe?.hasPhoto); }} />
       <fieldset disabled={busy}>
         {recipe?.videoTitle && <p className="muted" style={{ marginBottom: 10 }}>From the video: {recipe.videoTitle}</p>}
         <label className="field"><span>Title</span>
