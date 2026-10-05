@@ -14,6 +14,7 @@ import { lists } from './routes/lists';
 import { itemPhotos } from './routes/item-photos';
 import { chores } from './routes/chores';
 import { choreAreas } from './routes/chore-areas';
+import { messes } from './routes/messes';
 import { things } from './routes/things';
 import { thingPhotos } from './routes/thing-photos';
 import { announce } from './routes/announce';
@@ -51,6 +52,7 @@ api.route('/', itemPhotos); // §7A.3 /list-items/read-photo and /list-items/{id
 api.route('/', lists);
 api.route('/', chores);
 api.route('/', choreAreas); // §7B.6 what done looks like
+api.route('/', messes); // §7B.7 whose mess?
 api.route('/', thingPhotos); // before things: /things/read-photo must not match /things/:id
 api.route('/', things);
 api.route('/', announce);

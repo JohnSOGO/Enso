@@ -38,7 +38,7 @@ ops.post('/ops/notify', async (c) => {
 
   const recent = (await first<{ n: number }>(db,
     `SELECT COUNT(*) AS n FROM deliveries
-      WHERE channel = 'push' AND fire_id IS NULL AND title IS NOT NULL AND notice IS NULL AND created_at >= ?`, opsWindowStart(now)))!.n;
+      WHERE channel = 'push' AND fire_id IS NULL AND title IS NOT NULL AND notice IS NULL AND mess_id IS NULL AND created_at >= ?`, opsWindowStart(now)))!.n;
   if (recent >= OPS_NOTIFY_PER_HOUR) {
     return fail(c, 429, 'rate_limited', `At most ${OPS_NOTIFY_PER_HOUR} pings an hour — try again later.`);
   }

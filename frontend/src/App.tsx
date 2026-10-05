@@ -14,6 +14,7 @@ import { HouseholdLists } from './components/HouseholdLists';
 import { Recipes } from './components/Recipes';
 import { Settings } from './components/Settings';
 import { RingingBar } from './components/RingingBar';
+import { MessBanner } from './components/MessBanner';
 import { SignIn } from './components/SignIn';
 import { JoinPage } from './components/JoinPage';
 import { ApproveLogin, forgetApproveRequest, keepApproveRequest } from './components/ApproveLogin';
@@ -60,6 +61,7 @@ function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boo
   return (
     <div className={s.app}>
       <RingingBar />
+      <MessBanner />
       {(house || phoneOff) && (
         <div className={s.badges}>
           {house && (

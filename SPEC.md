@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.59 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.60 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -86,7 +86,9 @@ usually in the house and hears house announcements. Every feature is judged by:
 - **Visible without being asked for.** Out of sight is out of mind.
 - **Predictable and explicit.** Plain words, stable layout, a clear meaning of "done".
 - **Quiet by default.** Only time-critical things ring. Alert fatigue kills the app.
-- **No shaming.** Nothing overdue is shown in red to the household at large.
+- **No shaming.** Nothing overdue is shown in red to the household at large. Accountability is not shaming:
+  a mess report (§7B.7) asks the person who left it to own up, and the parents enforce it — decided by MojoSOGO
+  2026-10-05. It is never spoken in the house, never red, and nobody sees a household scoreboard.
 - **Independent of vendor features.** The app owns its data; Alexa and Home Assistant
   only speak. No dependence on Alexa's lists, routines or skills.
 
@@ -369,6 +371,8 @@ export const ITEM_READ_VIA = ['sogoai', 'claude'] as const;                     
 export const LOGIN_REQUEST_STATUS = ['pending', 'approved', 'denied', 'used'] as const; // §6.6 login_requests.status
 export const LOGIN_VIEW   = ['pending', 'approved', 'denied', 'expired'] as const; // §6.6 what the waiting browser / the phone is told — derived, never stored
 export const NOTICE_KIND  = ['login', 'new_sign_in'] as const;                    // §6.6 deliveries.notice — a sign-in notice push, never an alert
+export const MESS_SETTLE  = ['paid', 'forgiven'] as const;                        // §7B.7 messes.settled_how
+export const MESS_STATUS  = ['open', 'discuss', 'owed', 'closed', 'settled'] as const; // §7B.7 a mess's state — derived, never stored
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
 ```
@@ -396,6 +400,8 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `pending` / `approved` / `denied` / `used` (login request) | A "Sign in with my phone" request (§6.6): waiting for the phone / the member picked the right number / refused (a wrong number, "This wasn't me", or replaced by a newer request) / the waiting browser collected its session — spent |
 | `expired` (login view) | A login request past its `expires_at` while still `pending` or `approved`, or one already `used`, as the waiting browser is told — derived from `now`, never stored |
 | `login` / `new_sign_in` | A sign-in notice push (§6.6): a phone-approval request / "New sign-in on …" after a password sign-in. Not an `ALERT_KIND`: no fire, no actions |
+| `paid` / `forgiven` | How a point owed for a mess was settled (§7B.7): paid back in person / let go |
+| `open` / `discuss` / `owed` / `closed` / `settled` (mess) | A mess report (§7B.7): asking who left it / on To talk about / claimed or recorded, a point owed / closed as nobody's / the point paid back or let go — derived from the row |
 | `sogoai` / `claude` | Who named a snapped item (§7A.3): SogoAI's local vision model (free) / the Claude API (the fallback) |
 | `at` | Chore rings at its time, like an alarm |
 | `by` | Chore is quiet: due by its time, optionally one nudge then |
@@ -1290,6 +1296,48 @@ ALTER TABLE recipes ADD COLUMN photo_key TEXT;  -- R2 recipes/{id}/{random}.jpg;
 ```
 
 **Migration check (RP-M):** rows written under 0001–0030 survive 0031 unchanged, `photo_key` NULL.
+
+### 4.2ze Schema change — `migrations/0032_messes.sql`
+
+Asked by MojoSOGO 2026-10-05 (§7B.7).
+
+```sql
+-- §7B.7 — whose mess? A mess someone cleaned up, who owned up to it, and the point they owe. Additive only.
+CREATE TABLE messes (
+  id          TEXT PRIMARY KEY,                       -- 'mes_' + 16 base32
+  reported_by TEXT NOT NULL REFERENCES members(id),   -- who cleaned it up, and is owed
+  chore_id    TEXT REFERENCES chores(id),             -- the chore it belongs to; NULL = none named
+  note        TEXT,                                   -- 1–120 chars; NULL = none
+  photo_key   TEXT,                                   -- R2 messes/{id}/{random}.jpg; never on the wire; NULL once deleted
+  claimed_by  TEXT REFERENCES members(id),            -- who owes: claimed it, or recorded by an admin
+  claimed_at  TEXT,
+  assigned_by TEXT REFERENCES members(id),            -- the admin who recorded it; NULL = claimed by the person
+  discuss_at  TEXT,                                   -- moved to To talk about
+  closed_at   TEXT,                                   -- closed by an admin as nobody's
+  closed_by   TEXT REFERENCES members(id),
+  settled_at  TEXT,
+  settled_how TEXT CHECK (settled_how IN ('paid','forgiven')),
+  settled_by  TEXT REFERENCES members(id),
+  deleted_at  TEXT,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX idx_messes_created ON messes(created_at);
+
+CREATE TABLE mess_denials (                           -- "Not me"
+  mess_id    TEXT NOT NULL REFERENCES messes(id),
+  member_id  TEXT NOT NULL REFERENCES members(id),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (mess_id, member_id)
+);
+
+-- A mess's asks and its To talk about notice: fire-less pushes that point at their mess (counted for the 4 asks).
+ALTER TABLE deliveries ADD COLUMN mess_id TEXT REFERENCES messes(id);
+CREATE INDEX idx_deliveries_mess ON deliveries(mess_id, member_id);
+```
+
+Additive only. `deliveries.mess_id` is NULL on every existing row and on every delivery but a mess's asks and its
+To talk about notice. Messes are soft-deleted (their asks point at them). **Migration check (MS-M):** rows written
+under 0001–0031 survive 0032 unchanged with `mess_id` NULL; `PRAGMA foreign_key_check` is empty.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -2396,6 +2444,121 @@ itself (creator or an admin), because whoever does the chore often knows best wh
 | CA7 | a member who is not the chore's creator adds, edits and deletes an area | allowed (⚑ Q163) |
 | CA8 | no session; a bad photo type | 401; 400 |
 | CA-M | migration check (§4.2zb) | rows written before 0029 survive; `foreign_key_check` empty |
+
+### 7B.7 Whose mess? — mess reports and who owes whom — `src/shared/messes.ts` (pure)
+
+Asked by MojoSOGO 2026-10-05 (reviewed first as an AREC): "someone walks into a mess in the kitchen or house … post a
+picture of the mess I had to clean before I could continue … the perpetrator should identify themself … an economy
+where the perpetrator owes the person … let other people say 'it wasn't me'." And: "this isn't about shame, but
+rather teaching and enforcing accountability; if nobody claims it, we need a house discussion; mom and dad will deal
+with sibling warfare … the app is a vehicle to help things along because everyone isn't physically present at the
+same time." It is part of chores (a chore someone didn't do), so it lives in the 🧹 Chores tab, not a tab of its own.
+
+**The flow.**
+
+1. Whoever cleaned up the mess (the **reporter**) takes a photo of it in Chores → **📸 Report a mess**, optionally
+   names the chore it belongs to and adds a note ("pans left on the stove").
+2. Every other active member is **asked** "Was it yours?": a push at once and then every `NUDGE_EVERY_MIN` (15)
+   minutes, at most `NUDGES_MAX` (4) pushes in all ⚑ decided by MojoSOGO, until they answer or the mess is settled
+   one way or another. While the app is open, a **banner** asks the same question (§8.15a) until they answer.
+3. Each answers **That was me** (they **claim** it) or **Not me** (a **denial**). The reporter is never asked and
+   can do neither.
+4. A claim ends the asking: the claimer now **owes** the reporter **1 point** (always 1, ⚑ Q180).
+5. When every member asked has said Not me, or `DISCUSS_AFTER_H` (24) hours after the report with nobody claiming
+   it ⚑ Q177, it moves to **To talk about**: the house talks it through in person. The asking stops (the banner
+   stays for anyone who hasn't answered), and every active admin gets one push saying so ⚑ Q183. Claiming is still
+   open while it waits there.
+6. After the talk an **admin** records the outcome ⚑ Q179: whose it was (they then owe the reporter 1 point,
+   exactly as a claim) or **nobody's** (closed, no point). The app **never** decides by elimination or by whose turn
+   the chore was.
+7. A point is paid back in person. The one owed — or an admin — marks it **Paid back** or **Let it go** ⚑ Q181.
+
+**State** — `messStatus(m)`, derived from the row, never stored (`MESS_STATUS`, §3), first match wins:
+`settled` (settled_at set) · `closed` (closed_at set: nobody's) · `owed` (claimed_by set) · `discuss` (discuss_at
+set) · `open`. A deleted mess (deleted_at set) is gone from every answer.
+
+**The rules** (pure; imports only vocab and time):
+
+- `NUDGES_MAX` = 4, `NUDGE_EVERY_MIN` = 15, `DISCUSS_AFTER_H` = 24, `MESS_NOTE_MAX` = 120,
+  `MESS_PHOTO_KEEP_DAYS` = 30 ⚑ Q185.
+- `parseMessInput({ note, choreId })` → `{ note, choreId }` or a message naming the field: `note` trimmed, empty →
+  null, at most `MESS_NOTE_MAX`; `choreId` absent/empty → null, else a string (the route checks the chore exists).
+- `askedOf(m, activeIds, deniedIds)` → who still has to answer: when `open` or `discuss`, the active members other
+  than the reporter who have not said Not me; otherwise nobody.
+- `nudgeDue(createdAt, sent, now)` → true when `sent < NUDGES_MAX` and `now ≥ createdAt + sent × NUDGE_EVERY_MIN`.
+  `sent` is how many asks that member already has for that mess — counted from `deliveries.mess_id`, never stored.
+- `discussDue(createdAt, asked, now)` → true when nobody is left to ask, or `now ≥ createdAt + DISCUSS_AFTER_H`.
+- `balancesOf(owed, viewerId, isAdmin)` → `Balance[]` (`{ from, to, points }`, `from` owes `to`): the owed messes
+  (`claimed_by` owes `reported_by`) netted per pair of people, pairs at 0 left out. A member sees only the pairs
+  they are in; an admin sees every pair ⚑ Q178. Sorted by points, most first, then by `from`, `to`.
+- `askMessage(reporter, choreTitle, note)` → `"{reporter} cleaned up a mess ({chore}): {note}. Was it yours? Open
+  Ensō to answer."` — the chore part and the note part only when set. `discussMessage(...)` → `"Nobody has claimed
+  the mess {reporter} cleaned up ({chore}): {note}. It's on To talk about."`. Titles: `MESS_ASK_TITLE` "🧽 Whose
+  mess?", `MESS_DISCUSS_TITLE` "🗣 To talk about".
+- `Mess` — the wire type: `{ id, reportedBy, choreId, choreTitle, note, hasPhoto, createdAt, status, claimedBy,
+  assignedBy, deniedBy: string[], asked: string[] }`. `assignedBy` is the admin who recorded it (null when claimed
+  by the person themselves). The photo key is never on the wire.
+
+**Who may do what.**
+
+| Action | Who | When |
+|---|---|---|
+| Report | any member | — |
+| That was me / Not me | any active member but the reporter | `open` or `discuss` |
+| Record the outcome (whose / nobody's) | admins | `open`, `discuss`, or `owed` (a correction ⚑ Q182) |
+| Paid back / Let it go | the one owed, or an admin | `owed` |
+| Delete | the reporter while `open` or `discuss`; an admin any time | — |
+
+**Delivery.** The asks and the admin notice are **fire-less push deliveries** (§9.1) with their own `title` and
+`deliveries.mess_id` set; `alert_number` is the ask's number (1–4). **Never `house`**: a mess is never spoken in the
+house ⚑ Q183. Tapping one opens the app, where the banner is. The `/ops/notify` hourly limit does not count them
+(§9.4).
+
+**The routes** — `src/worker/routes/messes.ts`; the asking and the To talk about move, shared by the routes and
+`tick`, are `src/worker/mess-asks.ts`:
+
+- `POST /messes?choreId=&note=` — the raw photo is the body (`photoBody`, §7C.3's limits); the fields ride in the
+  query because the body is the image. A photo is required. A chore that doesn't exist → 404 "That chore no longer
+  exists." → 201 `Mess`. R2 key `messes/{id}/{random}.jpg`, private. The first ask goes to everyone asked in the
+  same request.
+- `GET /messes` → `{ messes: Mess[], balances: Balance[] }`: every `open` and `discuss` mess (everyone sees these:
+  the house talks about them), and the `owed` ones the viewer may see (the pair, or any admin), newest first;
+  `balances` = `balancesOf` over the owed messes.
+- `GET /messes/{id}/photo` → the image, `Cache-Control: private, max-age=3600`; 404 when it is gone or deleted.
+- `POST /messes/{id}/claim` → `Mess`. `POST /messes/{id}/deny` → `Mess` (a second Not me is a no-op); when it
+  leaves nobody to ask, the mess moves to To talk about in the same request.
+- `POST /messes/{id}/decide { memberId: string | null }` (admin) → `Mess`: a member → `claimed_by` = them,
+  `assigned_by` = the admin; `null` → closed as nobody's. The member must be active and not the reporter.
+- `POST /messes/{id}/settle { how: 'paid' | 'forgiven' }` → `Mess`.
+- `DELETE /messes/{id}` → 204 (soft: `deleted_at`).
+- Refusals: not allowed → 403 `forbidden` "Only …"; the wrong state → 409 `mess_settled` "That mess is already
+  settled." (or "… isn't owed."); unknown or deleted → 404 "That mess no longer exists."
+- **The photo** is deleted from R2 (and `photo_key` set NULL) when the mess is settled, closed or deleted, and by
+  `tick` once it is `MESS_PHOTO_KEEP_DAYS` old, whatever its state ⚑ Q185.
+
+**Tick** (§5.6, after stepping fires): for each `open` mess — when `discussDue`, it moves to To talk about (the
+`discuss_at` write is conditional, so the admin push goes once); otherwise each member asked whose `nudgeDue` gets
+the next ask. Then expired photos are deleted.
+
+**Acceptance (M4z — each row is a test; fakes only):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| MS1 | A reports a mess with a photo, note " pans " and a chore; B, C active | 201 `{ status: open, note: "pans", choreTitle, hasPhoto: true, asked: [B, C] }`; one push delivery each to B and C, `title` "🧽 Whose mess?", `mess_id` set, `alert_number` 1; none to A; no house row |
+| MS2 | ticks at +14, +15, +30, +45, +60 min | B and C get ask 2 at +15, 3 at +30, 4 at +45, nothing more |
+| MS3 | B says Not me, then ticks | B gets no more asks; C still does |
+| MS4 | C says That was me | `owed`, `claimedBy` C, `asked` []; asks stop; A's balances `[{ from: C, to: A, points: 1 }]` |
+| MS5 | A claims or denies their own report; a member claims an `owed` mess | 400 / 409 |
+| MS6 | B and C both say Not me | `discuss` at once; one push to each active admin, `title` "🗣 To talk about"; no more asks |
+| MS7 | nobody answers; tick at +24 h | `discuss`; the admin push once, not again on the next tick |
+| MS8 | an admin decides C on a `discuss` mess; another decides null | `owed` with `assignedBy` the admin; `closed`, the photo gone from R2; a non-admin → 403; the reporter → 400 |
+| MS9 | balances: C owes A twice, A owes C once; the viewer B (not admin) / an admin | B sees neither pair; A and C see `C → A 1`; the admin sees it too |
+| MS10 | A settles `paid`; B (not owed, not admin) tries | `settled`, the photo gone, the balance gone; 403 |
+| MS11 | the reporter deletes an open mess; deletes an owed one; an admin deletes an owed one | 204; 403; 204 — gone from `/messes`, photo gone |
+| MS12 | a mess 30 days old, still owed; tick | its photo deleted, `hasPhoto` false, still owed |
+| MS13 | no photo; a bad type; a note of 121 chars; an unknown chore | 400; 400; 400 naming note; 404 |
+| MS14 | the ops hourly limit with 30 mess asks in the hour | a ping still goes (mess asks don't count) |
+| MS-M | migration check (§4.2ze) | rows written before 0032 survive; `deliveries.mess_id` NULL on them; `foreign_key_check` empty |
 
 ---
 
@@ -3994,6 +4157,48 @@ Today row's 📋:
 - **✎ Edit chore** opens the chore form (§8.5) in place of the sheet.
 - Anyone in the household may change what done looks like ⚑ Q163.
 
+### 8.15a Whose mess? — the banner and the Messes section (§7B.7)
+
+**The banner** — on every screen, under the Ringing bar (§8.2), one row per mess I am still asked about:
+
+```
+🧽 Sam cleaned up a mess (Kitchen): pans on the stove. Was it yours?  [photo]  [That was me] [Not me]
+```
+
+- The photo is a small thumbnail (tap for full size). The two buttons are ≥ 44 px. Answering removes the row.
+- It is not red and makes no sound; it stays until I answer, even while the mess is on To talk about.
+
+**Messes** — a section of the 🧹 Chores tab between Today and All chores:
+
+```
+Messes                                    [📸 Report a mess]
+Waiting for answers
+  [photo] Kitchen: pans on the stove · Sam cleaned this up · 10:42
+          Not me: Kai                       [That was me] [Not me]
+To talk about
+  [photo] Living room · Shelly cleaned this up · yesterday
+          Whose was it? [ Pick ▾ ]   (admins only)
+Balances
+  Kai owes you 2                                         ▸
+  You owe Sam 1                                          ▸
+```
+
+- **📸 Report a mess** opens a sheet: **📷 Add photo** (required; the phone offers camera or library; shrunk as a
+  thing's photo, §7C.3, and shown once taken), **Which chore?** (a select of the chores, "None" first), **Note** (one line, `maxLength` 120), then
+  **Report** / **Cancel**. A refusal shows inside the sheet.
+- Each mess row: its thumbnail, the chore and note, "{reporter} cleaned this up" ("You cleaned this up" for mine),
+  and when. Who said Not me shows as a dim line. My buttons as on the banner when I am asked.
+- **Whose was it?** (admins, on every row of Waiting for answers and To talk about): a select of the active members
+  other than the reporter, and **Nobody's**; choosing one records it (§7B.7) after asking "Record that this was
+  Kai's?" / "Close this mess as nobody's?".
+- ✕ **Delete** (accessible name "Delete this mess") on my own unanswered messes, and on every mess for admins;
+  it asks first.
+- **Balances**: one line per pair (`balances`), "{name} owes you n" / "You owe {name} n", or for an admin's view of
+  others "{name} owes {name} n". Nothing to show → "Nobody owes anybody." Tapping a line opens its owed messes, each
+  with its photo, note and date, and — for the one owed or an admin — **Paid back** and **Let it go**. An admin
+  also sees **Whose was it?** there, to correct one (⚑ Q182).
+- Nothing in red; the section reads the same for everyone apart from the buttons a person may use.
+
 ### 8.7 Theme
 
 Dark by default. Colors are defined as tokens on `:root`:
@@ -4370,7 +4575,8 @@ announcement, §9.3) that carries its own title (§4.2u). No session, no house r
    there is no founder → **409 `no_recipients`**, nothing written (never a row with no member).
 5. **Hourly limit:** the push deliveries with no fire, a non-NULL `title` and **no `notice`** created at or after
    `opsWindowStart(now)` are counted; at `OPS_NOTIFY_PER_HOUR` or more → **429 `rate_limited`**, and no
-   row is written. Announcements (title NULL) and sign-in notices (§6.6, `notice` set) never count.
+   row is written. Announcements (title NULL), sign-in notices (§6.6, `notice` set) and a mess's asks (§7B.7,
+   `mess_id` set) never count.
 6. One delivery: `id` = `newId('dlv')`, `fire_id` NULL, `alert_number` 1, `channel` `push`, `member_id` =
    the founder, `message` = the trimmed text, `title` = `opsTitle(title)`, `queued`.
 7. Sent at once with `sendPushDeliveries` (§9.1); then **201 `{ deliveries: [{ id, status, detail }] }`**.
@@ -4466,6 +4672,13 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | PATCH/DELETE | `/chore-areas/{id}` | member | PATCH `{ name?, expectations? }` → area; DELETE → 204 with its photos (§7B.6) |
 | POST | `/chore-areas/{id}/photos` | member | the raw image → area (201); 400 at 4 photos or a bad image (§7B.6) |
 | GET/DELETE | `/chore-area-photos/{id}` | member | GET → the image, `private, max-age=3600`; DELETE → 204 (§7B.6) |
+| GET | `/messes` | member | → `{ messes: Mess[], balances: Balance[] }` — open and To talk about messes for everyone, owed ones for the pair and admins (§7B.7) |
+| POST | `/messes?choreId=&note=` | member | the raw photo → `Mess` (201); the first ask to everyone else at once; 400 no or bad photo, a long note; 404 an unknown chore (§7B.7) |
+| GET | `/messes/{id}/photo` | member | → the image, `private, max-age=3600`; 404 once deleted (§7B.7) |
+| POST | `/messes/{id}/claim` \| `/deny` | member, not the reporter | → `Mess`; 409 `mess_settled` unless open or To talk about (§7B.7) |
+| POST | `/messes/{id}/decide` | owner | `{ memberId: string \| null }` → `Mess`: whose it was, or nobody's (§7B.7) |
+| POST | `/messes/{id}/settle` | the one owed, or owner | `{ how: 'paid' \| 'forgiven' }` → `Mess`; 409 unless owed (§7B.7) |
+| DELETE | `/messes/{id}` | reporter while unanswered, or owner | → 204 (§7B.7) |
 | GET | `/things` | member | → `{ open: Thing[], closed: Thing[] }` (closed = done/dropped, last 60 days); `Thing = { id, title, note, place, address, phone, cost, url, windowStart, windowEnd, remindStart, remindOn, channels, hasPhoto, status, plannedEventId, plannedDate, createdBy, updatedAt }` |
 | POST | `/things` | member | thing fields → thing (201) |
 | GET/PATCH/DELETE | `/things/{id}` | member | GET → thing; PATCH fields, all optional, incl. `status` → thing; DELETE → 204 (and its photo) |
@@ -4800,8 +5013,8 @@ Captured from v1.0-draft so nothing is lost:
 - Offline **editing** and conflict resolution. v1 offline = the cached app shell;
   actions need network, and buttons show disabled "offline".
 - Queued offline acks
-- Photos anywhere other than Things to do (§7C.3), list items (§7A.3) and a chore's areas (§7B.6), the
-  only three attachments. A picture a show is looked up from (§7F.2) is read once and never stored, so it is not one. A recipe's video
+- Photos anywhere other than Things to do (§7C.3), list items (§7A.3), a chore's areas (§7B.6) and a mess
+  report (§7B.7, kept at most 30 days), the only four attachments. A picture a show is looked up from (§7F.2) is read once and never stored, so it is not one. A recipe's video
   thumbnail (§7E.1) is hotlinked from YouTube — not stored, not in R2, not an attachment — so it
   is not one. Transcript screenshots (§7E.2b) are read once and never stored — not in R2, not an
   attachment — so they are not one either ⚑ Q93, except the one kept as a recipe's picture (§7E.2b ⚑ Q174),
@@ -4821,7 +5034,7 @@ Captured from v1.0-draft so nothing is lost:
 - Turso / non-Cloudflare hosting
 - Adding list items by voice (Voice PE / Home Assistant intent → Worker). If built, it
   goes through Home Assistant's own Assist, never Alexa skills or lists.
-- Chore points, streaks or rewards
+- Chore points, streaks or rewards — except the one point owed for a mess (§7B.7, decided by MojoSOGO 2026-10-05)
 - Shopping list grouped by store aisle; list sharing outside the household; list ordering by hand
 
 ### 12.2 Movies & shows — follow-ups (suggested 2026-10-05, not built, need MojoSOGO's word)
@@ -4837,6 +5050,12 @@ Captured from v1.0-draft so nothing is lost:
 - A photo of the job done, taken when the last step is ticked, kept with that day's run to compare with the areas.
 - Ticks on the expectations saved per run, so a parent can see what was checked.
 - Reordering areas by hand (they keep the order added).
+
+### 12.4 Whose mess? — follow-ups (suggested 2026-10-05, not built, need MojoSOGO's word)
+
+- Paying a point back by taking one of the owed person's chore turns (needs a per-run swap that survives re-planning, §7B.3).
+- A push to the reporter when someone claims their mess.
+- Mess sizes worth more than one point.
 
 ### 12.1 Next — decided with MojoSOGO (2026-10-03), spec to be written before building
 
@@ -5027,6 +5246,15 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q174 | A recipe's screenshot as its picture (§7E.2b, §8.12) | ⚑ The first screenshot of the latest successful read is kept and shown whole at the top of the view and as the row's picture, ahead of a YouTube thumbnail; a new read replaces it; no separate upload or remove |
 | Q175 | A recipe's picture by hand (§8.12) | ⚑ 📷 Add photo in the recipe form, on new and saved recipes alike, any member; it replaces a kept screenshot and is replaced by a later screenshot read; nothing is read from it |
 | Q176 | A recipe's picture in the list (§8.12) | Whole, never cropped, inside the usual 64 × 36 slot; every row the same height (decided by MojoSOGO 2026-10-05); YouTube thumbnails keep their crop |
+| Q177 | When a mess goes to To talk about (§7B.7) | ⚑ When everyone asked has said Not me, or 24 h after the report with nobody claiming it |
+| Q178 | Who sees balances (§7B.7) | ⚑ Each member sees the pairs they are in; admins see every pair |
+| Q179 | Who records the outcome of the house talk (§7B.7) | ⚑ Any admin: whose it was (1 point owed to the reporter) or nobody's (closed) |
+| Q180 | Mess sizes (§7B.7) | ⚑ None: every mess is 1 point |
+| Q181 | Who settles a point (§7B.7) | ⚑ The one owed (Paid back or Let it go), or an admin |
+| Q182 | Taking back "That was me" (§7B.7) | ⚑ Not by the claimer; an admin can record someone else or nobody's |
+| Q183 | Pushes for a mess (§7B.7) | Asks to everyone but the reporter, up to 4, 15 min apart, plus an in-app banner until answered (decided by MojoSOGO 2026-10-05); ⚑ one push to each admin when it goes to To talk about; ⚑ never spoken in the house |
+| Q184 | Naming the reporter (§7B.7) | ⚑ Yes: "Sam cleaned this up" |
+| Q185 | A mess photo (§7B.7) | ⚑ Required to report; deleted when settled, closed or deleted, and at most 30 days after the report |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5239,6 +5467,11 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Whose mess?** (v1.33.0, §7B.7, §8.15a, §4.2ze; asked by MojoSOGO 2026-10-05, after an AREC; MS1–MS14, MS-M):
+📸 Report a mess in the Chores tab, That was me / Not me asked by push up to 4 times 15 min apart and by an in-app
+banner, To talk about for unclaimed messes with the outcome recorded by an admin, and a Balances card of who owes
+whom. Migration 0032. Q177–Q185 (all but Q183's asks) are ⚑ defaults. **Still owed:** apply 0032 in production;
+the camera from the button and a push opening the banner on the real iPhone.
 **Whole pictures in the recipe list** (v1.32.1–1.32.2, §8.12; asked by MojoSOGO 2026-10-05): a recipe's own picture
 is scaled to fit the usual 64 × 36 row slot, never cropped, and every row keeps one height (Q176, decided).
 **A recipe's picture by hand** (v1.32.0, §8.12; asked by MojoSOGO 2026-10-05; RL13): 📷 Add photo in the recipe

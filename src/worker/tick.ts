@@ -12,11 +12,12 @@ import type { Recurrence } from '../shared/recurrence';
 import { addMinutes, utcToLocal } from '../shared/time';
 import { sunsetUtc, type Place } from '../shared/sun';
 import type { Env } from './env';
-import { all, first, newId, parseJson } from './db';
+import { activeMemberIds, all, first, newId, parseJson } from './db';
 import { sendPushDeliveries } from './push';
 import { allHouseSpeakers, sendHouseDeliveries } from './house';
 import { deliverySpeakers } from './speaker-choices';
 import { onMemberIds } from './event-rows';
+import { messTick } from './mess-asks';
 
 export interface TickSummary { materialized: number; stepped: number; alerts: number; deliveries: number }
 
@@ -48,9 +49,6 @@ export function updateFire(db: D1Database, f: FireRow): D1PreparedStatement {
       WHERE id = ?`,
   ).bind(f.due_at, f.state, f.alert_count, f.last_alerted_at, f.close_reason, f.closed_by, f.closed_at, f.id);
 }
-
-export const activeMemberIds = async (db: D1Database): Promise<string[]> =>
-  (await all<{ id: string }>(db, 'SELECT id FROM members WHERE disabled_at IS NULL')).map((r) => r.id);
 
 /** A chore run with its (parsed) chore, or null when either is gone. */
 export async function loadChoreRun(db: D1Database, runId: string | null): Promise<{ chore: Chore; run: ChoreRun } | null> {
@@ -251,6 +249,8 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
 
   // 3. Send the push deliveries created in this tick.
   if (newDeliveryIds.length) await sendPushDeliveries(env, newDeliveryIds, now);
+  // 3b. Ask again about open messes, move unclaimed ones to To talk about, delete old mess photos (§7B.7).
+  await messTick(env, now);
   // 4. Speak the queued and stale-claimed house deliveries (§9.2).
   await sendHouseDeliveries(env, now);
   return summary;
