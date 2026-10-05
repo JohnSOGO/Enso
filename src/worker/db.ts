@@ -45,3 +45,7 @@ export async function householdPlace(db: D1Database): Promise<Place | null> {
   const at = await first<{ lat: number | null; lon: number | null }>(db, 'SELECT latitude AS lat, longitude AS lon FROM settings WHERE id = 1');
   return at && at.lat !== null && at.lon !== null ? { lat: at.lat, lon: at.lon } : null;
 }
+
+/** The ids of every member not disabled. */
+export const activeMemberIds = async (db: D1Database): Promise<string[]> =>
+  (await all<{ id: string }>(db, 'SELECT id FROM members WHERE disabled_at IS NULL')).map((r) => r.id);

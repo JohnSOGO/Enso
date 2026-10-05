@@ -9,10 +9,10 @@ import {
 } from '../../shared/chores';
 import { MATERIALIZE_AHEAD_H, type FireRow } from '../../shared/engine';
 import { addDays, addMinutes, utcToLocal } from '../../shared/time';
-import { all, first, newId, nowIso } from '../db';
+import { activeMemberIds, all, first, newId, nowIso } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
-import { activeMemberIds, choreRunInserts, insertFire, loadChoreRun, updateChoreRun, updateFire } from '../tick';
+import { choreRunInserts, insertFire, loadChoreRun, updateChoreRun, updateFire } from '../tick';
 import { areaCounts, choreAreaDeletes } from './chore-areas';
 
 const householdTz = async (db: D1Database) => (await first<{ timezone: string }>(db, 'SELECT timezone FROM settings WHERE id = 1'))!.timezone;

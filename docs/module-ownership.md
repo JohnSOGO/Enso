@@ -53,7 +53,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 |---|---|
 | `src/worker/index.ts` | Hono app assembly, route mounting, `/health`, `/dev/tick`, `scheduled()` entry |
 | `src/worker/env.ts` | Bindings + secrets type |
-| `src/worker/db.ts` | D1 helpers and id minting, householdTz and householdPlace (the settings row's latitude / longitude → Place or null) |
+| `src/worker/db.ts` | D1 helpers and id minting, householdTz, householdPlace (the settings row's latitude / longitude → Place or null) and activeMemberIds (the active member ids) |
 | `src/worker/http.ts` | Error envelope (§10) and input checks, including photoBody: the raw image body or a 400 naming what is wrong with it (type, size, empty; §7C.3) |
 | `src/worker/session.ts` | Password hashing, session cookie, `requireMember` / owner guards |
 | `src/worker/tick.ts` | `tick()` orchestration: load rows, call the engine, write results, deliveries (§5.6–5.7), chore run planning (§7B.3), thing reminder planning (§7C.2), a machine fire's source (owner, done message, §7D.3); step 3 sendPushDeliveries, step 4 sendHouseDeliveries; step 2's house row carries deliverySpeakers of the fire's audience (`[]` → no house row, §9.2a) |

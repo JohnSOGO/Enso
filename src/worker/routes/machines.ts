@@ -7,10 +7,10 @@ import {
   MACHINE_LABEL, clearMachine, doneNowMachine, machineHoursOf, parseMachineHours, finishMachine, isMachineId, machineState, moveMachine, nextMachine, parseDoneNow, parseMove, parseStart,
   refusalText, remindMachine, startMachine, type MachineChange, type MachineResult, type MachineRow,
 } from '../../shared/machines';
-import { all, first, nowIso } from '../db';
+import { activeMemberIds, all, first, nowIso } from '../db';
 import { body, fail } from '../http';
 import { requireMember, requireOwner } from '../session';
-import { activeMemberIds, insertFire, updateFire } from '../tick';
+import { insertFire, updateFire } from '../tick';
 
 const loadRows = (db: D1Database) => all<MachineRow>(db, 'SELECT * FROM machines');
 
