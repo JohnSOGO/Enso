@@ -32,8 +32,9 @@ input (PWA form / push action / cron)
 - **Cross-cutting client state** lives in `frontend/src/state.tsx`, never in a module
   global (the test bans top-level `let`/`var`).
 
-Changes that touch rules, schema, the House (Home Assistant) contract or the push contract are always
-the **full path** (placement-advisor first).
+Every code change asks the placement-advisor first (CLAUDE.md step 2), and changes that
+touch rules, schema, the House (Home Assistant) contract or the push contract get its
+closest look.
 
 ## Ceilings, the warning band, and the two verdicts
 
@@ -66,5 +67,6 @@ the decision is made earlier, calmly.
 
 The three agents are defined in `.claude/agents/` (adapted from SogoTable's).
 
-Light path (owner obvious, no cap pressure, no new file): name the owner from the map in
-the commit message and build. When unsure which path, it is the full path.
+There is no light path that skips the advisor: an obvious owner just makes its verdict
+quick. Every verdict leaves a receipt in `docs/placement-receipts.md`, and the commit
+message names the owner.

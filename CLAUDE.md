@@ -13,16 +13,16 @@ in `README.md`. Modularity doctrine: `docs/modularity.md`. **Start a new session
    section), API row, screen, and the acceptance check that proves it. Bump the
    version line. A product or UI decision the spec doesn't already settle is
    MojoSOGO's: ask, or build it as a ⚑ DEFAULT and list it in §13.
-2. **Placement, before any code is explored or written.** Look the owner up in
-   `docs/module-ownership.md`.
-   - **Light path:** the owner is obvious, there's no cap pressure and no new file.
-     Name the owner in the commit message and go.
-   - **Full path:** a new file or owner, a file near its cap, an unclear owner, or
-     anything touching rules (`src/shared/`), schema, or the house/push contracts.
-     The coordinating session asks the **`placement-advisor`**. If the owner is
-     full, the **`reorganizer`** opens a seam in its own commit first. The verdict
-     goes into the worker's brief, and the receipt into `docs/placement-receipts.md`.
-   - When unsure which path, it is the full path.
+2. **Placement, before any code is explored or written — every code change, through
+   the agents.** The session coordinating the work calls the **`placement-advisor`**
+   with the spec section and gets the owner before anything is built. No change skips
+   it, however obvious the owner looks; an obvious one just makes a quick verdict.
+   - If the verdict is extract-first, the **`reorganizer`** opens the seam in its own
+     commit, with `npm run typecheck && npm test` green, before the feature starts.
+   - The verdict goes into the worker's brief (or the session's own plan), and the
+     receipt the agent returns goes into `docs/placement-receipts.md` in the same
+     commit as the code. The commit message names the owner.
+   - Work that touches no source file (docs, spec wording, config) needs no placement.
 3. **Build to the spec**, inside the named owner and only to the spec. If something
    isn't written there, it isn't built (§0.6). Parallel slices each get their own
    worktree and file boundary.
@@ -39,8 +39,9 @@ at each milestone.
 
 The three agents (`placement-advisor`, `reorganizer`, `code-steward`) are defined in
 `.claude/agents/` and run as subagents (the Agent tool). In the project app, the thread
-doing the work is the coordinating session: it calls them itself, never skips them on
-the full path, and records each receipt they return.
+doing the work is the coordinating session: it calls them itself on every code change
+and records each receipt they return. A session that can't call them by name reads the
+agent's file and runs it as a general-purpose subagent with that file as its brief.
 
 ## Wu wei — act without forcing
 
