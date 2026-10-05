@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.56 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.57 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3111,6 +3111,7 @@ for it (as §7C.4b).
 | RL10 | the video reading, the transcript re-read and a link's fill | each prompt carries `RECIPE_IN_ENGLISH` |
 | RL11 | a transcript (a screenshot) on a typed recipe | 200; only Claude asked, with the typed title and "Site: (none)"; source `transcript`; YouTube's key not needed |
 | RL12 | after RL11: GET its photo; read two more screenshots; then pasted text only | 200 with the first screenshot's bytes; the old object deleted, the new one served; unchanged |
+| RL13 | PUT a picture twice, a GIF, on an unknown recipe; DELETE | 204 each, the old object deleted, `updatedAt` bumped, served; 400; 404; 204, gone, GET 404 |
 | RL9 | a transcript (text or a screenshot) on a link recipe | 200; re-read with nothing fetched but Claude; source `transcript`; YouTube's key not needed |
 | RL-M | migration check (§4.2zc) | as written there |
 
@@ -3740,7 +3741,12 @@ Pumpkin patch        📅 Sat Oct 12
     (`added` and `reopened` count as added, `existing` as already there). On a failure it stops and
     names what wasn't added: "Added 2 · Not added: Eggs, Flour — {error}";
   - **Steps**, numbered; then **✎ Edit** and **Close**.
-- **Recipe form** (modal, `RecipeForm.tsx`): Title · Ingredients (one per line) · Steps (one per
+- **Recipe form** (modal, `RecipeForm.tsx`): **📷 Add photo** first (asked by MojoSOGO 2026-10-05: "I just
+  wanna show the picture of the screenshot… I'm not doing a recipe import" ⚑ Q175) — the thing form's
+  `PhotoField` (camera or library, shrunk to JPEG, thumbnail, Replace photo / remove), **nothing read**; on Save,
+  after the fields, `PUT /recipes/{id}/photo` (or `DELETE` when removed), new recipes included; a failure keeps
+  the form open, saved, with "Saved, but the picture didn't save: …". The picture is the same one a screenshot
+  read keeps (⚑ Q174) and shows the same way. Then Title · Ingredients (one per line) · Steps (one per
   line) · Servings · Time. Title, ingredients and steps grow to fit (`Grow`). Save / Cancel /
   Delete (asks; existing recipes only). On an **existing** recipe of any kind, under the fields, **Fill in
   from screenshots** (asked by MojoSOGO 2026-10-05: "In recipes edit, let me add a screen shot" ⚑ Q173):
@@ -4470,7 +4476,8 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | POST | `/shows/look-up` | member | `{ title, year?, kind? }` or `{ url }` → `ShowReading` (§7F.2); nothing stored; 400 / 429 / 503 `show_lookup_off` / 422 `show_refused` / 502 `show_lookup_failed` |
 | POST | `/shows/look-up-photo` | member | raw image body → `ShowReading`; the picture is never stored; errors as look-up |
 | POST | `/things/read-link` | member | `{ url }` → the same reading as read-photo; nothing stored; 400 / 429 / 503 `link_reading_off` / 422 `link_refused` / 502 `link_reading_failed` per §7C.4b |
-| GET | `/recipes/{id}/photo` | member | → the recipe's kept screenshot (§7E.2b ⚑ Q174), private cache; 404 when none or the recipe is gone |
+| GET | `/recipes/{id}/photo` | member | → the recipe's picture (§7E.2b ⚑ Q174), private cache; 404 when none or the recipe is gone |
+| PUT/DELETE | `/recipes/{id}/photo` | member | PUT a raw photo body (`photoBody`, as a thing's) → 204, replacing (and deleting) the old one; DELETE → 204; each bumps `updatedAt`; 400 a bad type or size; 404 when the recipe is gone (⚑ Q175) |
 | GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, link, hasPhoto, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, commentsError, createdBy, createdAt, updatedAt, emojis: RecipeEmoji[] }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed or a link; `link` the page a link recipe was read from, §7E.6; `RecipeEmoji = { memberId, emoji }`, §7E.5) (§7E) |
 | POST | `/recipes` | member | `{ title, ingredients, steps, servings?, time? }` → recipe (201), typed by hand; 400 `invalid_input` |
 | GET/PATCH/DELETE | `/recipes/{id}` | member | GET → recipe; PATCH the POST fields, all optional, merged → recipe (found recomputed); DELETE → 204 (soft); 404 when gone |
@@ -5016,6 +5023,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q172 | Metric amounts (§7E.2) | ⚑ Converted to US units by Claude when read, rounded to kitchen measures (180 °C → 350 °F); the metric original is not kept; typed recipes are never converted |
 | Q173 | Screenshots in the recipe form (§8.12, §7E.2b) | ⚑ On every existing recipe, typed ones included; Claude reads them with the title (nothing fetched); a brand-new recipe takes them after its first Save |
 | Q174 | A recipe's screenshot as its picture (§7E.2b, §8.12) | ⚑ The first screenshot of the latest successful read is kept and shown whole at the top of the view and as the row's picture, ahead of a YouTube thumbnail; a new read replaces it; no separate upload or remove |
+| Q175 | A recipe's picture by hand (§8.12) | ⚑ 📷 Add photo in the recipe form, on new and saved recipes alike, any member; it replaces a kept screenshot and is replaced by a later screenshot read; nothing is read from it |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5228,6 +5236,8 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**A recipe's picture by hand** (v1.32.0, §8.12; asked by MojoSOGO 2026-10-05; RL13): 📷 Add photo in the recipe
+form sets the recipe's picture with nothing read. Q175 is a ⚑ default.
 **A recipe's screenshot as its picture** (v1.31.0, §7E.2b, §8.12, §4.2zd; asked by MojoSOGO 2026-10-05; RL12, RP-M):
 the first screenshot of a read that succeeds is kept in R2 and shown whole at the top of the recipe and as its row
 picture. Migration 0031. Q174 is a ⚑ default. **Still owed:** apply 0031 in production.

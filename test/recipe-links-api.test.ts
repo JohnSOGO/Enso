@@ -187,4 +187,28 @@ describe('§7E.6 from-link through the Worker', () => {
     expect((await again({ text: 'two eggs, whisk' })).status).toBe(200);
     expect(await (await photo()).text()).toBe('second page');
   });
+  it('RL13 a picture set by hand (⚑ Q175): PUT replaces (the old object deleted), bumps updatedAt; DELETE removes; bad bodies 400; gone recipe 404', async () => {
+    const typed = await o.post('/recipes', { title: 'Tacos' });
+    const put = (body: BodyInit, type = 'image/jpeg', id = typed.json.id) => worker.fetch(new Request(`${BASE}/recipes/${id}/photo`, {
+      method: 'PUT', headers: { 'content-type': type, cookie: o.cookie! }, body,
+    }), env, createExecutionContext());
+    const photo = () => worker.fetch(new Request(`${BASE}/recipes/${typed.json.id}/photo`, { headers: { cookie: o.cookie! } }), env, createExecutionContext());
+    const keyOf = async () => (await env.DB.prepare('SELECT photo_key, updated_at FROM recipes WHERE id = ?').bind(typed.json.id).first<{ photo_key: string | null; updated_at: string }>())!;
+    expect((await put('one')).status).toBe(204);
+    const first = await keyOf();
+    expect(first.updated_at).not.toBe(typed.json.updatedAt);
+    expect((await o.get(`/recipes/${typed.json.id}`)).json.hasPhoto).toBe(true);
+    expect(await (await photo()).text()).toBe('one');
+    expect((await put('two')).status).toBe(204);
+    expect(await env.PHOTOS.get(first.photo_key!)).toBeNull();
+    expect(await (await photo()).text()).toBe('two');
+    expect((await put('gif', 'image/gif')).status).toBe(400);
+    expect((await put('x', 'image/jpeg', 'rcp_nope')).status).toBe(404);
+    const second = (await keyOf()).photo_key!;
+    const gone = await worker.fetch(new Request(`${BASE}/recipes/${typed.json.id}/photo`, { method: 'DELETE', headers: { cookie: o.cookie! } }), env, createExecutionContext());
+    expect(gone.status).toBe(204);
+    expect((await keyOf()).photo_key).toBeNull();
+    expect(await env.PHOTOS.get(second)).toBeNull();
+    expect((await photo()).status).toBe(404);
+  });
 });
