@@ -12,6 +12,8 @@
 
 /* The view */
 .hero { display: block; margin-bottom: 8px; }
+/* A kept screenshot (⚑ Q174): shown whole, phone-tall, never cropped. */
+.shot { display: block; width: 100%; max-height: 420px; object-fit: contain; margin-bottom: 8px; border-radius: 10px; background: var(--surface-2); }
 .hero > img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; background: var(--surface-2); }
 .watch { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 6px; }
 .note { font-size: .85rem; margin: 6px 0 10px; }

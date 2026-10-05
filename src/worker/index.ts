@@ -19,6 +19,7 @@ import { thingPhotos } from './routes/thing-photos';
 import { announce } from './routes/announce';
 import { machines } from './routes/machines';
 import { recipes } from './routes/recipes';
+import { recipePhotos } from './routes/recipe-photos';
 import { shows } from './routes/shows';
 import { ops } from './routes/ops';
 import { phoneLogin } from './routes/phone-login';
@@ -55,6 +56,7 @@ api.route('/', things);
 api.route('/', announce);
 api.route('/', machines);
 api.route('/', recipes);
+api.route('/', recipePhotos);
 api.route('/', shows); // §7F; /shows/look-up is registered before /shows/:id in its file
 api.route('/', ops);
 

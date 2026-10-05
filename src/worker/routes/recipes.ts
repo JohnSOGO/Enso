@@ -212,7 +212,7 @@ recipes.post('/recipes/:id/transcript', requireMember, async (c) => {
   if ((r.video_id && !ytKey) || !aiKey) return readingOff(c, r.video_id ? 'videos' : 'links');
 
   const out = await rereadRecipe(c.env.DB, { yt: ytKey ?? '', ai: aiKey }, r, { pasted, screenshots },
-    c.get('member').id, now);
+    c.get('member').id, now, c.env.PHOTOS);
   if (out.ok) return answer(c, r.id);
   switch (out.kind) {
     case 'video_unavailable': return fail(c, 404, 'video_unavailable', `Couldn't find that video. ${out.reason}`);
