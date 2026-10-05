@@ -87,6 +87,21 @@ carry its result.
 - **Behavior:** preserved — typecheck, npm test (658/658, unchanged) and arch:audit green; check orders (duplicate, cap, keys in the route; YouTube, captions ∥ comments, count, Claude in the pipeline), every status, code and message, the recipe_reads and recipes rows and the unique-constraint race catch unchanged.
 - **Restraint:** `insert`, `answer`, toRecipes, the duplicate checks, the 429 text and readingOff stay in the route; recipe-reread.ts gets only the count call (keepPicture is item 4's); no new shared rule.
 
+## 2026-10-05 — Steward pass, whole tree (code-steward)
+
+- **Run:** first steward pass on Ensō, at the v1.33.0 milestone, on the first day placement is enforced.
+- **Verdict:** REAL DEBT, concentrated in five places; no file over its cap, layering clean.
+- **Top finding:** `routes/recipes.ts` 274/300 (91%), the top hotspot; extract the read pipelines (the seam named
+  2026-10-05, not taken).
+- **Handoffs:** items 1–5 (recipe-reads.ts, fire-rows.ts, deliveries.ts, photo-store.ts, mess rules into
+  shared/messes.ts) approved by MojoSOGO and done above; items 6–10 left for when those files are next touched.
+- **Placement audit:** 14 code commits from before enforcement have no receipt (`1e478e6`, `0a6ad57`, `a93d113`,
+  `77c4ef5`, `68786f3`, `54e09db`, `9c52930`, `9ae12ab`, `11753e9`, `52bc6c1`, `ebcccbe`, `0ecf855`, `b353be1`,
+  `3e88d17`); two questionable placements (recipe picture's second writer, machine speaker rule in tick) fixed by
+  items 4 and 2.
+
+---
+
 ## 2026-10-05 — Whose mess? (placement-advisor)
 
 - **Ask:** mess reports in Chores. Members answer That was me or Not me. Asks go by push up to 4 times, 15 min

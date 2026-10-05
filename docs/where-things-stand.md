@@ -45,4 +45,4 @@ the working agreement in `CLAUDE.md`.
   person tick theirs. Q125–Q129 are ⚑ defaults awaiting MojoSOGO.
 - Dishwasher (deferred by MojoSOGO). Phase C kitchen display (needs an AREC).
 - Real-phone checks still owed per SPEC §14 (Android push, Done/Snooze, the laundry and goat reminders in practice).
-- A code-steward pass at this milestone.
+- Code-steward pass 1 done 2026-10-05 (items 1–5 in v1.33.1); items 6–10 wait until those files are next touched (`/mnt/project-files/steward/2026-10-05-first-pass.md`).
