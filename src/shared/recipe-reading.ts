@@ -18,6 +18,11 @@ export const COMMENTS_LOOKED_AT = 20;
 export const CREATOR_COMMENTS_MAX = 5000;
 /** Video reads per household per local day (§7E.2), apart from photo reads. ⚑ Q65 */
 export const RECIPE_READS_PER_DAY = 20;
+/** Every reading is saved in English (§7E.2, §7E.6): a recipe in another language is translated, never left as is. ⚑ Q171 */
+export const RECIPE_IN_ENGLISH =
+  `Write the title, ingredients, steps, servings and time in English: if the recipe is in another language ` +
+  `(Spanish, say), translate it faithfully, keeping every amount and unit as given and adding nothing.`;
+
 /** The title of a found:false recipe whose video has no title either. */
 export const UNTITLED_VIDEO = 'Recipe from YouTube';
 

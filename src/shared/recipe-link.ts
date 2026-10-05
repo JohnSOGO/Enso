@@ -1,9 +1,10 @@
 // SPEC §7E.6 — reading a recipe from any link (pure): what kind of link was pasted (recipeLinkOf: a YouTube
 // video, or any other public page with its share and tracking junk cleaned off), the site's name, the limits
 // and the two prompts. The Worker fetches the page (page-fetch.ts) and asks Claude (recipe-link-reader.ts); the
-// answer is cleaned by cleanRecipeReading like a video's. Imports recipes and link-reading only; neither imports it.
+// answer is cleaned by cleanRecipeReading like a video's. Imports recipes, recipe-reading and link-reading only; none imports it.
 import { youtubeVideoId } from './recipes';
 import { pageSection, readableLink, type PageResult } from './link-reading';
+import { RECIPE_IN_ENGLISH } from './recipe-reading';
 
 export const RECIPE_LINK_SEARCHES_MAX = 3;
 export const RECIPE_LINK_FETCHES_MAX = 2;
@@ -67,7 +68,7 @@ export const recipeFillPrompt = (link: string, page: PageResult, notes: string) 
   `Fill in: found (true only when the page or the notes actually state this recipe's ingredients or steps), title ` +
   `(the dish's name), ingredients (one per item, with its amount, as written), steps (one per step, in order, short ` +
   `and clear), servings and time (only when stated; otherwise null). ${ONLY_THIS} Never fill in missing amounts ` +
-  `or steps. If neither holds the recipe, answer found false with empty ingredients and steps.`;
+  `or steps. If neither holds the recipe, answer found false with empty ingredients and steps. ${RECIPE_IN_ENGLISH}`;
 
 /** The title of a found:false link recipe: the page's og:title or <title>, else "Recipe from {site}". */
 export function pageTitle(page: PageResult, site: string): string {

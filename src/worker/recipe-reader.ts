@@ -4,7 +4,7 @@
 // fields or an honest failure; it never decides what is saved — the route cleans the answer with
 // cleanRecipeReading (src/shared/recipe-reading.ts). Claude is told never to invent a recipe from the title.
 import { askClaude } from './claude';
-import { TRANSCRIPT_MAX, type Screenshot } from '../shared/recipe-reading';
+import { RECIPE_IN_ENGLISH, TRANSCRIPT_MAX, type Screenshot } from '../shared/recipe-reading';
 import type { z as Zod } from 'zod';
 
 /** A recipe's reading (§7E.2), also the fill of a link's (§7E.6, recipe-link-reader.ts); cleaned by cleanRecipeReading. */
@@ -44,7 +44,7 @@ const PROMPT =
   `servings and time (only when stated; otherwise null). Use only what the description, captions and the ` +
   `creator's comments say. Never invent a recipe from the ` +
   `video's title or from general cooking knowledge, and never fill in missing amounts or steps. If the text does ` +
-  `not hold a recipe, answer found false with empty ingredients and steps.`;
+  `not hold a recipe, answer found false with empty ingredients and steps. ${RECIPE_IN_ENGLISH}`;
 
 const SCREENSHOTS_LINE =
   `The images above are screenshots of this video's transcript or captions: read their text as what is spoken ` +
