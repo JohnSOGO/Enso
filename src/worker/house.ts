@@ -5,7 +5,7 @@
 import type { Env } from './env';
 import { all, first, parseJson } from './db';
 import { callThroughAccess } from './access';
-import { splitSpeakers } from '../shared/speakers';
+import { everySpeaker, speakerList, splitSpeakers } from '../shared/speakers';
 import type { DeliveryStatus, HouseState } from '../shared/vocab';
 
 export const HOUSE_NOT_CONFIGURED = 'house_not_configured';
@@ -77,6 +77,14 @@ export const SPEAKER_TEMPLATE = `{%- set ns = namespace(out=[]) -%}
 
 /** One POST of SPEAKER_TEMPLATE to /api/template → HA's raw answer, or an honest reason. */
 export const houseSpeakerList = (cfg: HouseConfig) => ha(cfg, '/api/template', { template: SPEAKER_TEMPLATE }, ECHO_TIMEOUT_MS);
+
+/** §7D.3 — every speaker HA lists now; null (the default speakers) when House is off or the list can't be read. */
+export async function allHouseSpeakers(env: Env): Promise<string[] | null> {
+  const cfg = houseConfigOf(env);
+  const r = cfg && await houseSpeakerList(cfg);
+  const list = r?.ok ? speakerList(r.text) : null;
+  return list?.length ? everySpeaker(list) : null;
+}
 
 /**
  * Tick step 4 (all house rows) and POST /announce (`ids`: its one row): fail the exhausted rows, then

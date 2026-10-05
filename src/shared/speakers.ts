@@ -34,6 +34,11 @@ export function speakersFor(choices: readonly (readonly string[] | null)[]): str
   return [...new Set(choices.flatMap((c) => c!))];
 }
 
+/** §7D.3 ⚑ Q161 — every speaker HA lists, for a machine alert: the `Everywhere` group is dropped, so no Echo speaks twice. */
+export function everySpeaker(list: readonly Speaker[]): string[] {
+  return list.filter((sp) => !/^everywhere$/i.test(sp.name)).map((sp) => sp.id);
+}
+
 /** A row's speakers by kind: the Echo `target` and the Voice PE `entity_id` lists. */
 export function splitSpeakers(ids: readonly string[]): Record<SpeakerKind, string[]> {
   return { echo: ids.filter((id) => speakerKind(id) === 'echo'), satellite: ids.filter((id) => speakerKind(id) === 'satellite') };
