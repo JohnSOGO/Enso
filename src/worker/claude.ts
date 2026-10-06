@@ -76,6 +76,15 @@ export async function askClaude<S extends ZodType>(input: AskClaudeInput<S>): Pr
   }
 }
 
+/** The web search server tool (the one place its version is named); `where` → its approximate user_location. */
+export const webSearchTool = (maxUses: number, where?: { country?: string; timezone?: string }): ClaudeServerTool => ({
+  type: 'web_search_20260209', name: 'web_search', max_uses: maxUses,
+  ...(where ? { user_location: { type: 'approximate' as const, ...where } } : {}),
+});
+
+/** The web fetch server tool (the one place its version is named). */
+export const webFetchTool = (maxUses: number): ClaudeServerTool => ({ type: 'web_fetch_20260209', name: 'web_fetch', max_uses: maxUses });
+
 export interface AskClaudeResearchInput {
   apiKey: string;
   prompt: string;

@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-06 — Web-tool builders in claude.ts (placement-advisor)
+
+- **Ask:** steward pass 2 item 6 (pass 1 #8, approved): web_search_20260209 / web_fetch_20260209 copied into link-reader.ts, recipe-link-reader.ts and show-reader.ts (§7C.4b, §7E.6, §7F.2). Behavior-preserving.
+- **Verdict:** `src/worker/claude.ts` [EXISTING] (webSearchTool, webFetchTool); the three readers [EXISTING, call them].
+- **Flow stage:** deliver-side API client (Worker).
+- **Why:** claude.ts already owns the API surface and ClaudeServerTool; the next version bump is one line. Rejected: shared; a separate tools module; moving max_uses constants.
+- **Caps:** worker/claude.ts 121 → 130/300; link-reader.ts 37 → 34/300; recipe-link-reader.ts 37 → 34/300; show-reader.ts 85 → 81/300. No ceiling moved.
+
+## 2026-10-06 — Web-tool builders into claude.ts (reorganizer)
+
+- **Trigger:** steward pass 2 item 6: the web search and web fetch tool blocks, with their dated versions, written out in three readers.
+- **Seam moved:** the web_search / web_fetch tool literals from `src/worker/link-reader.ts`, `src/worker/recipe-link-reader.ts` and `src/worker/show-reader.ts` to webSearchTool(maxUses, where?) / webFetchTool(maxUses) in `src/worker/claude.ts` [EXISTING].
+- **Room opened:** link-reader.ts 37 → 34, recipe-link-reader.ts 37 → 34, show-reader.ts 85 → 81 lines; claude.ts 121 → 130. No pins.
+- **Behavior:** preserved — typecheck, npm test (666, unchanged) and arch:audit green (quiet); the research requests' `tools` are deep-equal to before (link-reading-api, shows-api and recipe-links-api tests assert them): user_location only when a `where` is given (link: timezone; show: country then timezone), the recipe link none, no undefined keys.
+- **Restraint:** max_uses constants stay with their features; no tools module; claude.ts still chooses no tools.
+
 ## 2026-10-06 — Photo limits out of things.ts (placement-advisor)
 
 - **Ask:** steward pass 2 item C (approved): the photo-size constants live in things.ts but serve 6 features, and the SogoAI helper bundles the cap (§7C.3, §7A.3). Behavior-preserving.
