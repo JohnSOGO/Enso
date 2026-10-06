@@ -16,7 +16,7 @@ agent shipping the feature.
 input (PWA form / push action / cron)
   → route: authenticate, validate against vocab.ts            src/worker/routes/*
   → rules: pure decision — engine, recurrence, time, holidays  src/shared/*
-  → persist: write rows, D1 batch per fire                     routes/*, tick.ts
+  → persist: write rows, D1 batch per fire                     routes/* and the persist owners named in docs/module-ownership.md
   → deliver: push sender, house speaker (HA via Tunnel+Access)  push.ts, house.ts
   → render: prepared state on screen, capture intent           frontend/src/*
 ```
@@ -63,7 +63,7 @@ the decision is made earlier, calmly.
 | `placement-advisor` | Names the one owner (or a new row) before code is written | Decides UI layout — that is MojoSOGO's |
 | `reorganizer` | Opens a seam behavior-preservingly, own commit, re-pins cap down | Adds a feature |
 | Worker | Builds to the spec, inside the named owner | Moves code to a new home on its own |
-| `code-steward` | At milestones: audits the whole tree, returns a ranked backlog | Refactors, or invents churn |
+| `code-steward` | After every feature release (each minor version, once live): audits the whole tree, returns a ranked backlog | Refactors, or invents churn |
 
 The three agents are defined in `.claude/agents/` (adapted from SogoTable's).
 

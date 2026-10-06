@@ -65,6 +65,10 @@ export const canSettle = (m: MessFacts, viewer: MessViewer): boolean =>
 export const canDelete = (m: MessFacts, viewer: MessViewer): boolean =>
   viewer.admin || (viewer.id === m.reportedBy && isAnswerable(m.status));
 
+/** Who sees a mess in the list: anyone until it is owed; then an admin, the one owed and the one who owes. */
+export const canSee = (m: Pick<MessRow, 'settled_at' | 'closed_at' | 'claimed_by' | 'discuss_at' | 'reported_by'>, viewer: MessViewer): boolean =>
+  messStatus(m) !== 'owed' || viewer.admin || m.reported_by === viewer.id || m.claimed_by === viewer.id;
+
 /** An admin's Whose was it? choice (a member, not null) → the refusal text, or null when it can be recorded. */
 export function decideError(memberId: unknown, reportedBy: string, activeIds: readonly string[]): string | null {
   if (typeof memberId !== 'string' || !activeIds.includes(memberId)) return 'memberId must be an active member, or null for nobody\'s.';

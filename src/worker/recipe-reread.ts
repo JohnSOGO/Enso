@@ -3,17 +3,15 @@
 // Claude via recipe-reader.ts, cleanRecipeReading, found false → nothing changes, else the one UPDATE. Returns an
 // outcome kind and a reason; the caller maps them to HTTP. No Hono here.
 import type { RecipeRow } from '../shared/recipes';
-import { COMMENTS_LOOKED_AT, cleanRecipeReading, creatorComments, sourcesOf, type RecipeReading, type Screenshot, type VideoText } from '../shared/recipe-reading';
+import { COMMENTS_LOOKED_AT, cleanRecipeReading, commentsError, creatorComments, sourcesOf, type RecipeReading, type Screenshot, type VideoText } from '../shared/recipe-reading';
 import type { RecipeSource } from '../shared/vocab';
 import { nowIso, run } from './db';
 import { lookUpComments, lookUpVideo } from './youtube';
 import { readRecipe } from './recipe-reader';
-import { countRecipeRead } from './recipe-reads';
+import { claudeFailure, countRecipeRead, videoFailure, type RecipeReadFailure } from './recipe-reads';
 import { replacePhoto } from './photo-store';
 
-export type RereadOutcome =
-  | { ok: true }
-  | { ok: false; kind: 'video_unavailable' | 'youtube_failed' | 'recipe_refused' | 'recipe_reading_failed' | 'no_recipe'; reason: string };
+export type RereadOutcome = { ok: true } | RecipeReadFailure;
 
 /** Re-read `row` (any recipe: a video's, a link's or a typed one) from the transcript given. `countFor`: the member the read is
  *  counted against in recipe_reads. Claude's captions slot gets the pasted text. */
@@ -34,8 +32,7 @@ async function rereadVideo(db: D1Database, keys: { yt: string; ai: string }, row
   given: Pick<VideoText, 'pasted' | 'screenshots'>, countFor: string, now: string): Promise<RereadOutcome> {
   const videoId = row.video_id!;
   const [video, comments] = await Promise.all([lookUpVideo(videoId, keys.yt), lookUpComments(videoId, keys.yt, COMMENTS_LOOKED_AT)]);
-  if (!video.ok && video.kind === 'not_found') return { ok: false, kind: 'video_unavailable', reason: video.reason };
-  if (!video.ok) return { ok: false, kind: 'youtube_failed', reason: video.reason };
+  if (!video.ok) return videoFailure(video);
   await countRecipeRead(db, now, countFor);
 
   const read: VideoText = {
@@ -45,11 +42,10 @@ async function rereadVideo(db: D1Database, keys: { yt: string; ai: string }, row
   const res = await readRecipe({
     apiKey: keys.ai, title: video.title, channel: video.channel, ...read, transcript: given.pasted ?? null,
   });
-  if (!res.ok && res.kind === 'refused') return { ok: false, kind: 'recipe_refused', reason: res.reason };
-  if (!res.ok) return { ok: false, kind: 'recipe_reading_failed', reason: res.reason };
+  if (!res.ok) return claudeFailure(res);
   const reading = cleanRecipeReading(res.raw, video.title);
   if (!reading.found) return { ok: false, kind: 'no_recipe', reason: 'No recipe in that transcript.' };
-  await save(db, row.id, reading, sourcesOf(read), comments.ok || comments.kind === 'none' ? null : comments.reason);
+  await save(db, row.id, reading, sourcesOf(read), commentsError(comments));
   return { ok: true };
 }
 
@@ -69,8 +65,7 @@ async function rereadLink(db: D1Database, aiKey: string, row: RecipeRow, given: 
   const res = await readRecipe({
     apiKey: aiKey, title: row.title, channel: null, site: row.link ? row.channel : null, ...read, transcript: given.pasted ?? null,
   });
-  if (!res.ok && res.kind === 'refused') return { ok: false, kind: 'recipe_refused', reason: res.reason };
-  if (!res.ok) return { ok: false, kind: 'recipe_reading_failed', reason: res.reason };
+  if (!res.ok) return claudeFailure(res);
   const reading = cleanRecipeReading(res.raw, row.title);
   if (!reading.found) return { ok: false, kind: 'no_recipe', reason: 'No recipe in that transcript.' };
   await save(db, row.id, reading, sourcesOf(read), null);

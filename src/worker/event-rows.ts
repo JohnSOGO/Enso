@@ -5,6 +5,7 @@ import { CHANNEL, isOneOf, type Channel, type SunEvent } from '../shared/vocab';
 import { isDate, isTime } from '../shared/time';
 import { recurrenceError, type Recurrence } from '../shared/recurrence';
 import { emojiError } from '../shared/emoji';
+import { ALERT_TITLE_MAX } from '../shared/alert-limits';
 import { all, parseJson } from './db';
 import { intIn, optStr, str } from './http';
 
@@ -41,8 +42,8 @@ export type EventInput = Omit<EventRow, 'id' | 'exdates' | 'created_by' | 'creat
 
 /** Validates untrusted event input → row fields, or an error message. */
 export async function parseEventInput(db: D1Database, b: Record<string, unknown>): Promise<EventInput | string> {
-  const title = str(b.title, 120);
-  if (!title) return 'Title is required (up to 120 characters).';
+  const title = str(b.title, ALERT_TITLE_MAX);
+  if (!title) return `Title is required (up to ${ALERT_TITLE_MAX} characters).`;
   const notes = optStr(b.notes);
   if (notes === undefined && b.notes !== undefined) return 'Notes must be text (up to 2000 characters).';
   if (!isDate(b.startDate)) return 'Start date must be YYYY-MM-DD.';

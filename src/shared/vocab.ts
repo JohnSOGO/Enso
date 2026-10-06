@@ -28,6 +28,7 @@ export const MESS_STATUS = ['open', 'discuss', 'owed', 'closed', 'settled'] as c
 export const SHOW_KIND = ['movie', 'show'] as const; // §7F shows.kind
 export const SHOW_STATUS = ['want', 'watched'] as const; // §7F shows.status
 export const WATCH_HOW = ['theater', 'stream', 'tv', 'rent', 'buy'] as const; // §7F a way to watch, in bestWatch order
+export const LIST_ADD_RESULT = ['added', 'existing', 'reopened'] as const; // §7A.1 POST /lists/{id}/items result
 
 export type AlertKind = (typeof ALERT_KIND)[number];
 export type Channel = (typeof CHANNEL)[number];
@@ -57,6 +58,7 @@ export type MessStatus = (typeof MESS_STATUS)[number];
 export type ShowKind = (typeof SHOW_KIND)[number];
 export type ShowStatus = (typeof SHOW_STATUS)[number];
 export type WatchHow = (typeof WATCH_HOW)[number];
+export type ListAddResult = (typeof LIST_ADD_RESULT)[number];
 
 /** /status `house.state` (§9.2) — derived from the deliveries table, never stored. */
 export const HOUSE_STATE = ['ok', 'failing', 'not_configured', 'untried'] as const;

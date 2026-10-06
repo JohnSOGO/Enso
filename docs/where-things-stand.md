@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth**: §14 holds status and deviatio
 MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-04, v1.19.0, main = production.*
+*Last updated 2026-10-06, v1.33.1, main = production.*
 
 ## Running where
 
@@ -34,7 +34,8 @@ the working agreement in `CLAUDE.md`.
    with exit -1073740791 is a known flake; rerun it.
 2. Additive migration: `CI=1 npm run db:migrate:remote`, **then** `npm run deploy`. Dropping migrations go after the deploy.
 3. Check the live stamp: `curl -s https://enso.sogodojo.com/ | grep -oE "v1\.[0-9.]+ · [0-9a-f]+"`.
-4. If `home/` changed: rebuild, copy it to SogoAI (`ssh sogoai`), and restart the "Enso captions helper" task (README).
+4. If `home/` or anything it bundles changed (`src/worker/youtube-captions.ts`, `src/shared/item-reading.ts` and what it
+   imports, among them `src/shared/photos.ts`, the photo-size cap): rebuild, copy it to SogoAI (`ssh sogoai`), and restart the "Enso captions helper" task (README).
 
 ## Owed
 
@@ -45,4 +46,6 @@ the working agreement in `CLAUDE.md`.
   person tick theirs. Q125–Q129 are ⚑ defaults awaiting MojoSOGO.
 - Dishwasher (deferred by MojoSOGO). Phase C kitchen display (needs an AREC).
 - Real-phone checks still owed per SPEC §14 (Android push, Done/Snooze, the laundry and goat reminders in practice).
-- Code-steward pass 1 done 2026-10-05 (items 1–5 in v1.33.1); items 6–10 wait until those files are next touched (`/mnt/project-files/steward/2026-10-05-first-pass.md`).
+- Code-steward pass 1 done 2026-10-05 (items 1–5 in v1.33.1); items 6–10 wait until those files are next touched. Pass 2
+  done 2026-10-06. Both reports are in `docs/steward/`.
+- Steward pass 2 done 2026-10-06 (v1.33.2); nothing from it is owed.

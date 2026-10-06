@@ -1,10 +1,11 @@
 // SPEC §8.14 — Lists → Movies & shows: the box (a title or a link) with 📷 and Find → POST /shows/look-up or
 // /shows/look-up-photo, busy and refusals in place; a reading opens ShowForm filled (nothing saved here). Want rows,
 // newest first, then Watched collapsed. Tapping a row opens its form.
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { ShowForm, WATCH_GLYPH, dayText, rowWatchText } from './ShowForm';
 import { errorText, get, post, upload } from '../api';
 import { useApp } from '../state';
+import { shrinkPicked, usePhotoPick } from './usePhotoPick';
 import { SHOW_URL_MAX, bestWatch, type Show, type ShowReading } from '../../../src/shared/shows';
 import ls from './Lists.module.css';
 import s from './Shows.module.css';
@@ -22,7 +23,7 @@ export function Shows({ onChanged }: { onChanged?: () => void }) {
   /** §8.14 — after a failed or empty look-up of typed text: offer to add it by hand. */
   const [manual, setManual] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
-  const picker = useRef<HTMLInputElement>(null);
+  const pick = usePhotoPick(([file]) => picked(file));
 
   const load = () => get<{ want: Show[]; watched: Show[] }>('/shows').then((d) => { setData(d); setError(null); }).catch((e) => setError(errorText(e)));
   useEffect(() => { load(); }, [version]);
@@ -47,12 +48,8 @@ export function Shows({ onChanged }: { onChanged?: () => void }) {
     lookUp(() => post<ShowReading>('/shows/look-up', /^https?:\/\//i.test(t) ? { url: t } : { title: t }), t);
   }
 
-  function picked(file: File | undefined) {
-    if (!file) return;
-    lookUp(async () => {
-      const { shrinkPhoto } = await import('../shrink-photo');
-      return upload<ShowReading>('POST', '/shows/look-up-photo', await shrinkPhoto(file));
-    }, null);
+  function picked(file: File) {
+    lookUp(async () => upload<ShowReading>('POST', '/shows/look-up-photo', await shrinkPicked(file)), null);
   }
 
   const saved = () => { if (editing && !editing.show) setText(''); load(); onChanged?.(); };
@@ -81,10 +78,9 @@ export function Shows({ onChanged }: { onChanged?: () => void }) {
       <form className="row" onSubmit={find}>
         <input value={text} maxLength={SHOW_URL_MAX} placeholder="A title, or paste a link…" aria-label="Movie or show"
           enterKeyHint="search" disabled={busy} onChange={(e) => { setText(e.target.value); setSaid(null); setManual(null); }} />
-        <input ref={picker} type="file" accept="image/*" className="visually-hidden" tabIndex={-1} aria-hidden
-          onChange={(e) => { picked(e.target.files?.[0]); e.target.value = ''; }} />
+        {pick.input}
         <button type="button" className={s.snap} disabled={busy} aria-label="Find from a picture" title="Find from a picture"
-          onClick={() => picker.current?.click()}>📷</button>
+          onClick={pick.open}>📷</button>
         <button type="submit" className="primary" disabled={busy || !text.trim()}>Find</button>
       </form>
       <p className={`muted ${s.said}`} aria-live="polite">{busy ? 'Looking it up…' : said ?? ''}</p>

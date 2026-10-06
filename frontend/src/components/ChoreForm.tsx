@@ -8,6 +8,7 @@ import { del, errorText, patch, post } from '../api';
 import { useApp } from '../state';
 import { CHORE_TIMING, type ChoreTiming } from '../../../src/shared/vocab';
 import { DONE_MEANS_MAX, PEOPLE_MAX, STEPS_MAX, TITLE_MAX, WAIT_MAX } from '../../../src/shared/chores';
+import { canChange } from '../../../src/shared/roles';
 
 interface StepDraft { title: string; wait: string; memberId: string | null }
 
@@ -35,7 +36,7 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(f) !== JSON.stringify(init);
-  const canEdit = !chore || me.role === 'owner' || chore.createdBy === me.id;
+  const canEdit = !chore || canChange(chore.createdBy, me);
   const shown = (ids: (string | null)[]) => members.filter((m) => !m.disabledAt || ids.includes(m.id));
 
   const setTitle = (title: string) =>

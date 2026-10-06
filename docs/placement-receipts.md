@@ -7,6 +7,152 @@ carry its result.
 
 ---
 
+## 2026-10-06 — Owed tests: migration 0028 and RepeatFields mappings (placement-advisor)
+
+- **Ask:** steward pass 2 item 8 (pass 1 #10, approved): test/migration-0028.test.ts and a unit test of RepeatFields.tsx's repeatOf / weeksOf / toRecurrence / repeatText (§4.2, §7D.5, §8.4).
+- **Verdict:** REUSE-add-nothing (test/ only; no source owner, no map row).
+- **Why:** test/ is outside SOURCE_ROOTS; a .tsx loads in the worker pool only via a run-time `@vite-ignore` dynamic import (precedent recipe-transcript.test.ts). Rejected: extracting the mappings to .ts for testability; widening the root tsconfig.
+
+## 2026-10-06 — usePhotoPick for the photo pickers (placement-advisor)
+
+- **Ask:** steward pass 2 item 7 (pass 1 #9, approved): a usePhotoPick hook beside PhotoField.tsx, adopted by ItemPhoto, RecipeTranscript, ChoreAreaForm and Shows (§7C.3, §8.8). Behavior-preserving.
+- **Verdict:** `frontend/src/components/usePhotoPick.tsx` [NEW row]; PhotoField.tsx and the four components [EXISTING, adopt it].
+- **Flow stage:** render / capture intent.
+- **Why:** five copies of input, click, reset and lazy shrink; raw files keep every caller's busy and error order unchanged; own file like useAction.tsx keeps PhotoField one concern. Rejected: inside PhotoField.tsx; state.tsx; shrinking inside the hook; a useObjectUrl.
+- **Caps:** usePhotoPick.tsx 16/300 (new); PhotoField.tsx 89 → 88/300; ItemPhoto.tsx 66 → 65/300; ChoreAreaForm.tsx 113 → 112/300; RecipeTranscript.tsx 117 → 116/300; Shows.tsx 112 → 108/300. No ceiling moved.
+
+## 2026-10-06 — The photo picker into usePhotoPick.tsx (reorganizer)
+
+- **Trigger:** steward pass 2 item 7: the hidden file input, its click, its reset and the lazy shrink-photo import written five times.
+- **Seam moved:** the picker (hidden `type=file accept=image/*` input, open, value reset, ≥ 1 file) and the lazy shrink from `PhotoField.tsx`, `ItemPhoto.tsx`, `ChoreAreaForm.tsx`, `RecipeTranscript.tsx` ({ multiple: true }) and `Shows.tsx` to usePhotoPick / shrinkPicked in `frontend/src/components/usePhotoPick.tsx` [NEW row]; the five rows now say "via usePhotoPick".
+- **Room opened:** each caller 1–4 lines smaller (Shows 112 → 108). No pins.
+- **Behavior:** preserved — typecheck, npm test (666, unchanged) and arch:audit green (quiet); the input markup is the same (attributes, `multiple` only on the transcript, aria-hidden, tabIndex -1, visually-hidden, in the same place); onPick runs before the value reset, as before; callers keep their busy and step text, error handling, `live` ref, object URLs and order; `vite build` still emits shrink-photo as its own lazy chunk.
+- **Restraint:** no useObjectUrl, no shrinking inside the hook, no state.tsx; ThingPhoto and the forms using PhotoField untouched.
+
+## 2026-10-06 — Web-tool builders in claude.ts (placement-advisor)
+
+- **Ask:** steward pass 2 item 6 (pass 1 #8, approved): web_search_20260209 / web_fetch_20260209 copied into link-reader.ts, recipe-link-reader.ts and show-reader.ts (§7C.4b, §7E.6, §7F.2). Behavior-preserving.
+- **Verdict:** `src/worker/claude.ts` [EXISTING] (webSearchTool, webFetchTool); the three readers [EXISTING, call them].
+- **Flow stage:** deliver-side API client (Worker).
+- **Why:** claude.ts already owns the API surface and ClaudeServerTool; the next version bump is one line. Rejected: shared; a separate tools module; moving max_uses constants.
+- **Caps:** worker/claude.ts 121 → 130/300; link-reader.ts 37 → 34/300; recipe-link-reader.ts 37 → 34/300; show-reader.ts 85 → 81/300. No ceiling moved.
+
+## 2026-10-06 — Web-tool builders into claude.ts (reorganizer)
+
+- **Trigger:** steward pass 2 item 6: the web search and web fetch tool blocks, with their dated versions, written out in three readers.
+- **Seam moved:** the web_search / web_fetch tool literals from `src/worker/link-reader.ts`, `src/worker/recipe-link-reader.ts` and `src/worker/show-reader.ts` to webSearchTool(maxUses, where?) / webFetchTool(maxUses) in `src/worker/claude.ts` [EXISTING].
+- **Room opened:** link-reader.ts 37 → 34, recipe-link-reader.ts 37 → 34, show-reader.ts 85 → 81 lines; claude.ts 121 → 130. No pins.
+- **Behavior:** preserved — typecheck, npm test (666, unchanged) and arch:audit green (quiet); the research requests' `tools` are deep-equal to before (link-reading-api, shows-api and recipe-links-api tests assert them): user_location only when a `where` is given (link: timezone; show: country then timezone), the recipe link none, no undefined keys.
+- **Restraint:** max_uses constants stay with their features; no tools module; claude.ts still chooses no tools.
+
+## 2026-10-06 — Photo limits out of things.ts (placement-advisor)
+
+- **Ask:** steward pass 2 item C (approved): the photo-size constants live in things.ts but serve 6 features, and the SogoAI helper bundles the cap (§7C.3, §7A.3). Behavior-preserving.
+- **Verdict:** `src/shared/photos.ts` [NEW row]; things.ts, item-reading.ts, recipe-reading.ts, http.ts, shrink-photo.ts [EXISTING, import from it].
+- **Flow stage:** rules (shared limits).
+- **Why:** a dependency-free leaf takes six features and home/ off the things → engine chain. home reaches it through item-reading.ts, so LAYERS `allowed` is unchanged; the cap is inlined at build, so the rebuild note is docs. Rejected: item-reading.ts as home; moving READS_PER_DAY; widening home's allowed list; a things.ts re-export.
+- **Caps:** shared/photos.ts 6/300 (new); shared/things.ts 252 → 246/300; shared/item-reading.ts 57/300; shared/recipe-reading.ts 180/300; worker/http.ts 41/300; frontend/src/shrink-photo.ts 45/300. No ceiling moved.
+
+## 2026-10-06 — Photo limits into src/shared/photos.ts (reorganizer)
+
+- **Trigger:** steward pass 2 item C: PHOTO_MAX_BYTES / PHOTO_TYPES / PHOTO_LONG_SIDE / PHOTO_QUALITY sat in things.ts, so every photo feature and the home/ bundle (via item-reading.ts) pulled in things → engine.
+- **Seam moved:** the four PHOTO_* constants from `src/shared/things.ts` to `src/shared/photos.ts` [NEW row], no re-export; item-reading.ts, recipe-reading.ts, worker http.ts, shrink-photo.ts and three tests import them from there.
+- **Room opened:** things.ts: 252 → 246 lines. No pins.
+- **Behavior:** preserved — typecheck, npm test (666, unchanged but for three import paths) and arch:audit green (quiet); same values (PHOTO_TYPES still `as const`), same 400/413 messages; the home/ helper still bundles PHOTO_MAX_BYTES = 4 MB as IDENTIFY_BODY_MAX, now without things.ts or engine.ts; LAYERS unchanged. where-things-stand.md's deploy step now says rebuild home/ when anything it bundles changes, naming photos.ts.
+- **Restraint:** READS_PER_DAY and the feature photo counts stay where they are; home's allowed list untouched.
+
+## 2026-10-06 — Recipe read failures: one union, two mappers, commentsError (placement-advisor)
+
+- **Ask:** steward pass 2 item 2 (approved): the refused/failed mapping written 4×, video-unavailable 2× and the ⚑ Q78 comments rule 2× across recipe-reads.ts and recipe-reread.ts; the route's readFailed typed on one union (§7E.2, §7E.2b). Behavior-preserving.
+- **Verdict:** `src/worker/recipe-reads.ts` [EXISTING] (RecipeReadFailure, videoFailure, claudeFailure); `src/shared/recipe-reading.ts` [EXISTING] (commentsError); recipe-reread.ts and routes/recipes.ts [EXISTING, call / retype].
+- **Flow stage:** persist-side outcome mapping (Worker); rules (Q78, shared).
+- **Why:** the mappers consume Worker result types, and recipe-reads.ts is already re-read's shared dependency; the Q78 rule is a decision, so shared, with a structural parameter. Rejected: a new failures module; mappers in shared; HTTP outside the route.
+- **Caps:** recipe-reads.ts 97 → 106/300; recipe-reread.ts 78 → 73/300; shared/recipe-reading.ts 176 → 180/300; routes/recipes.ts 229 → 229/269 (pinned). No ceiling moved.
+
+## 2026-10-06 — Recipe read failures into recipe-reads.ts; commentsError into recipe-reading.ts (reorganizer)
+
+- **Trigger:** steward pass 2 item 2: the YouTube and Claude failure mappings and the ⚑ Q78 comments rule copied between recipe-reads.ts and recipe-reread.ts, and the failure union written twice.
+- **Seam moved:** the failure union and its mappers from inline copies in `src/worker/recipe-reads.ts` and `src/worker/recipe-reread.ts` to RecipeReadFailure / videoFailure / claudeFailure in `src/worker/recipe-reads.ts` [EXISTING]; the ⚑ Q78 rule to commentsError in `src/shared/recipe-reading.ts` [EXISTING]; routes/recipes.ts readFailed now takes RecipeReadFailure.
+- **Room opened:** recipe-reread.ts: 78 → 73 lines; recipe-reads.ts 97 → 106 (the union and mappers it now owns). No pins moved.
+- **Behavior:** preserved — typecheck, npm test (666: the 665 existing unchanged plus 1 commentsError unit test) and arch:audit green (quiet); every kind, reason, status, code and message the same; comments_error stored the same; YouTube's not_found still → video_unavailable, Claude's refused still → recipe_refused.
+- **Restraint:** readFailed stays in the route; youtube.ts, recipe-reader.ts, recipe-link-reader.ts and claude.ts untouched; no new module.
+
+## 2026-10-06 — Alert limits and invite-code normalizing into shared (placement-advisor)
+
+- **Ask:** steward pass 2 item 4 (pass 1 #6, approved): title ≤120 ×5 and interval 1–1440 ×3 across routes/alerts.ts, event-rows.ts, Timers.tsx, Alarms.tsx and EventForm.tsx; normalizeInviteCode out of routes/auth.ts (§4.2, §5.4, §6.2). Behavior-preserving.
+- **Verdict:** `src/shared/alert-limits.ts` [NEW row]; `src/shared/invite-link.ts` [EXISTING, row widened]; the five limit sites, auth.ts and members.ts [EXISTING, import].
+- **Flow stage:** rules (shared limits and format), used by route and render.
+- **Why:** route and form restate the same numbers; a leaf keeps engine.ts (85%) from growing; moving the normalizer removes the members.ts → auth.ts route import. Rejected: engine.ts; things.ts' TITLE_MAX; a generic limits.ts; folding in offset/renotify/maxAlerts (not approved; alert-limits.ts is their named later home); PWA normalizing.
+- **Caps:** shared/alert-limits.ts 7/300 (new); shared/invite-link.ts 15 → 20/300; routes/auth.ts 178 → 174/300; event-rows.ts 134 → 135/300; routes/alerts.ts 185 → 186/300; routes/members.ts 73/300; Timers.tsx 172 → 173/300; Alarms.tsx 150 → 151/300; EventForm.tsx 187 → 188/223 (pinned). No ceiling moved.
+
+## 2026-10-06 — Alert limits into alert-limits.ts; normalizeInviteCode into invite-link.ts (reorganizer)
+
+- **Trigger:** steward pass 2 item 4: the 120-character title and the 1–1440-minute interval restated in two routes and three forms; the invite-code normalizer living in routes/auth.ts and imported route-to-route by members.ts.
+- **Seam moved:** ALERT_TITLE_MAX, TIMER_INTERVAL_MIN / TIMER_INTERVAL_MAX from literals in `src/worker/routes/alerts.ts`, `src/worker/event-rows.ts`, Timers.tsx, Alarms.tsx and EventForm.tsx to `src/shared/alert-limits.ts` [NEW row]; normalizeInviteCode verbatim from `src/worker/routes/auth.ts` to `src/shared/invite-link.ts` [EXISTING row, widened].
+- **Room opened:** routes/auth.ts: 178 → 174 lines; the limit sites +1 each (an import). No pins.
+- **Behavior:** preserved — typecheck, npm test (665: the 664 existing unchanged plus 1 normalizeInviteCode unit test) and arch:audit green (quiet); the 400 messages are byte-identical (template strings over the same numbers); the forms' maxLength, min/max and the "Interval (minutes, 1–1440)" label render the same; invite codes hash the same.
+- **Restraint:** reminder offset 0–1440, renotify 1–240, maxAlerts 1–20 and chores' TITLE_MAX stay where they are; the PWA still never normalizes a code.
+
+## 2026-10-06 — List-add result and delivery status typed from vocab (placement-advisor)
+
+- **Ask:** steward pass 2 item D (approved): the list-add result and the delivery-status badges are retyped by hand in the PWA (§3, §7A.1, §8.6). Behavior-preserving.
+- **Verdict:** `src/shared/vocab.ts` [EXISTING] (LIST_ADD_RESULT); routes/lists.ts, state.tsx, Settings.tsx, HouseholdLists.tsx, RecipeView.tsx [EXISTING, typed on it].
+- **Flow stage:** route (producer) and render (consumers); the vocabulary is shared.
+- **Why:** both are wire strings; one already had a vocab entry the PWA ignored, the other had none. Rejected: reusing AddDecision's kinds; dropping the badge fallback (the wire is untrusted).
+- **Caps:** vocab.ts 73 → 75/300; routes/lists.ts 226 → 227/300; Settings.tsx 177/207 (pinned, +0); HouseholdLists.tsx 236/300, RecipeView.tsx 142/300, state.tsx 99/300 (+0). No ceiling moved.
+
+## 2026-10-06 — List-add result and delivery status typed from vocab (reorganizer)
+
+- **Trigger:** steward pass 2 item D: `'added' | 'existing' | 'reopened'` retyped in HouseholdLists.tsx (and `string` in RecipeView.tsx); delivery status and channel typed `string` in state.tsx and the badge map.
+- **Seam moved:** the list-add result vocabulary from HouseholdLists.tsx's local AddResult to `src/shared/vocab.ts` LIST_ADD_RESULT / ListAddResult [EXISTING]; the route's three results `satisfies ListAddResult`; state.tsx's recentDeliveries typed `Channel` / `DeliveryStatus`; STATUS_BADGE `Record<DeliveryStatus, string>`. SPEC §3 lists LIST_ADD_RESULT.
+- **Room opened:** none needed (typing only); vocab.ts +2, routes/lists.ts +1, the PWA files +0. No pins.
+- **Behavior:** preserved — typecheck, npm test (664, unchanged) and arch:audit green (quiet); the same three strings on the wire with the same statuses (200, 200, 201); the badge's `?? 'neutral'` fallback kept.
+- **Restraint:** AddDecision's kinds not mapped onto the wire values; no other badge retyped; no map row change.
+
+## 2026-10-06 — Owed-mess visibility into the shared rules (placement-advisor)
+
+- **Ask:** steward pass 2 leftover (approved): GET /messes decides in the route who may see an owed mess (§7B.7). Behavior-preserving.
+- **Verdict:** `src/shared/messes.ts` [EXISTING] (canSee); routes/messes.ts [EXISTING, calls it].
+- **Flow stage:** rules (out of the route).
+- **Why:** the last mess permission still in the route; sits beside canSettle/canDelete on the same MessViewer built from P1's isAdmin. Rejected: filtering in the PWA; reshaping balancesOf.
+- **Caps:** shared/messes.ts 115 → 119/300; routes/messes.ts 144 → 145/300 (neither pinned). No ceiling moved.
+
+## 2026-10-06 — Owed-mess visibility: canSee (reorganizer)
+
+- **Trigger:** steward pass 2 leftover: GET /messes filtered owed messes inline in `routes/messes.ts`.
+- **Seam moved:** who sees a mess in the list (the owed filter) from `src/worker/routes/messes.ts` to `src/shared/messes.ts` canSee [EXISTING row, widened].
+- **Room opened:** routes/messes.ts: 144 → 145 lines (the viewer line); shared/messes.ts: 115 → 119. No pins; caps stay GLOBAL_FILE_CAP 300.
+- **Behavior:** preserved — typecheck, npm test (664: the 663 existing unchanged plus 1 canSee unit test) and arch:audit green (quiet); canSee's body is the route's filter term for term (not owed, or admin, or reporter, or claimer); the route's `admin` (isAdmin(me)) still feeds balancesOf; GET /messes response unchanged.
+- **Restraint:** balancesOf and Messes.tsx untouched; no filtering moved to the PWA.
+
+## 2026-10-06 — Steward pass, whole tree (code-steward)
+
+- **Run:** on demand, second pass, checking the PR #18 extractions (v1.33.1, main 712dc23).
+- **Verdict:** MINOR DRIFT. Items 1–5 landed as their verdicts said; typecheck, 662/662 tests and arch:audit green; nothing
+  in the warning band; tick.ts imported only by index.ts.
+- **Top finding:** SPEC §12 and §14 contradicted the code. A second run on SogoGamerPC added the creator-or-admin rule
+  repeated in 4 routes and 4 forms, §5.7 drift on machine alerts, photo limits bundled into home/, and hand-typed wire values.
+- **Handoffs:** MojoSOGO approved all of it 2026-10-06. The docs commit and P1–P9 are above (report: docs/steward/2026-10-06-second-pass.md).
+- **Placement audit:** 5 code commits since pass 1, all with advisor and reorganizer receipts; 0 without.
+
+---
+
+## 2026-10-06 — One creator-or-admin rule and isAdmin (placement-advisor)
+
+- **Ask:** steward pass 2 item A (approved): one shared "creator or admin may change it" rule plus isAdmin; today written in 4 routes and 4 forms beside canManageList, and `role === 'owner'` ~28 times (§6.3). Behavior-preserving.
+- **Verdict:** `src/shared/roles.ts` [NEW row] (ADMIN_ROLE, isAdmin, canChange); `src/shared/lists.ts` [EXISTING, canManageList removed]; the routes, forms, session.ts, env.ts and mess-asks.ts [EXISTING, call it].
+- **Flow stage:** rules (out of routes and render).
+- **Why:** canManageList is already this rule, so folding it in deletes a copy. Every admin read goes through isAdmin; every role-value write or SQL match through ADMIN_ROLE, so `'owner'` lives only in vocab.ts and roles.ts. Rejected: vocab.ts; lists.ts (inverted import); session.ts (PWA can't import it); a "permissions" module; moving the mess rules; renaming requireOwner; one shared 403 text.
+- **Caps:** shared/roles.ts 14/300 (new); shared/lists.ts 100 → 91/300; Settings.tsx 176 → 177/207 (pinned); EventForm.tsx 186 → 187/223 (pinned); routes/events.ts 113 → 114/147 (pinned); every other touched file +0 or +1, all unpinned under 300 (highest HouseholdLists.tsx 236, routes/lists.ts 226). No ceiling moved.
+
+## 2026-10-06 — Creator-or-admin rule and isAdmin into shared/roles.ts (reorganizer)
+
+- **Trigger:** steward pass 2 item A: the creator-or-admin check written in 4 routes, 4 forms and canManageList; `role === 'owner'` restated across Worker and PWA.
+- **Seam moved:** ADMIN and canManageList (renamed canChange, same body) from `src/shared/lists.ts`, the inline checks in routes alarms/alerts/chores/events/lists and the forms Alarms/Timers/ChoreForm/EventForm/HouseholdLists, and every `role === 'owner'` read or write (session.ts, members.ts, auth.ts, messes.ts, mess-asks.ts SQL, Messes/Settings/MachineHours) to `src/shared/roles.ts` [NEW row]. env.ts and auth.ts type the role as vocab's `Role`.
+- **Room opened:** shared/lists.ts: 100 → 91 lines; callers +0 or +1 (an import). No ceiling moved; no pin added.
+- **Behavior:** preserved — typecheck (all four projects), npm test (663: the 662 existing, canManageList's case moved unchanged to test/roles.test.ts as canChange, plus 1 isAdmin case) and arch:audit green (quiet); every 403 status, code, message and check order unchanged (forWrite guards kept; events.ts has none and still has none); EventForm's undefined meta → canChange(null) → admins only, as before; mess-asks binds ADMIN_ROLE to `role = ?`, the same rows. `'owner'` now appears only in vocab.ts ROLE and roles.ts (plus state.tsx's §6.3 comment).
+- **Restraint:** requireOwner keeps its name; 403 texts not unified; mess rules, MessViewer and balancesOf untouched; `'member'` literals untouched.
+
 ## 2026-10-05 — Mess permissions into the shared rules (placement-advisor)
 
 - **Ask:** steward backlog item 5 (approved): move the who-can-answer, settle, delete and decide checks out of `routes/messes.ts` into `src/shared/messes.ts`; the route and Messes.tsx import them (§7B.7, §8.15a). Behavior-preserving.

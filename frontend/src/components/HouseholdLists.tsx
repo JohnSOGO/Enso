@@ -11,12 +11,13 @@ import { ListPicker, pickerEntries } from './ListPicker';
 import { ItemPhoto, type Snap } from './ItemPhoto';
 import { errorText, get, patch, post, upload } from '../api';
 import { useApp } from '../state';
-import { SHOPPING_LIST_ID, TEXT_MAX, canManageList } from '../../../src/shared/lists';
+import { SHOPPING_LIST_ID, TEXT_MAX } from '../../../src/shared/lists';
+import { canChange } from '../../../src/shared/roles';
+import type { ListAddResult } from '../../../src/shared/vocab';
 import ls from './Lists.module.css';
 import s from './HouseholdLists.module.css';
 
 interface ListData { list: Omit<ListSummary, 'openCount'>; open: Item[]; checked: Item[] }
-type AddResult = 'added' | 'existing' | 'reopened';
 
 /** Remembered per device: a list id, THINGS or SHOWS. (An old `today` falls back to Shopping: chores have their own tab, §8.15.) */
 const STORE_KEY = 'enso.list';
@@ -82,7 +83,7 @@ export function HouseholdLists({ pickRequest }: { pickRequest: number }) {
           {shown?.count != null && <span className={`muted ${s.pickCount}`}>{shown.count}</span>}
           <span aria-hidden className="muted">▾</span>
         </button>
-        {current && canManageList(current.createdBy, me) && (
+        {current && canChange(current.createdBy, me) && (
           <button className={s.more} aria-label="List options" title="List options" onClick={() => setManaging(true)}>⋯</button>
         )}
       </div>
@@ -141,7 +142,7 @@ function ListPanel({ list, onItemsChanged }: { list: ListSummary; onItemsChanged
     if (!text.trim() || busy) return;
     setBusy(true); setError(null); setSaid(null);
     try {
-      const r = await post<{ item: Item; result: AddResult }>(`/lists/${list.id}/items`, { text });
+      const r = await post<{ item: Item; result: ListAddResult }>(`/lists/${list.id}/items`, { text });
       setText('');
       if (r.result === 'existing') setSaid(`${r.item.text} is already on the list`);
       if (r.result === 'reopened') setSaid(`${r.item.text} is back on the list`);

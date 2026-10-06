@@ -1,9 +1,9 @@
 // SPEC §7E.2, §7E.2b, §7E.2c — reading a recipe from a video (pure): what a video offered to be read, the creator's own
 // comments, a transcript pasted or screenshotted, when a video's text is worth reading, cleaning Claude's reading, and
 // the captions-from-home rules (when to ask SogoAI, checking its answer, the texts).
-// Imports recipes (the limits), things (the photo limits) and vocab only; recipes.ts never imports this file.
+// Imports recipes (the limits), photos (the photo limits) and vocab only; recipes.ts never imports this file.
 import { INGREDIENT_MAX, INGREDIENTS_MAX, RECIPE_TITLE_MAX, SERVINGS_MAX, STEP_MAX, STEPS_MAX, TIME_MAX } from './recipes';
-import { PHOTO_MAX_BYTES, PHOTO_TYPES } from './things';
+import { PHOTO_MAX_BYTES, PHOTO_TYPES } from './photos';
 import { CAPTIONS_FAILURE, RECIPE_SOURCE, isOneOf, type CaptionsFailure, type RecipeSource } from './vocab';
 
 /** Captions are cut to this many characters before they go to Claude (§7E.2). */
@@ -102,6 +102,10 @@ export function creatorComments(comments: readonly { authorChannelId: string | n
   const kept = comments.filter((c) => c.authorChannelId === channelId).map((c) => c.text.trim()).filter(Boolean);
   return cut(kept.join('\n\n'), CREATOR_COMMENTS_MAX);
 }
+
+/** Why the creator's comments couldn't be read (comments_error), or null; turned off (kind 'none') is not an error ⚑ Q78. */
+export const commentsError = (c: { ok: true } | { ok: false; kind: string; reason: string }): string | null =>
+  c.ok || c.kind === 'none' ? null : c.reason;
 
 const TIMESTAMP = /^\s*\d{1,2}(:\d{2}){1,2}\s*$/;
 const LEADING_TIMESTAMP = /^\s*\d{1,2}(:\d{2}){1,2}\s+/;

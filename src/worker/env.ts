@@ -1,3 +1,5 @@
+import type { Role } from '../shared/vocab';
+
 export interface Env {
   DB: D1Database;
   PHOTOS: R2Bucket;
@@ -26,7 +28,7 @@ export interface SessionMember {
   email: string;
   display_name: string;
   color: string;
-  role: 'owner' | 'member';
+  role: Role;
 }
 
 export type AppEnv = { Bindings: Env; Variables: { member: SessionMember } };

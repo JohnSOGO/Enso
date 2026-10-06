@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Grow } from './Grow';
 import { errorText, post } from '../api';
+import { shrinkPicked, usePhotoPick } from './usePhotoPick';
 import type { Recipe } from '../../../src/shared/recipes';
 import { SCREENSHOTS_MAX, type Screenshot } from '../../../src/shared/recipe-reading';
 import s from './Recipes.module.css';
@@ -21,7 +22,6 @@ const toScreenshot = (blob: Blob) => new Promise<Screenshot>((ok, fail) => {
 });
 
 export function RecipeTranscript({ recipe: r, onChange }: { recipe: Recipe; onChange: (r: Recipe) => void }) {
-  const input = useRef<HTMLInputElement>(null);
   const live = useRef(true);
   const [shots, setShots] = useState<Shot[]>([]);
   const [pasting, setPasting] = useState(false);
@@ -35,15 +35,15 @@ export function RecipeTranscript({ recipe: r, onChange }: { recipe: Recipe; onCh
   urls.current = shots.map((x) => x.url);
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
+  const pick = usePhotoPick((files) => picked(files), { multiple: true });
+
   async function picked(files: File[]) {
-    if (!files.length) return;
     const room = SCREENSHOTS_MAX - shots.length;
     setError(null); setSaid(files.length > room ? `Only ${SCREENSHOTS_MAX} screenshots are read at a time; the rest were left out.` : null);
     setStep('Getting the screenshots ready…');
     const added: Shot[] = [];
     try {
-      const { shrinkPhoto } = await import('../shrink-photo');
-      for (const f of files.slice(0, room)) { const blob = await shrinkPhoto(f); added.push({ blob, url: URL.createObjectURL(blob) }); }
+      for (const f of files.slice(0, room)) { const blob = await shrinkPicked(f); added.push({ blob, url: URL.createObjectURL(blob) }); }
     } catch (e) {
       if (live.current) setError(errorText(e));
     }
@@ -76,9 +76,8 @@ export function RecipeTranscript({ recipe: r, onChange }: { recipe: Recipe; onCh
   const busy = !!step;
   return (
     <div className={s.transcript}>
-      <input ref={input} type="file" accept="image/*" multiple className="visually-hidden" tabIndex={-1} aria-hidden
-        onChange={(e) => { picked([...(e.target.files ?? [])]); e.target.value = ''; }} />
-      <button type="button" disabled={busy || shots.length >= SCREENSHOTS_MAX} onClick={() => input.current?.click()}>
+      {pick.input}
+      <button type="button" disabled={busy || shots.length >= SCREENSHOTS_MAX} onClick={pick.open}>
         {shots.length ? '📷 Add another screenshot' : r.videoId ? '📷 Add transcript screenshots' : '📷 Add screenshots'}
       </button>
       <p className={`muted ${s.hint}`}>

@@ -6,6 +6,7 @@ import { MessReport } from './MessReport';
 import { apiUrl, del, errorText, get, post } from '../api';
 import { useApp } from '../state';
 import { canDelete, canSettle, isAnswerable, type Balance, type Mess } from '../../../src/shared/messes';
+import { isAdmin } from '../../../src/shared/roles';
 import s from './Messes.module.css';
 
 const NOBODY = 'nobody'; // the "Whose was it?" choice that closes a mess as nobody's
@@ -62,7 +63,7 @@ export function AnswerButtons({ m, busy, act }: { m: Mess; busy: boolean; act: R
 function MessRow({ m, act, busy, owedView }: { m: Mess; act: ReturnType<typeof useMessAction>['act']; busy: boolean; owedView?: boolean }) {
   const { me, members, memberById, localTime, today, tz } = useApp();
   const name = (id: string | null) => (id ? memberById(id)?.displayName ?? 'unknown member' : 'nobody');
-  const admin = me.role === 'owner';
+  const admin = isAdmin(me);
   const date = new Date(m.createdAt).toLocaleDateString(undefined, { timeZone: tz });
   const when = new Date(m.createdAt).toLocaleDateString('en-CA', { timeZone: tz }) === today() ? localTime(m.createdAt) : date;
   const viewer = { id: me.id, admin };

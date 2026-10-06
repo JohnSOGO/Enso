@@ -4,6 +4,7 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { AppEnv, SessionMember } from './env';
 import { first, newId, run } from './db';
 import { fail } from './http';
+import { isAdmin } from '../shared/roles';
 
 const ITERATIONS = 100_000; // Workers' PBKDF2 cap
 const COOKIE = 'hrc_session';
@@ -73,6 +74,6 @@ export const requireMember: MiddlewareHandler<AppEnv> = async (c, next) => {
 };
 
 export const requireOwner: MiddlewareHandler<AppEnv> = async (c, next) => {
-  if (c.get('member').role !== 'owner') return fail(c, 403, 'forbidden', 'Only an admin can do that.');
+  if (!isAdmin(c.get('member'))) return fail(c, 403, 'forbidden', 'Only an admin can do that.');
   await next();
 };

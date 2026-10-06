@@ -2,7 +2,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { get, patch, post } from '../api';
 import { useApp, type Status } from '../state';
-import { MEMBER_PALETTE } from '../../../src/shared/vocab';
+import { MEMBER_PALETTE, type DeliveryStatus } from '../../../src/shared/vocab';
+import { ADMIN_ROLE, isAdmin } from '../../../src/shared/roles';
 import { useAction } from './useAction';
 import { Invites } from './Invites';
 import { OptionalItems } from './OptionalItems';
@@ -52,7 +53,7 @@ function HouseholdSection() {
   const setAdmin = (id: string, name: string, make: boolean) => {
     const ask = make ? `Make ${name} an admin? They will have the same powers as you, except over the owner.`
       : id === me.id ? 'Remove your own admin role? You will lose these settings straight away.' : `Remove ${name}'s admin role?`;
-    if (confirm(ask)) run(async () => { await patch(`/members/${id}`, { role: make ? 'owner' : 'member' }); refresh(); });
+    if (confirm(ask)) run(async () => { await patch(`/members/${id}`, { role: make ? ADMIN_ROLE : 'member' }); refresh(); });
   };
 
   return (
@@ -75,12 +76,12 @@ function HouseholdSection() {
               <th scope="row" className={s.flexible} title={m.email}><span style={{ color: m.color }}>●</span> {m.displayName}</th>
               <td className={s.rigid}>
                 {m.disabledAt && <span className="badge bad">disabled</span>}{' '}
-                {m.role === 'owner' && <span className="chip">{m.isFounder ? 'Owner' : 'Admin'}</span>}
+                {isAdmin(m) && <span className="chip">{m.isFounder ? 'Owner' : 'Admin'}</span>}
               </td>
               <td className={s.rigid}>
                 {!m.isFounder && (
                   <span className="row" style={{ gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    {!m.disabledAt && <button disabled={busy} onClick={() => setAdmin(m.id, m.displayName, m.role !== 'owner')}>{m.role === 'owner' ? 'Remove admin' : 'Make admin'}</button>}
+                    {!m.disabledAt && <button disabled={busy} onClick={() => setAdmin(m.id, m.displayName, !isAdmin(m))}>{isAdmin(m) ? 'Remove admin' : 'Make admin'}</button>}
                     <button disabled={busy} onClick={() => run(async () => { await patch(`/members/${m.id}`, { disabled: !m.disabledAt }); refresh(); })}>
                       {m.disabledAt ? 'Enable' : 'Disable'}
                     </button>
@@ -125,7 +126,7 @@ function DaysOff() {
   );
 }
 
-const STATUS_BADGE: Record<string, string> = { sent: 'good', partial: 'warn', failed: 'bad', queued: 'neutral', claimed: 'neutral' };
+const STATUS_BADGE: Record<DeliveryStatus, string> = { sent: 'good', partial: 'warn', failed: 'bad', queued: 'neutral', claimed: 'neutral' };
 
 /** §8.6 ⚑ Q38 — the House line, from the server's `house` as given (§9.2). */
 function HouseLine({ house: h, localTime }: { house: Status['house']; localTime: (iso: string) => string }) {
@@ -169,7 +170,7 @@ export function Settings({ onLogout }: { onLogout: () => void }) {
     <div style={{ padding: 12, overflowY: 'auto', height: '100%' }}>
       <h1 style={{ fontSize: '1.15rem', marginBottom: 12 }}>Settings</h1>
       <MeSection onLogout={onLogout} />
-      {me.role === 'owner' && <HouseholdSection />}
+      {isAdmin(me) && <HouseholdSection />}
       <StatusSection />
     </div>
   );

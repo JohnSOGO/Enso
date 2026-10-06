@@ -6,7 +6,7 @@ import {
   PASTED_MAX, SCREENSHOTS_MAX, SCREENSHOT_TYPES, TRANSCRIPT_MAX, cleanTranscript, parseScreenshots, sourcesOf,
   type VideoText,
 } from '../src/shared/recipe-reading';
-import { PHOTO_MAX_BYTES, PHOTO_TYPES } from '../src/shared/things';
+import { PHOTO_MAX_BYTES, PHOTO_TYPES } from '../src/shared/photos';
 
 /** The view's own names for the sources (the consumer). A .tsx module, so it is loaded at run time: the Worker
  *  typecheck has no JSX, and the PWA typecheck already holds READ_FROM to Record<RecipeSource less typed, string>. */

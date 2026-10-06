@@ -5,6 +5,7 @@ import type { Env } from './env';
 import { activeMemberIds, all, first } from './db';
 import { pushDelivery } from './deliveries';
 import { sendPushDeliveries } from './push';
+import { ADMIN_ROLE } from '../shared/roles';
 import {
   MESS_ASK_TITLE, MESS_DISCUSS_TITLE, MESS_PHOTO_KEEP_DAYS, askMessage, askedOf, discussDue, discussMessage, nudgeDue,
   type MessRow,
@@ -31,7 +32,7 @@ export async function moveToDiscuss(env: Env, m: MessRow, now: string): Promise<
   const r = await db.prepare('UPDATE messes SET discuss_at = ? WHERE id = ? AND discuss_at IS NULL AND claimed_by IS NULL')
     .bind(now, m.id).run();
   if (!r.meta.changes) return;
-  const admins = await all<{ id: string }>(db, `SELECT id FROM members WHERE role = 'owner' AND disabled_at IS NULL`);
+  const admins = await all<{ id: string }>(db, 'SELECT id FROM members WHERE role = ? AND disabled_at IS NULL', ADMIN_ROLE);
   if (!admins.length) return;
   const w = await wordsOf(db, m);
   const rows = admins.map((a) =>

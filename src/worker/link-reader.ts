@@ -2,7 +2,7 @@
 // failure kept as a note, never fatal), a look-up with web search and web fetch, then the structured
 // reading with the photo reader's schema. Returns the raw reading or an honest failure; never HTTP, no
 // Hono, never decides what is saved (the route cleans it with cleanPhotoReading).
-import { askClaude, askClaudeResearch } from './claude';
+import { askClaude, askClaudeResearch, webFetchTool, webSearchTool } from './claude';
 import { fetchPage } from './page-fetch';
 import { thingReadingSchema } from './photo-reader';
 import {
@@ -23,10 +23,7 @@ export async function readLink(input: ReadLinkInput, opts: { fetch?: typeof fetc
   const notes = await askClaudeResearch({
     apiKey: input.apiKey, fetch: opts.fetch, maxTurns: RESEARCH_TURNS_MAX,
     prompt: researchPrompt(input.url, page, input.today, input.tz, input.home),
-    tools: [
-      { type: 'web_search_20260209', name: 'web_search', max_uses: LINK_SEARCHES_MAX, user_location: { type: 'approximate', timezone: input.tz } },
-      { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: LINK_FETCHES_MAX },
-    ],
+    tools: [webSearchTool(LINK_SEARCHES_MAX, { timezone: input.tz }), webFetchTool(LINK_FETCHES_MAX)],
   });
   if (!notes.ok) return notes;
   const res = await askClaude({

@@ -6,6 +6,8 @@ import { del, errorText, get, patch, post } from '../api';
 import { useApp } from '../state';
 import { WEEKDAY, type Channel } from '../../../src/shared/vocab';
 import { utcToLocal, weekdayOf } from '../../../src/shared/time';
+import { canChange } from '../../../src/shared/roles';
+import { ALERT_TITLE_MAX, TIMER_INTERVAL_MAX, TIMER_INTERVAL_MIN } from '../../../src/shared/alert-limits';
 import s from './Lists.module.css';
 
 export interface Timer {
@@ -113,7 +115,7 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(f) !== JSON.stringify(init);
-  const canEdit = !timer || me.role === 'owner' || timer.createdBy === me.id;
+  const canEdit = !timer || canChange(timer.createdBy, me);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true); setError(null);
@@ -137,10 +139,10 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
       </>}>
       <fieldset disabled={!canEdit || busy} style={{ border: 0, padding: 0 }}>
         <label className="field"><span>Title</span>
-          <input value={f.title} maxLength={120} onChange={(e) => setF({ ...f, title: e.target.value })} autoFocus={!timer} />
+          <input value={f.title} maxLength={ALERT_TITLE_MAX} onChange={(e) => setF({ ...f, title: e.target.value })} autoFocus={!timer} />
         </label>
-        <label className="field"><span>Interval (minutes, 1–1440)</span>
-          <input type="number" inputMode="numeric" min={1} max={1440} value={f.interval} onChange={(e) => setF({ ...f, interval: e.target.value })} />
+        <label className="field"><span>Interval (minutes, {TIMER_INTERVAL_MIN}–{TIMER_INTERVAL_MAX})</span>
+          <input type="number" inputMode="numeric" min={TIMER_INTERVAL_MIN} max={TIMER_INTERVAL_MAX} value={f.interval} onChange={(e) => setF({ ...f, interval: e.target.value })} />
         </label>
         <div className="row" role="group" aria-label="Active time range (empty = always)">
           <label className="field" style={{ flex: 1 }}><span>Active from</span>

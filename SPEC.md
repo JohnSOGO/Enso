@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.61 · **Date:** 2026-10-05 · **Owner:** MojoSOGO
+**Version:** 2.62 · **Date:** 2026-10-06 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -178,7 +178,7 @@ Cloudflare Tunnel + Access**.
 | Styling | CSS Modules + CSS custom properties | Follow `C:\Users\Public\git\MOJOSOGO-PREFERENCES.md` and the `phone-ui` skill |
 | Push | Web Push (VAPID) from the Worker via **`@block65/webcrypto-web-push` 2.0.0** (pinned exactly) | WebCrypto only. Sends `Content-Encoding: aes128gcm` (RFC 8291) + `Authorization: vapid t=…, k=…` (RFC 8292) — the legacy `aesgcm` that some libraries send is refused by Apple. The 2026-10-03 spike decrypted its output under Node **and** workerd, and cross-checked it with `http_ece`. |
 | House delivery | The Worker calls Home Assistant's REST API through **Cloudflare Tunnel + Access** (§9.2) | `src/worker/house.ts`; no process at home besides HA itself. |
-| Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Two attachments: a thing's photo (`things/…`, §7C.3) and a list item's photo (`list-items/…`, §7A.3). Private: photos are served only through the API to signed-in members. |
+| Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Five attachments, all through `src/worker/photo-store.ts`: a thing's photo (`things/…`, §7C.3), a list item's photo (`list-items/…`, §7A.3), chore-area photos (`chore-areas/…`, §7B.6), mess photos (`messes/…`, §7B.7) and a recipe's picture (`recipes/…`, §7E.2b, §8.12). Private: photos are served only through the API to signed-in members. |
 | Reading photos and recipes | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4, §7A.3, §7E) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). One caller of the SDK: `src/worker/claude.ts`. A snapped list item is read by SogoAI first and by Claude only when SogoAI gives no name (§7A.3). |
 | Naming a snapped item at home | **LM Studio** on SogoAI, `http://127.0.0.1:1234/v1/chat/completions` (OpenAI-compatible), the always-loaded vision model named by `IDENTIFY_MODEL` (`qwen-uncensored`) (§7A.3) | Free. Reached only by the SogoAI helper, never by the Worker directly. |
 | Recipes from videos | **YouTube Data API v3** `videos.list?part=snippet&id=…` and `commentThreads.list?part=snippet&videoId=…&order=relevance&maxResults=20&textFormat=plainText` (§7E) | Secret `YOUTUBE_API_KEY`; 1 quota unit per call, so 2 per read ⚑ Q82. Plus an **unofficial, keyless** captions attempt (YouTube's player endpoint asked as its Android app), which may be blocked — a failure is recorded and shown, never faked. |
@@ -232,29 +232,7 @@ Enso/
 │   │   ├── recipe-link.ts  # §7E.6 any link: its kind (video or page, cleaned), the site's name, the look-up and fill prompts
 │   │   ├── phone-login.ts  # §6.6 sign in with my phone: limits, number matching, request transitions, notice texts
 │   │   └── engine.ts       # §5
-│   └── worker/
-│       ├── index.ts        # Hono app + scheduled() handler
-│       ├── env.ts          # bindings + secrets type
-│       ├── db.ts           # small D1 helpers
-│       ├── http.ts         # error envelope (§10), input checks
-│       ├── routes/         # auth.ts (setup, login, signup, /me) · members.ts (members,
-│       │                   # invites) · events.ts (/calendar, events) · alarms.ts ·
-│       │                   # alerts.ts (timers, fires + actions) · household.ts (settings,
-│       │                   # days off, /push/*, /status) · announce.ts ·
-│       │                   # lists.ts (§7A) · item-photos.ts (§7A.3) · machines.ts (§7D) ·
-│       │                   # recipes.ts (§7E) · phone-login.ts (§6.6)
-│       ├── recipe-reads.ts # §7E.2, §7E.6 reading a new recipe + the daily read budget
-│       ├── recipe-reread.ts # §7E.2b re-reading a recipe in place
-│       ├── claude.ts       # the one Claude API call (§7C.4, §7E)
-│       ├── recipe-reader.ts # §7E the recipe prompt + schema
-│       ├── recipe-link-reader.ts # §7E.6 a page: fetched, looked up, filled with the recipe schema
-│       ├── youtube.ts      # §7E YouTube Data API videos.list + commentThreads.list
-│       ├── youtube-captions.ts # §7E the unofficial captions attempt
-│       ├── tick.ts         # loads rows, calls engine, writes results
-│       ├── push.ts         # Web Push sending
-│       ├── house.ts        # House delivery via HA through Cloudflare Tunnel + Access (§9.2)
-│       ├── home-captions.ts # §7E.2c, §7A.3 asking SogoAI for captions or an item's name, through Access + the tunnel
-│       └── session.ts      # password hashing, session cookie
+│   └── worker/             # the Worker: Hono app, routes/, tick, deliveries, readers — file by file in docs/module-ownership.md
 ├── frontend/               # Vite root
 │   ├── index.html
 │   ├── vite.config.ts
@@ -374,6 +352,7 @@ export const LOGIN_VIEW   = ['pending', 'approved', 'denied', 'expired'] as cons
 export const NOTICE_KIND  = ['login', 'new_sign_in'] as const;                    // §6.6 deliveries.notice — a sign-in notice push, never an alert
 export const MESS_SETTLE  = ['paid', 'forgiven'] as const;                        // §7B.7 messes.settled_how
 export const MESS_STATUS  = ['open', 'discuss', 'owed', 'closed', 'settled'] as const; // §7B.7 a mess's state — derived, never stored
+export const LIST_ADD_RESULT = ['added', 'existing', 'reopened'] as const;       // §7A.1 POST /lists/{id}/items result
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
 ```
@@ -1503,6 +1482,9 @@ Runs from `scheduled()` every minute, and from `POST /api/v1/dev/tick` in dev.
    - If the fire went `scheduled → ringing` and is a reminder, close any other
      `ringing` fire of the same event as `superseded`.
 3. **Send push.** Send the `push` deliveries created in this tick (§9.1).
+   3b. **Mess asks.** `messTick` (`src/worker/mess-asks.ts`): ask again about each open mess,
+   move an unclaimed one to To talk about, and delete mess photos past `MESS_PHOTO_KEEP_DAYS`
+   (§7B.7). Its asks are fire-less push deliveries, sent at once.
 4. **Speak house.** `sendHouseDeliveries(env, now)` drains queued and stale-claimed `house`
    deliveries (§9.2).
 5. Use a D1 `batch()` per fire for the writes. D1 has no `BEGIN`/`COMMIT`.
@@ -1536,7 +1518,8 @@ For one alert of one fire:
   - machine: `"{name}, your laundry in the {machine} is done"`; with no active owner,
     `"The laundry in the {machine} is done"`; plus `" — {name}'s load is waiting"` while the
     machine before it holds a done load (§7D.3). Built by `machines.ts` `doneMessage`;
-    recipients are the owner, or every active member when the owner is disabled.
+    recipients are every active member, and the house row goes to every speaker
+    (`machines.ts` `machineAlert`: nobody assigned, `allSpeakers`), waiting for the alert hours (§7D.5).
   - sun-timed reminder (§7.7): `"{title} — sunset at {h:mm}"` — the occurrence's sunset in
     the household tz, 12-hour with no am/pm ("18:42" → "6:42") ⚑ Q52; when that sunset cannot
     be computed at alert time, `"{title} — before sunset"`. `alertMessage(kind, title, n,
@@ -1544,8 +1527,9 @@ For one alert of one fire:
     `null` = could not be computed; absent = not a sun event). No emoji in the text.
   - from the second alert on, append `" (alert {n})"`
 
-A delivery with **no fire** is an announcement (§9.3); it is written by `POST /announce`,
-never by `tick`.
+A delivery with **no fire** is an announcement (§9.3, `POST /announce`), a sign-in notice (§6.6), a
+founder ping (§9.4, `POST /ops/notify`) or a mess ask (§7B.7). `tick` writes only the last of these, in
+step 3b (§5.6); every fire-less row is written through `src/worker/deliveries.ts`.
 
 ### 5.8 Engine acceptance tables (M1 — each row is a test)
 
@@ -5014,19 +4998,20 @@ Captured from v1.0-draft so nothing is lost:
 - Offline **editing** and conflict resolution. v1 offline = the cached app shell;
   actions need network, and buttons show disabled "offline".
 - Queued offline acks
-- Photos anywhere other than Things to do (§7C.3), list items (§7A.3), a chore's areas (§7B.6) and a mess
-  report (§7B.7, kept at most 30 days), the only four attachments. A picture a show is looked up from (§7F.2) is read once and never stored, so it is not one. A recipe's video
+- Photos anywhere other than Things to do (§7C.3), list items (§7A.3), a chore's areas (§7B.6), a mess
+  report (§7B.7, kept at most 30 days) and a recipe's picture (§7E.2b, §8.12), the only five attachments. A picture a show is looked up from (§7F.2) is read once and never stored, so it is not one. A recipe's video
   thumbnail (§7E.1) is hotlinked from YouTube — not stored, not in R2, not an attachment — so it
   is not one. Transcript screenshots (§7E.2b) are read once and never stored — not in R2, not an
   attachment — so they are not one either ⚑ Q93, except the one kept as a recipe's picture (§7E.2b ⚑ Q174),
-  which is read-only (no upload or delete of its own).
+  which since v1.32.0 also has its own upload and delete (`PUT/DELETE /recipes/{id}/photo`, ⚑ Q175).
 - Data export
 - Audit-log screen
 - Event templates
 - Week-strip view
 - Editing a single occurrence of a series
-- Household-wide quiet hours ⚑ — see Q2. (Rolling timers have their own active time range
-  since v2.28, §4.2n; quiet hours for everything else stay here.)
+- Household-wide quiet hours ⚑ — see Q2. (Two exceptions are built: rolling timers have their own
+  active time range since v2.28, §4.2n, and machine alerts wait for the machine alert hours, §7D.5;
+  quiet hours for everything else stay here.)
 - Escalation ladders: channel changes per alert number, light blinking, notifying
   the owner on escalation
 - HA entity/automation generation; HA events creating reminders (door/motion)
@@ -5256,17 +5241,18 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q183 | Pushes for a mess (§7B.7) | Asks to everyone but the reporter, up to 4, 15 min apart, plus an in-app banner until answered (decided by MojoSOGO 2026-10-05); ⚑ one push to each admin when it goes to To talk about; ⚑ never spoken in the house |
 | Q184 | Naming the reporter (§7B.7) | ⚑ Yes: "Sam cleaned this up" |
 | Q185 | A mess photo (§7B.7) | ⚑ Required to report; deleted when settled, closed or deleted, and at most 30 days after the report |
+| Q186 | Counting founder pings (§9.4) | Founder pings are counted by elimination in `src/worker/deliveries.ts` `opsPingsSince` (a fire-less push with a title that is neither a sign-in notice nor a mess ask), so a future kind of fire-less push could quietly count. ⚑ Keep the elimination (tested in `test/deliveries.test.ts`); the alternative is a `deliveries` kind/marker column |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
 
-## 14. Prototype status (2026-10-03)
+## 14. Prototype status (2026-10-06)
 
 Built: M0–M4 and M4a fully (alarms, with their API tests), plus the later §7 work:
 household days off (§7.3), grouped multi-day bars (§7.1), monthly-by-weekday repeat
 (§4.3) and the 📈 options-expiration marker (§7.4). M6 was first built as a LAN relay
 (relay + API + contract test + logon launcher); v1.7.0 retired it for direct House delivery
-(below). **M5 Web Push** is built (v1.3.0, §9.1): `web-push.ts` sends (VAPID header per
+(below). **M5 Web Push** is built (v1.3.0, refined in v1.4.0; §9.1): `web-push.ts` sends (VAPID header per
 origin, reused for 1 h; parallel sends to one origin share one signing), `push.ts` records
 results, `POST /push/test`, `sw.js` (no fetch listener; `_headers` serves it `no-cache` —
 checked under `wrangler dev`), the Phone alerts row in Settings → Me. P1–P9 green against a fake
@@ -5276,8 +5262,9 @@ subscriptions); a test push whose every phone fails → 502 with the failure, no
 missing keys on `/push/test` → 503; a failed notification action shows a second notification
 saying so. **Needs a real phone:** Turn on → Send a test on the iPhone home-screen app and on
 Android, the lock-screen reminder, Android Done/Snooze buttons, the Blocked and
-add-to-Home-Screen states, and a revoked subscription showing `failed` in Status. M7 not started: `wrangler.toml` still carries the
-placeholder `database_id`. The §2.5 architecture guard is in place (map, test, `arch:audit`). M4b Lists is built
+add-to-Home-Screen states, and a revoked subscription showing `failed` in Status. **Deviation:** §10's
+"refetch when a push arrives" is not built — an open app picks the alert up on its 30 s poll, and a
+reopened app reloads (§8.10). The §2.5 architecture guard is in place (map, test, `arch:audit`). M4b Lists is built
 with its API tests (L1–L12) and its 320 px manual check passed on 2026-10-03. M4c
 Chores is built (C1–C14 green; migration 0006 applied to the local dev database with
 existing fires and deliveries intact; the Laundry loop exercised end to end through the
@@ -5290,11 +5277,6 @@ home-screen tags, `AppRefresh` (reload on resume unless a dialog is open; pull t
 — verified with real touch events in an emulated phone; its on-iPhone check is still to do.
 The ensō mark (scripts/draw-enso.mjs) and the opening screen are built; the 7 iPhone launch
 images are rendered from it. Its on-iPhone check is still to do.
-**M5 Web Push** is built (v1.4.0; 253 tests incl. P1–P9 with a test-side RFC 8291 decryptor;
-`/sw.js` served `no-cache` via `_headers`). **Deviation:** §10's "refetch when a push arrives"
-is not built — an open app picks the alert up on its 30 s poll, and a reopened app reloads
-(§8.10). Still to check on real phones: Turn on → Send a test (iPhone home-screen app and
-Android), a reminder on the lock screen, Android Done/Snooze.
 **M6 House delivery, direct** (v1.7.0; 273 tests incl. H1–H9 and the rewritten AN3): the LAN
 relay is retired (`relay/`, `/relay/*`, `RELAY_TOKEN`, `settings.relay_last_seen` all gone); the
 Worker speaks through Cloudflare Tunnel + Access (`src/worker/house.ts`, §9.2) — on each tick
@@ -5468,6 +5450,13 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Steward pass 2, everything** (v1.33.2; approved by MojoSOGO 2026-10-06; behavior unchanged): each code item was placed
+by the placement-advisor and moved by the reorganizer in its own commit. There are four new owners: `src/shared/roles.ts`
+(ADMIN_ROLE, isAdmin, canChange: one creator-or-admin rule for routes and forms), `src/shared/photos.ts` (photo limits,
+bundled into home/), `src/shared/alert-limits.ts` (title and interval limits) and `frontend/src/components/usePhotoPick.tsx`.
+`canSee` joined the mess rules, normalizeInviteCode moved to `invite-link.ts`, the recipe read failures became one union
+with the Q78 rule as `commentsError`, the web-tool builders moved into `claude.ts`, and the list-add result is now
+vocabulary. New tests: migration 0028 and the RepeatFields mappings. Reports: `docs/steward/`.
 **Steward pass 1, items 1–5** (v1.33.1; approved by MojoSOGO 2026-10-05; behavior unchanged): the first
 code-steward pass's top five, each placed by the placement-advisor and moved by the reorganizer in its own commit.
 New owners `src/worker/recipe-reads.ts` (the recipe read pipelines and budget; `routes/recipes.ts` 274 → 229),

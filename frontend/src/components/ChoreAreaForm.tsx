@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Grow } from './Grow';
 import { Thumb } from './PhotoField';
+import { shrinkPicked, usePhotoPick } from './usePhotoPick';
 import { apiUrl, del, errorText, patch, post, upload } from '../api';
 import { AREA_NAME_MAX, AREA_PHOTOS_MAX, type ChoreArea } from '../../../src/shared/chore-areas';
 import s from './ChoreAreas.module.css';
@@ -23,7 +24,6 @@ export function ChoreAreaForm({ choreId, area, onDirty, onSaved, onCancel }: {
   const [pending, setPending] = useState<Pending[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const input = useRef<HTMLInputElement>(null);
   const urls = useRef<string[]>([]);
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
@@ -32,12 +32,12 @@ export function ChoreAreaForm({ choreId, area, onDirty, onSaved, onCancel }: {
   const kept = (saved?.photos ?? []).filter((id) => !removed.includes(id));
   const room = AREA_PHOTOS_MAX - kept.length - pending.length;
 
-  async function picked(file: File | undefined) {
-    if (!file) return;
+  const pick = usePhotoPick(([file]) => picked(file));
+
+  async function picked(file: File) {
     setError(null); setBusy('Getting the photo ready…');
     try {
-      const { shrinkPhoto } = await import('../shrink-photo');
-      const blob = await shrinkPhoto(file);
+      const blob = await shrinkPicked(file);
       const url = URL.createObjectURL(blob);
       urls.current.push(url);
       setPending((p) => [...p, { blob, url }]);
@@ -97,9 +97,8 @@ export function ChoreAreaForm({ choreId, area, onDirty, onSaved, onCancel }: {
               </span>
             ))}
           </div>
-          <input ref={input} type="file" accept="image/*" className="visually-hidden" tabIndex={-1} aria-hidden
-            onChange={(e) => { picked(e.target.files?.[0]); e.target.value = ''; }} />
-          {room > 0 && <button type="button" onClick={() => input.current?.click()}>📷 Add photo</button>}
+          {pick.input}
+          {room > 0 && <button type="button" onClick={pick.open}>📷 Add photo</button>}
         </div>
       </fieldset>
       {busy && <p className="muted" role="status">{busy}</p>}

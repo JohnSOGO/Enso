@@ -7,6 +7,8 @@ import { all, first, householdTz, newId, nowIso, parseJson, run } from '../db';
 import { isTime } from '../../shared/time';
 import { body, fail, intIn, str } from '../http';
 import { requireMember } from '../session';
+import { canChange } from '../../shared/roles';
+import { ALERT_TITLE_MAX, TIMER_INTERVAL_MAX, TIMER_INTERVAL_MIN } from '../../shared/alert-limits';
 import { choreFireContext } from '../../shared/chores';
 import { insertFire, loadChoreRun, sourceOf, updateFire } from '../fire-rows';
 import { completeStep } from './chores';
@@ -31,10 +33,10 @@ async function timerView(db: D1Database, t: TimerRow) {
 }
 
 function parseTimerInput(b: Record<string, unknown>) {
-  const title = str(b.title, 120);
-  if (!title) return 'Title is required (up to 120 characters).';
-  const interval = intIn(b.intervalMin, 1, 1440);
-  if (interval === null) return 'Interval must be 1–1440 minutes.';
+  const title = str(b.title, ALERT_TITLE_MAX);
+  if (!title) return `Title is required (up to ${ALERT_TITLE_MAX} characters).`;
+  const interval = intIn(b.intervalMin, TIMER_INTERVAL_MIN, TIMER_INTERVAL_MAX);
+  if (interval === null) return `Interval must be ${TIMER_INTERVAL_MIN}–${TIMER_INTERVAL_MAX} minutes.`;
   if (!Array.isArray(b.channels) || b.channels.length === 0 || !b.channels.every((ch) => isOneOf(CHANNEL, ch))) {
     return `Channels must be a non-empty list of: ${CHANNEL.join(', ')}.`;
   }
@@ -61,7 +63,7 @@ async function loadTimer(c: Context<AppEnv>, forWrite: boolean): Promise<TimerRo
   const t = await first<TimerRow>(c.env.DB, 'SELECT * FROM timers WHERE id = ? AND deleted_at IS NULL', c.req.param('id'));
   if (!t) return fail(c, 404, 'not_found', 'That timer no longer exists.');
   const me = c.get('member');
-  if (forWrite && t.created_by !== me.id && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this timer.');
+  if (forWrite && !canChange(t.created_by, me)) return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this timer.');
   return t;
 }
 

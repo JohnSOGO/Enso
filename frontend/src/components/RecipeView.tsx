@@ -13,7 +13,7 @@ import { useApp, type Member } from '../state';
 import { apiUrl, errorText, post } from '../api';
 import { SHOPPING_LIST_ID } from '../../../src/shared/lists';
 import { recipePhotoPath, type Recipe } from '../../../src/shared/recipes';
-import type { RecipeSource } from '../../../src/shared/vocab';
+import type { ListAddResult, RecipeSource } from '../../../src/shared/vocab';
 import s from './Recipes.module.css';
 
 /** How the source note names each thing a recipe was read from (⚑ Q81). */
@@ -65,7 +65,7 @@ export function RecipeView({ recipe: r, recipes, onChange, onEdit, onClose }: Pr
     try {
       for (let i = 0; i < items.length; i++) {
         try {
-          const res = await post<{ result: string }>(`/lists/${SHOPPING_LIST_ID}/items`, { text: items[i] });
+          const res = await post<{ result: ListAddResult }>(`/lists/${SHOPPING_LIST_ID}/items`, { text: items[i] });
           (res.result === 'existing' ? there : added).push(items[i]);
         } catch (e) {
           setError([...summary(added, there), `Not added: ${items.slice(i).join(', ')} — ${errorText(e)}`].join(' · '));

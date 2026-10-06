@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Client, member, owner } from './helpers';
 import {
   CHECKED_VISIBLE_DAYS, LISTS_MAX, LIST_NAME_MAX, SHOPPING_LIST_ID, TEXT_MAX,
-  DEFAULT_LIST_EMOJI, canManageList, checkedCutoff, defaultListEmoji, itemKey, listEmoji, listNameClash, renameClash, resolveAdd, visibleItems,
+  DEFAULT_LIST_EMOJI, checkedCutoff, defaultListEmoji, itemKey, listEmoji, listNameClash, renameClash, resolveAdd, visibleItems,
 } from '../src/shared/lists';
 
 describe('list rules (pure)', () => {
@@ -35,15 +35,6 @@ describe('list rules (pure)', () => {
     expect(listNameClash(null, ' Hardware  STORE ', lists)?.id).toBe('lst_a');
     expect(listNameClash('lst_a', 'hardware store', lists)).toBeNull();
     expect(listNameClash(null, 'Garden', lists)).toBeNull();
-  });
-
-  it('canManageList: creator or admin; a seeded list (no creator) admins only', () => {
-    const admin = { id: 'mem_a', role: 'owner' as const }, m = { id: 'mem_m', role: 'member' as const };
-    expect(canManageList('mem_m', m)).toBe(true);
-    expect(canManageList('mem_x', m)).toBe(false);
-    expect(canManageList('mem_x', admin)).toBe(true);
-    expect(canManageList(null, m)).toBe(false);
-    expect(canManageList(null, admin)).toBe(true);
   });
 
   it('defaultListEmoji picks from the name (⚑ Q157); listEmoji prefers the list\'s own', () => {

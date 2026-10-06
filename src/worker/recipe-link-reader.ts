@@ -3,7 +3,7 @@
 // fetch and web search, then the fill with recipe-reader.ts's schema. Returns the raw reading, the look-up's notes
 // and the fallback title, or an honest failure; no Hono, no D1, never decides what is saved (the route cleans it
 // with cleanRecipeReading).
-import { askClaude, askClaudeResearch } from './claude';
+import { askClaude, askClaudeResearch, webFetchTool, webSearchTool } from './claude';
 import { fetchPage } from './page-fetch';
 import { recipeReadingSchema } from './recipe-reader';
 import { RESEARCH_TURNS_MAX, pageExtract, type PageResult } from '../shared/link-reading';
@@ -24,10 +24,7 @@ export async function readRecipeLink(input: ReadRecipeLinkInput, opts: { fetch?:
   const notes = await askClaudeResearch({
     apiKey: input.apiKey, fetch: opts.fetch, maxTurns: RESEARCH_TURNS_MAX,
     prompt: recipeResearchPrompt(input.link, input.site, page),
-    tools: [
-      { type: 'web_search_20260209', name: 'web_search', max_uses: RECIPE_LINK_SEARCHES_MAX },
-      { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: RECIPE_LINK_FETCHES_MAX },
-    ],
+    tools: [webSearchTool(RECIPE_LINK_SEARCHES_MAX), webFetchTool(RECIPE_LINK_FETCHES_MAX)],
   });
   if (!notes.ok) return notes;
   const res = await askClaude({

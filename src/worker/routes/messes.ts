@@ -3,9 +3,10 @@
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import {
-  askedOf, balancesOf, canDelete, canSettle, decideError, isAnswerable, isDecidable, messStatus, parseMessInput, type Mess, type MessRow,
+  askedOf, balancesOf, canDelete, canSee, canSettle, decideError, isAnswerable, isDecidable, messStatus, parseMessInput, type Mess, type MessRow,
 } from '../../shared/messes';
 import { MESS_SETTLE, isOneOf } from '../../shared/vocab';
+import { isAdmin } from '../../shared/roles';
 import { activeMemberIds, all, first, newId, nowIso } from '../db';
 import { body, fail, photoBody } from '../http';
 import { requireMember, requireOwner } from '../session';
@@ -40,11 +41,12 @@ const dropPhoto = async (c: Context<AppEnv>, m: MessRow) => { if (m.photo_key) a
 export const messes = new Hono<AppEnv>();
 
 messes.get('/messes', requireMember, async (c) => {
-  const db = c.env.DB, me = c.get('member'), admin = me.role === 'owner';
+  const db = c.env.DB, me = c.get('member'), admin = isAdmin(me);
   const rows = await all<MessRow>(db,
     'SELECT * FROM messes WHERE deleted_at IS NULL AND settled_at IS NULL AND closed_at IS NULL ORDER BY created_at DESC, id');
   const owed = rows.filter((m) => messStatus(m) === 'owed');
-  const shown = rows.filter((m) => messStatus(m) !== 'owed' || admin || m.reported_by === me.id || m.claimed_by === me.id);
+  const viewer = { id: me.id, admin };
+  const shown = rows.filter((m) => canSee(m, viewer));
   const active = await activeMemberIds(db);
   return c.json({ messes: await Promise.all(shown.map((m) => view(db, m, active))), balances: balancesOf(owed, me.id, admin) });
 });
@@ -125,7 +127,7 @@ messes.post('/messes/:id/settle', requireMember, async (c) => {
   if (!isOneOf(MESS_SETTLE, how)) return fail(c, 400, 'invalid_input', `how must be one of: ${MESS_SETTLE.join(', ')}.`);
   const status = messStatus(m);
   if (status !== 'owed') return fail(c, 409, 'mess_settled', 'That mess isn\'t owed.');
-  if (!canSettle({ status, reportedBy: m.reported_by }, { id: me.id, admin: me.role === 'owner' })) return fail(c, 403, 'forbidden', 'Only the one owed or an admin can settle it.');
+  if (!canSettle({ status, reportedBy: m.reported_by }, { id: me.id, admin: isAdmin(me) })) return fail(c, 403, 'forbidden', 'Only the one owed or an admin can settle it.');
   await dropPhoto(c, m);
   await c.env.DB.prepare('UPDATE messes SET settled_at = ?, settled_how = ?, settled_by = ?, photo_key = NULL WHERE id = ?')
     .bind(nowIso(), how, me.id, m.id).run();
@@ -136,7 +138,7 @@ messes.delete('/messes/:id', requireMember, async (c) => {
   const m = await loadMess(c);
   if (m instanceof Response) return m;
   const me = c.get('member');
-  if (!canDelete({ status: messStatus(m), reportedBy: m.reported_by }, { id: me.id, admin: me.role === 'owner' })) return fail(c, 403, 'forbidden', 'Only the one who reported it, before anyone answers, or an admin can delete a mess.');
+  if (!canDelete({ status: messStatus(m), reportedBy: m.reported_by }, { id: me.id, admin: isAdmin(me) })) return fail(c, 403, 'forbidden', 'Only the one who reported it, before anyone answers, or an admin can delete a mess.');
   await dropPhoto(c, m);
   await c.env.DB.prepare('UPDATE messes SET deleted_at = ?, photo_key = NULL WHERE id = ?').bind(nowIso(), m.id).run();
   return c.body(null, 204);
