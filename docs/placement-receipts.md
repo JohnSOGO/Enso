@@ -7,6 +7,12 @@ carry its result.
 
 ---
 
+## 2026-10-06 — Owed tests: migration 0028 and RepeatFields mappings (placement-advisor)
+
+- **Ask:** steward pass 2 item 8 (pass 1 #10, approved): test/migration-0028.test.ts and a unit test of RepeatFields.tsx's repeatOf / weeksOf / toRecurrence / repeatText (§4.2, §7D.5, §8.4).
+- **Verdict:** REUSE-add-nothing (test/ only; no source owner, no map row).
+- **Why:** test/ is outside SOURCE_ROOTS; a .tsx loads in the worker pool only via a run-time `@vite-ignore` dynamic import (precedent recipe-transcript.test.ts). Rejected: extracting the mappings to .ts for testability; widening the root tsconfig.
+
 ## 2026-10-06 — usePhotoPick for the photo pickers (placement-advisor)
 
 - **Ask:** steward pass 2 item 7 (pass 1 #9, approved): a usePhotoPick hook beside PhotoField.tsx, adopted by ItemPhoto, RecipeTranscript, ChoreAreaForm and Shows (§7C.3, §8.8). Behavior-preserving.
