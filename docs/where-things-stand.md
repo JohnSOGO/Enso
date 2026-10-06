@@ -48,4 +48,4 @@ the working agreement in `CLAUDE.md`.
 - Real-phone checks still owed per SPEC §14 (Android push, Done/Snooze, the laundry and goat reminders in practice).
 - Code-steward pass 1 done 2026-10-05 (items 1–5 in v1.33.1); items 6–10 wait until those files are next touched. Pass 2
   done 2026-10-06. Both reports are in `docs/steward/`.
-- Steward pass 2 items (`docs/steward/2026-10-06-second-pass.md`) in progress 2026-10-06.
+- Steward pass 2 done 2026-10-06 (v1.33.2); nothing from it is owed.

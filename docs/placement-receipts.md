@@ -125,6 +125,18 @@ carry its result.
 - **Behavior:** preserved — typecheck, npm test (664: the 663 existing unchanged plus 1 canSee unit test) and arch:audit green (quiet); canSee's body is the route's filter term for term (not owed, or admin, or reporter, or claimer); the route's `admin` (isAdmin(me)) still feeds balancesOf; GET /messes response unchanged.
 - **Restraint:** balancesOf and Messes.tsx untouched; no filtering moved to the PWA.
 
+## 2026-10-06 — Steward pass, whole tree (code-steward)
+
+- **Run:** on demand, second pass, checking the PR #18 extractions (v1.33.1, main 712dc23).
+- **Verdict:** MINOR DRIFT. Items 1–5 landed as their verdicts said; typecheck, 662/662 tests and arch:audit green; nothing
+  in the warning band; tick.ts imported only by index.ts.
+- **Top finding:** SPEC §12 and §14 contradicted the code. A second run on SogoGamerPC added the creator-or-admin rule
+  repeated in 4 routes and 4 forms, §5.7 drift on machine alerts, photo limits bundled into home/, and hand-typed wire values.
+- **Handoffs:** MojoSOGO approved all of it 2026-10-06. The docs commit and P1–P9 are above (report: docs/steward/2026-10-06-second-pass.md).
+- **Placement audit:** 5 code commits since pass 1, all with advisor and reorganizer receipts; 0 without.
+
+---
+
 ## 2026-10-06 — One creator-or-admin rule and isAdmin (placement-advisor)
 
 - **Ask:** steward pass 2 item A (approved): one shared "creator or admin may change it" rule plus isAdmin; today written in 4 routes and 4 forms beside canManageList, and `role === 'owner'` ~28 times (§6.3). Behavior-preserving.

@@ -5450,6 +5450,13 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Steward pass 2, everything** (v1.33.2; approved by MojoSOGO 2026-10-06; behavior unchanged): each code item was placed
+by the placement-advisor and moved by the reorganizer in its own commit. There are four new owners: `src/shared/roles.ts`
+(ADMIN_ROLE, isAdmin, canChange: one creator-or-admin rule for routes and forms), `src/shared/photos.ts` (photo limits,
+bundled into home/), `src/shared/alert-limits.ts` (title and interval limits) and `frontend/src/components/usePhotoPick.tsx`.
+`canSee` joined the mess rules, normalizeInviteCode moved to `invite-link.ts`, the recipe read failures became one union
+with the Q78 rule as `commentsError`, the web-tool builders moved into `claude.ts`, and the list-add result is now
+vocabulary. New tests: migration 0028 and the RepeatFields mappings. Reports: `docs/steward/`.
 **Steward pass 1, items 1–5** (v1.33.1; approved by MojoSOGO 2026-10-05; behavior unchanged): the first
 code-steward pass's top five, each placed by the placement-advisor and moved by the reorganizer in its own commit.
 New owners `src/worker/recipe-reads.ts` (the recipe read pipelines and budget; `routes/recipes.ts` 274 → 229),
