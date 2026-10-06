@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-06 — Fill in an event from a screenshot (placement-advisor)
+
+- **Ask:** SPEC 2.63 §7.8 (with §8.4, §10 `POST /events/read-photo`): a screenshot fills the new-event form; nothing saved.
+- **Verdict:** `src/shared/event-reading.ts` [NEW row] (EventReading, cleanEventReading, readingToForm on an EventFill subset); `src/worker/event-reader.ts` [NEW row] (prompt, schema, imageBlock + nearestClause, askClaude); `src/worker/routes/event-photos.ts` [NEW row] (the §7C.4 order, spendPhotoRead mapped inline, mounted before `events` in index.ts); `frontend/src/components/EventPhotoFill.tsx` [NEW row], hosted by EventForm.tsx [EXISTING]; EVENT_NOTES_MAX into `src/shared/alert-limits.ts` [EXISTING].
+- **Flow stage:** rules / deliver / route / render, split along the flow.
+- **Why:** the fill rules are shared so the Worker and PWA cannot disagree and EP4–EP6 test pure. Rejected: things.ts as the rules home (Things owner; would pull things → engine into the event form); photo-reader.ts (already two readers); events.ts for the route (114/147, the CRUD hub); thing-photos.ts (Things owner); exporting or moving the file-local spendRead (a fourth inline mapping is steward material, as is event-rows.ts adopting EVENT_NOTES_MAX); the button inline in EventForm.tsx (188/223, band at 201). No `POST /events/:id` exists; mounting before `events` guards against one later.
+- **Caps:** shared/event-reading.ts ~60/300 (new); alert-limits.ts 7 → 9/300; worker/event-reader.ts ~45/300 (new); routes/event-photos.ts ~30/300 (new); worker/index.ts 88 → 90/300; EventPhotoFill.tsx ~50/300 (new); EventForm.tsx 188 → ~190/223. No ceiling moved, nothing newly in the band.
+- **Sources read:** SPEC.md §7.8, §8.4, §10; scripts/arch.ts; docs/module-ownership.md; docs/modularity.md; docs/placement-receipts.md; photo-reader.ts; routes/thing-photos.ts; routes/events.ts; photo-reads.ts; index.ts; shared/time.ts; alert-limits.ts; things.ts; link-reading.ts; EventForm.tsx; api.ts; item-photos.ts; shows.ts.
+
 ## 2026-10-06 — Owed tests: migration 0028 and RepeatFields mappings (placement-advisor)
 
 - **Ask:** steward pass 2 item 8 (pass 1 #10, approved): test/migration-0028.test.ts and a unit test of RepeatFields.tsx's repeatOf / weeksOf / toRecurrence / repeatText (§4.2, §7D.5, §8.4).

@@ -1,4 +1,4 @@
-// SPEC §8.4 — event form (modal). Creates or edits an event and its reminder.
+// SPEC §8.4 — event form (modal). Creates or edits an event and its reminder; a new one can be filled from a screenshot (§7.8).
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
 import { del, errorText, get, patch, post, put } from '../api';
@@ -6,10 +6,11 @@ import { useApp } from '../state';
 import { WEEKDAY } from '../../../src/shared/vocab';
 import { weekdayOf } from '../../../src/shared/time';
 import { canChange } from '../../../src/shared/roles';
-import { ALERT_TITLE_MAX } from '../../../src/shared/alert-limits';
+import { ALERT_TITLE_MAX, EVENT_NOTES_MAX } from '../../../src/shared/alert-limits';
 import { type Recurrence } from '../../../src/shared/recurrence';
 import { longDate } from './DaySheet';
 import { FromThing } from './ThingPhoto';
+import { EventPhotoFill } from './EventPhotoFill';
 import { RepeatFields, ownWeek, repeatOf, toRecurrence, weeksOf, type RepeatValue } from './RepeatFields';
 import { ReminderFields, reminderOf, toReminder, type ReminderValue } from './ReminderFields';
 
@@ -118,6 +119,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
       {meta?.thingId && <FromThing thingId={meta.thingId} />}
       {form && (
         <fieldset disabled={!canEdit || busy} style={{ border: 0, padding: 0 }}>
+          {!eventId && <EventPhotoFill form={form} opened={blank(date)} onFill={setForm} />}
           {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>Only the creator or an admin can change this event.</p>}
           <label className="field"><span>Title</span>
             <input value={form.title} maxLength={ALERT_TITLE_MAX} onChange={(e) => set('title', e.target.value)} autoFocus={!eventId} />
@@ -168,7 +170,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
             <input type="checkbox" checked={form.optional} onChange={(e) => set('optional', e.target.checked)} /> Optional — each person turns it on
           </label>
           <label className="field"><span>Notes</span>
-            <textarea rows={2} value={form.notes} maxLength={2000} onChange={(e) => set('notes', e.target.value)} />
+            <textarea rows={2} value={form.notes} maxLength={EVENT_NOTES_MAX} onChange={(e) => set('notes', e.target.value)} />
           </label>
         </fieldset>
       )}

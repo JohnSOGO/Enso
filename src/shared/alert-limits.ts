@@ -5,3 +5,5 @@ export const ALERT_TITLE_MAX = 120;
 /** A timer's interval, in whole minutes. */
 export const TIMER_INTERVAL_MIN = 1;
 export const TIMER_INTERVAL_MAX = 1440;
+/** An event's notes: at most this many characters. */
+export const EVENT_NOTES_MAX = 2000;
