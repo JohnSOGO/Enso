@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { MEMBER_PALETTE, type Role } from '../../shared/vocab';
 import { ADMIN_ROLE } from '../../shared/roles';
+import { normalizeInviteCode } from '../../shared/invite-link';
 import { all, first, newId, nowIso, run } from '../db';
 import { body, fail, str } from '../http';
 import { endSession, hashPassword, requireMember, sha256hex, startSession, verifyPassword } from '../session';
@@ -13,11 +14,6 @@ import { choiceOf } from '../speaker-choices';
 export const MIN_PASSWORD = 10;
 const FAIL_WINDOW_MIN = 15;
 const FAIL_LIMIT = 5;
-
-/** §6.2 — uppercase, strip dashes/spaces, I/L→1, O→0. */
-export function normalizeInviteCode(code: string): string {
-  return code.toUpperCase().replace(/[\s-]/g, '').replace(/[IL]/g, '1').replace(/O/g, '0');
-}
 
 /** §6.2 — wrong, expired, used and revoked codes all get this ONE message (preview and signup alike). */
 const INVALID_CODE_MESSAGE = 'That invite code is not valid. Ask an admin of the household for a new one.';

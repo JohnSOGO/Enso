@@ -6,7 +6,7 @@ import { body, fail, str } from '../http';
 import { ROLE, isOneOf } from '../../shared/vocab';
 import { ADMIN_ROLE, isAdmin } from '../../shared/roles';
 import { requireMember, requireOwner, sha256hex } from '../session';
-import { normalizeInviteCode } from './auth';
+import { normalizeInviteCode } from '../../shared/invite-link';
 
 const INVITE_DAYS = 7;
 

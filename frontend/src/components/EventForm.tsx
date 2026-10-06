@@ -6,6 +6,7 @@ import { useApp } from '../state';
 import { WEEKDAY } from '../../../src/shared/vocab';
 import { weekdayOf } from '../../../src/shared/time';
 import { canChange } from '../../../src/shared/roles';
+import { ALERT_TITLE_MAX } from '../../../src/shared/alert-limits';
 import { type Recurrence } from '../../../src/shared/recurrence';
 import { longDate } from './DaySheet';
 import { FromThing } from './ThingPhoto';
@@ -119,7 +120,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
         <fieldset disabled={!canEdit || busy} style={{ border: 0, padding: 0 }}>
           {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>Only the creator or an admin can change this event.</p>}
           <label className="field"><span>Title</span>
-            <input value={form.title} maxLength={120} onChange={(e) => set('title', e.target.value)} autoFocus={!eventId} />
+            <input value={form.title} maxLength={ALERT_TITLE_MAX} onChange={(e) => set('title', e.target.value)} autoFocus={!eventId} />
           </label>
           <div className="row">
             <label className="field" style={{ flex: 1 }}><span>Date</span>

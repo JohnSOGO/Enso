@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-06 — Alert limits and invite-code normalizing into shared (placement-advisor)
+
+- **Ask:** steward pass 2 item 4 (pass 1 #6, approved): title ≤120 ×5 and interval 1–1440 ×3 across routes/alerts.ts, event-rows.ts, Timers.tsx, Alarms.tsx and EventForm.tsx; normalizeInviteCode out of routes/auth.ts (§4.2, §5.4, §6.2). Behavior-preserving.
+- **Verdict:** `src/shared/alert-limits.ts` [NEW row]; `src/shared/invite-link.ts` [EXISTING, row widened]; the five limit sites, auth.ts and members.ts [EXISTING, import].
+- **Flow stage:** rules (shared limits and format), used by route and render.
+- **Why:** route and form restate the same numbers; a leaf keeps engine.ts (85%) from growing; moving the normalizer removes the members.ts → auth.ts route import. Rejected: engine.ts; things.ts' TITLE_MAX; a generic limits.ts; folding in offset/renotify/maxAlerts (not approved; alert-limits.ts is their named later home); PWA normalizing.
+- **Caps:** shared/alert-limits.ts 7/300 (new); shared/invite-link.ts 15 → 20/300; routes/auth.ts 178 → 174/300; event-rows.ts 134 → 135/300; routes/alerts.ts 185 → 186/300; routes/members.ts 73/300; Timers.tsx 172 → 173/300; Alarms.tsx 150 → 151/300; EventForm.tsx 187 → 188/223 (pinned). No ceiling moved.
+
+## 2026-10-06 — Alert limits into alert-limits.ts; normalizeInviteCode into invite-link.ts (reorganizer)
+
+- **Trigger:** steward pass 2 item 4: the 120-character title and the 1–1440-minute interval restated in two routes and three forms; the invite-code normalizer living in routes/auth.ts and imported route-to-route by members.ts.
+- **Seam moved:** ALERT_TITLE_MAX, TIMER_INTERVAL_MIN / TIMER_INTERVAL_MAX from literals in `src/worker/routes/alerts.ts`, `src/worker/event-rows.ts`, Timers.tsx, Alarms.tsx and EventForm.tsx to `src/shared/alert-limits.ts` [NEW row]; normalizeInviteCode verbatim from `src/worker/routes/auth.ts` to `src/shared/invite-link.ts` [EXISTING row, widened].
+- **Room opened:** routes/auth.ts: 178 → 174 lines; the limit sites +1 each (an import). No pins.
+- **Behavior:** preserved — typecheck, npm test (665: the 664 existing unchanged plus 1 normalizeInviteCode unit test) and arch:audit green (quiet); the 400 messages are byte-identical (template strings over the same numbers); the forms' maxLength, min/max and the "Interval (minutes, 1–1440)" label render the same; invite codes hash the same.
+- **Restraint:** reminder offset 0–1440, renotify 1–240, maxAlerts 1–20 and chores' TITLE_MAX stay where they are; the PWA still never normalizes a code.
+
 ## 2026-10-06 — List-add result and delivery status typed from vocab (placement-advisor)
 
 - **Ask:** steward pass 2 item D (approved): the list-add result and the delivery-status badges are retyped by hand in the PWA (§3, §7A.1, §8.6). Behavior-preserving.

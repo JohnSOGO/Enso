@@ -10,6 +10,7 @@ import { useApp } from '../state';
 import { WEEKDAY, type Channel, type Weekday } from '../../../src/shared/vocab';
 import { utcToLocal, weekdayOf } from '../../../src/shared/time';
 import { canChange } from '../../../src/shared/roles';
+import { ALERT_TITLE_MAX } from '../../../src/shared/alert-limits';
 import s from './Lists.module.css';
 
 export interface Alarm {
@@ -107,7 +108,7 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
       <fieldset disabled={!canEdit || busy}>
         {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>Only the creator or an admin can change this alarm.</p>}
         <label className="field"><span>Title</span>
-          <input value={f.title} maxLength={120} onChange={(e) => setF({ ...f, title: e.target.value })} autoFocus={!alarm} />
+          <input value={f.title} maxLength={ALERT_TITLE_MAX} onChange={(e) => setF({ ...f, title: e.target.value })} autoFocus={!alarm} />
         </label>
         <label className="field"><span>Time</span>
           <input type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} />

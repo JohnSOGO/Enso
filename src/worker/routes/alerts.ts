@@ -8,6 +8,7 @@ import { isTime } from '../../shared/time';
 import { body, fail, intIn, str } from '../http';
 import { requireMember } from '../session';
 import { canChange } from '../../shared/roles';
+import { ALERT_TITLE_MAX, TIMER_INTERVAL_MAX, TIMER_INTERVAL_MIN } from '../../shared/alert-limits';
 import { choreFireContext } from '../../shared/chores';
 import { insertFire, loadChoreRun, sourceOf, updateFire } from '../fire-rows';
 import { completeStep } from './chores';
@@ -32,10 +33,10 @@ async function timerView(db: D1Database, t: TimerRow) {
 }
 
 function parseTimerInput(b: Record<string, unknown>) {
-  const title = str(b.title, 120);
-  if (!title) return 'Title is required (up to 120 characters).';
-  const interval = intIn(b.intervalMin, 1, 1440);
-  if (interval === null) return 'Interval must be 1–1440 minutes.';
+  const title = str(b.title, ALERT_TITLE_MAX);
+  if (!title) return `Title is required (up to ${ALERT_TITLE_MAX} characters).`;
+  const interval = intIn(b.intervalMin, TIMER_INTERVAL_MIN, TIMER_INTERVAL_MAX);
+  if (interval === null) return `Interval must be ${TIMER_INTERVAL_MIN}–${TIMER_INTERVAL_MAX} minutes.`;
   if (!Array.isArray(b.channels) || b.channels.length === 0 || !b.channels.every((ch) => isOneOf(CHANNEL, ch))) {
     return `Channels must be a non-empty list of: ${CHANNEL.join(', ')}.`;
   }
