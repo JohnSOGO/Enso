@@ -1,12 +1,12 @@
 // M4o acceptance (SPEC §7E) — the pure recipe rules: R1 (youtubeVideoId), R9 (cleanRecipeReading),
-// parseRecipeInput, hasRecipeText / sourcesOf, R15 creatorComments, the clash, recipeFromRow; M4p (§7E.5) RE8 byMyEmoji, RE9 usedEmojis.
+// parseRecipeInput, hasRecipeText / sourcesOf, R15 creatorComments, commentsError (⚑ Q78), the clash, recipeFromRow; M4p (§7E.5) RE8 byMyEmoji, RE9 usedEmojis.
 import { describe, expect, it } from 'vitest';
 import {
   INGREDIENTS_MAX, INGREDIENT_MAX, RECIPE_TITLE_MAX, STEPS_MAX, parseRecipeInput, recipeFromRow, recipeVideoClash, thumbnailUrl, watchUrl,
   youtubeVideoId, type Recipe, type RecipeRow,
 } from '../src/shared/recipes';
 import {
-  CREATOR_COMMENTS_MAX, UNTITLED_VIDEO, cleanRecipeReading, creatorComments, hasRecipeText, sourcesOf,
+  CREATOR_COMMENTS_MAX, UNTITLED_VIDEO, cleanRecipeReading, commentsError, creatorComments, hasRecipeText, sourcesOf,
 } from '../src/shared/recipe-reading';
 import { USED_EMOJIS_MAX, byMyEmoji, myEmoji, usedEmojis } from '../src/shared/recipe-emoji';
 import { TEXT_MAX } from '../src/shared/lists';
@@ -100,6 +100,15 @@ describe("R15 creatorComments — only the video's own channel", () => {
     const cut = creatorComments([c(CH, `a${'🍅'.repeat(CREATOR_COMMENTS_MAX)}`)], CH)!;
     expect(cut.length).toBeLessThanOrEqual(CREATOR_COMMENTS_MAX);
     expect(/[\uD800-\uDBFF]$/.test(cut)).toBe(false);
+  });
+});
+
+describe('commentsError — turned off is not an error ⚑ Q78', () => {
+  it('read → null; turned off (none) → null; any other failure → its reason', () => {
+    expect(commentsError({ ok: true })).toBeNull();
+    expect(commentsError({ ok: false, kind: 'none', reason: 'Comments are turned off for this video.' })).toBeNull();
+    expect(commentsError({ ok: false, kind: 'quota', reason: 'quota used up' })).toBe('quota used up');
+    expect(commentsError({ ok: false, kind: 'failed', reason: 'YouTube answered 500' })).toBe('YouTube answered 500');
   });
 });
 

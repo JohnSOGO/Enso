@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-06 — Recipe read failures: one union, two mappers, commentsError (placement-advisor)
+
+- **Ask:** steward pass 2 item 2 (approved): the refused/failed mapping written 4×, video-unavailable 2× and the ⚑ Q78 comments rule 2× across recipe-reads.ts and recipe-reread.ts; the route's readFailed typed on one union (§7E.2, §7E.2b). Behavior-preserving.
+- **Verdict:** `src/worker/recipe-reads.ts` [EXISTING] (RecipeReadFailure, videoFailure, claudeFailure); `src/shared/recipe-reading.ts` [EXISTING] (commentsError); recipe-reread.ts and routes/recipes.ts [EXISTING, call / retype].
+- **Flow stage:** persist-side outcome mapping (Worker); rules (Q78, shared).
+- **Why:** the mappers consume Worker result types, and recipe-reads.ts is already re-read's shared dependency; the Q78 rule is a decision, so shared, with a structural parameter. Rejected: a new failures module; mappers in shared; HTTP outside the route.
+- **Caps:** recipe-reads.ts 97 → 106/300; recipe-reread.ts 78 → 73/300; shared/recipe-reading.ts 176 → 180/300; routes/recipes.ts 229 → 229/269 (pinned). No ceiling moved.
+
+## 2026-10-06 — Recipe read failures into recipe-reads.ts; commentsError into recipe-reading.ts (reorganizer)
+
+- **Trigger:** steward pass 2 item 2: the YouTube and Claude failure mappings and the ⚑ Q78 comments rule copied between recipe-reads.ts and recipe-reread.ts, and the failure union written twice.
+- **Seam moved:** the failure union and its mappers from inline copies in `src/worker/recipe-reads.ts` and `src/worker/recipe-reread.ts` to RecipeReadFailure / videoFailure / claudeFailure in `src/worker/recipe-reads.ts` [EXISTING]; the ⚑ Q78 rule to commentsError in `src/shared/recipe-reading.ts` [EXISTING]; routes/recipes.ts readFailed now takes RecipeReadFailure.
+- **Room opened:** recipe-reread.ts: 78 → 73 lines; recipe-reads.ts 97 → 106 (the union and mappers it now owns). No pins moved.
+- **Behavior:** preserved — typecheck, npm test (666: the 665 existing unchanged plus 1 commentsError unit test) and arch:audit green (quiet); every kind, reason, status, code and message the same; comments_error stored the same; YouTube's not_found still → video_unavailable, Claude's refused still → recipe_refused.
+- **Restraint:** readFailed stays in the route; youtube.ts, recipe-reader.ts, recipe-link-reader.ts and claude.ts untouched; no new module.
+
 ## 2026-10-06 — Alert limits and invite-code normalizing into shared (placement-advisor)
 
 - **Ask:** steward pass 2 item 4 (pass 1 #6, approved): title ≤120 ×5 and interval 1–1440 ×3 across routes/alerts.ts, event-rows.ts, Timers.tsx, Alarms.tsx and EventForm.tsx; normalizeInviteCode out of routes/auth.ts (§4.2, §5.4, §6.2). Behavior-preserving.

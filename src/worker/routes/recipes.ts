@@ -18,8 +18,8 @@ import type { RecipeSource } from '../../shared/vocab';
 import { all, first, newId, nowIso, run } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
-import { readPageRecipe, readVideoRecipe, recipeReadsUsedUp, type ReadErrors } from '../recipe-reads';
-import { rereadRecipe, type RereadOutcome } from '../recipe-reread';
+import { readPageRecipe, readVideoRecipe, recipeReadsUsedUp, type ReadErrors, type RecipeReadFailure } from '../recipe-reads';
+import { rereadRecipe } from '../recipe-reread';
 
 const LIVE = 'SELECT * FROM recipes WHERE deleted_at IS NULL';
 const loadRow = (db: D1Database, id: string) => first<RecipeRow>(db, `${LIVE} AND id = ?`, id);
@@ -58,7 +58,7 @@ async function readsUsedUp(c: Context<AppEnv>, now: string): Promise<Response | 
 const readingOff = (c: Context<AppEnv>, what = 'videos') => fail(c, 503, 'recipe_reading_off', `Reading recipes from ${what} isn't set up yet.`);
 
 /** A read or re-read that stopped → its status, code and message; `noun` is what Claude was given. */
-function readFailed(c: Context<AppEnv>, out: Extract<RereadOutcome, { ok: false }>, noun: 'video' | 'link' | 'transcript'): Response {
+function readFailed(c: Context<AppEnv>, out: RecipeReadFailure, noun: 'video' | 'link' | 'transcript'): Response {
   switch (out.kind) {
     case 'video_unavailable': return fail(c, 404, 'video_unavailable', `Couldn't find that video. ${out.reason}`);
     case 'youtube_failed': return fail(c, 502, 'youtube_failed', `Couldn't look the video up: ${out.reason}`);

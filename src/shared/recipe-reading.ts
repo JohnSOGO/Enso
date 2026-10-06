@@ -103,6 +103,10 @@ export function creatorComments(comments: readonly { authorChannelId: string | n
   return cut(kept.join('\n\n'), CREATOR_COMMENTS_MAX);
 }
 
+/** Why the creator's comments couldn't be read (comments_error), or null; turned off (kind 'none') is not an error ⚑ Q78. */
+export const commentsError = (c: { ok: true } | { ok: false; kind: string; reason: string }): string | null =>
+  c.ok || c.kind === 'none' ? null : c.reason;
+
 const TIMESTAMP = /^\s*\d{1,2}(:\d{2}){1,2}\s*$/;
 const LEADING_TIMESTAMP = /^\s*\d{1,2}(:\d{2}){1,2}\s+/;
 const DURATION = /^\s*\d+ (hours?|minutes?|seconds?)(,\s*\d+ (hours?|minutes?|seconds?))*\s*$/i;
