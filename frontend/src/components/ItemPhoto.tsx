@@ -1,9 +1,10 @@
-// SPEC §8.8, §7A.3 — the 📷 on a list's add row: pick a photo (camera or library), shrink it (lazy shrink-photo),
+// SPEC §8.8, §7A.3 — the 📷 on a list's add row: pick a photo (camera or library), shrink it (via usePhotoPick),
 // POST /list-items/read-photo while busy, then hand the waiting photo and the name — or the refusal — to the list
 // panel. Shows the waiting photo as a small thumbnail with ✕ (the whole thumbnail is the ✕ button). Holds no list
 // state: the panel fills the box, keeps the waiting photo and saves it after Add.
 import { useEffect, useRef, useState } from 'react';
 import { errorText, upload } from '../api';
+import { shrinkPicked, usePhotoPick } from './usePhotoPick';
 import type { ItemReading } from '../../../src/shared/item-reading';
 import s from './ItemPhoto.module.css';
 
@@ -19,7 +20,6 @@ interface Props {
 }
 
 export function ItemPhoto({ waiting, onSnap, onDrop }: Props) {
-  const input = useRef<HTMLInputElement>(null);
   const live = useRef(true);
   const [busy, setBusy] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
@@ -32,13 +32,13 @@ export function ItemPhoto({ waiting, onSnap, onDrop }: Props) {
     return () => URL.revokeObjectURL(u);
   }, [waiting]);
 
-  async function picked(file: File | undefined) {
-    if (!file) return;
+  const pick = usePhotoPick(([file]) => picked(file));
+
+  async function picked(file: File) {
     setBusy(true);
     let photo: Blob | null = null;
     try {
-      const { shrinkPhoto } = await import('../shrink-photo');
-      photo = await shrinkPhoto(file);
+      photo = await shrinkPicked(file);
       const r = await upload<ItemReading>('POST', '/list-items/read-photo', photo);
       if (live.current) onSnap({ photo, name: r.name });
     } catch (e) {
@@ -56,11 +56,10 @@ export function ItemPhoto({ waiting, onSnap, onDrop }: Props) {
           <span aria-hidden className={s.drop}>✕</span>
         </button>
       )}
-      <input ref={input} type="file" accept="image/*" className="visually-hidden" tabIndex={-1} aria-hidden
-        onChange={(e) => { picked(e.target.files?.[0]); e.target.value = ''; }} />
+      {pick.input}
       <button type="button" className={s.snap} disabled={busy} aria-busy={busy}
         aria-label={busy ? 'Reading the photo…' : 'Snap an item'} title={busy ? 'Reading the photo…' : 'Snap an item'}
-        onClick={() => input.current?.click()}>{busy ? '…' : '📷'}</button>
+        onClick={pick.open}>{busy ? '…' : '📷'}</button>
     </>
   );
 }

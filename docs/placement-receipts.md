@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-06 — usePhotoPick for the photo pickers (placement-advisor)
+
+- **Ask:** steward pass 2 item 7 (pass 1 #9, approved): a usePhotoPick hook beside PhotoField.tsx, adopted by ItemPhoto, RecipeTranscript, ChoreAreaForm and Shows (§7C.3, §8.8). Behavior-preserving.
+- **Verdict:** `frontend/src/components/usePhotoPick.tsx` [NEW row]; PhotoField.tsx and the four components [EXISTING, adopt it].
+- **Flow stage:** render / capture intent.
+- **Why:** five copies of input, click, reset and lazy shrink; raw files keep every caller's busy and error order unchanged; own file like useAction.tsx keeps PhotoField one concern. Rejected: inside PhotoField.tsx; state.tsx; shrinking inside the hook; a useObjectUrl.
+- **Caps:** usePhotoPick.tsx 16/300 (new); PhotoField.tsx 89 → 88/300; ItemPhoto.tsx 66 → 65/300; ChoreAreaForm.tsx 113 → 112/300; RecipeTranscript.tsx 117 → 116/300; Shows.tsx 112 → 108/300. No ceiling moved.
+
+## 2026-10-06 — The photo picker into usePhotoPick.tsx (reorganizer)
+
+- **Trigger:** steward pass 2 item 7: the hidden file input, its click, its reset and the lazy shrink-photo import written five times.
+- **Seam moved:** the picker (hidden `type=file accept=image/*` input, open, value reset, ≥ 1 file) and the lazy shrink from `PhotoField.tsx`, `ItemPhoto.tsx`, `ChoreAreaForm.tsx`, `RecipeTranscript.tsx` ({ multiple: true }) and `Shows.tsx` to usePhotoPick / shrinkPicked in `frontend/src/components/usePhotoPick.tsx` [NEW row]; the five rows now say "via usePhotoPick".
+- **Room opened:** each caller 1–4 lines smaller (Shows 112 → 108). No pins.
+- **Behavior:** preserved — typecheck, npm test (666, unchanged) and arch:audit green (quiet); the input markup is the same (attributes, `multiple` only on the transcript, aria-hidden, tabIndex -1, visually-hidden, in the same place); onPick runs before the value reset, as before; callers keep their busy and step text, error handling, `live` ref, object URLs and order; `vite build` still emits shrink-photo as its own lazy chunk.
+- **Restraint:** no useObjectUrl, no shrinking inside the hook, no state.tsx; ThingPhoto and the forms using PhotoField untouched.
+
 ## 2026-10-06 — Web-tool builders in claude.ts (placement-advisor)
 
 - **Ask:** steward pass 2 item 6 (pass 1 #8, approved): web_search_20260209 / web_fetch_20260209 copied into link-reader.ts, recipe-link-reader.ts and show-reader.ts (§7C.4b, §7E.6, §7F.2). Behavior-preserving.

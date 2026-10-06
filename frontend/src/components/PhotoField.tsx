@@ -3,6 +3,7 @@
 // its status and refusal. No API path of its own: the form saves the photo, the caller does the read.
 import { useEffect, useRef, useState } from 'react';
 import { errorText } from '../api';
+import { shrinkPicked, usePhotoPick } from './usePhotoPick';
 import s from './PhotoField.module.css';
 
 /** The thumbnail: a tap shows it full size within the dialog, another tap shrinks it back. */
@@ -30,7 +31,6 @@ interface Props {
 }
 
 export function PhotoField({ savedSrc, pending, alt, onPick, onRemove, read }: Props) {
-  const input = useRef<HTMLInputElement>(null);
   const live = useRef(true);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [step, setStep] = useState<string | null>(null);
@@ -45,13 +45,13 @@ export function PhotoField({ savedSrc, pending, alt, onPick, onRemove, read }: P
     return () => URL.revokeObjectURL(url);
   }, [pending]);
 
-  async function picked(file: File | undefined) {
-    if (!file) return;
+  const pick = usePhotoPick(([file]) => picked(file));
+
+  async function picked(file: File) {
     setError(null); setSaid(null); setStep('Getting the photo ready…');
     let photo: Blob;
     try {
-      const { shrinkPhoto } = await import('../shrink-photo');
-      photo = await shrinkPhoto(file);
+      photo = await shrinkPicked(file);
     } catch (e) {
       if (live.current) { setError(errorText(e)); setStep(null); }
       return;
@@ -75,10 +75,9 @@ export function PhotoField({ savedSrc, pending, alt, onPick, onRemove, read }: P
   return (
     <div className={s.photo}>
       {src && <Thumb src={src} alt={alt} />}
-      <input ref={input} type="file" accept="image/*" className="visually-hidden" tabIndex={-1} aria-hidden
-        onChange={(e) => { picked(e.target.files?.[0]); e.target.value = ''; }} />
+      {pick.input}
       <div className="row wrap">
-        <button type="button" disabled={!!step} onClick={() => input.current?.click()}>{src ? 'Replace photo' : '📷 Add photo'}</button>
+        <button type="button" disabled={!!step} onClick={pick.open}>{src ? 'Replace photo' : '📷 Add photo'}</button>
         {src && <button type="button" disabled={!!step} onClick={() => { setSaid(null); setError(null); onRemove(); }}>Remove photo</button>}
       </div>
       {step && <p className="muted" role="status">{step}</p>}
