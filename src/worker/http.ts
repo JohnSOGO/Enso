@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { PHOTO_MAX_BYTES, PHOTO_TYPES } from '../shared/things';
+import { PHOTO_MAX_BYTES, PHOTO_TYPES } from '../shared/photos';
 import { isOneOf } from '../shared/vocab';
 
 /** Every error response: { error, message } with a non-empty message (SPEC §10). */

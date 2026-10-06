@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-06 — Photo limits out of things.ts (placement-advisor)
+
+- **Ask:** steward pass 2 item C (approved): the photo-size constants live in things.ts but serve 6 features, and the SogoAI helper bundles the cap (§7C.3, §7A.3). Behavior-preserving.
+- **Verdict:** `src/shared/photos.ts` [NEW row]; things.ts, item-reading.ts, recipe-reading.ts, http.ts, shrink-photo.ts [EXISTING, import from it].
+- **Flow stage:** rules (shared limits).
+- **Why:** a dependency-free leaf takes six features and home/ off the things → engine chain. home reaches it through item-reading.ts, so LAYERS `allowed` is unchanged; the cap is inlined at build, so the rebuild note is docs. Rejected: item-reading.ts as home; moving READS_PER_DAY; widening home's allowed list; a things.ts re-export.
+- **Caps:** shared/photos.ts 6/300 (new); shared/things.ts 252 → 246/300; shared/item-reading.ts 57/300; shared/recipe-reading.ts 180/300; worker/http.ts 41/300; frontend/src/shrink-photo.ts 45/300. No ceiling moved.
+
+## 2026-10-06 — Photo limits into src/shared/photos.ts (reorganizer)
+
+- **Trigger:** steward pass 2 item C: PHOTO_MAX_BYTES / PHOTO_TYPES / PHOTO_LONG_SIDE / PHOTO_QUALITY sat in things.ts, so every photo feature and the home/ bundle (via item-reading.ts) pulled in things → engine.
+- **Seam moved:** the four PHOTO_* constants from `src/shared/things.ts` to `src/shared/photos.ts` [NEW row], no re-export; item-reading.ts, recipe-reading.ts, worker http.ts, shrink-photo.ts and three tests import them from there.
+- **Room opened:** things.ts: 252 → 246 lines. No pins.
+- **Behavior:** preserved — typecheck, npm test (666, unchanged but for three import paths) and arch:audit green (quiet); same values (PHOTO_TYPES still `as const`), same 400/413 messages; the home/ helper still bundles PHOTO_MAX_BYTES = 4 MB as IDENTIFY_BODY_MAX, now without things.ts or engine.ts; LAYERS unchanged. where-things-stand.md's deploy step now says rebuild home/ when anything it bundles changes, naming photos.ts.
+- **Restraint:** READS_PER_DAY and the feature photo counts stay where they are; home's allowed list untouched.
+
 ## 2026-10-06 — Recipe read failures: one union, two mappers, commentsError (placement-advisor)
 
 - **Ask:** steward pass 2 item 2 (approved): the refused/failed mapping written 4×, video-unavailable 2× and the ⚑ Q78 comments rule 2× across recipe-reads.ts and recipe-reread.ts; the route's readFailed typed on one union (§7E.2, §7E.2b). Behavior-preserving.

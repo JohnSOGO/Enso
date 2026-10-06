@@ -1,6 +1,6 @@
 // SPEC §7C.3 — shrink a picked image on the phone before it is uploaded or read: longest side
 // PHOTO_LONG_SIDE px, JPEG at PHOTO_QUALITY, via canvas. No app state.
-import { PHOTO_LONG_SIDE, PHOTO_QUALITY } from '../../src/shared/things';
+import { PHOTO_LONG_SIDE, PHOTO_QUALITY } from '../../src/shared/photos';
 
 const CANT_DECODE = "This browser can't open that picture (HEIC photos open only on Apple devices). Try a JPEG or PNG.";
 

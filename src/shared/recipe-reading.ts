@@ -1,9 +1,9 @@
 // SPEC §7E.2, §7E.2b, §7E.2c — reading a recipe from a video (pure): what a video offered to be read, the creator's own
 // comments, a transcript pasted or screenshotted, when a video's text is worth reading, cleaning Claude's reading, and
 // the captions-from-home rules (when to ask SogoAI, checking its answer, the texts).
-// Imports recipes (the limits), things (the photo limits) and vocab only; recipes.ts never imports this file.
+// Imports recipes (the limits), photos (the photo limits) and vocab only; recipes.ts never imports this file.
 import { INGREDIENT_MAX, INGREDIENTS_MAX, RECIPE_TITLE_MAX, SERVINGS_MAX, STEP_MAX, STEPS_MAX, TIME_MAX } from './recipes';
-import { PHOTO_MAX_BYTES, PHOTO_TYPES } from './things';
+import { PHOTO_MAX_BYTES, PHOTO_TYPES } from './photos';
 import { CAPTIONS_FAILURE, RECIPE_SOURCE, isOneOf, type CaptionsFailure, type RecipeSource } from './vocab';
 
 /** Captions are cut to this many characters before they go to Claude (§7E.2). */

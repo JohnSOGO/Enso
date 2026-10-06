@@ -34,7 +34,8 @@ the working agreement in `CLAUDE.md`.
    with exit -1073740791 is a known flake; rerun it.
 2. Additive migration: `CI=1 npm run db:migrate:remote`, **then** `npm run deploy`. Dropping migrations go after the deploy.
 3. Check the live stamp: `curl -s https://enso.sogodojo.com/ | grep -oE "v1\.[0-9.]+ · [0-9a-f]+"`.
-4. If `home/` changed: rebuild, copy it to SogoAI (`ssh sogoai`), and restart the "Enso captions helper" task (README).
+4. If `home/` or anything it bundles changed (`src/worker/youtube-captions.ts`, `src/shared/item-reading.ts` and what it
+   imports, among them `src/shared/photos.ts`, the photo-size cap): rebuild, copy it to SogoAI (`ssh sogoai`), and restart the "Enso captions helper" task (README).
 
 ## Owed
 

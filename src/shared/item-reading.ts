@@ -1,8 +1,8 @@
 // SPEC §7A.3 — naming a snapped list item (pure): the prompt both readers get (SogoAI's local model and Claude),
 // cleaning an answer into a list item's name, the SogoAI helper's report and its check, and the read's answer.
-// Imports lists (TEXT_MAX), things (the photo limits) and vocab only. Shared by the Worker and home/ (§2.5).
+// Imports lists (TEXT_MAX), photos (the photo limits) and vocab only. Shared by the Worker and home/ (§2.5).
 import { TEXT_MAX } from './lists';
-import { PHOTO_MAX_BYTES } from './things';
+import { PHOTO_MAX_BYTES } from './photos';
 import { IDENTIFY_FAILURE, isOneOf, type IdentifyFailure, type ItemReadVia } from './vocab';
 
 /** The longest name the prompt asks for. The name kept is cut at TEXT_MAX. ⚑ Q116 */

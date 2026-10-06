@@ -5,7 +5,7 @@ import {
   cleanItemName, parseIdentifyReport,
 } from '../src/shared/item-reading';
 import { TEXT_MAX } from '../src/shared/lists';
-import { PHOTO_MAX_BYTES } from '../src/shared/things';
+import { PHOTO_MAX_BYTES } from '../src/shared/photos';
 import { IDENTIFY_FAILURE } from '../src/shared/vocab';
 
 describe('SN12 the prompt and the limits', () => {

@@ -12,12 +12,6 @@ export const PHONE_MAX = 50;
 export const COST_MAX = 200;
 export const URL_MAX = 500;
 
-/** Photos (§7C.3): the server's limits and the phone's shrink settings. */
-export const PHOTO_MAX_BYTES = 4 * 1024 * 1024;
-export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'] as const;
-export const PHOTO_LONG_SIDE = 1600;
-export const PHOTO_QUALITY = 0.85;
-
 /** Photo reading cost guard (§7C.4): reads per household per local day. ⚑ */
 export const READS_PER_DAY = 40;
 /** Reminders ring at this local time (§7C.2). ⚑ */
