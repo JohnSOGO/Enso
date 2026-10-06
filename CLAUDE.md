@@ -34,8 +34,10 @@ in `README.md`. Modularity doctrine: `docs/modularity.md`. **Start a new session
    never the author's.
 
 If the code and the spec disagree, that's a bug in one of them. Decide which, correct
-the spec first, then make the code match. Never let the drift sit. Run `code-steward`
-at each milestone.
+the spec first, then make the code match. Never let the drift sit. **Run `code-steward` after every feature release** (each
+minor version, once it is merged and live): the thread that shipped it calls the steward,
+appends its receipt, and tells MojoSOGO what is new in the backlog. MojoSOGO picks what
+to take on; nothing is fixed without that. Patch-only fixes don't trigger a run.
 
 The three agents (`placement-advisor`, `reorganizer`, `code-steward`) are defined in
 `.claude/agents/` and run as subagents (the Agent tool). In the project app, the thread
