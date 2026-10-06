@@ -6,6 +6,7 @@ import { tick } from './tick';
 import { auth } from './routes/auth';
 import { members } from './routes/members';
 import { events } from './routes/events';
+import { eventPhotos } from './routes/event-photos';
 import { optins } from './routes/optins';
 import { alerts } from './routes/alerts';
 import { alarms } from './routes/alarms';
@@ -43,6 +44,7 @@ api.get('/health', async (c) => {
 api.route('/', auth);
 api.route('/', phoneLogin); // §6.6 /auth/phone-login
 api.route('/', members);
+api.route('/', eventPhotos); // before events: a later POST /events/:id must not capture /events/read-photo
 api.route('/', events);
 api.route('/', optins);
 api.route('/', alerts);

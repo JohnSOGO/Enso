@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.62 · **Date:** 2026-10-06 · **Owner:** MojoSOGO
+**Version:** 2.63 · **Date:** 2026-10-06 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2063,6 +2063,54 @@ audience is not empty), Done / Snooze, renotify, `missed`. What is new:
 
 ---
 
+### 7.8 Fill in an event from a screenshot — asked by MojoSOGO 2026-10-06
+
+"To post an event, let me screenshot the info I have and auto process what can be extracted, then I can
+manually edit the event." A screenshot of an invite, a flyer, a text message or an email fills the **new
+event** form the way a photo fills a thing's (§7C.4): **nothing is saved**, the person checks the form and
+taps Save.
+
+- **Where:** the new-event form only (§8.4), a **📷 Fill in from a screenshot** button above the Title. It
+  opens the phone's picker (camera or library); the picture is shrunk as every upload is (§7C.3) and sent;
+  "Reading the screenshot…" while it runs, then what it filled or why it couldn't, under the button. The
+  screenshot itself is never stored ⚑ Q187.
+- `POST /events/read-photo` with the image → `EventReading { title, startDate, endDate, startTime,
+  endTime, location, notes }`, each a string or `null`; dates `YYYY-MM-DD`, times `HH:MM` (24 h).
+- **The prompt** (`src/worker/event-reader.ts`) gives today's date, the household zone and, when set, the
+  household's place (Oceanside): dates like "Sat Oct 12" become the next such date on or after today; a
+  place name that could be several places is read as the one nearest the household ⚑ Q188; `location` is the
+  venue and its address as one line; `notes` is anything else useful (who it's from, what to bring, RSVP,
+  a phone or a link), copied as written. Anything not shown → null.
+- `cleanEventReading` (pure, `src/shared/event-reading.ts`) — the answer is input, never trusted: text
+  trimmed to the event limits (title `ALERT_TITLE_MAX`, location 200, notes so that the form's notes fit
+  2000); unreal dates dropped; a reversed start/end date swapped; a time that isn't a real `HH:MM` dropped; an
+  end time without a start time dropped; empty → null.
+- **Filling the form** (`readingToForm`, same file, pure): only fields the person **hasn't changed since the
+  form opened** fill (the tapped day and the 09:00 start count as unchanged) ⚑ Q189:
+  - title ← title; date ← startDate.
+  - A start time → timed, start ← startTime, end ← endTime (or blank).
+  - No start time but a date → **All day**, end date ← endDate (or the date).
+  - Notes ← `📍 {location}` on the first line, then the notes ⚑ Q190 (events have no place field).
+  - The form says "Filled N fields from the screenshot — check them." or "Nothing new to fill in from the
+    screenshot." Everything stays editable; nothing is saved until Save.
+- **Budget, check order and failures:** exactly as `POST /things/read-photo` (§7C.4) — the **same 40-a-day
+  `photo_reads` budget**; signed in (401) → size/type (400) → daily cap (429) → key present (503
+  `photo_reading_off`) → count the read → Claude (`askClaude`, the image block of `photo-reader.ts`) →
+  refusal 422 `photo_refused` / failure 502 `photo_reading_failed` with the reason → cleaned → 200.
+- **Privacy:** the screenshot goes to Anthropic to be read (as Q30); the household's latitude and longitude
+  go in the prompt (as Q141).
+
+**Acceptance (each row a test):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| EP1 | read-photo with a fake Claude answering a timed event | 200 with the cleaned fields; one `photo_reads` row; the request carries the image and a prompt with today, the zone and the household's place; nothing saved |
+| EP2 | read-photo with no API key; at the daily cap; without a session; a non-image body | 503 `photo_reading_off`; 429, no read counted; 401; 400 |
+| EP3 | refusal / failure from Claude | 422 `photo_refused` / 502 `photo_reading_failed` |
+| EP4 | `cleanEventReading` on `2026-02-30`, reversed dates, `25:00`, an end time alone, a 300-char title | date dropped, dates swapped, time dropped, end time dropped, title cut |
+| EP5 | `readingToForm` on a blank form: timed reading; date-only reading; multi-day reading; location + notes | timed with times; all day; all day with end date; notes `📍 place` then notes |
+| EP6 | `readingToForm` where the person already typed a title and changed the date | title and date kept, the rest filled; the count names only the filled fields |
+
 ## 7A. Lists
 
 Lists are **household data**: any number, each with a name. The household starts with two,
@@ -3461,6 +3509,7 @@ the date.
 
 Fields:
 
+- **📷 Fill in from a screenshot** (new events only, §7.8): above the Title; fills the form, saves nothing.
 - Title
 - Date
 - All-day toggle
@@ -4621,6 +4670,7 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | GET | `/optional-events` | member | → `{ id, title, emoji, recurrence, startDate, on }[]` — every optional event, with this member's switch |
 | PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |
+| POST | `/events/read-photo` | member | raw image body → `{ title, startDate, endDate, startTime, endTime, location, notes }` (each nullable); 503 / 502 / 422 / 429 per §7.8 |
 | GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6). A sun-timed event (§7.7) is 404 here and on `/exdates` |
 | POST | `/events/{id}/exdates` | creator or owner | `{ date }` |
 | GET/POST | `/timers` | member | → `Timer[]` / POST `{ title, intervalMin, channels, renotifyMin?, maxAlerts?, assignedTo?, activeFrom?, activeTo? }` → timer (201). `Timer = { id, title, intervalMin, channels, renotifyMin, maxAlerts, assignedTo, running, createdBy, activeFrom, activeTo, openFire }`; `activeFrom`/`activeTo` are `"HH:MM"` or both `null` (no window). 400 `invalid_input` when only one is set, either is not `HH:MM`, or `timerWindowError` refuses them (§5.1) |
@@ -5242,6 +5292,10 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q184 | Naming the reporter (§7B.7) | ⚑ Yes: "Sam cleaned this up" |
 | Q185 | A mess photo (§7B.7) | ⚑ Required to report; deleted when settled, closed or deleted, and at most 30 days after the report |
 | Q186 | Counting founder pings (§9.4) | Founder pings are counted by elimination in `src/worker/deliveries.ts` `opsPingsSince` (a fire-less push with a title that is neither a sign-in notice nor a mess ask), so a future kind of fire-less push could quietly count. ⚑ Keep the elimination (tested in `test/deliveries.test.ts`); the alternative is a `deliveries` kind/marker column |
+| Q187 | Keeping an event's screenshot (§7.8) | ⚑ Not kept: it is read and dropped; events have no photo |
+| Q188 | An ambiguous place in a screenshot (§7.8) | ⚑ Read as the one nearest the household (Oceanside) |
+| Q189 | What a screenshot may fill (§7.8) | ⚑ Only fields not changed since the form opened; a timed reading sets the times, a date-only one makes it All day |
+| Q190 | An event's location from a screenshot (§7.8) | ⚑ The first line of Notes, as `📍 venue, address` (events have no place field) |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5450,6 +5504,10 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Fill in an event from a screenshot** (v1.34.0, §7.8; asked by MojoSOGO 2026-10-06; EP1–EP6): 📷 Fill in from a
+screenshot in the new-event form, `POST /events/read-photo` on the shared 40-a-day photo budget, fields the person
+hasn't changed filled (timed or All day), the location as the first line of Notes. No migration. Q187–Q190 are ⚑
+defaults. **Still owed:** a real invite screenshot read on the iPhone.
 **Steward pass 2, everything** (v1.33.2; approved by MojoSOGO 2026-10-06; behavior unchanged): each code item was placed
 by the placement-advisor and moved by the reorganizer in its own commit. There are four new owners: `src/shared/roles.ts`
 (ADMIN_ROLE, isAdmin, canChange: one creator-or-admin rule for routes and forms), `src/shared/photos.ts` (photo limits,
