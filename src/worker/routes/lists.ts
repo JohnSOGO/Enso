@@ -9,6 +9,7 @@ import {
   LISTS_MAX, LIST_NAME_MAX, NOTE_MAX, TEXT_MAX, itemKey, listNameClash, renameClash, resolveAdd, visibleItems,
 } from '../../shared/lists';
 import { emojiError } from '../../shared/emoji';
+import type { ListAddResult } from '../../shared/vocab';
 import { canChange } from '../../shared/roles';
 import { all, first, newId, nowIso, run } from '../db';
 import { body, fail, optStr, str } from '../http';
@@ -167,19 +168,19 @@ lists.post('/lists/:id/items', requireMember, async (c) => {
 
   const me = c.get('member').id, now = nowIso();
   const decision = resolveAdd(text, await loadItems(c.env.DB, list.id));
-  if (decision.kind === 'existing') return c.json({ item: itemView(decision.item), result: 'existing' });
+  if (decision.kind === 'existing') return c.json({ item: itemView(decision.item), result: 'existing' satisfies ListAddResult });
   if (decision.kind === 'reopen') {
     await run(c.env.DB,
       'UPDATE list_items SET text = ?, text_key = ?, checked_at = NULL, checked_by = NULL, updated_at = ? WHERE id = ?',
       text, itemKey(text), now, decision.item.id);
-    return c.json({ item: itemView((await loadItem(c.env.DB, decision.item.id))!), result: 'reopened' });
+    return c.json({ item: itemView((await loadItem(c.env.DB, decision.item.id))!), result: 'reopened' satisfies ListAddResult });
   }
   const id = newId('itm');
   await run(c.env.DB,
     `INSERT INTO list_items (id, list_id, text, text_key, note, assignee_id, created_by, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id, list.id, text, decision.key, note ?? null, assignee ?? null, me, now, now);
-  return c.json({ item: itemView((await loadItem(c.env.DB, id))!), result: 'added' }, 201);
+  return c.json({ item: itemView((await loadItem(c.env.DB, id))!), result: 'added' satisfies ListAddResult }, 201);
 });
 
 lists.patch('/list-items/:id', requireMember, async (c) => {

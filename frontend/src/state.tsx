@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { get } from './api';
 import { utcToLocal } from '../../src/shared/time';
-import type { AlertKind, HouseState, Role } from '../../src/shared/vocab';
+import type { AlertKind, Channel, DeliveryStatus, HouseState, Role } from '../../src/shared/vocab';
 
 export interface Me {
   id: string; email: string; displayName: string; color: string; role: Role;
@@ -27,7 +27,7 @@ export interface Status {
   /** §9.2 — the server's verdict; shown as given, never re-derived here. */
   house: { state: HouseState; lastOkAt: string | null; lastFailedAt: string | null; lastError: string | null };
   mySubscriptions: { id: string; endpoint: string; userAgent: string | null; createdAt: string; lastOkAt: string | null; lastError: string | null }[];
-  recentDeliveries: { id: string; channel: string; message: string; status: string; detail: string | null; createdAt: string; member: string | null }[];
+  recentDeliveries: { id: string; channel: Channel; message: string; status: DeliveryStatus; detail: string | null; createdAt: string; member: string | null }[];
 }
 
 interface Ctx {

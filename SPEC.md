@@ -352,6 +352,7 @@ export const LOGIN_VIEW   = ['pending', 'approved', 'denied', 'expired'] as cons
 export const NOTICE_KIND  = ['login', 'new_sign_in'] as const;                    // §6.6 deliveries.notice — a sign-in notice push, never an alert
 export const MESS_SETTLE  = ['paid', 'forgiven'] as const;                        // §7B.7 messes.settled_how
 export const MESS_STATUS  = ['open', 'discuss', 'owed', 'closed', 'settled'] as const; // §7B.7 a mess's state — derived, never stored
+export const LIST_ADD_RESULT = ['added', 'existing', 'reopened'] as const;       // §7A.1 POST /lists/{id}/items result
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
 ```

@@ -2,7 +2,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { get, patch, post } from '../api';
 import { useApp, type Status } from '../state';
-import { MEMBER_PALETTE } from '../../../src/shared/vocab';
+import { MEMBER_PALETTE, type DeliveryStatus } from '../../../src/shared/vocab';
 import { ADMIN_ROLE, isAdmin } from '../../../src/shared/roles';
 import { useAction } from './useAction';
 import { Invites } from './Invites';
@@ -126,7 +126,7 @@ function DaysOff() {
   );
 }
 
-const STATUS_BADGE: Record<string, string> = { sent: 'good', partial: 'warn', failed: 'bad', queued: 'neutral', claimed: 'neutral' };
+const STATUS_BADGE: Record<DeliveryStatus, string> = { sent: 'good', partial: 'warn', failed: 'bad', queued: 'neutral', claimed: 'neutral' };
 
 /** §8.6 ⚑ Q38 — the House line, from the server's `house` as given (§9.2). */
 function HouseLine({ house: h, localTime }: { house: Status['house']; localTime: (iso: string) => string }) {

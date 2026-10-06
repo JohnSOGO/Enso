@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-06 — List-add result and delivery status typed from vocab (placement-advisor)
+
+- **Ask:** steward pass 2 item D (approved): the list-add result and the delivery-status badges are retyped by hand in the PWA (§3, §7A.1, §8.6). Behavior-preserving.
+- **Verdict:** `src/shared/vocab.ts` [EXISTING] (LIST_ADD_RESULT); routes/lists.ts, state.tsx, Settings.tsx, HouseholdLists.tsx, RecipeView.tsx [EXISTING, typed on it].
+- **Flow stage:** route (producer) and render (consumers); the vocabulary is shared.
+- **Why:** both are wire strings; one already had a vocab entry the PWA ignored, the other had none. Rejected: reusing AddDecision's kinds; dropping the badge fallback (the wire is untrusted).
+- **Caps:** vocab.ts 73 → 75/300; routes/lists.ts 226 → 227/300; Settings.tsx 177/207 (pinned, +0); HouseholdLists.tsx 236/300, RecipeView.tsx 142/300, state.tsx 99/300 (+0). No ceiling moved.
+
+## 2026-10-06 — List-add result and delivery status typed from vocab (reorganizer)
+
+- **Trigger:** steward pass 2 item D: `'added' | 'existing' | 'reopened'` retyped in HouseholdLists.tsx (and `string` in RecipeView.tsx); delivery status and channel typed `string` in state.tsx and the badge map.
+- **Seam moved:** the list-add result vocabulary from HouseholdLists.tsx's local AddResult to `src/shared/vocab.ts` LIST_ADD_RESULT / ListAddResult [EXISTING]; the route's three results `satisfies ListAddResult`; state.tsx's recentDeliveries typed `Channel` / `DeliveryStatus`; STATUS_BADGE `Record<DeliveryStatus, string>`. SPEC §3 lists LIST_ADD_RESULT.
+- **Room opened:** none needed (typing only); vocab.ts +2, routes/lists.ts +1, the PWA files +0. No pins.
+- **Behavior:** preserved — typecheck, npm test (664, unchanged) and arch:audit green (quiet); the same three strings on the wire with the same statuses (200, 200, 201); the badge's `?? 'neutral'` fallback kept.
+- **Restraint:** AddDecision's kinds not mapped onto the wire values; no other badge retyped; no map row change.
+
 ## 2026-10-06 — Owed-mess visibility into the shared rules (placement-advisor)
 
 - **Ask:** steward pass 2 leftover (approved): GET /messes decides in the route who may see an owed mess (§7B.7). Behavior-preserving.
