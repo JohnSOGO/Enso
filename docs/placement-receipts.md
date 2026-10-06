@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-06 — Owed-mess visibility into the shared rules (placement-advisor)
+
+- **Ask:** steward pass 2 leftover (approved): GET /messes decides in the route who may see an owed mess (§7B.7). Behavior-preserving.
+- **Verdict:** `src/shared/messes.ts` [EXISTING] (canSee); routes/messes.ts [EXISTING, calls it].
+- **Flow stage:** rules (out of the route).
+- **Why:** the last mess permission still in the route; sits beside canSettle/canDelete on the same MessViewer built from P1's isAdmin. Rejected: filtering in the PWA; reshaping balancesOf.
+- **Caps:** shared/messes.ts 115 → 119/300; routes/messes.ts 144 → 145/300 (neither pinned). No ceiling moved.
+
+## 2026-10-06 — Owed-mess visibility: canSee (reorganizer)
+
+- **Trigger:** steward pass 2 leftover: GET /messes filtered owed messes inline in `routes/messes.ts`.
+- **Seam moved:** who sees a mess in the list (the owed filter) from `src/worker/routes/messes.ts` to `src/shared/messes.ts` canSee [EXISTING row, widened].
+- **Room opened:** routes/messes.ts: 144 → 145 lines (the viewer line); shared/messes.ts: 115 → 119. No pins; caps stay GLOBAL_FILE_CAP 300.
+- **Behavior:** preserved — typecheck, npm test (664: the 663 existing unchanged plus 1 canSee unit test) and arch:audit green (quiet); canSee's body is the route's filter term for term (not owed, or admin, or reporter, or claimer); the route's `admin` (isAdmin(me)) still feeds balancesOf; GET /messes response unchanged.
+- **Restraint:** balancesOf and Messes.tsx untouched; no filtering moved to the PWA.
+
 ## 2026-10-06 — One creator-or-admin rule and isAdmin (placement-advisor)
 
 - **Ask:** steward pass 2 item A (approved): one shared "creator or admin may change it" rule plus isAdmin; today written in 4 routes and 4 forms beside canManageList, and `role === 'owner'` ~28 times (§6.3). Behavior-preserving.

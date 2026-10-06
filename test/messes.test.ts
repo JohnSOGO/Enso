@@ -1,7 +1,7 @@
 // SPEC §7B.7 — the pure rules of whose mess: state, input, who is asked, when, To talk about, who may act, balances, the words.
 import { describe, expect, it } from 'vitest';
 import {
-  DISCUSS_AFTER_H, MESS_NOTE_MAX, NUDGES_MAX, NUDGE_EVERY_MIN, askMessage, askedOf, balancesOf, canDelete, canSettle, decideError,
+  DISCUSS_AFTER_H, MESS_NOTE_MAX, NUDGES_MAX, NUDGE_EVERY_MIN, askMessage, askedOf, balancesOf, canDelete, canSee, canSettle, decideError,
   discussDue, discussMessage, isAnswerable, isDecidable, messStatus, nudgeDue, parseMessInput,
 } from '../src/shared/messes';
 import { addMinutes } from '../src/shared/time';
@@ -51,6 +51,17 @@ describe('§7B.7 messes — rules', () => {
     expect(canDelete({ status: 'owed', reportedBy: 'A' }, viewerA)).toBe(false);
     expect(canDelete({ status: 'open', reportedBy: 'B' }, viewerA)).toBe(false);
     expect(canDelete({ status: 'settled', reportedBy: 'B' }, { id: 'A', admin: true })).toBe(true);
+  });
+
+  it('see: everyone until owed; an owed mess only by an admin, the one owed and the one who owes', () => {
+    const base = { settled_at: null, closed_at: null, claimed_by: null, discuss_at: null, reported_by: 'A' };
+    const owed = { ...base, claimed_by: 'B' };
+    expect(canSee(base, { id: 'C', admin: false })).toBe(true);
+    expect(canSee({ ...base, discuss_at: '2026-10-06T00:00:00Z' }, { id: 'C', admin: false })).toBe(true);
+    expect(canSee(owed, { id: 'A', admin: false })).toBe(true);
+    expect(canSee(owed, { id: 'B', admin: false })).toBe(true);
+    expect(canSee(owed, { id: 'C', admin: true })).toBe(true);
+    expect(canSee(owed, { id: 'C', admin: false })).toBe(false);
   });
 
   it('decide: an active member who is not the reporter, else the refusal text', () => {

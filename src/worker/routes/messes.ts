@@ -3,7 +3,7 @@
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import {
-  askedOf, balancesOf, canDelete, canSettle, decideError, isAnswerable, isDecidable, messStatus, parseMessInput, type Mess, type MessRow,
+  askedOf, balancesOf, canDelete, canSee, canSettle, decideError, isAnswerable, isDecidable, messStatus, parseMessInput, type Mess, type MessRow,
 } from '../../shared/messes';
 import { MESS_SETTLE, isOneOf } from '../../shared/vocab';
 import { isAdmin } from '../../shared/roles';
@@ -45,7 +45,8 @@ messes.get('/messes', requireMember, async (c) => {
   const rows = await all<MessRow>(db,
     'SELECT * FROM messes WHERE deleted_at IS NULL AND settled_at IS NULL AND closed_at IS NULL ORDER BY created_at DESC, id');
   const owed = rows.filter((m) => messStatus(m) === 'owed');
-  const shown = rows.filter((m) => messStatus(m) !== 'owed' || admin || m.reported_by === me.id || m.claimed_by === me.id);
+  const viewer = { id: me.id, admin };
+  const shown = rows.filter((m) => canSee(m, viewer));
   const active = await activeMemberIds(db);
   return c.json({ messes: await Promise.all(shown.map((m) => view(db, m, active))), balances: balancesOf(owed, me.id, admin) });
 });
