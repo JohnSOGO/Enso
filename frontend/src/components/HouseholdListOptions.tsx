@@ -1,6 +1,6 @@
 // SPEC §8.8 — Lists tab list management: the new-list form and the ⋯ list options (rename, emoji,
 // delete with its open-item count). Owns the `ListSummary` shape; HouseholdLists imports both
-// from here, never the reverse. Who may open the options is canManageList (§7A.1), decided by
+// from here, never the reverse. Who may open the options is canChange (§7A.1, shared/roles.ts), decided by
 // the caller; the server checks the same function.
 import { useState, type FormEvent } from 'react';
 import { Modal } from './Modal';

@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-06 — One creator-or-admin rule and isAdmin (placement-advisor)
+
+- **Ask:** steward pass 2 item A (approved): one shared "creator or admin may change it" rule plus isAdmin; today written in 4 routes and 4 forms beside canManageList, and `role === 'owner'` ~28 times (§6.3). Behavior-preserving.
+- **Verdict:** `src/shared/roles.ts` [NEW row] (ADMIN_ROLE, isAdmin, canChange); `src/shared/lists.ts` [EXISTING, canManageList removed]; the routes, forms, session.ts, env.ts and mess-asks.ts [EXISTING, call it].
+- **Flow stage:** rules (out of routes and render).
+- **Why:** canManageList is already this rule, so folding it in deletes a copy. Every admin read goes through isAdmin; every role-value write or SQL match through ADMIN_ROLE, so `'owner'` lives only in vocab.ts and roles.ts. Rejected: vocab.ts; lists.ts (inverted import); session.ts (PWA can't import it); a "permissions" module; moving the mess rules; renaming requireOwner; one shared 403 text.
+- **Caps:** shared/roles.ts 14/300 (new); shared/lists.ts 100 → 91/300; Settings.tsx 176 → 177/207 (pinned); EventForm.tsx 186 → 187/223 (pinned); routes/events.ts 113 → 114/147 (pinned); every other touched file +0 or +1, all unpinned under 300 (highest HouseholdLists.tsx 236, routes/lists.ts 226). No ceiling moved.
+
+## 2026-10-06 — Creator-or-admin rule and isAdmin into shared/roles.ts (reorganizer)
+
+- **Trigger:** steward pass 2 item A: the creator-or-admin check written in 4 routes, 4 forms and canManageList; `role === 'owner'` restated across Worker and PWA.
+- **Seam moved:** ADMIN and canManageList (renamed canChange, same body) from `src/shared/lists.ts`, the inline checks in routes alarms/alerts/chores/events/lists and the forms Alarms/Timers/ChoreForm/EventForm/HouseholdLists, and every `role === 'owner'` read or write (session.ts, members.ts, auth.ts, messes.ts, mess-asks.ts SQL, Messes/Settings/MachineHours) to `src/shared/roles.ts` [NEW row]. env.ts and auth.ts type the role as vocab's `Role`.
+- **Room opened:** shared/lists.ts: 100 → 91 lines; callers +0 or +1 (an import). No ceiling moved; no pin added.
+- **Behavior:** preserved — typecheck (all four projects), npm test (663: the 662 existing, canManageList's case moved unchanged to test/roles.test.ts as canChange, plus 1 isAdmin case) and arch:audit green (quiet); every 403 status, code, message and check order unchanged (forWrite guards kept; events.ts has none and still has none); EventForm's undefined meta → canChange(null) → admins only, as before; mess-asks binds ADMIN_ROLE to `role = ?`, the same rows. `'owner'` now appears only in vocab.ts ROLE and roles.ts (plus state.tsx's §6.3 comment).
+- **Restraint:** requireOwner keeps its name; 403 texts not unified; mess rules, MessViewer and balancesOf untouched; `'member'` literals untouched.
+
 ## 2026-10-05 — Mess permissions into the shared rules (placement-advisor)
 
 - **Ask:** steward backlog item 5 (approved): move the who-can-answer, settle, delete and decide checks out of `routes/messes.ts` into `src/shared/messes.ts`; the route and Messes.tsx import them (§7B.7, §8.15a). Behavior-preserving.

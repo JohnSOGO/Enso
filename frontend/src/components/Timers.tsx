@@ -6,6 +6,7 @@ import { del, errorText, get, patch, post } from '../api';
 import { useApp } from '../state';
 import { WEEKDAY, type Channel } from '../../../src/shared/vocab';
 import { utcToLocal, weekdayOf } from '../../../src/shared/time';
+import { canChange } from '../../../src/shared/roles';
 import s from './Lists.module.css';
 
 export interface Timer {
@@ -113,7 +114,7 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(f) !== JSON.stringify(init);
-  const canEdit = !timer || me.role === 'owner' || timer.createdBy === me.id;
+  const canEdit = !timer || canChange(timer.createdBy, me);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true); setError(null);

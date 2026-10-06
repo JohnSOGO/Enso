@@ -11,7 +11,8 @@ import { ListPicker, pickerEntries } from './ListPicker';
 import { ItemPhoto, type Snap } from './ItemPhoto';
 import { errorText, get, patch, post, upload } from '../api';
 import { useApp } from '../state';
-import { SHOPPING_LIST_ID, TEXT_MAX, canManageList } from '../../../src/shared/lists';
+import { SHOPPING_LIST_ID, TEXT_MAX } from '../../../src/shared/lists';
+import { canChange } from '../../../src/shared/roles';
 import ls from './Lists.module.css';
 import s from './HouseholdLists.module.css';
 
@@ -82,7 +83,7 @@ export function HouseholdLists({ pickRequest }: { pickRequest: number }) {
           {shown?.count != null && <span className={`muted ${s.pickCount}`}>{shown.count}</span>}
           <span aria-hidden className="muted">▾</span>
         </button>
-        {current && canManageList(current.createdBy, me) && (
+        {current && canChange(current.createdBy, me) && (
           <button className={s.more} aria-label="List options" title="List options" onClick={() => setManaging(true)}>⋯</button>
         )}
       </div>

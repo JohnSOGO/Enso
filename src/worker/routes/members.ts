@@ -4,6 +4,7 @@ import type { AppEnv } from '../env';
 import { all, first, newId, nowIso, randomBase32, run } from '../db';
 import { body, fail, str } from '../http';
 import { ROLE, isOneOf } from '../../shared/vocab';
+import { ADMIN_ROLE, isAdmin } from '../../shared/roles';
 import { requireMember, requireOwner, sha256hex } from '../session';
 import { normalizeInviteCode } from './auth';
 
@@ -14,7 +15,7 @@ export const members = new Hono<AppEnv>();
 export const FOUNDER_SQL = 'SELECT id FROM members ORDER BY created_at, id LIMIT 1';
 
 members.get('/members', requireMember, async (c) => {
-  const isOwner = c.get('member').role === 'owner';
+  const isOwner = isAdmin(c.get('member'));
   const founder = (await first<{ id: string }>(c.env.DB, FOUNDER_SQL))?.id;
   const rows = await all<Record<string, unknown>>(c.env.DB,
     `SELECT id, email, display_name AS displayName, color, role, disabled_at AS disabledAt FROM members ORDER BY created_at`);
@@ -32,10 +33,10 @@ members.patch('/members/:id', requireMember, requireOwner, async (c) => {
   // §6.3: the founder is protected — never demoted, never disabled.
   if ((await first<{ id: string }>(c.env.DB, FOUNDER_SQL))?.id === id) {
     if (b.disabled === true) return fail(c, 400, 'invalid_input', 'The owner cannot be disabled.');
-    if (b.role !== undefined && b.role !== 'owner') return fail(c, 400, 'invalid_input', "The owner can't be made a regular member.");
+    if (b.role !== undefined && b.role !== ADMIN_ROLE) return fail(c, 400, 'invalid_input', "The owner can't be made a regular member.");
   }
   const disabledAfter = b.disabled === undefined ? target.disabled_at !== null : b.disabled;
-  if (b.role === 'owner' && disabledAfter) return fail(c, 400, 'invalid_input', 'Enable this member before making them an admin.');
+  if (b.role === ADMIN_ROLE && disabledAfter) return fail(c, 400, 'invalid_input', 'Enable this member before making them an admin.');
   await c.env.DB.batch([
     ...(b.role !== undefined ? [c.env.DB.prepare('UPDATE members SET role = ? WHERE id = ?').bind(b.role, id)] : []),
     ...(b.disabled !== undefined ? [c.env.DB.prepare('UPDATE members SET disabled_at = ? WHERE id = ?').bind(b.disabled ? nowIso() : null, id)] : []),

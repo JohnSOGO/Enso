@@ -9,6 +9,7 @@ import { isOnFor } from '../../shared/optins';
 import { all, first, newId, nowIso, parseJson } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
+import { canChange } from '../../shared/roles';
 import { eventView, insertEventStatement, onEventIds, optInStatement, parseEventInput, removeFutureFires, type EventRow } from '../event-rows';
 import { daysOff } from './household';
 
@@ -18,7 +19,7 @@ async function loadEditable(c: Context<AppEnv>): Promise<EventRow | Response> {
   const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND is_alarm = 0 AND start_sun IS NULL', c.req.param('id'));
   if (!e) return fail(c, 404, 'not_found', 'That event no longer exists.');
   const me = c.get('member');
-  if (e.created_by !== me.id && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this event.');
+  if (!canChange(e.created_by, me)) return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this event.');
   return e;
 }
 

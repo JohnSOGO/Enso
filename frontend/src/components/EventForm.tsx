@@ -5,6 +5,7 @@ import { del, errorText, get, patch, post, put } from '../api';
 import { useApp } from '../state';
 import { WEEKDAY } from '../../../src/shared/vocab';
 import { weekdayOf } from '../../../src/shared/time';
+import { canChange } from '../../../src/shared/roles';
 import { type Recurrence } from '../../../src/shared/recurrence';
 import { longDate } from './DaySheet';
 import { FromThing } from './ThingPhoto';
@@ -70,7 +71,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
   }, [eventId]);
 
   const dirty = useMemo(() => form !== null && JSON.stringify(form) !== initial, [form, initial]);
-  const canEdit = !eventId || me.role === 'owner' || meta?.createdBy === me.id;
+  const canEdit = !eventId || canChange(meta?.createdBy ?? null, me);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
 
   async function run(fn: () => Promise<unknown>) {

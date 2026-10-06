@@ -7,6 +7,7 @@ import { occurrences, type Recurrence } from '../../shared/recurrence';
 import { all, first, newId, nowIso, parseJson, run } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
+import { canChange } from '../../shared/roles';
 import { parseEventInput, removeFutureFires, type EventRow } from '../event-rows';
 
 interface AlarmRow extends EventRow {
@@ -60,7 +61,7 @@ async function loadAlarm(c: Context<AppEnv>, forWrite: boolean): Promise<AlarmRo
   const a = await first<AlarmRow>(c.env.DB, `${SELECT_ALARMS} AND e.id = ?`, c.req.param('id'));
   if (!a) return fail(c, 404, 'not_found', 'That alarm no longer exists.');
   const me = c.get('member');
-  if (forWrite && a.created_by !== me.id && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this alarm.');
+  if (forWrite && !canChange(a.created_by, me)) return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this alarm.');
   return a;
 }
 

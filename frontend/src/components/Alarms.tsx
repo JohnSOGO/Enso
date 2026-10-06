@@ -9,6 +9,7 @@ import { del, errorText, get, patch, post } from '../api';
 import { useApp } from '../state';
 import { WEEKDAY, type Channel, type Weekday } from '../../../src/shared/vocab';
 import { utcToLocal, weekdayOf } from '../../../src/shared/time';
+import { canChange } from '../../../src/shared/roles';
 import s from './Lists.module.css';
 
 export interface Alarm {
@@ -83,7 +84,7 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(f) !== JSON.stringify(init);
-  const canEdit = !alarm || me.role === 'owner' || alarm.createdBy === me.id;
+  const canEdit = !alarm || canChange(alarm.createdBy, me);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true); setError(null);

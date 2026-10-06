@@ -7,6 +7,7 @@ import { all, first, householdTz, newId, nowIso, parseJson, run } from '../db';
 import { isTime } from '../../shared/time';
 import { body, fail, intIn, str } from '../http';
 import { requireMember } from '../session';
+import { canChange } from '../../shared/roles';
 import { choreFireContext } from '../../shared/chores';
 import { insertFire, loadChoreRun, sourceOf, updateFire } from '../fire-rows';
 import { completeStep } from './chores';
@@ -61,7 +62,7 @@ async function loadTimer(c: Context<AppEnv>, forWrite: boolean): Promise<TimerRo
   const t = await first<TimerRow>(c.env.DB, 'SELECT * FROM timers WHERE id = ? AND deleted_at IS NULL', c.req.param('id'));
   if (!t) return fail(c, 404, 'not_found', 'That timer no longer exists.');
   const me = c.get('member');
-  if (forWrite && t.created_by !== me.id && me.role !== 'owner') return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this timer.');
+  if (forWrite && !canChange(t.created_by, me)) return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this timer.');
   return t;
 }
 

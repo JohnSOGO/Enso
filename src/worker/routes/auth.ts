@@ -1,7 +1,8 @@
 // SPEC §6 — setup, signup, invite preview, login, logout, me.
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
-import { MEMBER_PALETTE } from '../../shared/vocab';
+import { MEMBER_PALETTE, type Role } from '../../shared/vocab';
+import { ADMIN_ROLE } from '../../shared/roles';
 import { all, first, newId, nowIso, run } from '../db';
 import { body, fail, str } from '../http';
 import { endSession, hashPassword, requireMember, sha256hex, startSession, verifyPassword } from '../session';
@@ -46,7 +47,7 @@ function credentialsError(b: Record<string, unknown>): string | null {
   return null;
 }
 
-async function createMember(db: D1Database, b: Record<string, unknown>, role: 'owner' | 'member') {
+async function createMember(db: D1Database, b: Record<string, unknown>, role: Role) {
   const id = newId('mem');
   const now = nowIso();
   await db.batch([
@@ -81,7 +82,7 @@ auth.post('/setup', async (c) => {
   if (!c.env.SETUP_TOKEN || b.setupToken !== c.env.SETUP_TOKEN) return fail(c, 403, 'bad_setup_token', 'That setup token is not correct.');
   const err = credentialsError(b);
   if (err) return fail(c, 400, 'invalid_input', err);
-  const id = await createMember(c.env.DB, b, 'owner');
+  const id = await createMember(c.env.DB, b, ADMIN_ROLE);
   await startSession(c, id);
   return c.json(await memberView(c.env.DB, id), 201);
 });

@@ -1,14 +1,15 @@
 // SPEC §7A, §10 — household lists: list CRUD and list item CRUD. Every add/re-open/duplicate
-// decision and who may rename/delete a list is made by src/shared/lists.ts; this route
+// decision is made by src/shared/lists.ts, who may rename/delete a list by src/shared/roles.ts; this route
 // validates, persists and shapes the response. Items of a deleted list are unreachable:
 // every item read and write joins lists.deleted_at IS NULL (L16). Deleting an item or a list
 // deletes its items' photos from R2 (§7A.3); the photo routes are routes/item-photos.ts.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import {
-  LISTS_MAX, LIST_NAME_MAX, NOTE_MAX, TEXT_MAX, canManageList, itemKey, listNameClash, renameClash, resolveAdd, visibleItems,
+  LISTS_MAX, LIST_NAME_MAX, NOTE_MAX, TEXT_MAX, itemKey, listNameClash, renameClash, resolveAdd, visibleItems,
 } from '../../shared/lists';
 import { emojiError } from '../../shared/emoji';
+import { canChange } from '../../shared/roles';
 import { all, first, newId, nowIso, run } from '../db';
 import { body, fail, optStr, str } from '../http';
 import { requireMember } from '../session';
@@ -111,7 +112,7 @@ lists.post('/lists', requireMember, async (c) => {
 lists.patch('/lists/:id', requireMember, async (c) => {
   const list = await listParam(c);
   if (list instanceof Response) return list;
-  if (!canManageList(list.created_by, c.get('member'))) {
+  if (!canChange(list.created_by, c.get('member'))) {
     return fail(c, 403, 'forbidden', list.created_by ? 'Only the person who made this list or an admin can rename it.' : 'Only an admin can rename this list.');
   }
   const b = await body(c);
@@ -129,7 +130,7 @@ lists.patch('/lists/:id', requireMember, async (c) => {
 lists.delete('/lists/:id', requireMember, async (c) => {
   const list = await listParam(c);
   if (list instanceof Response) return list;
-  if (!canManageList(list.created_by, c.get('member'))) {
+  if (!canChange(list.created_by, c.get('member'))) {
     return fail(c, 403, 'forbidden', list.created_by ? 'Only the person who made this list or an admin can delete it.' : 'Only an admin can delete this list.');
   }
   const db = c.env.DB, now = nowIso();
