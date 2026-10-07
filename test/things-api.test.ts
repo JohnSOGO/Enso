@@ -105,9 +105,10 @@ describe('M4g things — create, list, validate (D1, D2)', () => {
     expect(order.indexOf(soon.id)).toBeLessThan(order.indexOf(late.id));
     expect(order.indexOf(late.id)).toBeLessThan(order.indexOf(any.id));
 
-    // Any member may change any thing (§7C.1).
+    // Only its creator or an admin finishes a thing (§6.3).
     const bClient = (await member(o)).client;
-    expect((await bClient.patch(`/things/${late.id}`, { status: 'done' })).json.status).toBe('done');
+    expect((await bClient.patch(`/things/${late.id}`, { status: 'done' })).status).toBe(403);
+    expect((await o.patch(`/things/${late.id}`, { status: 'done' })).json.status).toBe('done');
     const list = (await o.get('/things')).json;
     expect(list.closed.find((x: any) => x.id === late.id)).toMatchObject({ status: 'done' });
     expect(list.open.some((x: any) => x.id === late.id)).toBe(false);

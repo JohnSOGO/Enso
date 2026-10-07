@@ -5322,7 +5322,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 
 ---
 
-## 14. Prototype status (2026-10-06)
+## 14. Prototype status (2026-10-07)
 
 Built: M0–M4 and M4a fully (alarms, with their API tests), plus the later §7 work:
 household days off (§7.3), grouped multi-day bars (§7.1), monthly-by-weekday repeat
@@ -5526,6 +5526,12 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Own entries only** (v1.35.0, §6.3; asked by MojoSOGO 2026-10-07 before adding two kids as plain members; A8–A12):
+writes to someone else's thing, show, recipe or list item (and their photos, Plan it, a recipe re-read) and to the areas
+of someone else's chore are now 403 `forbidden` for a non-admin; checking a list item, want / watched on a show, alarm
+acks, chore steps, the machines and mess answers stay open to everyone. The forms go read-only for those entries
+(`cannotChangeText` in `shared/roles.ts`). Q10, Q66, Q154, Q163 and Q175 changed accordingly. No migration. This applies to
+every non-admin member, adults too. **Still owed:** a kid's phone check (ack an alarm, answer a mess, tick Shopping).
 **Fill in an event from a screenshot** (v1.34.0, §7.8; asked by MojoSOGO 2026-10-06; EP1–EP6): 📷 Fill in from a
 screenshot in the new-event form, `POST /events/read-photo` on the shared 40-a-day photo budget, fields the person
 hasn't changed filled (timed or All day), the location as the first line of Notes. No migration. Q187–Q190 are ⚑

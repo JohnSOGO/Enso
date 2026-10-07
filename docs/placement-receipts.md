@@ -7,6 +7,20 @@ carry its result.
 
 ---
 
+## 2026-10-07 — Whose entry it is: creator-or-admin on things, shows, recipes, list items, chore areas (placement-advisor)
+
+- **Ask:** SPEC 2.64 §6.3 "Whose entry it is" (kids as plain members): writes to things, shows, recipes, list items and chore areas need `canChange`; checking a list item (`checked` only) and want/watched on a show (`status` only) stay open; the PWA forms go read-only for non-creators.
+- **Verdict:** `src/shared/roles.ts` [EXISTING] (cannotChangeText(noun), the §6.3 refusal sentence for routes and forms). routes/things.ts, thing-photos.ts, shows.ts, recipes.ts, recipe-photos.ts, lists.ts, item-photos.ts, chore-areas.ts [EXISTING]: `forWrite` on the file-local loaders (the alerts / alarms / chores idiom), inline where there is no loader. ThingForm, ShowForm, HouseholdListItemForm, ChoreAreas, RecipeView [EXISTING], hiding controls with canChange.
+- **Flow stage:** rules (roles.ts) / route (checks) / render (read-only forms).
+- **Why:**
+  - The rule already exists as canChange. §6.3 gives one refusal sentence, now written in 7 places and about to be written in ~12 more, so the sentence goes into shared code that both Worker and PWA import.
+  - Rejected a forbid helper in http.ts (it would pull member/role knowledge into the error-envelope file) and in session.ts (a second way to write a check five routes write one way; two lines per call site).
+  - Rejected a shared isTickOnly: it is a check on the request shape that only the route sees, and the PWA decides by canChange and sends one field. Use "exactly one key" so `{}` is not a tick.
+  - recipes.ts fits below its 242 band, so no extraction and no re-pin.
+  - Sibling: ShowForm's Watched must send `{ status }` alone for a non-creator.
+  - Moving the old copies of the sentence (events, alarms, alerts, chores, Alarms, EventForm, ChoreForm) to cannotChangeText, and the list-rename wording, are for code-steward or step 4.
+- **Caps:** no ceiling moved, nothing newly in the band.
+
 ## 2026-10-06 — Fill in an event from a screenshot (placement-advisor)
 
 - **Ask:** SPEC 2.63 §7.8 (with §8.4, §10 `POST /events/read-photo`): a screenshot fills the new-event form; nothing saved.

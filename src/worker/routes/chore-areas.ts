@@ -1,15 +1,22 @@
-// SPEC §7B.6 — what done looks like: a chore's areas and their reference photos (R2, private). Any member may
-// change them (⚑ Q163). The rules (limits, validation, the wire type) are src/shared/chore-areas.ts.
+// SPEC §7B.6 — what done looks like: a chore's areas and their reference photos (R2, private). Anyone may read
+// them; the chore's creator or an admin changes them (§6.3, Q163). The rules (limits, validation, the wire type) are src/shared/chore-areas.ts.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { AREAS_MAX, AREA_PHOTOS_MAX, parseAreaInput, type ChoreArea } from '../../shared/chore-areas';
 import { all, first, newId, nowIso, run } from '../db';
 import { body, fail, photoBody } from '../http';
 import { requireMember } from '../session';
+import { canChange, cannotChangeText } from '../../shared/roles';
 import { putPhoto, servePhoto } from '../photo-store';
 
 interface AreaRow { id: string; chore_id: string; name: string; expectations: string; position: number; updated_at: string }
 interface PhotoRow { id: string; area_id: string; photo_key: string }
+/** Either row with its chore's creator, for §6.3. */
+type Owned<T> = T & { chore_created_by: string | null };
+
+/** §6.3 — a write needs the chore's creator or an admin. → the 403 to send, or null. */
+const refuse = (c: Context<AppEnv>, choreCreatedBy: string | null) =>
+  canChange(choreCreatedBy, c.get('member')) ? null : fail(c, 403, 'forbidden', cannotChangeText('chore'));
 
 const AREA_GONE = 'That area no longer exists.';
 
@@ -18,15 +25,17 @@ async function areaView(db: D1Database, a: AreaRow): Promise<ChoreArea> {
   return { id: a.id, choreId: a.chore_id, name: a.name, expectations: JSON.parse(a.expectations), photos: photos.map((p) => p.id), updatedAt: a.updated_at };
 }
 
-/** An area whose chore still exists, or the 404 to send. */
-async function loadArea(c: Context<AppEnv>, id: string): Promise<AreaRow | Response> {
-  const a = await first<AreaRow>(c.env.DB,
-    `SELECT a.* FROM chore_areas a JOIN chores ch ON ch.id = a.chore_id WHERE a.id = ? AND ch.deleted_at IS NULL`, id);
-  return a ?? fail(c, 404, 'not_found', AREA_GONE);
+/** An area whose chore still exists, or the 404 to send (403 for a write by someone who can't change the chore). */
+async function loadArea(c: Context<AppEnv>, id: string, forWrite: boolean): Promise<AreaRow | Response> {
+  const a = await first<Owned<AreaRow>>(c.env.DB,
+    `SELECT a.*, ch.created_by AS chore_created_by FROM chore_areas a JOIN chores ch ON ch.id = a.chore_id
+      WHERE a.id = ? AND ch.deleted_at IS NULL`, id);
+  if (!a) return fail(c, 404, 'not_found', AREA_GONE);
+  return (forWrite && refuse(c, a.chore_created_by)) || a;
 }
 
 const loadAreaById = async (c: Context<AppEnv>, id: string) => {
-  const a = await loadArea(c, id);
+  const a = await loadArea(c, id, false);
   return a instanceof Response ? a : areaView(c.env.DB, a);
 };
 
@@ -60,7 +69,10 @@ choreAreas.get('/chores/:id/areas', requireMember, async (c) => {
 
 choreAreas.post('/chores/:id/areas', requireMember, async (c) => {
   const db = c.env.DB, choreId = c.req.param('id');
-  if (!(await first(db, 'SELECT id FROM chores WHERE id = ? AND deleted_at IS NULL', choreId))) return fail(c, 404, 'not_found', 'That chore no longer exists.');
+  const chore = await first<{ created_by: string | null }>(db, 'SELECT created_by FROM chores WHERE id = ? AND deleted_at IS NULL', choreId);
+  if (!chore) return fail(c, 404, 'not_found', 'That chore no longer exists.');
+  const no = refuse(c, chore.created_by);
+  if (no) return no;
   const input = parseAreaInput(await body(c));
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   const at = (await first<{ n: number; last: number | null }>(db, 'SELECT COUNT(*) AS n, MAX(position) AS last FROM chore_areas WHERE chore_id = ?', choreId))!;
@@ -72,7 +84,7 @@ choreAreas.post('/chores/:id/areas', requireMember, async (c) => {
 });
 
 choreAreas.patch('/chore-areas/:id', requireMember, async (c) => {
-  const a = await loadArea(c, c.req.param('id'));
+  const a = await loadArea(c, c.req.param('id'), true);
   if (a instanceof Response) return a;
   const input = parseAreaInput(await body(c), { name: a.name, expectations: JSON.parse(a.expectations) });
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
@@ -82,7 +94,7 @@ choreAreas.patch('/chore-areas/:id', requireMember, async (c) => {
 });
 
 choreAreas.delete('/chore-areas/:id', requireMember, async (c) => {
-  const a = await loadArea(c, c.req.param('id'));
+  const a = await loadArea(c, c.req.param('id'), true);
   if (a instanceof Response) return a;
   const db = c.env.DB;
   const keys = await all<{ photo_key: string }>(db, 'SELECT photo_key FROM chore_area_photos WHERE area_id = ?', a.id);
@@ -95,7 +107,7 @@ choreAreas.delete('/chore-areas/:id', requireMember, async (c) => {
 });
 
 choreAreas.post('/chore-areas/:id/photos', requireMember, async (c) => {
-  const a = await loadArea(c, c.req.param('id'));
+  const a = await loadArea(c, c.req.param('id'), true);
   if (a instanceof Response) return a;
   const db = c.env.DB;
   const n = (await first<{ n: number }>(db, 'SELECT COUNT(*) AS n FROM chore_area_photos WHERE area_id = ?', a.id))!.n;
@@ -110,22 +122,23 @@ choreAreas.post('/chore-areas/:id/photos', requireMember, async (c) => {
   return c.json(await loadAreaById(c, a.id), 201);
 });
 
-/** A photo whose area and chore still exist, or the 404 to send. */
-async function loadPhoto(c: Context<AppEnv>): Promise<PhotoRow | Response> {
-  const p = await first<PhotoRow>(c.env.DB,
-    `SELECT p.* FROM chore_area_photos p JOIN chore_areas a ON a.id = p.area_id JOIN chores ch ON ch.id = a.chore_id
-      WHERE p.id = ? AND ch.deleted_at IS NULL`, c.req.param('id'));
-  return p ?? fail(c, 404, 'not_found', 'That photo no longer exists.');
+/** A photo whose area and chore still exist, or the 404 to send (403 for a write, as loadArea). */
+async function loadPhoto(c: Context<AppEnv>, forWrite: boolean): Promise<PhotoRow | Response> {
+  const p = await first<Owned<PhotoRow>>(c.env.DB,
+    `SELECT p.*, ch.created_by AS chore_created_by FROM chore_area_photos p JOIN chore_areas a ON a.id = p.area_id
+      JOIN chores ch ON ch.id = a.chore_id WHERE p.id = ? AND ch.deleted_at IS NULL`, c.req.param('id'));
+  if (!p) return fail(c, 404, 'not_found', 'That photo no longer exists.');
+  return (forWrite && refuse(c, p.chore_created_by)) || p;
 }
 
 choreAreas.get('/chore-area-photos/:id', requireMember, async (c) => {
-  const p = await loadPhoto(c);
+  const p = await loadPhoto(c, false);
   if (p instanceof Response) return p;
   return servePhoto(c, c.env.PHOTOS, p.photo_key, 'That photo no longer exists.');
 });
 
 choreAreas.delete('/chore-area-photos/:id', requireMember, async (c) => {
-  const p = await loadPhoto(c);
+  const p = await loadPhoto(c, true);
   if (p instanceof Response) return p;
   const db = c.env.DB;
   await db.batch([

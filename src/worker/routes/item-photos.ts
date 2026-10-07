@@ -9,6 +9,7 @@ import { cleanItemName, type ItemReading } from '../../shared/item-reading';
 import { nowIso, run } from '../db';
 import { fail, photoBody } from '../http';
 import { requireMember } from '../session';
+import { canChange, cannotChangeText } from '../../shared/roles';
 import { homeCaptionsConfigOf, identifyFromHome } from '../home-captions';
 import { readItemPhoto } from '../photo-reader';
 import { spendPhotoRead } from '../photo-reads';
@@ -52,6 +53,7 @@ itemPhotos.post('/list-items/read-photo', requireMember, async (c) => {
 itemPhotos.put('/list-items/:id/photo', requireMember, async (c) => {
   const item = await loadItem(c.env.DB, c.req.param('id'));
   if (!item) return fail(c, 404, 'not_found', ITEM_GONE);
+  if (!canChange(item.created_by, c.get('member'))) return fail(c, 403, 'forbidden', cannotChangeText('item'));
   const photo = await photoBody(c);
   if (photo instanceof Response) return photo;
   await replacePhoto(c.env.PHOTOS, 'list-items', item.id, photo.bytes, photo.type, item.photo_key,
@@ -67,6 +69,7 @@ itemPhotos.get('/list-items/:id/photo', requireMember, async (c) => {
 itemPhotos.delete('/list-items/:id/photo', requireMember, async (c) => {
   const item = await loadItem(c.env.DB, c.req.param('id'));
   if (!item) return fail(c, 404, 'not_found', ITEM_GONE);
+  if (!canChange(item.created_by, c.get('member'))) return fail(c, 403, 'forbidden', cannotChangeText('item'));
   if (item.photo_key) {
     await run(c.env.DB, 'UPDATE list_items SET photo_key = NULL, updated_at = ? WHERE id = ?', nowIso(), item.id);
     await c.env.PHOTOS.delete(item.photo_key);

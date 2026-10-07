@@ -10,7 +10,7 @@ import {
 } from '../../shared/lists';
 import { emojiError } from '../../shared/emoji';
 import type { ListAddResult } from '../../shared/vocab';
-import { canChange } from '../../shared/roles';
+import { canChange, cannotChangeText } from '../../shared/roles';
 import { all, first, newId, nowIso, run } from '../db';
 import { body, fail, optStr, str } from '../http';
 import { requireMember } from '../session';
@@ -187,6 +187,9 @@ lists.patch('/list-items/:id', requireMember, async (c) => {
   const row = await loadItem(c.env.DB, c.req.param('id'));
   if (!row) return fail(c, 404, 'not_found', ITEM_GONE);
   const b = await body(c);
+  // §6.3: checking or unchecking alone is anyone's tick; any other change is the creator's or an admin's.
+  const tickOnly = Object.keys(b).length === 1 && 'checked' in b;
+  if (!tickOnly && !canChange(row.created_by, c.get('member'))) return fail(c, 403, 'forbidden', cannotChangeText('item'));
 
   let text = row.text;
   if (b.text !== undefined) {
@@ -216,6 +219,7 @@ lists.patch('/list-items/:id', requireMember, async (c) => {
 lists.delete('/list-items/:id', requireMember, async (c) => {
   const row = await loadItem(c.env.DB, c.req.param('id'));
   if (!row) return fail(c, 404, 'not_found', ITEM_GONE);
+  if (!canChange(row.created_by, c.get('member'))) return fail(c, 403, 'forbidden', cannotChangeText('item'));
   const now = nowIso();
   const r = await run(c.env.DB,
     `UPDATE list_items SET deleted_at = ?, photo_key = NULL, updated_at = ?

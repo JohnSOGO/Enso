@@ -12,6 +12,7 @@ import { SHOW_KIND, isOneOf } from '../../shared/vocab';
 import { all, first, householdPlace, newId, nowIso } from '../db';
 import { body, fail, photoBody } from '../http';
 import { requireMember } from '../session';
+import { canChange, cannotChangeText } from '../../shared/roles';
 import { spendPhotoRead } from '../photo-reads';
 import { lookUpShow, type ShowAsk } from '../show-reader';
 
@@ -95,7 +96,11 @@ shows.patch('/shows/:id', requireMember, async (c) => {
   const db = c.env.DB;
   const r = await loadRow(db, c.req.param('id'));
   if (!r) return fail(c, 404, 'not_found', GONE);
-  const input = parseShowInput({ ...showFromRow(r), status: undefined, ...(await body(c)) });
+  const b = await body(c);
+  // §6.3: want / watched alone is anyone's tick; any other change is the creator's or an admin's.
+  const tickOnly = Object.keys(b).length === 1 && 'status' in b;
+  if (!tickOnly && !canChange(r.created_by, c.get('member'))) return fail(c, 403, 'forbidden', cannotChangeText('show'));
+  const input = parseShowInput({ ...showFromRow(r), status: undefined, ...b });
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   const clash = await clashOf(db, showKey(input.title, input.year), r.id);
   if (clash) return duplicate(c, clash);
@@ -113,6 +118,7 @@ shows.patch('/shows/:id', requireMember, async (c) => {
 shows.delete('/shows/:id', requireMember, async (c) => {
   const r = await loadRow(c.env.DB, c.req.param('id'));
   if (!r) return fail(c, 404, 'not_found', GONE);
+  if (!canChange(r.created_by, c.get('member'))) return fail(c, 403, 'forbidden', cannotChangeText('show'));
   const now = nowIso();
   await c.env.DB.prepare('UPDATE shows SET deleted_at = ?, updated_at = ? WHERE id = ?').bind(now, now, r.id).run();
   return c.body(null, 204);

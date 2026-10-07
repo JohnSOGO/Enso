@@ -12,3 +12,6 @@ export const isAdmin = (member: { role: Role }): boolean => member.role === ADMI
 export function canChange(createdBy: string | null, member: { id: string; role: Role }): boolean {
   return member.role === ADMIN_ROLE || (createdBy !== null && createdBy === member.id);
 }
+
+/** §6.3 — the one refusal sentence when canChange says no, for the routes and the read-only forms. */
+export const cannotChangeText = (noun: string): string => `Only the creator or an admin can change this ${noun}.`;

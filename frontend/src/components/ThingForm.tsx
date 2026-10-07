@@ -1,7 +1,7 @@
 // SPEC §8.11 — the thing form (modal): photo, title, From / To, place, address, phone, cost, link, note,
 // reminders and channels; ↗ / 🗺️ / 📞 beside Link / Address / Phone open them; every text field but phone grows to fit its text; Plan it / Done / Let it go / Put back by status; Save / Cancel / Delete. A photo or link
 // reading (ThingPhoto / ThingLinkFill) fills only empty fields, each marked "from photo" / "from link — check it". The photo (new, replaced or removed)
-// goes to the server on Save, after the thing itself. Rules and validation are the server's (§7C).
+// goes to the server on Save, after the thing itself. Someone else's thing is read-only (§6.3). Rules and validation are the server's (§7C).
 import { useRef, useState, type ReactNode } from 'react';
 import { Modal } from './Modal';
 import { Grow } from './Grow';
@@ -11,6 +11,7 @@ import { ThingPlan } from './ThingPlan';
 import { ThingLinkFill } from './ThingLinkFill';
 import { del, errorText, get, patch, post, upload } from '../api';
 import { useApp } from '../state';
+import { canChange, cannotChangeText } from '../../../src/shared/roles';
 import type { Channel, ThingStatus } from '../../../src/shared/vocab';
 import {
   ADDRESS_MAX, COST_MAX, NOTE_MAX, PHONE_MAX, PLACE_MAX, THING_REMIND_TIME, TITLE_MAX, URL_MAX, webLink, type PhotoReading, type Thing,
@@ -59,7 +60,7 @@ const formOf = (t: Thing | null) => ({
 type Form = ReturnType<typeof formOf>;
 
 export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: () => void }) {
-  const { refresh } = useApp();
+  const { me, refresh } = useApp();
   const [init, setInit] = useState(() => formOf(thing));
   const [f, setF] = useState<Form>(init);
   const latest = useRef(f);
@@ -130,16 +131,18 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
 
   const mark = (k: Field) => filledFrom[k] && <em className="muted"> · from {filledFrom[k]} — check it</em>;
   const status = saved?.status;
+  const canEdit = !thing || canChange(thing.createdBy, me);
   const savedSrc = saved?.hasPhoto && !removed ? photoSrc(saved) : null;
 
   return (
     <>
       <Modal title={thing ? `Edit: ${thing.title}` : 'New thing to do'} onClose={onClose} dirty={dirty} error={error}
         footer={<>
-          <button className="primary" disabled={busy || !f.title.trim()} onClick={() => run(() => persist())}>Save</button>
-          <button onClick={onClose} disabled={busy}>Cancel</button>
+          {canEdit && <button className="primary" disabled={busy || !f.title.trim()} onClick={() => run(() => persist())}>Save</button>}
+          <button onClick={onClose} disabled={busy}>{canEdit ? 'Cancel' : 'Close'}</button>
         </>}>
-        <fieldset disabled={busy}>
+        {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>{cannotChangeText('thing')}</p>}
+        <fieldset disabled={busy || !canEdit}>
           {status === 'planned' && saved?.plannedDate && (
             <p className="muted" style={{ marginBottom: 10 }}>📅 Planned for {shortDate(saved.plannedDate, true)} — it's on the calendar.</p>
           )}
@@ -202,7 +205,7 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
           </div>
           <ChannelChecks push={f.push} house={f.house} onChange={(c) => setF({ ...f, ...c })} />
         </fieldset>
-        {saved && (
+        {saved && canEdit && (
           <div className="row wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             {status === 'idea' && <button disabled={busy || !f.title.trim()} onClick={planIt}>Plan it</button>}
             {(status === 'idea' || status === 'planned') && <>

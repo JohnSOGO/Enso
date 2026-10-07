@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth**: §14 holds status and deviatio
 MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-06, v1.34.0, main = production.*
+*Last updated 2026-10-07, v1.35.0, main = production.*
 
 ## Running where
 

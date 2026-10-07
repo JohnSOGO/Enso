@@ -1,12 +1,13 @@
 // SPEC §8.8 — the list item form modal: the item's photo (§7A.3, PhotoField; saved on Save, after the fields), text,
 // note, Assigned to (one member or Nobody), Save / Cancel / Delete. Owns the `Item` shape; HouseholdLists imports
-// both from here, never the reverse.
+// both from here, never the reverse. Someone else's item is read-only (§6.3); ticking it stays on the list.
 import { useMemo, useState } from 'react';
 import { Modal } from './Modal';
 import { PhotoField } from './PhotoField';
 import { apiUrl, del, errorText, patch, upload } from '../api';
 import { useApp } from '../state';
 import { NOTE_MAX, TEXT_MAX } from '../../../src/shared/lists';
+import { canChange, cannotChangeText } from '../../../src/shared/roles';
 
 /** One item as GET /lists/{id} returns it (§10). */
 export interface Item {
@@ -23,7 +24,8 @@ const chip = { padding: '4px 10px', minHeight: 44 } as const;
 
 /** Item form (§8.8): text, note, Assigned to, Save / Cancel / Delete. */
 export function ItemForm({ item, onClose, onSaved }: { item: Item; onClose: () => void; onSaved: () => void }) {
-  const { members } = useApp();
+  const { me, members } = useApp();
+  const canEdit = canChange(item.createdBy, me);
   const init = useMemo(() => ({ text: item.text, note: item.note ?? '', assigneeId: item.assigneeId }), [item]);
   const [f, setF] = useState(init);
   const [error, setError] = useState<string | null>(null);
@@ -55,10 +57,11 @@ export function ItemForm({ item, onClose, onSaved }: { item: Item; onClose: () =
   return (
     <Modal title={`Edit: ${item.text}`} onClose={onClose} dirty={dirty} error={error}
       footer={<>
-        <button className="primary" disabled={busy || !f.text.trim()} onClick={save}>Save</button>
-        <button onClick={onClose} disabled={busy}>Cancel</button>
+        {canEdit && <button className="primary" disabled={busy || !f.text.trim()} onClick={save}>Save</button>}
+        <button onClick={onClose} disabled={busy}>{canEdit ? 'Cancel' : 'Close'}</button>
       </>}>
-      <fieldset disabled={busy}>
+      {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>{cannotChangeText('item')}</p>}
+      <fieldset disabled={busy || !canEdit}>
         <PhotoField savedSrc={item.hasPhoto && !removed ? itemPhotoSrc(item) : null} pending={pending} alt={`Photo of ${item.text}`}
           onPick={(photo) => { setPending(photo); setRemoved(false); }}
           onRemove={() => { setPending(null); setRemoved(item.hasPhoto); }} />
@@ -82,9 +85,9 @@ export function ItemForm({ item, onClose, onSaved }: { item: Item; onClose: () =
           </div>
         </div>
       </fieldset>
-      <div className="row wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
+      {canEdit && <div className="row wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
         <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete “${item.text}”?`)) run(() => del(`/list-items/${item.id}`)); }}>Delete</button>
-      </div>
+      </div>}
     </Modal>
   );
 }
