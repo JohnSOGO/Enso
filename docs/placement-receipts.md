@@ -7,6 +7,16 @@ carry its result.
 
 ---
 
+## 2026-10-07 — Steward pass, whole tree (code-steward)
+
+- **Run:** after the v1.35.0 release (PR #22, SPEC 2.64 §6.3 "Whose entry it is", merged and live 2026-10-07; head 16f84ed), covering v1.34.0 too.
+- **Verdict:** MINOR DRIFT. Typecheck green, 690/690 tests (77 files), arch:audit quiet (nothing in the band; routes/recipes.ts 233/269 is the nearest at 87%).
+- **Top finding:** test/roles-api.test.ts A9 sends ~44 requests under vitest's default 5 s timeout and flakes under full-suite load on Windows. Split it into own and admin, each with `}, 30_000)`.
+- **Handoffs:** 0 to reorganizer; 3 to worker (A9 split and timeout; the 7 old refusal literals in events/alarms/alerts/chores routes and EventForm/Alarms/ChoreForm → cannotChangeText, plus the missing read-only line in Timers.tsx and the stale roles.ts comment; event-rows.ts notes on EVENT_NOTES_MAX); 2 quick placement-advisor verdicts (roles.ts already the owner; event-rows.ts); 1 spec decision for MojoSOGO (§6.3 says lists use the one sentence, while §7A.1 and lists.ts keep "Only the person who made this list…" / "Only an admin…"; recommended: name lists as §6.3's exception).
+- **Placement audit:** 2 code commits since pass 2 (049b76a v1.34.0, 16f84ed v1.35.0), both with advisor receipts and owner-naming messages, both landed as their verdicts said; 0 without.
+- **Restraint:** no shared spendRead (each route's 429/503 messages differ by spec); no forbid helper or shared isTickOnly (rejected by the advisor; the idiom is uniform); no ReadOnlyNote component; recipes.ts left alone until it reaches the band (seam ready: the emoji routes, like recipe-photos.ts); no PWA tests for the read-only forms.
+- **Report:** `docs/steward/2026-10-07-third-pass.md`. Nothing is fixed until MojoSOGO picks.
+
 ## 2026-10-07 — Whose entry it is: creator-or-admin on things, shows, recipes, list items, chore areas (placement-advisor)
 
 - **Ask:** SPEC 2.64 §6.3 "Whose entry it is" (kids as plain members): writes to things, shows, recipes, list items and chore areas need `canChange`; checking a list item (`checked` only) and want/watched on a show (`status` only) stay open; the PWA forms go read-only for non-creators.
