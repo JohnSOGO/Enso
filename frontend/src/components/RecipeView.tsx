@@ -4,12 +4,14 @@
 // under the title everyone's emoji ("Shelly 🌶 · John ⭐", ⚑ Q73) and RecipeEmoji, mine (§7E.5); under the source note
 // RecipeTranscript on a "watch it" video recipe or one whose captions couldn't be read (§7E.2b ⚑ Q87); a link recipe
 // (§7E.6) shows 🔗 Open on {site} in place of the thumbnail and ▶, and takes screenshots too (⚑ Q169). A kept
-// screenshot (⚑ Q174) is the main picture, above everything, in place of the thumbnail.
+// screenshot (⚑ Q174) is the main picture, above everything, in place of the thumbnail. ✎ and RecipeTranscript only for
+// the recipe's creator or an admin (§6.3).
 import { useState } from 'react';
 import { Modal } from './Modal';
 import { RecipeEmoji } from './RecipeEmoji';
 import { RecipeTranscript } from './RecipeTranscript';
 import { useApp, type Member } from '../state';
+import { canChange } from '../../../src/shared/roles';
 import { apiUrl, errorText, post } from '../api';
 import { SHOPPING_LIST_ID } from '../../../src/shared/lists';
 import { recipePhotoPath, type Recipe } from '../../../src/shared/recipes';
@@ -51,7 +53,8 @@ const summary = (added: string[], there: string[]) => [
 interface Props { recipe: Recipe; recipes: Recipe[]; onChange: (r: Recipe) => void; onEdit: () => void; onClose: () => void }
 
 export function RecipeView({ recipe: r, recipes, onChange, onEdit, onClose }: Props) {
-  const { members } = useApp();
+  const { me, members } = useApp();
+  const canEdit = canChange(r.createdBy, me);
   const [picked, setPicked] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
@@ -81,7 +84,7 @@ export function RecipeView({ recipe: r, recipes, onChange, onEdit, onClose }: Pr
 
   return (
     <Modal title={r.title} onClose={onClose} error={error}
-      footer={<><button onClick={onEdit} disabled={busy}>✎ Edit</button><button onClick={onClose}>Close</button></>}>
+      footer={<>{canEdit && <button onClick={onEdit} disabled={busy}>✎ Edit</button>}<button onClick={onClose}>Close</button></>}>
       {r.emojis.length > 0 && <p className={s.everyone}>{everyone(r, members)}</p>}
       <RecipeEmoji recipe={r} recipes={recipes} onChange={onChange} />
       {r.hasPhoto && <img className={s.shot} src={apiUrl(recipePhotoPath(r))} alt="The recipe's screenshot" />}
@@ -109,7 +112,7 @@ export function RecipeView({ recipe: r, recipes, onChange, onEdit, onClose }: Pr
       )}
       {(r.servings || r.time) && <p>{[r.servings && `Serves: ${r.servings}`, r.time && `Time: ${r.time}`].filter(Boolean).join(' · ')}</p>}
       <p className={`muted ${s.note}`}>{sourceNote(r)}</p>
-      {(r.videoId || r.link) && (!r.found || r.captionsError) && <RecipeTranscript recipe={r} onChange={onChange} />}
+      {canEdit && (r.videoId || r.link) && (!r.found || r.captionsError) && <RecipeTranscript recipe={r} onChange={onChange} />}
 
       {r.ingredients.length > 0 && (
         <>

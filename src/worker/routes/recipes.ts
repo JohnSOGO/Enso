@@ -4,7 +4,7 @@
 // is src/shared/recipes.ts or, for reading, src/shared/recipe-reading.ts; reading a new recipe (YouTube, captions with
 // SogoAI in-line §7E.2c, count, Claude, clean) and the daily-cap budget are recipe-reads.ts; the re-read itself is
 // recipe-reread.ts. This route keeps the §7E.2 / §7E.6 / §7E.2b check orders before them, maps their outcomes to HTTP,
-// and persists. Any member may do anything; delete is soft (⚑ Q66). Each person sets only their own emoji (§7E.5),
+// and persists. Writes are the creator's or an admin's (§6.3, Q66); delete is soft. Each person sets only their own emoji (§7E.5),
 // and every recipe answered carries everyone's through toRecipes.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
@@ -14,6 +14,7 @@ import {
 import { recipeLinkOf, siteName } from '../../shared/recipe-link';
 import { PASTED_MAX, RECIPE_READS_PER_DAY, cleanTranscript, parseScreenshots } from '../../shared/recipe-reading';
 import { emojiError } from '../../shared/emoji';
+import { canChange, cannotChangeText } from '../../shared/roles';
 import type { RecipeSource } from '../../shared/vocab';
 import { all, first, newId, nowIso, run } from '../db';
 import { body, fail } from '../http';
@@ -25,8 +26,10 @@ const LIVE = 'SELECT * FROM recipes WHERE deleted_at IS NULL';
 const loadRow = (db: D1Database, id: string) => first<RecipeRow>(db, `${LIVE} AND id = ?`, id);
 const GONE = 'That recipe no longer exists.';
 
-async function loadRecipe(c: Context<AppEnv>): Promise<RecipeRow | Response> {
-  return (await loadRow(c.env.DB, c.req.param('id')!)) ?? fail(c, 404, 'not_found', GONE);
+async function loadRecipe(c: Context<AppEnv>, forWrite: boolean): Promise<RecipeRow | Response> {
+  const r = await loadRow(c.env.DB, c.req.param('id')!);
+  if (!r) return fail(c, 404, 'not_found', GONE);
+  return forWrite && !canChange(r.created_by, c.get('member')) ? fail(c, 403, 'forbidden', cannotChangeText('recipe')) : r;
 }
 
 /** The one way a recipe leaves this route: rows → the wire, each with everyone's emoji (§7E.5). One extra
@@ -156,7 +159,7 @@ async function fromVideo(c: Context<AppEnv>, videoId: string): Promise<Response>
 recipes.post('/recipes/:id/transcript', requireMember, async (c) => {
   // §7E.2b check order: recipe → a video → the text → daily cap → keys → YouTube + the creator's comments (no
   // captions attempt) → count → Claude → clean → found, else nothing changes → save.
-  const r = await loadRecipe(c);
+  const r = await loadRecipe(c, true);
   if (r instanceof Response) return r;
   const { text, screenshots: shots } = await body(c);
   const screenshots = parseScreenshots(shots);
@@ -179,12 +182,12 @@ recipes.post('/recipes/:id/transcript', requireMember, async (c) => {
 });
 
 recipes.get('/recipes/:id', requireMember, async (c) => {
-  const r = await loadRecipe(c);
+  const r = await loadRecipe(c, false);
   return r instanceof Response ? r : c.json((await toRecipes(c.env.DB, [r]))[0]);
 });
 
 recipes.patch('/recipes/:id', requireMember, async (c) => {
-  const r = await loadRecipe(c);
+  const r = await loadRecipe(c, true);
   if (r instanceof Response) return r;
   const was = recipeFromRow(r);
   const b = await body(c);
@@ -201,15 +204,16 @@ recipes.patch('/recipes/:id', requireMember, async (c) => {
 });
 
 recipes.delete('/recipes/:id', requireMember, async (c) => {
+  const r = await loadRecipe(c, true);
+  if (r instanceof Response) return r;
   const now = nowIso();
-  const res = await run(c.env.DB, 'UPDATE recipes SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL', now, now, c.req.param('id'));
-  if (res.meta.changes !== 1) return fail(c, 404, 'not_found', GONE);
+  await run(c.env.DB, 'UPDATE recipes SET deleted_at = ?, updated_at = ? WHERE id = ?', now, now, r.id);
   return c.body(null, 204);
 });
 
 // §7E.5 — my emoji on a recipe: the member is the session's, never the body's; recipes.updated_at is untouched.
 recipes.put('/recipes/:id/emoji', requireMember, async (c) => {
-  const r = await loadRecipe(c);
+  const r = await loadRecipe(c, false);
   if (r instanceof Response) return r;
   const { emoji } = await body(c);
   const err = emojiError(emoji);
@@ -222,7 +226,7 @@ recipes.put('/recipes/:id/emoji', requireMember, async (c) => {
 });
 
 recipes.delete('/recipes/:id/emoji', requireMember, async (c) => {
-  const r = await loadRecipe(c);
+  const r = await loadRecipe(c, false);
   if (r instanceof Response) return r;
   await run(c.env.DB, 'DELETE FROM recipe_emojis WHERE recipe_id = ? AND member_id = ?', r.id, c.get('member').id);
   return answer(c, r.id);

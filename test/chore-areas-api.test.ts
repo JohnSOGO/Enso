@@ -69,13 +69,13 @@ describe('M4y what done looks like — areas', () => {
     expect(ninth.json.message).toBe(`A chore has at most ${AREAS_MAX} areas.`);
   });
 
-  it('CA7 a member who did not make the chore may add, edit and delete an area', async () => {
+  it('CA7 a member who did not make the chore may not add, edit or delete an area (Q163, §6.3)', async () => {
     const id = await newChore();
-    const a = await b.post(`/chores/${id}/areas`, { name: 'Floor' });
-    expect(a.status).toBe(201);
-    expect((await b.patch(`/chore-areas/${a.json.id}`, { expectations: ['Swept'] })).json.expectations).toEqual(['Swept']);
-    expect((await raw(b, 'DELETE', `/chore-areas/${a.json.id}`)).status).toBe(204);
-    expect((await o.get(`/chores/${id}/areas`)).json).toEqual([]);
+    expect((await b.post(`/chores/${id}/areas`, { name: 'Floor' })).status).toBe(403);
+    const a = await o.post(`/chores/${id}/areas`, { name: 'Floor' });
+    expect((await b.patch(`/chore-areas/${a.json.id}`, { expectations: ['Swept'] })).status).toBe(403);
+    expect((await raw(b, 'DELETE', `/chore-areas/${a.json.id}`)).status).toBe(403);
+    expect((await o.get(`/chores/${id}/areas`)).json).toMatchObject([{ name: 'Floor', expectations: [] }]);
   });
 
   it('parseAreaInput: a PATCH keeps what it leaves out; an empty list clears the expectations', () => {

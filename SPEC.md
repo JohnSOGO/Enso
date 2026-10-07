@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.63 · **Date:** 2026-10-06 · **Owner:** MojoSOGO
+**Version:** 2.64 · **Date:** 2026-10-07 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1654,12 +1654,28 @@ never stored.
 
 | | owner (Admin / Owner) | member |
 |---|---|---|
-| Create events/timers/alarms/chores | ✓ | ✓ |
+| Create events/timers/alarms/chores, list items, things, shows, recipes | ✓ | ✓ |
 | Edit/delete **own** | ✓ | ✓ |
 | Edit/delete **others'** | ✓ | ✗ |
 | Done / snooze / ack any fire; start/stop any timer; tick any list item or chore | ✓ | ✓ |
+| Answer That was me / Not me on a mess; mark a show watched; run the machines | ✓ | ✓ |
 | Invites, disable members, household settings | ✓ | ✗ |
 | **Make a member an admin, or remove an admin** | ✓ | ✗ |
+
+**Whose entry it is** (decided by MojoSOGO 2026-10-07, for the kids joining as plain members: "they
+shouldn't be able to edit locations or edit things except their own entries, but they still need to be able
+to acknowledge alarms and *is this my mess*"). Every write to an entry is `canChange(createdBy, member)`
+(`shared/roles.ts`): its creator or an admin; no creator → admins only. A refusal is 403 `forbidden`,
+"Only the creator or an admin can change this {noun}." This covers events, timers, alarms, chores, lists,
+**list items** (edit, assign, delete, photo), **things** (edit, Plan it, Done / Let it go / Put back, delete,
+photo), **shows** (edit, delete), **recipes** (edit, re-read from a transcript, delete, picture) and a chore's
+**areas** ("what done looks like": add, edit, delete, photos), which follow the **chore's** creator.
+Still open to every member, because they are taking part rather than changing someone's entry: acting on
+any fire (§5.4, so alarms are acknowledged by anyone), ticking a chore step, **checking or unchecking any list
+item** (a PATCH whose only field is `checked`), **marking any show watched or wanted again** (a PATCH whose only
+field is `status`), adding an item to any list, the machines (§7D), answering a mess (§7B.7), and one's own
+recipe emoji, optional-event switch, speakers and phone. A member who can't change an entry sees it read-only:
+its form shows "Only the creator or an admin can change this …" and no Save, Delete, photo or Plan it buttons.
 
 **Rules for changing people** (`PATCH /members/{id}`, owner only):
 - **The founder is protected:** their role cannot be changed and they cannot be disabled.
@@ -1683,6 +1699,11 @@ never stored.
 | A5 | make a disabled member an admin | 400 `invalid_input` |
 | A6 | `GET /members` | each row has `role` and `isFounder`; exactly one founder |
 | A7 | admin M removes their own admin role | 200; M's next owner-only request is 403 |
+| A8 | member K (not admin) PATCHes / DELETEs a thing, show, recipe and list item someone else made; PUTs / DELETEs their photos; Plans the thing; re-reads the recipe | each 403 `forbidden`; nothing changed |
+| A9 | K does the same to their own thing, show, recipe and list item | allowed as before |
+| A10 | K checks and unchecks someone else's list item (`{ checked }` only); marks someone else's show watched (`{ status }` only) | both 200 |
+| A11 | K adds, edits or deletes an area (or its photos) of a chore someone else made; then of their own chore | 403 `forbidden`; allowed |
+| A12 | K acknowledges a ringing alarm someone else made; answers That was me / Not me on someone else's mess | 200 each, as before |
 
 ### 6.4 Login rate limit
 
@@ -2168,7 +2189,8 @@ is done in JS with `itemKey` — never with SQLite `lower()`/`NOCASE`, which fol
   re-opens rather than duplicates) but are not returned.
 - **Delete** is a soft delete. Adding the same text later creates a new item. Its photo
   (§7A.3) is deleted from R2 and its key cleared in the same UPDATE.
-- Any member may add, edit, check, assign or delete any item. ⚑ DEFAULT
+- Any member may add an item to any list and check or uncheck any item. Editing, assigning, deleting or
+  changing the photo of an item is its creator or an admin (§6.3, decided by MojoSOGO 2026-10-07).
 - Lists never ring, push or speak. They are things to look at, not alerts — being
   assigned an item notifies nobody.
 
@@ -2443,8 +2465,8 @@ chore, not to a day's run: they say what done looks like every time. Nothing her
 - `ChoreArea` — the wire type: `{ id, choreId, name, expectations: string[], photos: string[], updatedAt }`;
   `photos` are photo ids, oldest first. A photo key is never on the wire.
 
-**Who:** anyone in the household may add, change or delete an area and its photos ⚑ Q163 — unlike the chore
-itself (creator or an admin), because whoever does the chore often knows best what done looks like.
+**Who:** the **chore's** creator or an admin may add, change or delete an area and its photos (§6.3; decided by
+MojoSOGO 2026-10-07, Q163) — anyone else gets 403 `forbidden`. Anyone may read them.
 
 **The routes** — `src/worker/routes/chore-areas.ts`:
 
@@ -2474,7 +2496,7 @@ itself (creator or an admin), because whoever does the chore often knows best wh
 | CA4 | POST a photo, GET it, POST up to 4, then a 5th | the bytes round-trip with `private, max-age=3600`; the area lists 4 ids oldest first; the 5th is 400; no key in any answer |
 | CA5 | DELETE a photo; DELETE an area with photos | 204 and the object gone; 204, the area and every object of it gone |
 | CA6 | delete the chore | its areas' rows and objects gone; GET its areas → 404 |
-| CA7 | a member who is not the chore's creator adds, edits and deletes an area | allowed (⚑ Q163) |
+| CA7 | a member who is not the chore's creator adds, edits and deletes an area, adds and deletes a photo | each 403 `forbidden` (Q163, §6.3 A11) |
 | CA8 | no session; a bad photo type | 401; 400 |
 | CA-M | migration check (§4.2zb) | rows written before 0029 survive; `foreign_key_check` empty |
 
@@ -2618,7 +2640,7 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
   end ≥ start). No dates = **any time**. Only an end = **until** that date.
 - **Status:** `idea` → `planned` (Plan it) → `done`; or `dropped` ("let it go"). A done or
   dropped thing can be put back to `idea`.
-- **Photo:** at most one (§7C.3). **Anyone** may add, edit, plan, finish or delete any thing. ⚑
+- **Photo:** at most one (§7C.3). **Anyone** may add a thing; editing, planning, finishing or deleting it is its creator or an admin (§6.3). ⚑
 
 ### 7C.2 Reminders and Plan it
 
@@ -2888,7 +2910,7 @@ what to buy and what to do, next to the video. **Paste a YouTube link** and the 
 recipe out of the video's own text, or **type one by hand**. Since v1.29.0 (asked by MojoSOGO
 2026-10-05) **any link** works too — a Facebook reel or post, a recipe site, any web page — and the
 kind of link is detected, never chosen (§7E.6). Recipes are household-shared: anyone
-may add, edit or delete any recipe ⚑ Q66. Their own tab, 🍳 Recipes (§8.12).
+may add a recipe; editing, re-reading or deleting it, or changing its picture, is its creator or an admin (§6.3, Q66). Their own tab, 🍳 Recipes (§8.12).
 
 ### 7E.1 A recipe
 
@@ -3334,7 +3356,7 @@ look-up with web search and web fetch, then a structured fill.
 - **Summary** ≤ 500 (what it is about). **Note** ≤ 2000 (the household's own). **Link** ≤ 500 through `webLink`
   (§7C.1) — the clip or page it came from.
 - **Status** `want` → `watched` (`SHOW_STATUS`); a watched show can go back to `want`. Watching records who and when.
-  **Delete** removes it (soft). **Anyone** may add, edit, mark watched or delete any show ⚑ Q154.
+  **Delete** removes it (soft). **Anyone** may add a show or mark any show watched (or wanted again); editing or deleting it is its creator or an admin (§6.3, Q154).
 - **One per title:** the key is the title lower-cased with whitespace collapsed, plus the year. A second show with
   the same key (whatever its status) is 409 `duplicate` "{title} is already on the list." ⚑ Q152; the same title
   with another year is a different show (remakes).
@@ -4189,7 +4211,7 @@ Today row's 📋:
   then each new photo, then each removed photo's DELETE; a refusal shows inside the sheet and keeps the editor
   open. Cancel with changes asks "Discard your changes?".
 - **✎ Edit chore** opens the chore form (§8.5) in place of the sheet.
-- Anyone in the household may change what done looks like ⚑ Q163.
+- The chore's creator or an admin may change what done looks like (Q163); everyone else sees it read-only, without ✎ or ＋ Add an area.
 
 ### 8.15a Whose mess? — the banner and the Messes section (§7B.7)
 
@@ -4703,10 +4725,10 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | GET | `/chores/today` | member | → `{ date, runs: Run[] }`; `Run = { id, choreId, title, doneMeans, timing, time, step, steps, assigneeId, personId, doneAt, doneBy, nextDueAt, ringing, areaCount }` (`personId` = the current step's person) |
 | POST | `/chore-runs/{id}/done` | member | advances one step (§7B.3) → run; 409 `already_done` when finished |
 | POST | `/chore-runs/{id}/undo` | member | → run; 409 `nothing_to_undo` at step 0 |
-| GET/POST | `/chores/{id}/areas` | member | GET → `ChoreArea[]` by position; POST `{ name, expectations? }` → area (201); 400 at 8 areas; 404 when the chore is gone (§7B.6) |
-| PATCH/DELETE | `/chore-areas/{id}` | member | PATCH `{ name?, expectations? }` → area; DELETE → 204 with its photos (§7B.6) |
-| POST | `/chore-areas/{id}/photos` | member | the raw image → area (201); 400 at 4 photos or a bad image (§7B.6) |
-| GET/DELETE | `/chore-area-photos/{id}` | member | GET → the image, `private, max-age=3600`; DELETE → 204 (§7B.6) |
+| GET/POST | `/chores/{id}/areas` | GET member / POST the chore's creator or owner | GET → `ChoreArea[]` by position; POST `{ name, expectations? }` → area (201); 400 at 8 areas; 404 when the chore is gone (§7B.6) |
+| PATCH/DELETE | `/chore-areas/{id}` | the chore's creator or owner | PATCH `{ name?, expectations? }` → area; DELETE → 204 with its photos (§7B.6) |
+| POST | `/chore-areas/{id}/photos` | the chore's creator or owner | the raw image → area (201); 400 at 4 photos or a bad image (§7B.6) |
+| GET/DELETE | `/chore-area-photos/{id}` | GET member / DELETE the chore's creator or owner | GET → the image, `private, max-age=3600`; DELETE → 204 (§7B.6) |
 | GET | `/messes` | member | → `{ messes: Mess[], balances: Balance[] }` — open and To talk about messes for everyone, owed ones for the pair and admins (§7B.7) |
 | POST | `/messes?choreId=&note=` | member | the raw photo → `Mess` (201); the first ask to everyone else at once; 400 no or bad photo, a long note; 404 an unknown chore (§7B.7) |
 | GET | `/messes/{id}/photo` | member | → the image, `private, max-age=3600`; 404 once deleted (§7B.7) |
@@ -4716,34 +4738,34 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | DELETE | `/messes/{id}` | reporter while unanswered, or owner | → 204 (§7B.7) |
 | GET | `/things` | member | → `{ open: Thing[], closed: Thing[] }` (closed = done/dropped, last 60 days); `Thing = { id, title, note, place, address, phone, cost, url, windowStart, windowEnd, remindStart, remindOn, channels, hasPhoto, status, plannedEventId, plannedDate, createdBy, updatedAt }` |
 | POST | `/things` | member | thing fields → thing (201) |
-| GET/PATCH/DELETE | `/things/{id}` | member | GET → thing; PATCH fields, all optional, incl. `status` → thing; DELETE → 204 (and its photo) |
-| POST | `/things/{id}/plan` | member | `{ date, time? }` → `{ thing, eventId }`; 400 outside the window |
-| PUT/GET/DELETE | `/things/{id}/photo` | member | PUT raw image body (≤ 4 MB) → 204; GET → the image; DELETE → 204 |
+| GET/PATCH/DELETE | `/things/{id}` | GET member / writes creator or owner (§6.3) | GET → thing; PATCH fields, all optional, incl. `status` → thing; DELETE → 204 (and its photo) |
+| POST | `/things/{id}/plan` | creator or owner | `{ date, time? }` → `{ thing, eventId }`; 400 outside the window |
+| PUT/GET/DELETE | `/things/{id}/photo` | GET member / PUT, DELETE creator or owner | PUT raw image body (≤ 4 MB) → 204; GET → the image; DELETE → 204 |
 | POST | `/things/read-photo` | member | raw image body → `{ title, startDate, endDate, place, address, phone, cost, url, note }` (each nullable); 503 / 502 / 422 / 429 per §7C.4 |
 | GET | `/shows` | member | → `{ want: Show[], watched: Show[] }` (want newest added first, watched newest watched first); `Show = { id, title, kind, year, rtCritics, rtAudience, watch: { how, where, note }[], summary, note, url, checkedAt, status, watchedAt, watchedBy, createdBy, createdAt, updatedAt }` (§7F) |
 | POST | `/shows` | member | `{ title, kind?, year?, rtCritics?, rtAudience?, watch?, summary?, note?, url?, checkedAt? }` → show (201); 400 `invalid_input`; 409 `duplicate` (+ `showId`) |
-| GET/PATCH/DELETE | `/shows/{id}` | member | GET → show; PATCH the POST fields, all optional, merged, plus `status: 'want' \| 'watched'` → show; 409 `duplicate`; DELETE → 204 (soft); 404 when gone |
+| GET/PATCH/DELETE | `/shows/{id}` | GET member / writes creator or owner, except a PATCH of only `status` (any member, §6.3) | GET → show; PATCH the POST fields, all optional, merged, plus `status: 'want' \| 'watched'` → show; 409 `duplicate`; DELETE → 204 (soft); 404 when gone |
 | POST | `/shows/look-up` | member | `{ title, year?, kind? }` or `{ url }` → `ShowReading` (§7F.2); nothing stored; 400 / 429 / 503 `show_lookup_off` / 422 `show_refused` / 502 `show_lookup_failed` |
 | POST | `/shows/look-up-photo` | member | raw image body → `ShowReading`; the picture is never stored; errors as look-up |
 | POST | `/things/read-link` | member | `{ url }` → the same reading as read-photo; nothing stored; 400 / 429 / 503 `link_reading_off` / 422 `link_refused` / 502 `link_reading_failed` per §7C.4b |
 | GET | `/recipes/{id}/photo` | member | → the recipe's picture (§7E.2b ⚑ Q174), private cache; 404 when none or the recipe is gone |
-| PUT/DELETE | `/recipes/{id}/photo` | member | PUT a raw photo body (`photoBody`, as a thing's) → 204, replacing (and deleting) the old one; DELETE → 204; each bumps `updatedAt`; 400 a bad type or size; 404 when the recipe is gone (⚑ Q175) |
+| PUT/DELETE | `/recipes/{id}/photo` | creator or owner | PUT a raw photo body (`photoBody`, as a thing's) → 204, replacing (and deleting) the old one; DELETE → 204; each bumps `updatedAt`; 400 a bad type or size; 404 when the recipe is gone (⚑ Q175) |
 | GET | `/recipes` | member | → `Recipe[]`, newest first; `Recipe = { id, title, videoId, videoTitle, channel, link, hasPhoto, watchUrl, thumbnailUrl, ingredients: string[], steps: string[], servings, time, found, source: RecipeSource[], captionsError, commentsError, createdBy, createdAt, updatedAt, emojis: RecipeEmoji[] }` (`watchUrl` / `thumbnailUrl` derived from `videoId`, null when typed or a link; `link` the page a link recipe was read from, §7E.6; `RecipeEmoji = { memberId, emoji }`, §7E.5) (§7E) |
 | POST | `/recipes` | member | `{ title, ingredients, steps, servings?, time? }` → recipe (201), typed by hand; 400 `invalid_input` |
-| GET/PATCH/DELETE | `/recipes/{id}` | member | GET → recipe; PATCH the POST fields, all optional, merged → recipe (found recomputed); DELETE → 204 (soft); 404 when gone |
+| GET/PATCH/DELETE | `/recipes/{id}` | GET member / writes creator or owner (§6.3) | GET → recipe; PATCH the POST fields, all optional, merged → recipe (found recomputed); DELETE → 204 (soft); 404 when gone |
 | PUT/DELETE | `/recipes/{id}/emoji` | member (their own) | PUT `{ emoji }` → recipe (200), my emoji set (upsert); DELETE → recipe (200), mine cleared; 400 `invalid_input` (`emojiError`); 404 when the recipe is gone; `updatedAt` untouched (§7E.5) |
 | POST | `/recipes/from-link` | member | `{ url }` → recipe (201): any link, its kind detected (§7E.6); a YouTube video as from-video; a page: 400 / 409 `duplicate` (+ `recipeId`) / 429 / 503 `recipe_reading_off` / 422 `recipe_refused` / 502 `recipe_reading_failed`, in the §7E.6 order |
 | POST | `/recipes/from-video` | member | the same handler as from-link (kept for older apps). For a video: `{ url }` → recipe (201); 400 / 409 `duplicate` (+ `recipeId`) / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed`, in the §7E.2 order |
-| POST | `/recipes/{id}/transcript` | member | `{ screenshots?: { type, data }[] (≤ 4, base64), text? (≤ PASTED_MAX) }`, at least one → recipe (200), re-read from the pasted transcript; 404 / 400 `invalid_input` / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed` / 422 `no_recipe` (nothing changed), in the §7E.2b order |
+| POST | `/recipes/{id}/transcript` | creator or owner | `{ screenshots?: { type, data }[] (≤ 4, base64), text? (≤ PASTED_MAX) }`, at least one → recipe (200), re-read from the pasted transcript; 404 / 400 `invalid_input` / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed` / 422 `no_recipe` (nothing changed), in the §7E.2b order |
 | GET | `/lists` | member | → `{ id, name, emoji, createdBy, openCount }[]`, by name (§7A); `emoji` null = the default |
 | POST | `/lists` | member | `{ name, emoji? }` → list (201); 409 `duplicate`; 400 at `LISTS_MAX` or a bad emoji |
 | PATCH/DELETE | `/lists/{id}` | creator or admin (seeded lists: admin) | PATCH `{ name, emoji? }` (absent = unchanged, null = the default) → list; DELETE → 204 (and its items' photos, §7A.3) |
 | GET | `/lists/{id}` | member | → `{ list: { id, name, emoji, createdBy }, open: Item[], checked: Item[] }` (§7A.1); `Item = { id, listId, text, note, assigneeId, createdBy, createdAt, checkedAt, checkedBy, hasPhoto, updatedAt }` |
 | POST | `/lists/{id}/items` | member | `{ text, note?, assigneeId? }` → `{ item, result: "added" \| "existing" \| "reopened" }`, 201 when added, else 200 |
-| PATCH | `/list-items/{id}` | member | `{ text?, note?, assigneeId?, checked?: boolean }` → item; 409 `duplicate` on a key clash |
-| DELETE | `/list-items/{id}` | member | → 204 (and its photo, §7A.3) |
+| PATCH | `/list-items/{id}` | creator or owner, except a PATCH of only `checked` (any member, §6.3) | `{ text?, note?, assigneeId?, checked?: boolean }` → item; 409 `duplicate` on a key clash |
+| DELETE | `/list-items/{id}` | creator or owner | → 204 (and its photo, §7A.3) |
 | POST | `/list-items/read-photo` | member | raw image body → `{ name, via: "sogoai" \| "claude" }` (`ItemReading`); nothing stored; 400 / 429 / 503 `photo_reading_off` / 422 `photo_refused` / 502 `photo_reading_failed` / 422 `item_unknown`, in the §7A.3 order |
-| PUT/GET/DELETE | `/list-items/{id}/photo` | member | PUT raw image body (≤ 4 MB) → 204 (replaces); GET → the image (`private, max-age=3600`); DELETE → 204; 404 when the item is gone, and GET also when it has no photo (§7A.3) |
+| PUT/GET/DELETE | `/list-items/{id}/photo` | GET member / PUT, DELETE creator or owner | PUT raw image body (≤ 4 MB) → 204 (replaces); GET → the image (`private, max-age=3600`); DELETE → 204; 404 when the item is gone, and GET also when it has no photo (§7A.3) |
 | POST | `/dev/tick?now=ISO` | only if `DEV_ENDPOINTS=1` | runs `tick(db, now)` → summary |
 
 **Freshness:** there are no WebSockets. The app refetches the visible calendar range
@@ -5120,7 +5142,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q7 | Accent color: v1 used blue, which collides with school-holiday blue | Indigo `#6366F1` |
 | Q8 | Snooze length | 10 min, single option |
 | Q9 | Can any member Done/Ack a fire assigned to someone else? | Yes |
-| Q10 | Can any member edit or delete any list item (not only their own)? | Yes — they are household lists |
+| Q10 | Can any member edit or delete any list item (not only their own)? | Was yes; since 2026-10-07 (MojoSOGO): anyone checks or unchecks any item, only its creator or an admin edits or deletes it (§6.3) |
 | Q11 | How long do bought / done items stay visible? | 30 days |
 | Q12 | Where do chores live? | Set up in **Alarms → Chores**; ticked off in **Lists → Today** (no fifth tab). **Superseded by Q166** (v1.28.0): their own 🧹 Chores tab |
 | Q13 | When do turns change? | Every Sunday (weekly), counted from the week the chore was made |
@@ -5175,7 +5197,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q63 | The same link pasted twice | ⚑ 409 `duplicate`; the PWA opens the existing recipe |
 | Q64 | The source note | ⚑ Says what was read ("From the description and captions"), plus "captions couldn't be read: {reason}" when that happened |
 | Q65 | Recipe reads per day | ⚑ 20 (`RECIPE_READS_PER_DAY`), counted apart from photo reads |
-| Q66 | Who edits or deletes a recipe? | ⚑ Anyone in the household; delete is soft |
+| Q66 | Who edits or deletes a recipe? | Its creator or an admin (MojoSOGO 2026-10-07, §6.3); delete is soft |
 | Q67 | A hand edit of a "watch it" recipe | ⚑ Adding ingredients or steps sets found = true (found = has ingredients or steps) |
 | Q68 | A typed recipe with a video link | ⚑ Not in v1 — a typed recipe has no video |
 | Q69 | Add to Shopping | ⚑ Nothing picked at first, a "Pick all" chip; summary "Added 4 · Milk already on the list"; on a failure it stops and names what wasn't added |
@@ -5258,7 +5280,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q151 | Saving a look-up | ⚑ Find opens the show form filled; nothing is saved until Save (as a thing's link reading) |
 | Q152 | The same show twice | ⚑ Same title (ignoring case and spaces) and year → 409 "… is already on the list.", watched or not |
 | Q153 | Editing how to watch | ⚑ Lines can be removed (✕) or refreshed (Check again), not typed by hand |
-| Q154 | Who may change a show | ⚑ Anyone in the household: add, edit, mark watched, delete |
+| Q154 | Who may change a show | Anyone adds or marks watched; its creator or an admin edits or deletes (MojoSOGO 2026-10-07, §6.3) |
 | Q155 | The row's way to watch | ⚑ The best option: theater, then stream, tv, rent, buy |
 | Q156 | Comments read for a YouTube link | ⚑ The top 20 by relevance (one quota unit), plus the title, channel and description; replies not read; other sites' comments only if Claude's own page fetch shows them |
 | Q157 | Lists' emojis | ⚑ A list without its own shows one picked from its name (keyword table in §7A.1, else 📋); Today 🧹, Things to do ✅, Movies & shows 🎬 are fixed |
@@ -5267,7 +5289,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q160 | A load nobody started in the app, or one that finished early (§7D.2, §8.5) | ⚑ A free or running machine offers **Done now**: free asks whose load; the machine shows DONE — waiting and the done alerts ring at once, then Still loaded works as usual |
 | Q161 | Machine alerts on "all devices" (§7D.3) | Everyone's phones and every speaker HA lists (decided by MojoSOGO 2026-10-05); ⚑ the `Everywhere` group is left out so each Echo speaks once; HA unreadable → the default speakers |
 | Q162 | A machine alert outside its hours (§7D.5) | ⚑ It waits and the reminders start over when the hours open (not dropped); only admins edit the hours, on the Machines section |
-| Q163 | Who may change what done looks like (§7B.6) | ⚑ Anyone in the household: add, edit and delete areas and their photos (the chore itself stays creator or admin) |
+| Q163 | Who may change what done looks like (§7B.6) | The chore's creator or an admin, like the chore itself (MojoSOGO 2026-10-07, §6.3) |
 | Q164 | How much a chore's done standard holds | ⚑ Up to 8 areas; each a name ≤ 40, up to 12 expectations ≤ 120 characters, and up to 4 photos |
 | Q165 | Ticking expectations (§8.15) | ⚑ Only to walk through the job while the sheet is open; never saved, cleared when it closes |
 | Q166 | Where chores live (§8.1, §8.15) | ⚑ Their own 🧹 Chores tab between Alarms and Lists: Today on top, All chores under it; they left Alarms and the Lists popup |
@@ -5280,7 +5302,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q172 | Metric amounts (§7E.2) | ⚑ Converted to US units by Claude when read, rounded to kitchen measures (180 °C → 350 °F); the metric original is not kept; typed recipes are never converted |
 | Q173 | Screenshots in the recipe form (§8.12, §7E.2b) | ⚑ On every existing recipe, typed ones included; Claude reads them with the title (nothing fetched); a brand-new recipe takes them after its first Save |
 | Q174 | A recipe's screenshot as its picture (§7E.2b, §8.12) | ⚑ The first screenshot of the latest successful read is kept and shown whole at the top of the view and as the row's picture, ahead of a YouTube thumbnail; a new read replaces it; no separate upload or remove |
-| Q175 | A recipe's picture by hand (§8.12) | ⚑ 📷 Add photo in the recipe form, on new and saved recipes alike, any member; it replaces a kept screenshot and is replaced by a later screenshot read; nothing is read from it |
+| Q175 | A recipe's picture by hand (§8.12) | ⚑ 📷 Add photo in the recipe form, on new and saved recipes alike, by the recipe's creator or an admin (§6.3); it replaces a kept screenshot and is replaced by a later screenshot read; nothing is read from it |
 | Q176 | A recipe's picture in the list (§8.12) | Whole, never cropped, inside the usual 64 × 36 slot; every row the same height (decided by MojoSOGO 2026-10-05); YouTube thumbnails keep their crop |
 | Q177 | When a mess goes to To talk about (§7B.7) | ⚑ When everyone asked has said Not me, or 24 h after the report with nobody claiming it |
 | Q178 | Who sees balances (§7B.7) | ⚑ Each member sees the pairs they are in; admins see every pair |
@@ -5300,7 +5322,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 
 ---
 
-## 14. Prototype status (2026-10-06)
+## 14. Prototype status (2026-10-07)
 
 Built: M0–M4 and M4a fully (alarms, with their API tests), plus the later §7 work:
 household days off (§7.3), grouped multi-day bars (§7.1), monthly-by-weekday repeat
@@ -5504,6 +5526,12 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Own entries only** (v1.35.0, §6.3; asked by MojoSOGO 2026-10-07 before adding two kids as plain members; A8–A12):
+writes to someone else's thing, show, recipe or list item (and their photos, Plan it, a recipe re-read) and to the areas
+of someone else's chore are now 403 `forbidden` for a non-admin; checking a list item, want / watched on a show, alarm
+acks, chore steps, the machines and mess answers stay open to everyone. The forms go read-only for those entries
+(`cannotChangeText` in `shared/roles.ts`). Q10, Q66, Q154, Q163 and Q175 changed accordingly. No migration. This applies to
+every non-admin member, adults too. **Still owed:** a kid's phone check (ack an alarm, answer a mess, tick Shopping).
 **Fill in an event from a screenshot** (v1.34.0, §7.8; asked by MojoSOGO 2026-10-06; EP1–EP6): 📷 Fill in from a
 screenshot in the new-event form, `POST /events/read-photo` on the shared 40-a-day photo budget, fields the person
 hasn't changed filled (timed or All day), the location as the first line of Notes. No migration. Q187–Q190 are ⚑

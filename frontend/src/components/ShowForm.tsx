@@ -1,10 +1,13 @@
 // SPEC §8.14 — the show form (modal): title, Movie / Show, year, Rotten Tomatoes critics / audience, how to watch
 // (✕ removes a line), Checked, 🔄 Check again (POST /shows/look-up; the answer goes into the form, saved only on
-// Save), summary, link (↗), note; Watched / Want to see it again; Save / Cancel / Delete. Rules are the server's (§7F).
+// Save), summary, link (↗), note; Watched / Want to see it again; Save / Cancel / Delete. Someone else's show is read-only
+// but for Watched / Want to see it again, which sends `{ status }` alone (§6.3). Rules are the server's (§7F).
 import { useState } from 'react';
 import { Modal } from './Modal';
 import { Grow } from './Grow';
 import { del, errorText, patch, post } from '../api';
+import { useApp } from '../state';
+import { canChange, cannotChangeText } from '../../../src/shared/roles';
 import {
   SHOW_NOTE_MAX, SHOW_TITLE_MAX, SHOW_URL_MAX, SUMMARY_MAX, YEAR_MAX, type Show, type ShowReading, type WatchOption,
 } from '../../../src/shared/shows';
@@ -40,6 +43,8 @@ interface Props {
 }
 
 export function ShowForm({ show, reading = null, typed, onClose, onSaved }: Props) {
+  const { me } = useApp();
+  const canEdit = !show || canChange(show.createdBy, me);
   const [init] = useState(() => formOf(show));
   const [f, setF] = useState<Form>(() => {
     const form = formOf(show ?? reading);
@@ -66,6 +71,7 @@ export function ShowForm({ show, reading = null, typed, onClose, onSaved }: Prop
   }
 
   const persist = (status?: ShowStatus) => run(async () => {
+    if (show && !canEdit) { await patch(`/shows/${show.id}`, { status }); return; }
     const b = {
       title: f.title, kind: f.kind, year: f.year.trim() || null, rtCritics: number(f.rtCritics, 'Critics %'),
       rtAudience: number(f.rtAudience, 'Audience %'), watch: f.watch, checkedAt: f.checkedAt, summary: f.summary.trim() || null,
@@ -102,10 +108,11 @@ export function ShowForm({ show, reading = null, typed, onClose, onSaved }: Prop
   return (
     <Modal title={show ? `Edit: ${show.title}` : 'New movie or show'} onClose={onClose} dirty={dirty} error={error}
       footer={<>
-        <button className="primary" disabled={busy || checking || !f.title.trim()} onClick={() => persist()}>Save</button>
-        <button onClick={onClose} disabled={busy}>Cancel</button>
+        {canEdit && <button className="primary" disabled={busy || checking || !f.title.trim()} onClick={() => persist()}>Save</button>}
+        <button onClick={onClose} disabled={busy}>{canEdit ? 'Cancel' : 'Close'}</button>
       </>}>
-      <fieldset disabled={busy}>
+      {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>{cannotChangeText('show')}</p>}
+      <fieldset disabled={busy || !canEdit}>
         {!show && reading && <p className="muted" style={{ marginBottom: 10 }}>Found by looking it up — check it before saving.</p>}
         <label className="field"><span>Title</span>
           <Grow oneLine value={f.title} maxLength={SHOW_TITLE_MAX} onChange={(e) => set('title', e.target.value)} autoFocus={!show && !reading} />
@@ -171,7 +178,7 @@ export function ShowForm({ show, reading = null, typed, onClose, onSaved }: Prop
           {show.status === 'want'
             ? <button disabled={busy || !f.title.trim()} onClick={() => persist('watched')}>Watched</button>
             : <button disabled={busy || !f.title.trim()} onClick={() => persist('want')}>Want to see it again</button>}
-          <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete “${show.title}”?`)) run(() => del(`/shows/${show.id}`)); }}>Delete</button>
+          {canEdit && <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete “${show.title}”?`)) run(() => del(`/shows/${show.id}`)); }}>Delete</button>}
         </div>
       )}
     </Modal>

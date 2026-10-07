@@ -54,7 +54,7 @@ thingPhotos.post('/things/read-link', requireMember, async (c) => {
 });
 
 thingPhotos.put('/things/:id/photo', requireMember, async (c) => {
-  const t = await loadThing(c);
+  const t = await loadThing(c, true);
   if (t instanceof Response) return t;
   const photo = await photoBody(c);
   if (photo instanceof Response) return photo;
@@ -64,13 +64,13 @@ thingPhotos.put('/things/:id/photo', requireMember, async (c) => {
 });
 
 thingPhotos.get('/things/:id/photo', requireMember, async (c) => {
-  const t = await loadThing(c);
+  const t = await loadThing(c, false);
   if (t instanceof Response) return t;
   return servePhoto(c, c.env.PHOTOS, t.photo_key, 'This thing has no photo.');
 });
 
 thingPhotos.delete('/things/:id/photo', requireMember, async (c) => {
-  const t = await loadThing(c);
+  const t = await loadThing(c, true);
   if (t instanceof Response) return t;
   if (t.photo_key) {
     await run(c.env.DB, 'UPDATE things SET photo_key = NULL, updated_at = ? WHERE id = ?', nowIso(), t.id);

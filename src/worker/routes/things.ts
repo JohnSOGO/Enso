@@ -1,6 +1,6 @@
 // SPEC §7C, §10 — things to do: CRUD, Plan it, and closing a thing's scheduled fires on every edit.
 // Every rule (limits, window, reminders, planning dates, order) is src/shared/things.ts; this route
-// loads rows, calls it, and writes each change in ONE db.batch. Any member may do anything (§7C.1).
+// loads rows, calls it, and writes each change in ONE db.batch. Anyone may add; writes are the creator's or an admin's (§6.3).
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import {
@@ -10,6 +10,7 @@ import { addMinutes } from '../../shared/time';
 import { all, first, newId, nowIso } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
+import { canChange, cannotChangeText } from '../../shared/roles';
 import { insertEventStatement, parseEventInput } from '../event-rows';
 
 type Row = ThingRow & { planned_date: string | null };
@@ -21,10 +22,11 @@ const SELECT = `SELECT t.*, e.start_date AS planned_date FROM things t
 const view = (r: Row) => thingFromRow(r, r.planned_date);
 const loadRow = (db: D1Database, id: string) => first<Row>(db, `${SELECT} AND t.id = ?`, id);
 
-/** The thing named by :id, or a 404 response. Shared with routes/thing-photos.ts. */
-export async function loadThing(c: Context<AppEnv>): Promise<Row | Response> {
+/** The thing named by :id, or a 404 (403 for a write by someone who can't change it, §6.3). Shared with routes/thing-photos.ts. */
+export async function loadThing(c: Context<AppEnv>, forWrite: boolean): Promise<Row | Response> {
   const t = await loadRow(c.env.DB, c.req.param('id')!);
-  return t ?? fail(c, 404, 'not_found', 'That thing no longer exists.');
+  if (!t) return fail(c, 404, 'not_found', 'That thing no longer exists.');
+  return forWrite && !canChange(t.created_by, c.get('member')) ? fail(c, 403, 'forbidden', cannotChangeText('thing')) : t;
 }
 
 /** §7C.2 — an edit makes the thing's future scheduled reminders obsolete; the next tick re-plans what still applies. */
@@ -57,12 +59,12 @@ things.post('/things', requireMember, async (c) => {
 });
 
 things.get('/things/:id', requireMember, async (c) => {
-  const t = await loadThing(c);
+  const t = await loadThing(c, false);
   return t instanceof Response ? t : c.json(view(t));
 });
 
 things.patch('/things/:id', requireMember, async (c) => {
-  const t = await loadThing(c);
+  const t = await loadThing(c, true);
   if (t instanceof Response) return t;
   const b = await body(c);
   const input = parseThingInput({ ...view(t), status: undefined, ...b });
@@ -84,7 +86,7 @@ things.patch('/things/:id', requireMember, async (c) => {
 });
 
 things.delete('/things/:id', requireMember, async (c) => {
-  const t = await loadThing(c);
+  const t = await loadThing(c, true);
   if (t instanceof Response) return t;
   const db = c.env.DB, now = nowIso();
   await db.batch([
@@ -96,7 +98,7 @@ things.delete('/things/:id', requireMember, async (c) => {
 });
 
 things.post('/things/:id/plan', requireMember, async (c) => {
-  const t = await loadThing(c);
+  const t = await loadThing(c, true);
   if (t instanceof Response) return t;
   if (t.status !== 'idea') return fail(c, 409, 'not_an_idea', `This thing is ${t.status}; only an idea can be planned.`);
   const b = await body(c);
