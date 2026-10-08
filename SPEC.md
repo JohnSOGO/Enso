@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.64 · **Date:** 2026-10-07 · **Owner:** MojoSOGO
+**Version:** 2.65 · **Date:** 2026-10-08 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1319,6 +1319,19 @@ Additive only. `deliveries.mess_id` is NULL on every existing row and on every d
 To talk about notice. Messes are soft-deleted (their asks point at them). **Migration check (MS-M):** rows written
 under 0001–0031 survive 0032 unchanged with `mess_id` NULL; `PRAGMA foreign_key_check` is empty.
 
+### 4.2zf Schema change — `migrations/0033_timer_announce.sql`
+
+Asked by MojoSOGO 2026-10-08 (§5.5a).
+
+```sql
+-- §5.5a — a rolling timer can announce the start of its day. Additive only.
+ALTER TABLE timers ADD COLUMN announce_start INTEGER NOT NULL DEFAULT 0 CHECK (announce_start IN (0, 1));
+ALTER TABLE timers ADD COLUMN announced_on TEXT;  -- local YYYY-MM-DD of the window opening last announced
+```
+
+**Migration check (TS-M):** timers written under 0001–0032 survive 0033 unchanged with `announce_start` 0 and
+`announced_on` NULL — none of them announces anything.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1468,6 +1481,52 @@ Any member may act on any fire. ⚑ DEFAULT
 | `stop` | running | `running = 0`; open fire (if any) → `closed`, reason `stopped` |
 | `stop` | not running | no change |
 
+### 5.5a A rolling timer's day starts — the start announcement — asked by MojoSOGO 2026-10-08
+
+"Rolling timers like pushups: announce at the beginning of the day when the first one starts, and start the
+timer on ack." A timer with an active time range (§4.2n) begins its day when the window opens: its countdown
+restarts then (§5.1 `nextTimerDue`), and nothing used to say so. With **Announce the start of each day**
+(`announce_start = 1`) the household now hears it: *"Pushups timer started — every 60 minutes"*. From there it
+is the rolling timer as it always was: it rings after the interval, and each **Ack** starts the next countdown
+(§1, §5.4).
+
+**Rules** (pure, `src/shared/timer-start.ts`; it imports `engine.ts` and `time.ts`, never the reverse):
+- `TIMER_START_LATE_MIN = MISSED_AFTER_MIN` (60) ⚑ Q192: how late after the opening the announcement may still go.
+- `windowOpening(now, win)` → the local date of the window opening `now` belongs to, or `null` when `now` is
+  outside the window or more than `TIMER_START_LATE_MIN` after that opening. The opening of a window `from–to` is
+  `from` on the local date of `now`, or the day before for the small hours of an overnight window (local `< to`
+  when `from > to`); it is converted with `localToUtc` (§4.1).
+- `timerStartDue({ running, announceStart, announcedOn }, win, now)` → that date when the timer is running,
+  announces, has a window, `windowOpening` is not `null` and `announcedOn` is not that date; else `null`.
+- `timerStartMessage(title, intervalMin)` → `"{title} timer started — every {n} minutes"` (`minute` when n = 1).
+
+**Tick, step 3c** (`src/worker/timer-starts.ts`, `timerStartTick(env, now)`): for every running, non-deleted
+timer with `announce_start = 1` and a window, when `timerStartDue` gives a date:
+1. `UPDATE timers SET announced_on = date WHERE id = ? AND announced_on IS NOT date` — only a changed row goes on, so
+   two overlapping ticks announce once.
+2. Fire-less deliveries (§4.2k), like an announcement (§9.3) but on the **timer's** channels and audience (§5.7):
+   Phone → one `push` row per `audience(…).push` member, `title` NULL, so the push shows "📢 Announcement" and is
+   not counted as a founder ping (Q186); House → one `house` row on `deliverySpeakers` of those members (§9.2a),
+   none ticked by any of them → not spoken. The push rows are sent at once; the house row is spoken by step 4.
+
+So a timer started mid-window (Start at 14:00) announces at once if its opening was less than an hour ago,
+and otherwise waits for the next day ⚑ Q192. A stopped timer says nothing; Start on a later day announces on
+the first tick inside the late hour. Ack and the ringing are unchanged.
+
+`announce_start = 1` needs a window: POST/PATCH refuse it without one (400, "Set Active from / to so the timer
+has a day to start."), including a PATCH that clears the window of an announcing timer ⚑ Q191.
+
+**Acceptance (M4za — each row is a test):**
+
+| # | Check | Expected |
+|---|---|---|
+| TS1 | `windowOpening`, window 08:00–21:00, America/Los_Angeles | 08:00 → that date; 08:59 → that date; 09:00 → that date (exactly 60 min); 09:01 → null; 07:59 → null; overnight 22:00–06:00 at 22:45 → that date, at 02:00 → null (past the late hour); 23:30–06:00 at 00:15 → the day before |
+| TS2 | `timerStartDue` / `timerStartMessage` | running + announce + window at 08:05 → the date; announcedOn = the date, not running, announce off, or no window → null; `("Pushups", 60)` = `"Pushups timer started — every 60 minutes"`, `("Plank", 1)` = `"Plank timer started — every 1 minute"` |
+| TS3 | POST/PATCH `/timers` | `announceStart: true` without a window → 400 with the message; with 08:00–21:00 → 201, `announceStart: true` in the view and GET; PATCH `{ activeFrom: null, activeTo: null }` on it → 400; PATCH `{ announceStart: false }` then clearing → 200; omitted → false |
+| TS4 | tick at 08:01 local, a running announcing timer, Phone + House, two members, one speaker ticked | one push per member (`title` NULL, `fire_id` NULL) and one house row, all `"Pushups timer started — every 60 minutes"`; `announced_on` = today; a second tick at 08:02 writes nothing |
+| TS5 | tick at 09:30 local, or a stopped timer, or `announce_start` 0 | no deliveries; `announced_on` unchanged |
+| TS-M | migration 0033 | earlier timers survive with `announce_start` 0, `announced_on` NULL |
+
 ### 5.6 `tick(db, now)` — `src/worker/tick.ts` (not pure; orchestration only)
 
 Runs from `scheduled()` every minute, and from `POST /api/v1/dev/tick` in dev.
@@ -1485,6 +1544,8 @@ Runs from `scheduled()` every minute, and from `POST /api/v1/dev/tick` in dev.
    3b. **Mess asks.** `messTick` (`src/worker/mess-asks.ts`): ask again about each open mess,
    move an unclaimed one to To talk about, and delete mess photos past `MESS_PHOTO_KEEP_DAYS`
    (§7B.7). Its asks are fire-less push deliveries, sent at once.
+   3c. **Timer days start.** `timerStartTick` (`src/worker/timer-starts.ts`): the start announcement of each
+   announcing timer whose window just opened (§5.5a). Fire-less deliveries; the push rows are sent at once.
 4. **Speak house.** `sendHouseDeliveries(env, now)` drains queued and stale-claimed `house`
    deliveries (§9.2).
 5. Use a D1 `batch()` per fire for the writes. D1 has no `BEGIN`/`COMMIT`.
@@ -3600,8 +3661,11 @@ Time   Alarm                    Days            Next
 
 **Rolling timers** — as before: `⏱ Check on the dog · 60 min · 08:00–21:00`, a
 status badge (running / ringing / stopped), **Next** and **[Start]/[Stop]**; tapping a row
-opens the timer form (title, interval 1–1440 min, **Active from / to**, channels, repeat
-alert every, assigned to, Delete).
+opens the timer form (title, interval 1–1440 min, **Active from / to**, ☐ **📢 Announce the start of
+each day**, channels, repeat alert every, assigned to, Delete).
+
+- **📢 Announce the start of each day** (§5.5a): a checkbox under the Active from / to line, shown only while
+  both times are filled; with either time empty it is saved off. Off for a new timer.
 
 - The row shows `· 08:00–21:00` after the interval only when the timer has an active time
   range (§4.2n).
@@ -4695,7 +4759,7 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | POST | `/events/read-photo` | member | raw image body → `{ title, startDate, endDate, startTime, endTime, location, notes }` (each nullable); 503 / 502 / 422 / 429 per §7.8 |
 | GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6). A sun-timed event (§7.7) is 404 here and on `/exdates` |
 | POST | `/events/{id}/exdates` | creator or owner | `{ date }` |
-| GET/POST | `/timers` | member | → `Timer[]` / POST `{ title, intervalMin, channels, renotifyMin?, maxAlerts?, assignedTo?, activeFrom?, activeTo? }` → timer (201). `Timer = { id, title, intervalMin, channels, renotifyMin, maxAlerts, assignedTo, running, createdBy, activeFrom, activeTo, openFire }`; `activeFrom`/`activeTo` are `"HH:MM"` or both `null` (no window). 400 `invalid_input` when only one is set, either is not `HH:MM`, or `timerWindowError` refuses them (§5.1) |
+| GET/POST | `/timers` | member | → `Timer[]` / POST `{ title, intervalMin, channels, renotifyMin?, maxAlerts?, assignedTo?, activeFrom?, activeTo?, announceStart? }` → timer (201). `Timer = { id, title, intervalMin, channels, renotifyMin, maxAlerts, assignedTo, running, createdBy, activeFrom, activeTo, announceStart, openFire }`; `announceStart` (default false) needs a window, else 400 (§5.5a); `activeFrom`/`activeTo` are `"HH:MM"` or both `null` (no window). 400 `invalid_input` when only one is set, either is not `HH:MM`, or `timerWindowError` refuses them (§5.1) |
 | PATCH/DELETE | `/timers/{id}` | creator or owner | PATCH: the POST fields, all optional, merged over the timer; `activeFrom: null, activeTo: null` clears the window. A PATCH never re-plans the open fire (rule 0 defers it when it comes due) |
 | POST | `/timers/{id}/commands` | member | `{ cmd: TimerCmd }`; start plans the fire with `nextTimerDue` and the timer's window |
 | GET | `/alarms` | member | → alarms: `{ id, title, time, days: Weekday[], channels, renotifyMin, assignedTo, createdBy, nextDueAt, ringing }` |
@@ -5318,11 +5382,13 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q188 | An ambiguous place in a screenshot (§7.8) | ⚑ Read as the one nearest the household (Oceanside) |
 | Q189 | What a screenshot may fill (§7.8) | ⚑ Only fields not changed since the form opened; a timed reading sets the times, a date-only one makes it All day |
 | Q190 | An event's location from a screenshot (§7.8) | ⚑ The first line of Notes, as `📍 venue, address` (events have no place field) |
+| Q191 | A timer's start announcement (§5.5a) | ⚑ Opt-in per timer, only with active hours (a timer without a window has no day to start); worded "Pushups timer started — every 60 minutes", on the timer's own channels and people; the push is titled "📢 Announcement" |
+| Q192 | A late start announcement (§5.5a) | ⚑ Said up to 60 min after the window opens (an outage, or Start tapped soon after the opening); later than that, nothing until the next day |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
 
-## 14. Prototype status (2026-10-07)
+## 14. Prototype status (2026-10-08)
 
 Built: M0–M4 and M4a fully (alarms, with their API tests), plus the later §7 work:
 household days off (§7.3), grouped multi-day bars (§7.1), monthly-by-weekday repeat
@@ -5526,6 +5592,10 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Rolling timer day start** (v1.36.0, §5.5a, §4.2zf; asked by MojoSOGO 2026-10-08; TS1–TS5, TS-M): a timer with
+active hours can **📢 Announce the start of each day** — when its window opens the house and phones hear
+"Pushups timer started — every 60 minutes"; then it rings after the interval and each Ack starts the next one,
+as before. Migration 0033. Q191–Q192 are ⚑ defaults. **Still owed:** hearing it at a real window opening.
 **Own entries only** (v1.35.0, §6.3; asked by MojoSOGO 2026-10-07 before adding two kids as plain members; A8–A12):
 writes to someone else's thing, show, recipe or list item (and their photos, Plan it, a recipe re-read) and to the areas
 of someone else's chore are now 403 `forbidden` for a non-admin; checking a list item, want / watched on a show, alarm
