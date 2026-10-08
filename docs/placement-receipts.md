@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-08 — Steward pass, whole tree (code-steward)
+
+- **Run:** after the v1.36.0 release (PR #24, SPEC 2.65 §5.5a "A rolling timer's day starts", merged and live 2026-10-08, dbfdae2).
+- **Verdict:** MINOR DRIFT. Typecheck green, 698/698 tests, arch:audit quiet.
+- **Top finding:** docs/where-things-stand.md still read v1.35.0 and repeated the pass-2 line; refreshed in the same commit as the report. Pass-3 items 1–4 still owed; item 2 (the timer form's read-only sentence) rides the next timer-form change.
+- **Handoffs:** 0 to reorganizer, 1 docs refresh (done), 0 to placement-advisor (watch: a fourth fire-less sender should get one owner).
+- **Restraint:** no shared fire-less-send helper (3 sites with real differences); the PWA's window guard for announceStart (settled in the spec); TIMER_START_LATE_MIN (derived); announced_on not reset when the window is edited.
+- **Report:** `docs/steward/2026-10-08-fourth-pass.md`.
+
 ## 2026-10-08 — A rolling timer's day starts: the start announcement (placement-advisor)
 
 - **Ask:** SPEC 2.65 §5.5a (v1.36.0, migration 0033): an opt-in `announce_start` on a rolling timer with a window; once per window opening, within MISSED_AFTER_MIN of it, a fire-less "{title} timer started — every {n} minutes" on the timer's channels; `announceStart` on GET/POST/PATCH /timers; a checkbox in the timer form.
