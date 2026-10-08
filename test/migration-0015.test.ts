@@ -25,7 +25,7 @@ it('TW-M existing timers survive 0015 unchanged, with a null window', async () =
   const before = (await db.prepare('SELECT * FROM timers ORDER BY id').all<Record<string, unknown>>()).results;
   const firesBefore = (await db.prepare('SELECT * FROM fires ORDER BY id').all()).results;
 
-  await applyD1Migrations(db, env.TEST_MIGRATIONS);
+  await applyD1Migrations(db, env.TEST_MIGRATIONS.slice(0, at + 1));
 
   const after = (await db.prepare('SELECT * FROM timers ORDER BY id').all<Record<string, unknown>>()).results;
   expect(after).toEqual(before.map((r) => ({ ...r, active_from: null, active_to: null })));

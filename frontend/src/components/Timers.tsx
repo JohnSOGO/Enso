@@ -15,6 +15,8 @@ export interface Timer {
   assignedTo: string[]; running: boolean; createdBy: string;
   /** §4.2n — the active time range, "HH:MM"; both null = always. */
   activeFrom: string | null; activeTo: string | null;
+  /** §5.5a — announce when the window opens each day. */
+  announceStart: boolean;
   openFire: { id: string; due_at: string; state: string; alert_count: number } | null;
 }
 
@@ -109,13 +111,14 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
     push: timer ? timer.channels.includes('push') : true, house: timer ? timer.channels.includes('house') : false,
     renotify: timer ? (timer.renotifyMin ? String(timer.renotifyMin) : 'off') : '15',
     assignedTo: timer?.assignedTo ?? [],
-    activeFrom: timer?.activeFrom ?? '', activeTo: timer?.activeTo ?? '',
+    activeFrom: timer?.activeFrom ?? '', activeTo: timer?.activeTo ?? '', announceStart: timer?.announceStart ?? false,
   }), [timer]);
   const [f, setF] = useState(init);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(f) !== JSON.stringify(init);
   const canEdit = !timer || canChange(timer.createdBy, me);
+  const hasWindow = !!(f.activeFrom && f.activeTo);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true); setError(null);
@@ -125,7 +128,7 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
     const channels = [...(f.push ? ['push'] : []), ...(f.house ? ['house'] : [])];
     if (!channels.length) throw new Error('Pick at least one way to alert (Phone or House).');
     const body = { title: f.title, intervalMin: Number(f.interval), channels, renotifyMin: f.renotify === 'off' ? null : Number(f.renotify), assignedTo: f.assignedTo,
-      activeFrom: f.activeFrom || null, activeTo: f.activeTo || null };
+      activeFrom: f.activeFrom || null, activeTo: f.activeTo || null, announceStart: hasWindow && f.announceStart };
     if (timer) await patch(`/timers/${timer.id}`, body); else await post('/timers', body);
   });
 
@@ -153,6 +156,12 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
           </label>
         </div>
         <p className="muted" style={{ fontSize: '.8rem', marginTop: -4 }}>Both empty = always.</p>
+        {hasWindow && (
+          <label className="row" style={{ gap: 8, marginBottom: 12 }}>
+            <input type="checkbox" checked={f.announceStart} onChange={(e) => setF({ ...f, announceStart: e.target.checked })} />
+            📢 Announce the start of each day
+          </label>
+        )}
         <ChannelChecks push={f.push} house={f.house} onChange={(c) => setF({ ...f, ...c })} />
         <RenotifySelect label="While ringing, repeat the alert" value={f.renotify} onChange={(renotify) => setF({ ...f, renotify })} />
         <div className="field" role="group" aria-label="Assigned to">
