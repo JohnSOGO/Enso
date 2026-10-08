@@ -7,6 +7,19 @@ carry its result.
 
 ---
 
+## 2026-10-08 — A rolling timer's day starts: the start announcement (placement-advisor)
+
+- **Ask:** SPEC 2.65 §5.5a (v1.36.0, migration 0033): an opt-in `announce_start` on a rolling timer with a window; once per window opening, within MISSED_AFTER_MIN of it, a fire-less "{title} timer started — every {n} minutes" on the timer's channels; `announceStart` on GET/POST/PATCH /timers; a checkbox in the timer form.
+- **Verdict:** `src/shared/timer-start.ts` [NEW row] (TIMER_START_LATE_MIN, ANNOUNCE_NEEDS_WINDOW, windowOpening, timerStartDue, timerStartMessage); `src/worker/timer-starts.ts` [NEW row] (timerStartTick, tick step 3c); tick.ts, routes/alerts.ts, Timers.tsx [EXISTING]; migrations/0033_timer_announce.sql.
+- **Flow stage:** rules (timer-start.ts) / persist + deliver (timer-starts.ts, tick) / route (alerts.ts) / render (Timers.tsx).
+- **Why:**
+  - engine.ts is 255/300 and the most-imported shared hub; the rule would put it near 280, in the band. A leaf importing engine (never the reverse) keeps the hub still, the same pattern as things.ts.
+  - The tick step mirrors mess-asks.ts, so tick.ts (pinned 148) grows by three lines only.
+  - The advisor found that opsPingsSince counts every titled fire-less push that is not a notice or a mess ask, so a titled timer-start push would use up the founder's §9.4 hourly limit. It proposed a `deliveries.timer_id` column. **Built instead (coordinating session, wu wei):** the push carries `title` NULL, like an announcement, so it shows "📢 Announcement" and the elimination never counts it; no deliveries column, deliveries.ts untouched. Recorded in §5.5a and Q191.
+  - Rejected: engine.ts; a new `notice` value (CHECK rebuild); a timer branch in push.ts; the announce rule in the route or the commands handler.
+  - Spec gaps the advisor sent back, settled in §5.5a: the form saves announceStart off whenever a window end is empty, so the route's refusal is only for API misuse; a timer started or switched on within 60 min of its opening announces then (Q192).
+- **Caps:** shared/timer-start.ts 31/300 (new); worker/timer-starts.ts 49/300 (new); tick.ts 108 → 111/148 (pinned); routes/alerts.ts 186 → 192/300; Timers.tsx 173 → 182/300; engine.ts 255/300 unchanged. No ceiling moved.
+
 ## 2026-10-07 — Steward pass, whole tree (code-steward)
 
 - **Run:** after the v1.35.0 release (PR #22, SPEC 2.64 §6.3 "Whose entry it is", merged and live 2026-10-07; head 16f84ed), covering v1.34.0 too.

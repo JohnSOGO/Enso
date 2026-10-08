@@ -15,11 +15,12 @@ import { completeStep } from './chores';
 import { isOnFor } from '../../shared/optins';
 import { MACHINE_LABEL, isMachineId } from '../../shared/machines';
 import { onEventIds } from '../event-rows';
+import { ANNOUNCE_NEEDS_WINDOW } from '../../shared/timer-start';
 
 interface TimerRow {
   id: string; title: string; interval_min: number; channels: string; renotify_min: number | null; max_alerts: number;
   assigned_to: string; running: number; created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
-  active_from: string | null; active_to: string | null;
+  active_from: string | null; active_to: string | null; announce_start: number; announced_on: string | null;
 }
 
 async function timerView(db: D1Database, t: TimerRow) {
@@ -28,7 +29,7 @@ async function timerView(db: D1Database, t: TimerRow) {
   return {
     id: t.id, title: t.title, intervalMin: t.interval_min, channels: parseJson<Channel[]>(t.channels, []),
     renotifyMin: t.renotify_min, maxAlerts: t.max_alerts, assignedTo: parseJson<string[]>(t.assigned_to, []),
-    running: t.running === 1, createdBy: t.created_by, activeFrom: t.active_from, activeTo: t.active_to, openFire: open ?? null,
+    running: t.running === 1, createdBy: t.created_by, activeFrom: t.active_from, activeTo: t.active_to, announceStart: t.announce_start === 1, openFire: open ?? null,
   };
 }
 
@@ -53,9 +54,14 @@ function parseTimerInput(b: Record<string, unknown>) {
     const err = timerWindowError({ from, to }, interval);
     if (err) return err;
   }
+  // §5.5a: the start announcement needs a window — a day to start.
+  if (b.announceStart !== undefined && typeof b.announceStart !== 'boolean') return 'announceStart must be true or false.';
+  const announce = b.announceStart === true;
+  if (announce && from === null) return ANNOUNCE_NEEDS_WINDOW;
   return {
     title, interval_min: interval, channels: JSON.stringify([...new Set(b.channels)]), renotify_min: renotify, max_alerts: maxAlerts,
     assigned_to: JSON.stringify(assigned), active_from: from as string | null, active_to: to as string | null,
+    announce_start: announce ? 1 : 0,
   };
 }
 
@@ -79,10 +85,10 @@ alerts.post('/timers', requireMember, async (c) => {
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   const id = newId('tmr'), now = nowIso();
   await run(c.env.DB,
-    `INSERT INTO timers (id, title, interval_min, channels, renotify_min, max_alerts, assigned_to, active_from, active_to, running, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+    `INSERT INTO timers (id, title, interval_min, channels, renotify_min, max_alerts, assigned_to, active_from, active_to, announce_start, running, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
     id, input.title, input.interval_min, input.channels, input.renotify_min, input.max_alerts, input.assigned_to,
-    input.active_from, input.active_to, c.get('member').id, now, now);
+    input.active_from, input.active_to, input.announce_start, c.get('member').id, now, now);
   return c.json(await timerView(c.env.DB, (await first<TimerRow>(c.env.DB, 'SELECT * FROM timers WHERE id = ?', id))!), 201);
 });
 
@@ -94,9 +100,9 @@ alerts.patch('/timers/:id', requireMember, async (c) => {
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   await run(c.env.DB,
     `UPDATE timers SET title = ?, interval_min = ?, channels = ?, renotify_min = ?, max_alerts = ?, assigned_to = ?, active_from = ?, active_to = ?,
-       updated_at = ? WHERE id = ?`,
+       announce_start = ?, updated_at = ? WHERE id = ?`,
     input.title, input.interval_min, input.channels, input.renotify_min, input.max_alerts, input.assigned_to,
-    input.active_from, input.active_to, nowIso(), t.id);
+    input.active_from, input.active_to, input.announce_start, nowIso(), t.id);
   return c.json(await timerView(c.env.DB, (await first<TimerRow>(c.env.DB, 'SELECT * FROM timers WHERE id = ?', t.id))!));
 });
 
