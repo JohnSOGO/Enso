@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-09 — Paste a link into an event (placement-advisor)
+
+- **Ask:** SPEC 2.68 §7.9 "A link" (v1.39.0, EA6–EA7, ⚑ Q197). The fill bar's Paste takes text from text/plain, then text/uri-list, then text/html, then readText(). read-text sends a paste that is only a readable link to a new readEventLink (fetchPage, then the look-up with web search and web fetch, then a fill with the event schema and a third `link` prompt wording), with `link_refused` / `link_reading_failed`.
+- **Verdict:** `frontend/src/components/EventFillBar.tsx` + `src/worker/event-reader.ts` + `src/worker/routes/event-photos.ts` [EXISTING].
+- **Flow stage:** render (clipboard capture) → route (link-only dispatch, error codes) → read (event-reader: page, look-up, fill).
+- **Why:** each part matches its owner's single concern. readEventLink mirrors link-reader.ts's pipeline instead of generalizing readLink, following recipe-link-reader.ts: a generalized readLink would take a second concern, make the thing's url rule (Q138) conditional, and become a hub. Every piece it calls already has one home (page-fetch.ts, claude.ts, shared/link-reading.ts). The link-only check stays in the route; readWith takes its refusal/failure codes from a small map instead of a special case; the clipboard text extraction stays private to the component (DOMParser for HTML).
+- **Caps:** event-reader.ts 61 → 84/300; event-photos.ts 40 → 50/300; EventFillBar.tsx 76 → 88/300. None pinned, none in the band.
+
 ## 2026-10-09 — Steward pass, whole tree (code-steward)
 
 - **Run:** after the v1.37.0 (PR #26, SPEC 2.66 §7.9, migration 0034) and v1.38.0 (PR #27, SPEC 2.67 §7.9a) releases, both live 2026-10-09 (98d5624).
