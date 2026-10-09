@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth**: §14 holds status and deviatio
 MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-08, v1.36.0, main = production.*
+*Last updated 2026-10-09, v1.38.0, main = production.*
 
 ## Running where
 
@@ -46,7 +46,9 @@ the working agreement in `CLAUDE.md`.
   person tick theirs. Q125–Q129 are ⚑ defaults awaiting MojoSOGO.
 - Dishwasher (deferred by MojoSOGO). Phase C kitchen display (needs an AREC).
 - Real-phone checks still owed per SPEC §14 (Android push, Done/Snooze, the laundry and goat reminders in practice).
-- Code-steward: pass 1 items 6–10 wait until those files are next touched; pass 2 left nothing owed; pass 3 items 1–4
-  (A9 test timeout, the refusal sentence in one place incl. Timers.tsx, the §6.3/§7A.1 lists wording, the notes limit)
-  wait on MojoSOGO's pick. Pass 4 (after v1.36.0) found only this page stale. Reports are in `docs/steward/`.
+- Code-steward: pass 1 items 6–10 wait until those files are next touched; pass 3 items 1–4 and pass 5 items 1–3
+  (one maps rule for things and events, and Plan it filling an event's Address; the read-text cap wording) wait on
+  MojoSOGO's pick. Reports are in `docs/steward/`.
 - Rolling timer day start (v1.36.0, §5.5a): hear it at a real window opening.
+- Event address and paste (v1.37.0–v1.38.0, §7.9, §7.9a): on the iPhone, Paste a copied text and a screenshot into a
+  new event, and a "moved to…" text into an existing one; Open in Maps.
