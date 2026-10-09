@@ -1,5 +1,5 @@
 // SPEC §7.8, §7.9, §7.9a, §8.4 — the event form's fill bar: 📷 Screenshot (pick and shrink a picture, POST
-// /events/read-photo) and 📋 Paste (the clipboard's picture the same way, its text to /events/read-text). A new
+// /events/read-photo) and 📋 Paste (the clipboard's picture the same way, its text or link to /events/read-text). A new
 // event fills by readingToForm against the form as it opened; an existing one is updated by readingOverForm.
 // Hands the result to the form; holds no form state, never saves, keeps no photo or text.
 import { useRef, useState } from 'react';
@@ -14,6 +14,17 @@ interface Props<F extends EventFill> {
   onFill: (form: F) => void;
 }
 
+/** An item's text (§7.9): text/plain, else the first link of text/uri-list (an iPhone's copied link), else text/html's text. */
+async function itemText(item: ClipboardItem): Promise<string> {
+  const read = async (type: string) => (item.types.includes(type) ? (await item.getType(type)).text() : '');
+  const plain = (await read('text/plain')).trim();
+  if (plain) return plain;
+  const link = (await read('text/uri-list')).split(/\r?\n/).map((l) => l.trim()).find((l) => l && !l.startsWith('#'));
+  if (link) return link;
+  const html = await read('text/html');
+  return html ? (new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '').trim() : '';
+}
+
 /** What the clipboard holds: a picture first, else its text; null when the phone won't say. */
 async function clipboard(): Promise<{ image: Blob | null; text: string } | null> {
   try {
@@ -22,8 +33,9 @@ async function clipboard(): Promise<{ image: Blob | null; text: string } | null>
     for (const item of await navigator.clipboard.read()) {
       const image = item.types.find((t) => t.startsWith('image/'));
       if (image) return { image: await item.getType(image), text: '' };
-      if (!text && item.types.includes('text/plain')) text = await (await item.getType('text/plain')).text();
+      text ||= await itemText(item);
     }
+    if (!text) text = await navigator.clipboard.readText().catch(() => '');
     return { image: null, text };
   } catch {
     return null;

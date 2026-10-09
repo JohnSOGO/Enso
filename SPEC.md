@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.67 · **Date:** 2026-10-09 · **Owner:** MojoSOGO
+**Version:** 2.68 · **Date:** 2026-10-09 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2219,13 +2219,21 @@ image." An event has an optional **address**: where it is, as one line (a venue 
   page elsewhere) ⚑ Q193. The box is ordinary text: typing or pasting into it by hand reads nothing.
 - **📋 Paste**, beside 📷 Screenshot above the Title (new and existing events), reads the clipboard
   (`navigator.clipboard.read()`, else `readText()`; the phone may ask to allow it) and asks Claude what the copied
-  thing says ⚑ Q194:
+  thing says ⚑ Q194. A clipboard item's text is its `text/plain`, else its `text/uri-list` (the first link in it —
+  how an iPhone hands over a copied link), else its `text/html` with the tags removed; an item with none of them
+  falls back to `readText()` before saying there is nothing to paste.
   - **A picture** (a screenshot, a copied image) → shrunk as every upload is (§7C.3) → `POST /events/read-photo`
     (§7.8).
   - **Text** (a copied invite, message, email, map link's text or a bare address; its first `EVENT_TEXT_MAX`
     characters) → `POST /events/read-text { text }` → the same `EventReading` as read-photo, cleaned by the same
     `cleanEventReading`. The prompt is §7.8's, for copied text instead of a screenshot, with the same household
     place for a place that could be several places ⚑ Q188.
+  - **A link** (asked by MojoSOGO 2026-10-09: an event page such as incognitosd.com/events/…): when the pasted
+    text, trimmed, is one link that `readableLink` accepts (§7C.4b), read-text **reads the page** instead: the
+    Worker fetches it (`fetchPage`), Claude looks it up (`researchPrompt`, web search and web fetch, the same limits
+    as §7C.4b), then fills the `EventReading` from the page and the notes with §7.8's prompt for a pasted link. One
+    read of the budget. Refusal 422 `link_refused` "Couldn't read that link."; failure 502 `link_reading_failed`
+    "Couldn't read that link: {reason}". A link with other words around it is read as text ⚑ Q197.
   - **The reading fills the form** like a screenshot's ⚑ Q195: on a new event by §7.8's rule (`readingToForm`,
     the location into Address), on an existing one by §7.9a's. "Reading what you copied…" while it runs; then
     what it filled ("Filled N fields from what you copied — check them." / "Updated N fields from what you copied
@@ -2275,6 +2283,8 @@ reading)` (pure, `event-reading.ts`) ⚑ Q196:
 | EA3 | read-text with a fake Claude answering a location | 200 with the cleaned reading; one `photo_reads` row; the request carries the text (no image) and a prompt with today, the zone and the household's place; nothing saved |
 | EA4 | read-text with empty text; 5 001 characters; no API key; at the daily cap; without a session | 400; 400; 503 `photo_reading_off`; 429, no read counted; 401 |
 | EA5 | read-text refusal / failure from Claude | 422 `photo_refused` / 502 `photo_reading_failed` |
+| EA6 | read-text with only a link, a fake page and a fake Claude (look-up, then fill) | 200 with the cleaned reading; the page fetched once; the fill request carries the page and the notes; one `photo_reads` row |
+| EA7 | read-text with a link that Claude refuses / that fails | 422 `link_refused` / 502 `link_reading_failed` |
 | EA-M | migration 0034 over events written before it | rows unchanged, `address` NULL |
 
 ## 7A. Lists
@@ -5475,6 +5485,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q194 | What 📋 Paste reads (§7.9) | ⚑ Anything copied — a picture or text — is read by Claude on the shared 40-a-day budget, even a bare address (so it comes back cleaned up and the nearest one is picked) |
 | Q195 | What 📋 Paste fills (§7.9) | ⚑ The whole form, like a screenshot (v1.37.0 filled only the Address; changed when MojoSOGO asked for existing events to take later info) |
 | Q196 | Later info on an existing event (§7.9a) | ⚑ What the paste names wins over what's saved, except the title (kept) and the notes (added under, never replaced); a date alone keeps the times; nothing saved until Save |
+| Q197 | Pasting a link into an event (§7.9) | ⚑ Only a paste that is just one link reads the page (fetched, then looked up with web search, like a thing's link); a link inside other text is read as text |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5683,6 +5694,9 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Paste a link into an event** (v1.39.0, §7.9; asked by MojoSOGO 2026-10-09; EA6–EA7): Paste now finds a copied
+link on the iPhone (`text/uri-list`), and a paste that is one link reads the page (fetch, look-up, fill) on the same
+budget. No migration. Q197 is a ⚑ default. **Still owed:** pasting the incognitosd.com event link on the iPhone.
 **Update an event from later info** (v1.38.0, §7.9a; asked by MojoSOGO 2026-10-09; EU1–EU5): 📷 Screenshot and
 📋 Paste sit above the Title on new and existing events; on an existing one what was copied updates the form
 (title kept, notes added under), and nothing saves until Save. Paste moved there from the Address box and now
