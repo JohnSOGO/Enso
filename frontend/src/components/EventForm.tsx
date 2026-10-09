@@ -1,4 +1,4 @@
-// SPEC §8.4 — event form (modal). Creates or edits an event and its reminder; a new one can be filled from a screenshot (§7.8).
+// SPEC §8.4 — event form (modal). Creates or edits an event and its reminder; a new one can be filled from a screenshot (§7.8); an address can be pasted (§7.9).
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
 import { del, errorText, get, patch, post, put } from '../api';
@@ -11,17 +11,18 @@ import { type Recurrence } from '../../../src/shared/recurrence';
 import { longDate } from './DaySheet';
 import { FromThing } from './ThingPhoto';
 import { EventPhotoFill } from './EventPhotoFill';
+import { AddressField } from './AddressField';
 import { RepeatFields, ownWeek, repeatOf, toRecurrence, weeksOf, type RepeatValue } from './RepeatFields';
 import { ReminderFields, reminderOf, toReminder, type ReminderValue } from './ReminderFields';
 
 interface Form extends RepeatValue, ReminderValue {
-  title: string; notes: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string;
+  title: string; address: string; notes: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string;
   assignedTo: string[]; optional: boolean; emoji: string;
 }
 
 function blank(date: string): Form {
   return {
-    title: '', notes: '', date, allDay: false, startTime: '09:00', endTime: '', endDate: date,
+    title: '', address: '', notes: '', date, allDay: false, startTime: '09:00', endTime: '', endDate: date,
     repeat: 'none', byDay: [WEEKDAY[weekdayOf(date)]], weeks: ownWeek(date), until: '', assignedTo: [], optional: false, emoji: '',
     ...reminderOf(null),
   };
@@ -31,7 +32,7 @@ function fromEvent(e: any): Form {
   const r: Recurrence | null = e.recurrence;
   const repeat = repeatOf(r);
   return {
-    title: e.title, notes: e.notes ?? '', date: e.startDate, allDay: e.allDay, startTime: e.startTime ?? '09:00',
+    title: e.title, address: e.address ?? '', notes: e.notes ?? '', date: e.startDate, allDay: e.allDay, startTime: e.startTime ?? '09:00',
     endTime: e.endTime ?? '', endDate: e.endDate, repeat, byDay: r?.byDay ?? [WEEKDAY[weekdayOf(e.startDate)]],
     weeks: weeksOf(r, e.startDate), until: r?.until ?? '', assignedTo: e.assignedTo, optional: !!e.optional, emoji: e.emoji ?? '',
     ...reminderOf(e.reminder),
@@ -41,7 +42,7 @@ function fromEvent(e: any): Form {
 function toPayload(f: Form) {
   const recurrence = toRecurrence(f, f.date);
   return {
-    title: f.title, notes: f.notes || null, startDate: f.date,
+    title: f.title, address: f.address.trim() || null, notes: f.notes || null, startDate: f.date,
     startTime: f.allDay ? null : f.startTime, endTime: f.allDay || !f.endTime ? null : f.endTime,
     endDate: f.allDay ? f.endDate : f.date,
     recurrence, assignedTo: f.assignedTo, optional: f.optional, emoji: f.emoji.trim() || null,
@@ -146,6 +147,8 @@ export function EventForm({ eventId, date, onClose }: Props) {
               </label>
             </div>
           )}
+
+          <AddressField value={form.address} onChange={(v) => set('address', v)} />
 
           <RepeatFields value={form} date={form.date} onChange={(c) => setForm((f) => (f ? { ...f, ...c } : f))} />
 

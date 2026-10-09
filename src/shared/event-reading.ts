@@ -1,12 +1,11 @@
-// SPEC §7.8 — filling a new event from a screenshot: the reading as it comes over the wire, cleanEventReading
+// SPEC §7.8, §7.9 — reading an event from a screenshot or copied text: the reading as it comes over the wire, cleanEventReading
 // (the model's answer is input, never trusted) and readingToForm (which form fields it may fill). Pure; the
 // Worker cleans with it and the PWA fills with it, so the two can't disagree.
 import { isDate, isTime } from './time';
-import { ALERT_TITLE_MAX, EVENT_NOTES_MAX } from './alert-limits';
+import { ALERT_TITLE_MAX, EVENT_ADDRESS_MAX, EVENT_NOTES_MAX } from './alert-limits';
 
-export const EVENT_LOCATION_MAX = 200;
-/** The reading's notes leave room for the `📍 location` line above them. */
-export const EVENT_READING_NOTES_MAX = EVENT_NOTES_MAX - EVENT_LOCATION_MAX - 3;
+/** §7.9 — copied text sent to POST /events/read-text: at most this many characters. */
+export const EVENT_TEXT_MAX = 5000;
 
 /** What reading a screenshot returns — each field a string or null; dates YYYY-MM-DD, times HH:MM. */
 export interface EventReading {
@@ -33,12 +32,12 @@ export function cleanEventReading(raw: Partial<Record<keyof EventReading, unknow
   return {
     title: text(r.title, ALERT_TITLE_MAX), startDate, endDate, startTime,
     endTime: startTime && isTime(r.endTime) ? r.endTime : null,
-    location: text(r.location, EVENT_LOCATION_MAX), notes: text(r.notes, EVENT_READING_NOTES_MAX),
+    location: text(r.location, EVENT_ADDRESS_MAX), notes: text(r.notes, EVENT_NOTES_MAX),
   };
 }
 
 /** The event form's fields a screenshot can fill. */
-export interface EventFill { title: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string; notes: string }
+export interface EventFill { title: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string; address: string; notes: string }
 
 /** §7.8 — fills only the fields still as they were when the form opened; → the form and how many fields changed. */
 export function readingToForm<F extends EventFill>(form: F, opened: EventFill, r: EventReading): { form: F; filled: number } {
@@ -55,8 +54,8 @@ export function readingToForm<F extends EventFill>(form: F, opened: EventFill, r
     if (open('endDate')) next.endDate = r.endDate ?? next.date;
   }
   if (next.endDate < next.date) next.endDate = next.date;
-  const notes = [r.location && `📍 ${r.location}`, r.notes].filter(Boolean).join('\n');
-  if (notes && open('notes')) next.notes = notes;
-  const keys: (keyof EventFill)[] = ['title', 'date', 'allDay', 'startTime', 'endTime', 'endDate', 'notes'];
+  if (r.location && open('address')) next.address = r.location;
+  if (r.notes && open('notes')) next.notes = r.notes;
+  const keys: (keyof EventFill)[] = ['title', 'date', 'allDay', 'startTime', 'endTime', 'endDate', 'address', 'notes'];
   return { form: next, filled: keys.filter((k) => next[k] !== form[k]).length };
 }

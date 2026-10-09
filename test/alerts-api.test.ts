@@ -114,14 +114,14 @@ describe('reminder replayed through the database', () => {
   it('an edited event re-materializes its future fires (closed fires do not block)', async () => {
     const o = await owner();
     const ev = await o.post('/events', {
-      title: 'Walk', startDate: '2026-10-08', startTime: '18:00', reminder: { offsetMin: 0, channels: ['push'] },
+      title: 'Walk', startDate: '2030-10-08', startTime: '18:00', reminder: { offsetMin: 0, channels: ['push'] },
     });
-    await tickAt(o, '2026-10-08T12:00Z');
+    await tickAt(o, '2030-10-08T12:00Z');
     await o.patch(`/events/${ev.json.id}`, { startTime: '19:00' });
     // The PATCH closed the old 18:00 fire as 'removed'; that closed row must not block the new 19:00 one.
-    await tickAt(o, '2026-10-08T12:01Z');
+    await tickAt(o, '2030-10-08T12:01Z');
     const open = await env.DB.prepare(`SELECT due_at FROM fires WHERE event_id = ? AND state = 'scheduled'`).bind(ev.json.id).all<any>();
-    expect(open.results.map((r) => r.due_at)).toEqual(['2026-10-09T02:00:00.000Z']);
+    expect(open.results.map((r) => r.due_at)).toEqual(['2030-10-09T02:00:00.000Z']);
   });
 
   it('a reminder overdue by more than an hour is missed, not rung', async () => {
