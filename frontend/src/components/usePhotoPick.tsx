@@ -12,5 +12,5 @@ export function usePhotoPick(onPick: (files: File[]) => void, { multiple }: { mu
   return { input, open: () => ref.current?.click() };
 }
 
-/** A picked file shrunk to the upload JPEG; shrink-photo loads only when first used. */
-export const shrinkPicked = async (file: File): Promise<Blob> => (await import('../shrink-photo')).shrinkPhoto(file);
+/** A picked file (or a clipboard image) shrunk to the upload JPEG; shrink-photo loads only when first used. */
+export const shrinkPicked = async (file: Blob): Promise<Blob> => (await import('../shrink-photo')).shrinkPhoto(file);

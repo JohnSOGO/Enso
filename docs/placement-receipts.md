@@ -7,6 +7,19 @@ carry its result.
 
 ---
 
+## 2026-10-09 — An event's address, paste to fill (placement-advisor)
+
+- **Ask:** SPEC 2.66 §7.9 (v1.37.0, migration 0034, §4.2zg; §7.8 Q190/EP5; §8.4; §10 `/events/read-text`): an optional `events.address` (≤ EVENT_ADDRESS_MAX 200) on events GET/POST/PATCH; a screenshot reading fills the address instead of a 📍 notes line; `POST /events/read-text { text }` (≤ EVENT_TEXT_MAX 5000, same 40-a-day budget); an Address box with 📋 Paste and Open in Maps in the event form.
+- **Verdict:** EXISTING alert-limits.ts (EVENT_ADDRESS_MAX); event-reading.ts (EVENT_TEXT_MAX, address in EventFill/readingToForm; EVENT_LOCATION_MAX and EVENT_READING_NOTES_MAX deleted); event-rows.ts; routes/events.ts (PATCH UPDATE); routes/event-photos.ts (read-text); event-reader.ts (readEventText, one prompt with a source variant); EventForm.tsx (field wiring only); usePhotoPick.tsx (shrinkPicked takes a Blob). NEW row `frontend/src/components/AddressField.tsx`. Schema: migrations/0034_event_address.sql.
+- **Flow stage:** rules (alert-limits, event-reading) / route + persist (event-rows, events, event-photos) / read (event-reader) / render (AddressField, EventForm).
+- **Why:**
+  - EVENT_TEXT_MAX limits a read request, not an event, so it goes with the reading.
+  - read-text shares read-photo's budget, check order and failure mapping, so it joins event-photos.ts (one local helper, readWith) rather than a new route file.
+  - EventForm is pinned at 223 with the band at 201; inline Paste and Maps logic would cross the cap and give the form a second concern, so the whole Address row is a leaf with value/onChange.
+  - Rejected: Paste inside EventPhotoFill (fills several untouched fields on new events only, a different rule from Q195); a second shrink helper.
+  - parseEventInput turns a missing address into null, so alarms.ts and things.ts stay untouched.
+- **Caps:** EventForm.tsx 190 → 193/223 (pinned); routes/events.ts 114/147; event-rows.ts 135 → 137/300; event-photos.ts 30 → 40/300; event-reader.ts 47 → 61/300; event-reading.ts 62 → 61/300; alert-limits.ts 11/300; AddressField.tsx 66/300 (new). No ceiling moved; no reorganizer.
+
 ## 2026-10-08 — Steward pass, whole tree (code-steward)
 
 - **Run:** after the v1.36.0 release (PR #24, SPEC 2.65 §5.5a "A rolling timer's day starts", merged and live 2026-10-08, dbfdae2).

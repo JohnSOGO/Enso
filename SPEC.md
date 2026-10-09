@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.65 · **Date:** 2026-10-08 · **Owner:** MojoSOGO
+**Version:** 2.66 · **Date:** 2026-10-09 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1332,6 +1332,17 @@ ALTER TABLE timers ADD COLUMN announced_on TEXT;  -- local YYYY-MM-DD of the win
 **Migration check (TS-M):** timers written under 0001–0032 survive 0033 unchanged with `announce_start` 0 and
 `announced_on` NULL — none of them announces anything.
 
+### 4.2zg Schema change — `migrations/0034_event_address.sql`
+
+Asked by MojoSOGO 2026-10-09 (§7.9).
+
+```sql
+-- §7.9 — an event's address (optional). Additive only.
+ALTER TABLE events ADD COLUMN address TEXT;  -- NULL = none; at most EVENT_ADDRESS_MAX (200) characters
+```
+
+**Migration check (EA-M):** events written under 0001–0033 survive 0034 unchanged with `address` NULL.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -2164,15 +2175,15 @@ taps Save.
   venue and its address as one line; `notes` is anything else useful (who it's from, what to bring, RSVP,
   a phone or a link), copied as written. Anything not shown → null.
 - `cleanEventReading` (pure, `src/shared/event-reading.ts`) — the answer is input, never trusted: text
-  trimmed to the event limits (title `ALERT_TITLE_MAX`, location 200, notes so that the form's notes fit
-  2000); unreal dates dropped; a reversed start/end date swapped; a time that isn't a real `HH:MM` dropped; an
+  trimmed to the event limits (title `ALERT_TITLE_MAX`, location `EVENT_ADDRESS_MAX` 200, notes
+  `EVENT_NOTES_MAX` 2000); unreal dates dropped; a reversed start/end date swapped; a time that isn't a real `HH:MM` dropped; an
   end time without a start time dropped; empty → null.
 - **Filling the form** (`readingToForm`, same file, pure): only fields the person **hasn't changed since the
   form opened** fill (the tapped day and the 09:00 start count as unchanged) ⚑ Q189:
   - title ← title; date ← startDate.
   - A start time → timed, start ← startTime, end ← endTime (or blank).
   - No start time but a date → **All day**, end date ← endDate (or the date).
-  - Notes ← `📍 {location}` on the first line, then the notes ⚑ Q190 (events have no place field).
+  - Address (§7.9) ← location; notes ← notes ⚑ Q190.
   - The form says "Filled N fields from the screenshot — check them." or "Nothing new to fill in from the
     screenshot." Everything stays editable; nothing is saved until Save.
 - **Budget, check order and failures:** exactly as `POST /things/read-photo` (§7C.4) — the **same 40-a-day
@@ -2190,8 +2201,52 @@ taps Save.
 | EP2 | read-photo with no API key; at the daily cap; without a session; a non-image body | 503 `photo_reading_off`; 429, no read counted; 401; 400 |
 | EP3 | refusal / failure from Claude | 422 `photo_refused` / 502 `photo_reading_failed` |
 | EP4 | `cleanEventReading` on `2026-02-30`, reversed dates, `25:00`, an end time alone, a 300-char title | date dropped, dates swapped, time dropped, end time dropped, title cut |
-| EP5 | `readingToForm` on a blank form: timed reading; date-only reading; multi-day reading; location + notes | timed with times; all day; all day with end date; notes `📍 place` then notes |
+| EP5 | `readingToForm` on a blank form: timed reading; date-only reading; multi-day reading; location + notes | timed with times; all day; all day with end date; address ← location, notes ← notes |
 | EP6 | `readingToForm` where the person already typed a title and changed the date | title and date kept, the rest filled; the count names only the filled fields |
+
+### 7.9 An event's address — paste to fill — asked by MojoSOGO 2026-10-09
+
+"Calendar add an address field; let me paste from clipboard and you parse what you are given, usually text or
+image." An event has an optional **address**: where it is, as one line (a venue and its street address).
+
+- **Stored** in `events.address` (migration 0034, §4.2zg), at most `EVENT_ADDRESS_MAX` = 200 characters
+  (`alert-limits.ts`), trimmed; empty → null. Events, `GET /events/{id}`, POST and PATCH carry `address`; a longer
+  or non-text value → 400 `invalid_input` "Address must be text (up to 200 characters).". Alarms and sun-timed
+  events never have one.
+- **In the form** (§8.4): an **Address** box under the times, with **📋 Paste** beside it, and, when an address is
+  there, **Open in Maps** (`https://maps.apple.com/?q={address}` in a new tab: Apple Maps on the iPhone, its web
+  page elsewhere) ⚑ Q193. The box is ordinary text: typing or pasting into it by hand reads nothing.
+- **📋 Paste** reads the clipboard (`navigator.clipboard.read()`, else `readText()`; the phone may ask to allow it)
+  and asks Claude for the address in what was copied ⚑ Q194:
+  - **A picture** (a screenshot, a copied image) → shrunk as every upload is (§7C.3) → `POST /events/read-photo`
+    (§7.8); its `location` is the address.
+  - **Text** (a copied invite, message, email, map link's text or a bare address; its first `EVENT_TEXT_MAX`
+    characters) → `POST /events/read-text { text }` → the same `EventReading` as read-photo, cleaned by the same `cleanEventReading`; its `location` is
+    the address. The prompt is §7.8's, for copied text instead of a screenshot, with the same household place
+    for a place that could be several places ⚑ Q188.
+  - **Only the address fills** ⚑ Q195, replacing what the box held (the person tapped Paste for it). "Reading what
+    you copied…" while it runs; then "Address filled — check it." or "No address found in what you copied.", or
+    why it couldn't: "Nothing to paste — copy an address, a message or a screenshot first." for an empty
+    clipboard, "Couldn't read the clipboard — paste into the box instead." when the phone refuses, else the
+    server's message.
+- **`POST /events/read-text`** — check order: signed in (401) → `text` a non-empty string of at most
+  `EVENT_TEXT_MAX` = 5 000 characters after trimming (400 `invalid_input` "Paste some text, up to 5000
+  characters.") → daily cap (429, the **same 40-a-day `photo_reads` budget**) → key present (503
+  `photo_reading_off`) → count the read → Claude (`askClaude`, text only) → refusal 422 `photo_refused` "Couldn't
+  read that text." / failure 502 `photo_reading_failed` "Couldn't read that text: {reason}" → cleaned → 200. Nothing is saved; the text is never stored.
+- **Privacy:** the copied text or picture goes to Anthropic to be read (as Q30), with the household's place (as
+  Q141).
+
+**Acceptance (each row a test):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| EA1 | POST an event with `address`; PATCH it to `null`; GET | stored trimmed and returned; cleared to null |
+| EA2 | POST with a 201-character address; with a number | 400 `invalid_input` each |
+| EA3 | read-text with a fake Claude answering a location | 200 with the cleaned reading; one `photo_reads` row; the request carries the text (no image) and a prompt with today, the zone and the household's place; nothing saved |
+| EA4 | read-text with empty text; 5 001 characters; no API key; at the daily cap; without a session | 400; 400; 503 `photo_reading_off`; 429, no read counted; 401 |
+| EA5 | read-text refusal / failure from Claude | 422 `photo_refused` / 502 `photo_reading_failed` |
+| EA-M | migration 0034 over events written before it | rows unchanged, `address` NULL |
 
 ## 7A. Lists
 
@@ -3598,6 +3653,7 @@ Fields:
 - All-day toggle
 - Start / end time (hidden when all-day)
 - End date (all-day only)
+- **Address** (optional, §7.9) with **📋 Paste** (reads the clipboard: text or a picture) and **Open in Maps**
 - Repeat: Never / Daily / Weekly (day checkboxes) / Every 2 weeks / Monthly on day N /
   Monthly on the nth weekday (e.g. "Monthly on the 3rd Friday", derived from the date) /
   **Monthly on certain weeks** — the date's weekday, with week chips **1st 2nd 3rd 4th
@@ -4757,6 +4813,7 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |
 | POST | `/events/read-photo` | member | raw image body → `{ title, startDate, endDate, startTime, endTime, location, notes }` (each nullable); 503 / 502 / 422 / 429 per §7.8 |
+| POST | `/events/read-text` | member | `{ text }` → the same reading as read-photo; 400 / 503 / 502 / 422 / 429 per §7.9 |
 | GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6). A sun-timed event (§7.7) is 404 here and on `/exdates` |
 | POST | `/events/{id}/exdates` | creator or owner | `{ date }` |
 | GET/POST | `/timers` | member | → `Timer[]` / POST `{ title, intervalMin, channels, renotifyMin?, maxAlerts?, assignedTo?, activeFrom?, activeTo?, announceStart? }` → timer (201). `Timer = { id, title, intervalMin, channels, renotifyMin, maxAlerts, assignedTo, running, createdBy, activeFrom, activeTo, announceStart, openFire }`; `announceStart` (default false) needs a window, else 400 (§5.5a); `activeFrom`/`activeTo` are `"HH:MM"` or both `null` (no window). 400 `invalid_input` when only one is set, either is not `HH:MM`, or `timerWindowError` refuses them (§5.1) |
@@ -5381,14 +5438,17 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q187 | Keeping an event's screenshot (§7.8) | ⚑ Not kept: it is read and dropped; events have no photo |
 | Q188 | An ambiguous place in a screenshot (§7.8) | ⚑ Read as the one nearest the household (Oceanside) |
 | Q189 | What a screenshot may fill (§7.8) | ⚑ Only fields not changed since the form opened; a timed reading sets the times, a date-only one makes it All day |
-| Q190 | An event's location from a screenshot (§7.8) | ⚑ The first line of Notes, as `📍 venue, address` (events have no place field) |
+| Q190 | An event's location from a screenshot (§7.8) | ⚑ Fills the Address (§7.9), when it hasn't been changed since the form opened (until v1.37.0 it was the first line of Notes) |
 | Q191 | A timer's start announcement (§5.5a) | ⚑ Opt-in per timer, only with active hours (a timer without a window has no day to start); worded "Pushups timer started — every 60 minutes", on the timer's own channels and people; the push is titled "📢 Announcement" |
 | Q192 | A late start announcement (§5.5a) | ⚑ Said up to 60 min after the window opens (an outage, or Start tapped soon after the opening); later than that, nothing until the next day |
+| Q193 | Opening an event's address (§7.9) | ⚑ "Open in Maps" in the form, as an Apple Maps link (the family's phones are iPhones); the day sheet doesn't show the address |
+| Q194 | What 📋 Paste reads (§7.9) | ⚑ Anything copied — a picture or text — is read by Claude on the shared 40-a-day budget, even a bare address (so it comes back cleaned up and the nearest one is picked) |
+| Q195 | What 📋 Paste fills (§7.9) | ⚑ Only the Address, replacing what was there; the screenshot button stays the way to fill the whole event |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
 
-## 14. Prototype status (2026-10-08)
+## 14. Prototype status (2026-10-09)
 
 Built: M0–M4 and M4a fully (alarms, with their API tests), plus the later §7 work:
 household days off (§7.3), grouped multi-day bars (§7.1), monthly-by-weekday repeat
@@ -5592,6 +5652,11 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**An event's address, paste to fill** (v1.37.0, §7.9, §4.2zg; asked by MojoSOGO 2026-10-09; EA1–EA5, EA-M): an
+optional Address on every event with 📋 Paste (the clipboard's picture through `/events/read-photo`, its text through
+the new `POST /events/read-text`, both on the 40-a-day budget) and Open in Maps. A screenshot's location now fills the
+Address instead of the first line of Notes (Q190). Migration 0034. Q193–Q195 are ⚑ defaults. **Still owed:** Paste
+tried on the iPhone with a copied text and a copied screenshot.
 **Rolling timer day start** (v1.36.0, §5.5a, §4.2zf; asked by MojoSOGO 2026-10-08; TS1–TS5, TS-M): a timer with
 active hours can **📢 Announce the start of each day** — when its window opens the house and phones hear
 "Pushups timer started — every 60 minutes"; then it rings after the interval and each Ack starts the next one,

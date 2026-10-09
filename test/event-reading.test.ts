@@ -4,7 +4,7 @@ import { cleanEventReading, readingToForm, type EventFill, type EventReading } f
 import { ALERT_TITLE_MAX } from '../src/shared/alert-limits';
 
 const none: EventReading = { title: null, startDate: null, endDate: null, startTime: null, endTime: null, location: null, notes: null };
-const opened: EventFill = { title: '', date: '2026-10-06', allDay: false, startTime: '09:00', endTime: '', endDate: '2026-10-06', notes: '' };
+const opened: EventFill = { title: '', date: '2026-10-06', allDay: false, startTime: '09:00', endTime: '', endDate: '2026-10-06', address: '', notes: '' };
 
 describe('§7.8 cleanEventReading (EP4)', () => {
   it('drops unreal dates and times, swaps reversed dates, drops a lone end time, cuts the title', () => {
@@ -21,7 +21,7 @@ describe('§7.8 cleanEventReading (EP4)', () => {
 });
 
 describe('§7.8 readingToForm (EP5, EP6)', () => {
-  it('EP5 a timed reading sets the times; a date-only one is all day; a multi-day one keeps its end; location leads the notes', () => {
+  it('EP5 a timed reading sets the times; a date-only one is all day; a multi-day one keeps its end; the location fills the address', () => {
     const timed = readingToForm(opened, opened, { ...none, title: 'Party', startDate: '2026-10-17', startTime: '14:00', endTime: '16:00' });
     expect(timed.form).toEqual({ ...opened, title: 'Party', date: '2026-10-17', startTime: '14:00', endTime: '16:00', endDate: '2026-10-17' });
     expect(timed.filled).toBe(5);
@@ -30,8 +30,9 @@ describe('§7.8 readingToForm (EP5, EP6)', () => {
     const multi = readingToForm(opened, opened, { ...none, startDate: '2026-10-10', endDate: '2026-10-12' });
     expect(multi.form).toMatchObject({ date: '2026-10-10', allDay: true, endDate: '2026-10-12' });
     const notes = readingToForm(opened, opened, { ...none, location: 'Sky Zone, 3030 Plaza Bonita Rd', notes: 'RSVP to Jen' });
-    expect(notes.form.notes).toBe('📍 Sky Zone, 3030 Plaza Bonita Rd\nRSVP to Jen');
-    expect(notes.filled).toBe(1);
+    expect(notes.form.address).toBe('Sky Zone, 3030 Plaza Bonita Rd');
+    expect(notes.form.notes).toBe('RSVP to Jen');
+    expect(notes.filled).toBe(2);
     expect(readingToForm(opened, opened, none)).toEqual({ form: opened, filled: 0 });
   });
 
