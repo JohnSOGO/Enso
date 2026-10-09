@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-09 — Steward pass, whole tree (code-steward)
+
+- **Run:** after the v1.37.0 (PR #26, SPEC 2.66 §7.9, migration 0034) and v1.38.0 (PR #27, SPEC 2.67 §7.9a) releases, both live 2026-10-09 (98d5624).
+- **Verdict:** MINOR DRIFT. Typecheck green, 710/710 tests (82 files), arch:audit quiet (nearest: routes/recipes.ts and EventForm.tsx, both 87%).
+- **Placement audit:** 2 receipts reconciled, both landed as their verdicts said (sizes within 2 lines); 0 code commits without a receipt; map rows and §14 accurate.
+- **Top finding:** an address opens by two rules: ThingForm's mapsHref (⚑ Q35, iPhone → Apple, else Google) and AddressField's Apple-always link (⚑ Q193). Plan it still writes a thing's address into the event's Notes now that events have an Address. MojoSOGO decides one rule and the Plan-it fill; then one mapsHref (quick advisor verdict, home AddressField.tsx) and a worker change.
+- **Handoffs:** 0 to reorganizer; 3 to worker (maps rule + Plan-it address after MojoSOGO decides; pass-3 items 2 and 4 if picked; the read-text 429/503 wording after a §7.9 line); 1 quick placement-advisor verdict (mapsHref); 1 docs refresh (where-things-stand.md, done in this commit; adding it to CLAUDE.md step 4 is MojoSOGO's call). Pass-3 items 1–4 still owed.
+- **Watch:** EventForm.tsx 193/223 has changed in 3 of the last 5 releases. If it reaches the band, the seam is the When block → WhenFields.tsx.
+- **Restraint:** READS_PER_DAY left in things.ts; the fill count including the hidden end date (EU1 specifies it); cleanEventReading's `_today`; the 2030 test date.
+- **Report:** `docs/steward/2026-10-09-fifth-pass.md`.
+
 ## 2026-10-09 — Update an event from later info; one fill bar for 📷 + 📋 (placement-advisor)
 
 - **Ask:** SPEC 2.67 §7.9a (Q196) adds `readingOverForm` for existing events. §7.9 / §8.4 / §7.8 "Where" (Q195) move 📋 Paste from the Address box to the top of the form beside 📷 Screenshot, filling the whole form, for new and existing events.
