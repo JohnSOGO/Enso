@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.66 · **Date:** 2026-10-09 · **Owner:** MojoSOGO
+**Version:** 2.67 · **Date:** 2026-10-09 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2163,7 +2163,8 @@ manually edit the event." A screenshot of an invite, a flyer, a text message or 
 event** form the way a photo fills a thing's (§7C.4): **nothing is saved**, the person checks the form and
 taps Save.
 
-- **Where:** the new-event form only (§8.4), a **📷 Fill in from a screenshot** button above the Title. It
+- **Where:** the event form (§8.4), a **📷 Screenshot** button above the Title — on new events, and since v1.38.0
+  on existing ones too, where the reading updates the event (§7.9a). It
   opens the phone's picker (camera or library); the picture is shrunk as every upload is (§7C.3) and sent;
   "Reading the screenshot…" while it runs, then what it filled or why it couldn't, under the button. The
   screenshot itself is never stored ⚑ Q187.
@@ -2184,8 +2185,8 @@ taps Save.
   - A start time → timed, start ← startTime, end ← endTime (or blank).
   - No start time but a date → **All day**, end date ← endDate (or the date).
   - Address (§7.9) ← location; notes ← notes ⚑ Q190.
-  - The form says "Filled N fields from the screenshot — check them." or "Nothing new to fill in from the
-    screenshot." Everything stays editable; nothing is saved until Save.
+  - The form says "Filled N fields from the screenshot — check them." (on an existing event "Updated N fields
+    from the screenshot — check them, then Save.", §7.9a) or "Nothing new in the screenshot." Everything stays editable; nothing is saved until Save.
 - **Budget, check order and failures:** exactly as `POST /things/read-photo` (§7C.4) — the **same 40-a-day
   `photo_reads` budget**; signed in (401) → size/type (400) → daily cap (429) → key present (503
   `photo_reading_off`) → count the read → Claude (`askClaude`, the image block of `photo-reader.ts`) →
@@ -2213,22 +2214,24 @@ image." An event has an optional **address**: where it is, as one line (a venue 
   (`alert-limits.ts`), trimmed; empty → null. Events, `GET /events/{id}`, POST and PATCH carry `address`; a longer
   or non-text value → 400 `invalid_input` "Address must be text (up to 200 characters).". Alarms and sun-timed
   events never have one.
-- **In the form** (§8.4): an **Address** box under the times, with **📋 Paste** beside it, and, when an address is
+- **In the form** (§8.4): an **Address** box under the times and, when an address is
   there, **Open in Maps** (`https://maps.apple.com/?q={address}` in a new tab: Apple Maps on the iPhone, its web
   page elsewhere) ⚑ Q193. The box is ordinary text: typing or pasting into it by hand reads nothing.
-- **📋 Paste** reads the clipboard (`navigator.clipboard.read()`, else `readText()`; the phone may ask to allow it)
-  and asks Claude for the address in what was copied ⚑ Q194:
+- **📋 Paste**, beside 📷 Screenshot above the Title (new and existing events), reads the clipboard
+  (`navigator.clipboard.read()`, else `readText()`; the phone may ask to allow it) and asks Claude what the copied
+  thing says ⚑ Q194:
   - **A picture** (a screenshot, a copied image) → shrunk as every upload is (§7C.3) → `POST /events/read-photo`
-    (§7.8); its `location` is the address.
+    (§7.8).
   - **Text** (a copied invite, message, email, map link's text or a bare address; its first `EVENT_TEXT_MAX`
-    characters) → `POST /events/read-text { text }` → the same `EventReading` as read-photo, cleaned by the same `cleanEventReading`; its `location` is
-    the address. The prompt is §7.8's, for copied text instead of a screenshot, with the same household place
-    for a place that could be several places ⚑ Q188.
-  - **Only the address fills** ⚑ Q195, replacing what the box held (the person tapped Paste for it). "Reading what
-    you copied…" while it runs; then "Address filled — check it." or "No address found in what you copied.", or
-    why it couldn't: "Nothing to paste — copy an address, a message or a screenshot first." for an empty
-    clipboard, "Couldn't read the clipboard — paste into the box instead." when the phone refuses, else the
-    server's message.
+    characters) → `POST /events/read-text { text }` → the same `EventReading` as read-photo, cleaned by the same
+    `cleanEventReading`. The prompt is §7.8's, for copied text instead of a screenshot, with the same household
+    place for a place that could be several places ⚑ Q188.
+  - **The reading fills the form** like a screenshot's ⚑ Q195: on a new event by §7.8's rule (`readingToForm`,
+    the location into Address), on an existing one by §7.9a's. "Reading what you copied…" while it runs; then
+    what it filled ("Filled N fields from what you copied — check them." / "Updated N fields from what you copied
+    — check them, then Save." / "Nothing new in what you copied."), or why it couldn't: "Nothing to paste — copy
+    a message, an address or a screenshot first." for an empty clipboard, "Couldn't read the clipboard — copy it
+    again, or type it in." when the phone refuses, else the server's message.
 - **`POST /events/read-text`** — check order: signed in (401) → `text` a non-empty string of at most
   `EVENT_TEXT_MAX` = 5 000 characters after trimming (400 `invalid_input` "Paste some text, up to 5000
   characters.") → daily cap (429, the **same 40-a-day `photo_reads` budget**) → key present (503
@@ -2237,7 +2240,33 @@ image." An event has an optional **address**: where it is, as one line (a venue 
 - **Privacy:** the copied text or picture goes to Anthropic to be read (as Q30), with the household's place (as
   Q141).
 
+### 7.9a Updating an event from later info — asked by MojoSOGO 2026-10-09
+
+"Make sure existing items can be updated from later pasted info." On an **existing** event, 📋 Paste and 📷
+Screenshot read the same way, but the newer information **wins over what is saved** — `readingOverForm(form,
+reading)` (pure, `event-reading.ts`) ⚑ Q196:
+
+- **Title kept** (a later "it's moved to 3" rarely names the event the same way).
+- A date → the date; on an all-day event the end date ← the reading's end date, or the new date.
+- A start time → timed, start ← it, end ← the reading's end time or blank (the old end no longer fits). A date
+  with no time leaves the event timed or all day as it was; a time with no date keeps the date.
+- A location → the Address, replacing it.
+- Notes → **added** as a new paragraph under the event's notes (never replacing them), unless the notes already
+  hold that text; the total cut to `EVENT_NOTES_MAX`.
+- Nothing is saved until **Save**; the form shows every change first, and Cancel drops them. The message counts
+  the fields that changed.
+
 **Acceptance (each row a test):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| EU1 | `readingOverForm` on a timed event: reading with a new date, start and end time, location, notes | title kept; date, times, address replaced; notes appended as a new paragraph; count 6 (the hidden end date follows the date) |
+| EU2 | on a timed event: date only | date changed, still timed with its times |
+| EU3 | on an all-day event: start time only | timed at that time, end blank, date kept |
+| EU4 | on an all-day event: new start and end date | dates replaced, still all day |
+| EU5 | notes already holding the reading's notes; an empty reading | notes unchanged; nothing changed, count 0 |
+
+**Acceptance for §7.9 (each row a test):**
 
 | # | Setup / call | Expected |
 |---|---|---|
@@ -3647,13 +3676,14 @@ the date.
 
 Fields:
 
-- **📷 Fill in from a screenshot** (new events only, §7.8): above the Title; fills the form, saves nothing.
+- **📷 Screenshot** and **📋 Paste** (§7.8, §7.9): above the Title, on new and existing events; fill or update the
+  form from a picture or what was copied (§7.9a), save nothing.
 - Title
 - Date
 - All-day toggle
 - Start / end time (hidden when all-day)
 - End date (all-day only)
-- **Address** (optional, §7.9) with **📋 Paste** (reads the clipboard: text or a picture) and **Open in Maps**
+- **Address** (optional, §7.9) with **Open in Maps**
 - Repeat: Never / Daily / Weekly (day checkboxes) / Every 2 weeks / Monthly on day N /
   Monthly on the nth weekday (e.g. "Monthly on the 3rd Friday", derived from the date) /
   **Monthly on certain weeks** — the date's weekday, with week chips **1st 2nd 3rd 4th
@@ -5443,7 +5473,8 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q192 | A late start announcement (§5.5a) | ⚑ Said up to 60 min after the window opens (an outage, or Start tapped soon after the opening); later than that, nothing until the next day |
 | Q193 | Opening an event's address (§7.9) | ⚑ "Open in Maps" in the form, as an Apple Maps link (the family's phones are iPhones); the day sheet doesn't show the address |
 | Q194 | What 📋 Paste reads (§7.9) | ⚑ Anything copied — a picture or text — is read by Claude on the shared 40-a-day budget, even a bare address (so it comes back cleaned up and the nearest one is picked) |
-| Q195 | What 📋 Paste fills (§7.9) | ⚑ Only the Address, replacing what was there; the screenshot button stays the way to fill the whole event |
+| Q195 | What 📋 Paste fills (§7.9) | ⚑ The whole form, like a screenshot (v1.37.0 filled only the Address; changed when MojoSOGO asked for existing events to take later info) |
+| Q196 | Later info on an existing event (§7.9a) | ⚑ What the paste names wins over what's saved, except the title (kept) and the notes (added under, never replaced); a date alone keeps the times; nothing saved until Save |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5652,6 +5683,11 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Update an event from later info** (v1.38.0, §7.9a; asked by MojoSOGO 2026-10-09; EU1–EU5): 📷 Screenshot and
+📋 Paste sit above the Title on new and existing events; on an existing one what was copied updates the form
+(title kept, notes added under), and nothing saves until Save. Paste moved there from the Address box and now
+fills the whole form (Q195). No migration. Q196 is a ⚑ default. **Still owed:** pasting a "moved to…" text onto a
+real event on the iPhone.
 **An event's address, paste to fill** (v1.37.0, §7.9, §4.2zg; asked by MojoSOGO 2026-10-09; EA1–EA5, EA-M): an
 optional Address on every event with 📋 Paste (the clipboard's picture through `/events/read-photo`, its text through
 the new `POST /events/read-text`, both on the 40-a-day budget) and Open in Maps. A screenshot's location now fills the

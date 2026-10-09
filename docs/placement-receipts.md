@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-09 — Update an event from later info; one fill bar for 📷 + 📋 (placement-advisor)
+
+- **Ask:** SPEC 2.67 §7.9a (Q196) adds `readingOverForm` for existing events. §7.9 / §8.4 / §7.8 "Where" (Q195) move 📋 Paste from the Address box to the top of the form beside 📷 Screenshot, filling the whole form, for new and existing events.
+- **Verdict:** `src/shared/event-reading.ts` (readingOverForm) [EXISTING]; `frontend/src/components/EventFillBar.tsx` [RENAME of EventPhotoFill.tsx, map row rewritten]; `AddressField.tsx` shrinks to box + Open in Maps [EXISTING]; `EventForm.tsx` renders the bar for every event it can edit [EXISTING].
+- **Flow stage:** rules (event-reading) / render (EventFillBar, AddressField, EventForm).
+- **Why:** The merge rule is pure and sits beside its sibling readingToForm. 📷 and 📋 are two inputs to one concern (fill the form from a reading), so one bar owns both; the clipboard helper moves with it and AddressField goes back to one concern. `EventFill.tsx` rejected: `EventFill` is already the shared form-shape interface. Rejected: Paste staying in AddressField; a second paste component; the Q196 merge in the component.
+- **Caps:** event-reading.ts 61 → 83/300; EventPhotoFill.tsx 46 → EventFillBar.tsx 76/300; AddressField.tsx 66 → 20/300; EventForm.tsx 193/223 (pinned, unchanged). No ceiling moved, nothing newly in the band, no reorganizer.
+
 ## 2026-10-09 — An event's address, paste to fill (placement-advisor)
 
 - **Ask:** SPEC 2.66 §7.9 (v1.37.0, migration 0034, §4.2zg; §7.8 Q190/EP5; §8.4; §10 `/events/read-text`): an optional `events.address` (≤ EVENT_ADDRESS_MAX 200) on events GET/POST/PATCH; a screenshot reading fills the address instead of a 📍 notes line; `POST /events/read-text { text }` (≤ EVENT_TEXT_MAX 5000, same 40-a-day budget); an Address box with 📋 Paste and Open in Maps in the event form.

@@ -1,6 +1,6 @@
-// SPEC §7.8 EP4–EP6 — the screenshot reading's pure rules: cleanEventReading and readingToForm.
+// SPEC §7.8 EP4–EP6, §7.9a EU1–EU5 — the reading's pure rules: cleanEventReading, readingToForm and readingOverForm.
 import { describe, expect, it } from 'vitest';
-import { cleanEventReading, readingToForm, type EventFill, type EventReading } from '../src/shared/event-reading';
+import { cleanEventReading, readingOverForm, readingToForm, type EventFill, type EventReading } from '../src/shared/event-reading';
 import { ALERT_TITLE_MAX } from '../src/shared/alert-limits';
 
 const none: EventReading = { title: null, startDate: null, endDate: null, startTime: null, endTime: null, location: null, notes: null };
@@ -46,5 +46,33 @@ describe('§7.8 readingToForm (EP5, EP6)', () => {
   it('keeps extra form fields untouched', () => {
     const form = { ...opened, emoji: '🎂' };
     expect(readingToForm(form, opened, { ...none, title: 'Party' }).form).toEqual({ ...form, title: 'Party' });
+  });
+});
+
+describe('§7.9a readingOverForm — an existing event updated from later info', () => {
+  const timed: EventFill = { title: 'Mia party', date: '2026-10-17', allDay: false, startTime: '14:00', endTime: '16:00', endDate: '2026-10-17', address: 'Sky Zone', notes: 'Bring socks' };
+  const allDay: EventFill = { ...timed, allDay: true, startTime: '09:00', endTime: '', endDate: '2026-10-18' };
+
+  it('EU1 date, times and location replaced; title kept; notes added under', () => {
+    const r = readingOverForm(timed, { ...none, title: 'MOVED', startDate: '2026-10-18', startTime: '15:00', endTime: '17:00', location: 'Pump It Up, 123 Main St', notes: 'Moved because of rain' });
+    expect(r.form).toEqual({ ...timed, date: '2026-10-18', endDate: '2026-10-18', startTime: '15:00', endTime: '17:00', address: 'Pump It Up, 123 Main St', notes: 'Bring socks\n\nMoved because of rain' });
+    expect(r.filled).toBe(6);
+  });
+
+  it('EU2 a date alone keeps a timed event timed with its times', () => {
+    expect(readingOverForm(timed, { ...none, startDate: '2026-10-24' }).form).toEqual({ ...timed, date: '2026-10-24', endDate: '2026-10-24' });
+  });
+
+  it('EU3 a start time alone makes an all-day event timed, end blank, date kept', () => {
+    expect(readingOverForm(allDay, { ...none, startTime: '10:30' }).form).toEqual({ ...allDay, allDay: false, startTime: '10:30', endTime: '' });
+  });
+
+  it('EU4 new start and end dates on an all-day event stay all day', () => {
+    expect(readingOverForm(allDay, { ...none, startDate: '2026-11-01', endDate: '2026-11-03' }).form).toEqual({ ...allDay, date: '2026-11-01', endDate: '2026-11-03' });
+  });
+
+  it('EU5 notes already there are not repeated; an empty reading changes nothing', () => {
+    expect(readingOverForm(timed, { ...none, notes: 'Bring socks' })).toEqual({ form: timed, filled: 0 });
+    expect(readingOverForm(timed, none)).toEqual({ form: timed, filled: 0 });
   });
 });

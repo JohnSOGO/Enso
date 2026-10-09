@@ -1,4 +1,4 @@
-// SPEC §8.4 — event form (modal). Creates or edits an event and its reminder; a new one can be filled from a screenshot (§7.8); an address can be pasted (§7.9).
+// SPEC §8.4 — event form (modal). Creates or edits an event and its reminder; a screenshot or what was copied fills a new one or updates an existing one (§7.8, §7.9a).
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
 import { del, errorText, get, patch, post, put } from '../api';
@@ -10,7 +10,7 @@ import { ALERT_TITLE_MAX, EVENT_NOTES_MAX } from '../../../src/shared/alert-limi
 import { type Recurrence } from '../../../src/shared/recurrence';
 import { longDate } from './DaySheet';
 import { FromThing } from './ThingPhoto';
-import { EventPhotoFill } from './EventPhotoFill';
+import { EventFillBar } from './EventFillBar';
 import { AddressField } from './AddressField';
 import { RepeatFields, ownWeek, repeatOf, toRecurrence, weeksOf, type RepeatValue } from './RepeatFields';
 import { ReminderFields, reminderOf, toReminder, type ReminderValue } from './ReminderFields';
@@ -120,7 +120,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
       {meta?.thingId && <FromThing thingId={meta.thingId} />}
       {form && (
         <fieldset disabled={!canEdit || busy} style={{ border: 0, padding: 0 }}>
-          {!eventId && <EventPhotoFill form={form} opened={blank(date)} onFill={setForm} />}
+          {canEdit && <EventFillBar form={form} opened={eventId ? null : blank(date)} onFill={setForm} />}
           {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>Only the creator or an admin can change this event.</p>}
           <label className="field"><span>Title</span>
             <input value={form.title} maxLength={ALERT_TITLE_MAX} onChange={(e) => set('title', e.target.value)} autoFocus={!eventId} />

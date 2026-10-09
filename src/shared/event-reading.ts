@@ -1,5 +1,6 @@
-// SPEC §7.8, §7.9 — reading an event from a screenshot or copied text: the reading as it comes over the wire, cleanEventReading
-// (the model's answer is input, never trusted) and readingToForm (which form fields it may fill). Pure; the
+// SPEC §7.8, §7.9, §7.9a — reading an event from a screenshot or copied text: the reading as it comes over the wire, cleanEventReading
+// (the model's answer is input, never trusted), readingToForm (which fields a new event's form may fill) and
+// readingOverForm (how later info updates an existing event, §7.9a). Pure; the
 // Worker cleans with it and the PWA fills with it, so the two can't disagree.
 import { isDate, isTime } from './time';
 import { ALERT_TITLE_MAX, EVENT_ADDRESS_MAX, EVENT_NOTES_MAX } from './alert-limits';
@@ -39,6 +40,9 @@ export function cleanEventReading(raw: Partial<Record<keyof EventReading, unknow
 /** The event form's fields a screenshot can fill. */
 export interface EventFill { title: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string; address: string; notes: string }
 
+const FILL_KEYS: (keyof EventFill)[] = ['title', 'date', 'allDay', 'startTime', 'endTime', 'endDate', 'address', 'notes'];
+const changed = (a: EventFill, b: EventFill) => FILL_KEYS.filter((k) => a[k] !== b[k]).length;
+
 /** §7.8 — fills only the fields still as they were when the form opened; → the form and how many fields changed. */
 export function readingToForm<F extends EventFill>(form: F, opened: EventFill, r: EventReading): { form: F; filled: number } {
   const next: F = { ...form };
@@ -56,6 +60,26 @@ export function readingToForm<F extends EventFill>(form: F, opened: EventFill, r
   if (next.endDate < next.date) next.endDate = next.date;
   if (r.location && open('address')) next.address = r.location;
   if (r.notes && open('notes')) next.notes = r.notes;
-  const keys: (keyof EventFill)[] = ['title', 'date', 'allDay', 'startTime', 'endTime', 'endDate', 'address', 'notes'];
-  return { form: next, filled: keys.filter((k) => next[k] !== form[k]).length };
+  return { form: next, filled: changed(form, next) };
+}
+
+/** §7.9a — an existing event updated from later info: what the reading names wins, except the title (kept) and
+ *  the notes (added under, never replaced); a date alone keeps the times. → the form and how many fields changed. */
+export function readingOverForm<F extends EventFill>(form: F, r: EventReading): { form: F; filled: number } {
+  const next: F = { ...form };
+  if (r.startDate) {
+    next.date = r.startDate;
+    if (next.allDay) next.endDate = r.endDate ?? r.startDate;
+  }
+  if (r.startTime) {
+    next.allDay = false;
+    next.startTime = r.startTime;
+    next.endTime = r.endTime ?? '';
+  }
+  if (next.endDate < next.date) next.endDate = next.date;
+  if (r.location) next.address = r.location;
+  if (r.notes && !form.notes.includes(r.notes)) {
+    next.notes = (form.notes.trim() ? `${form.notes.trimEnd()}\n\n${r.notes}` : r.notes).slice(0, EVENT_NOTES_MAX);
+  }
+  return { form: next, filled: changed(form, next) };
 }
