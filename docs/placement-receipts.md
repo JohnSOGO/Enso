@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-10 — Dish washer joins the machines; laundry labels renamed (placement-advisor)
+
+- **Ask:** SPEC 2.71 §7D.6 (v1.42.0, migration 0037, §4.2zj; §8.5, §8.2; DW1–DW4, DW-M; ⚑ Q204–Q207). Washer/Dryer are labelled Clothes washer/Clothes dryer (ids unchanged); the washer gains a 120-min chip. A third machine `dishwasher` ("Dish washer") with Start / Done now / Still loaded / Clear, no Move, Emptied as its finish; chips 60/90/120/150; owner_id = who started it ("started by Sam"); done message "The dish washer Sam started is done".
+- **Verdict:** [EXISTING] owners, no new module or column. src/shared/machines.ts: LAUNDRY + isLaundry, machineMinutes, finishLabel, the dish-washer arm of doneMessage, parseStart/parseMove by machine, refusal wording. src/shared/vocab.ts: MACHINE gains 'dishwasher' (card order). src/worker/routes/machines.ts passes the machine to the parsers. Machines.tsx and RingingBar.tsx render via the shared helpers. migrations/0037_dishwasher.sql + test/migration-0037.test.ts.
+- **Flow stage:** rules (machines.ts, vocab) / route + persist (routes/machines.ts, 0037) / render (Machines.tsx, RingingBar.tsx). Delivery unchanged (fire-rows sourceOf keeps doneMessage's signature).
+- **Why:** the dish washer has a machine's shape, so it extends the §7D owner (wu wei). Splitting card order (vocab MACHINE) from the chain (machines.ts LAUNDRY) gives the dish washer null next/previous, so Move refuses `no_next`, finishMachine accepts it and waitingLoad is null with no special case. Rejected: LAUNDRY in vocab (a rule, not a stored vocabulary); a new column (owner_id already holds a member); a separate dish-washer module or route; the PWA comparing ids for labels.
+- **Watch:** machines.ts 232 → 242/300 (band 270). Next growth is extract-first: the §7D.5 alert-hours block → src/shared/machine-hours.ts.
+- **Caps:** nothing newly in the band; no reorganizer.
+
 ## 2026-10-10 — Steward pass, whole tree (code-steward)
 
 - **Run:** after the v1.41.0 release (SPEC 2.70 §7.11, weather on the calendar, migration 0036, PR #32); audited 6f118ad against 8813b07.

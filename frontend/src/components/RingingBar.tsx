@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { errorText, post } from '../api';
 import { useApp, type Fire } from '../state';
 import { MachineChooser } from './Machines';
-import { MACHINE_LABEL, isMachineId, nextMachine } from '../../../src/shared/machines';
+import { MACHINE_LABEL, finishLabel, isMachineId, nextMachine } from '../../../src/shared/machines';
 import type { AlertKind, MachineId } from '../../../src/shared/vocab';
 import s from './RingingBar.module.css';
 
@@ -34,7 +34,7 @@ export function RingingBar() {
       ? <button className="primary" disabled={busy === f.id} onClick={() => setMoving({ from, ownerId: f.personId ?? null })}>
           Move to {MACHINE_LABEL[next].toLowerCase()}
         </button>
-      : <button className="primary" disabled={busy === f.id} onClick={() => send(f, `/machines/${from}/finish`, {})}>Fold &amp; out</button>;
+      : <button className="primary" disabled={busy === f.id} onClick={() => send(f, `/machines/${from}/finish`, {})}>{finishLabel(from)}</button>;
   };
 
   const shown = expanded ? ringing : ringing.slice(0, COLLAPSE_AFTER);

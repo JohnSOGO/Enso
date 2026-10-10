@@ -1,4 +1,4 @@
-// SPEC §7D, §10 — the laundry loop: /machines and its six transitions, one batch each; its alert hours (§7D.5).
+// SPEC §7D, §10 — the laundry loop and the dish washer: /machines and its six transitions, one batch each; its alert hours (§7D.5).
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { MACHINE } from '../../shared/vocab';
@@ -92,7 +92,7 @@ machines.get('/machines', requireMember, async (c) => c.json(machinesView(await 
 machines.post('/machines/:id/start', requireMember, async (c) => {
   const m = await load(c);
   if (m instanceof Response) return m;
-  const input = parseStart(await body(c), await activeMemberIds(c.env.DB));
+  const input = parseStart(await body(c), m.row.id, await activeMemberIds(c.env.DB));
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   const now = nowIso();
   return save(c, m.rows, startMachine(m.row, input.ownerId, input.minutes, c.get('member').id, now), now);
@@ -101,11 +101,12 @@ machines.post('/machines/:id/start', requireMember, async (c) => {
 machines.post('/machines/:id/move', requireMember, async (c) => {
   const m = await load(c);
   if (m instanceof Response) return m;
-  const input = parseMove(await body(c));
-  if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   const now = nowIso();
   const next = nextMachine(m.row.id);
   const to = next ? m.rows.find((r) => r.id === next) ?? null : null;
+  if (!to) return save(c, m.rows, moveMachine(m.row, null, m.openFire, 0, c.get('member').id, now), now); // invalid_state
+  const input = parseMove(await body(c), to.id);
+  if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   return save(c, m.rows, moveMachine(m.row, to, m.openFire, input.minutes, c.get('member').id, now), now);
 });
 
