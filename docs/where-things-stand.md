@@ -47,7 +47,7 @@ the working agreement in `CLAUDE.md`.
   person tick theirs. Q125–Q129 are ⚑ defaults awaiting MojoSOGO.
 - Phase C kitchen display (needs an AREC).
 - Real-phone checks still owed per SPEC §14 (Android push, Done/Snooze, the laundry and goat reminders in practice).
-- Code-steward: pass 1 items 6–10 wait until those files are next touched; pass 3 items 1–4 and pass 5 items 1–3 and pass 6 items 1–4 (pass 7: items 3–6 carry them)
+- Code-steward: pass 1 items 6–10 wait until those files are next touched; pass 3 items 1–4 and pass 5 items 1–3 and pass 6 items 1–4 (pass 7: items 3–6 carry them; pass 8 carries them too and adds the machine-hours extract-first note)
   (one maps rule for things and events, and Plan it filling an event's Address; the read-text cap wording) wait on
   MojoSOGO's pick. Reports are in `docs/steward/`.
 - Rolling timer day start (v1.36.0, §5.5a): hear it at a real window opening.

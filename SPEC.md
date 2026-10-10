@@ -3207,8 +3207,9 @@ remember who started the dish washer".
   **Finish**, shown as **Emptied** (not Fold & out) ⚑ Q205. **Still loaded** works as on the
   laundry. Its alerts ring like any machine's (§7D.3), in the same alert hours (§7D.5) ⚑ Q206.
 - **Who started it:** the load's `owner_id` is the person who started the dish washer. Start and
-  Done now ask *Who started it?* (me preselected) instead of *Whose load?*; the card reads
-  **started by Sam · done ~14:05**, and the Ringing bar names them as for laundry.
+  Done now ask *Who started it?* instead of *Whose load?* (Start preselects me; Done now
+  preselects Owner unknown, §7D.2); the card reads **started by Sam · done ~14:05** (with nobody
+  named, **started by owner unknown**), and the Ringing bar names them as for laundry.
 - **Minutes** (`machineMinutes(id)`): the dish washer's chips are **60 / 90 / 120 / 150** ⚑ Q207;
   the laundry's are in §7D.2. Any other value → 400 naming the machine's chips.
 - Message: `"The dish washer Sam started is done"`; Still loaded `"The dish washer Sam started
