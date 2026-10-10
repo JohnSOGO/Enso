@@ -28,6 +28,9 @@ export default defineConfig(async () => {
             HOME_CAPTIONS_URL: 'https://sogoai.test',
             // §9.4 — a TEST-ONLY bearer for POST /ops/notify; test/ops.test.ts overrides it (empty) per call.
             OPS_NOTIFY_TOKEN: 'test-ops-token',
+            // §7.11 — pinned empty so no tick in a test asks the real forecast; test/weather.test.ts sets
+            // https://weather.test per call, with a fetch spy answering it.
+            WEATHER_URL: '',
             // §9.2 — pinned so a test can never speak in the real house: a fake host, and the secrets
             // empty (House is then not configured). test/house.test.ts overrides them per call, with a
             // fetch spy answering https://ha.test.

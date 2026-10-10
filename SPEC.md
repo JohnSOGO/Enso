@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.69 · **Date:** 2026-10-10 · **Owner:** MojoSOGO
+**Version:** 2.70 · **Date:** 2026-10-10 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1354,6 +1354,25 @@ ALTER TABLE events ADD COLUMN bring TEXT;  -- NULL = none; else a JSON list of 1
 
 **Migration check (EB-M):** events written under 0001–0034 survive 0035 unchanged with `bring` NULL.
 
+### 4.2zi Schema change — `migrations/0036_weather.sql`
+
+Asked by MojoSOGO 2026-10-10 (§7.11).
+
+```sql
+-- §7.11 — the daily forecast shown on the calendar. Additive only.
+CREATE TABLE weather_days (
+  date       TEXT PRIMARY KEY,   -- household-local YYYY-MM-DD
+  code       INTEGER NOT NULL,   -- WMO weather code (§7.11 table)
+  high_f     INTEGER NOT NULL,   -- rounded °F
+  low_f      INTEGER NOT NULL,
+  fetched_at TEXT NOT NULL       -- UTC ISO of the refresh that wrote it
+);
+ALTER TABLE settings ADD COLUMN weather_tried_at TEXT;  -- UTC ISO of the last refresh attempt; NULL = never
+```
+
+**Migration check (WX-M):** settings written under 0001–0035 survive 0036 unchanged with `weather_tried_at` NULL;
+`weather_days` starts empty.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1568,6 +1587,8 @@ Runs from `scheduled()` every minute, and from `POST /api/v1/dev/tick` in dev.
    (§7B.7). Its asks are fire-less push deliveries, sent at once.
    3c. **Timer days start.** `timerStartTick` (`src/worker/timer-starts.ts`): the start announcement of each
    announcing timer whose window just opened (§5.5a). Fire-less deliveries; the push rows are sent at once.
+   3d. **Weather.** `weatherTick` (`src/worker/weather.ts`): the once-a-day forecast refresh (§7.11). It never
+   throws; a failure is logged and retried hourly.
 4. **Speak house.** `sendHouseDeliveries(env, now)` drains queued and stale-claimed `house`
    deliveries (§9.2).
 5. Use a D1 `batch()` per fire for the writes. D1 has no `BEGIN`/`COMMIT`.
@@ -2329,6 +2350,57 @@ reading)` (pure, `event-reading.ts`) ⚑ Q196:
 | EB4 | `alertMessage` for a reminder with bring lines, first and second alert | "Reminder: Soccer — bring: shin guards and water"; the same with " (alert 2)" |
 | EB5 | tick an event reminder with bring lines, phone and house | the push and the house delivery both carry "Reminder: Soccer — bring: shin guards and water" |
 | EB-M | migration 0035 over events written before it | rows unchanged, `bring` NULL |
+
+### 7.11 Weather on the calendar — `src/shared/weather.ts` (pure) — asked by MojoSOGO 2026-10-10
+
+"Daily update calendar with weather report emojis." Each of the next 7 days shows the day's forecast as an emoji.
+
+- **Source:** the free Open-Meteo forecast (no key) ⚑ Q200, at the household place and time zone (`settings.latitude`
+  / `longitude` / `timezone`, §4.2o):
+  `{WEATHER_URL}/v1/forecast?latitude={lat}&longitude={lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone={tz}&forecast_days=7`.
+  `WEATHER_URL` is a wrangler var (`https://api.open-meteo.com`); empty or no place → weather is off (nothing fetched,
+  nothing shown). Tests pin it empty and reach only a fake.
+- **Refreshed once a day** by the minute tick (§5.6, a step after the timer announcements): `weatherDue` (pure) says a
+  refresh is due when the last good refresh (the newest `weather_days.fetched_at`) was not on today's local date and
+  the last try (`settings.weather_tried_at`) was at least 60 minutes ago or never. So the first tick after local
+  midnight refreshes, and a failed try is retried hourly. Every try first claims `weather_tried_at` with a conditional
+  update, so two overlapping ticks fetch once. A good answer
+  replaces the table: the 7 days are written and every other row is deleted (no past days) ⚑ Q201. A bad answer (not
+  200, not the shape below) changes no rows and is logged; the tick goes on.
+- **`parseForecast(json)`** (pure) reads `daily.time`, `daily.weather_code`, `daily.temperature_2m_max`,
+  `daily.temperature_2m_min` (equal-length lists) into `{ date, code, highF, lowF }` rows, temperatures rounded;
+  anything else → null. A day whose code is not in the table below is left out (no emoji that day).
+- **Codes → emoji and words** (`weatherOf(code)`, the one table):
+
+  | WMO codes | Emoji | Words |
+  |---|:---:|---|
+  | 0 | ☀️ | Clear |
+  | 1 | 🌤️ | Mostly clear |
+  | 2 | ⛅ | Partly cloudy |
+  | 3 | ☁️ | Cloudy |
+  | 45, 48 | 🌫️ | Fog |
+  | 51, 53, 55, 56, 57 | 🌦️ | Drizzle |
+  | 61, 63, 65, 66, 67, 80, 81, 82 | 🌧️ | Rain |
+  | 71, 73, 75, 77, 85, 86 | 🌨️ | Snow |
+  | 95, 96, 99 | ⛈️ | Thunderstorms |
+
+- **`/calendar`** returns `weather: { date, emoji, words, high, low }[]` for the stored days in the range.
+- **On the calendar** (§7.1): the emoji sits in the **top-right corner** of the day cell (bottom-right below 480px,
+  where the date line is already full), apart from the two day icons
+  (§7.2) so it never pushes a holiday or event emoji out ⚑ Q202. Everyone sees it; there is no switch ⚑ Q203. The cell's
+  accessible label adds the words ("Clear, high 72°, low 58°").
+- **In the day sheet** (§8.3): the first line, above any holiday, is `weatherText` (pure): "☀️ Clear · high 72° · low 58°".
+
+**Acceptance (each row a test):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| WX1 | `weatherOf` of 0, 2, 3, 45, 61, 80, 71, 95, and 42 | ☀️ Clear, ⛅, ☁️, 🌫️, 🌧️ Rain, 🌧️, 🌨️, ⛈️; 42 → null |
+| WX2 | `parseForecast` of a real-shaped answer (7 days, 71.6 / 58.4); of `{}`, of unequal lists | 7 rows, high 72, low 58 (a day with code 42 left out); null; null |
+| WX3 | `weatherDue`: never tried; good refresh yesterday, tried 2 h ago; good refresh today; tried 30 min ago with no good refresh today; tried 61 min ago likewise (America/Los_Angeles) | true; true; false; false; true |
+| WX4 | tick with `WEATHER_URL` set and the fake answering 7 days; tick again a minute later; GET `/calendar` for the week | one request to `/v1/forecast` with the place, `fahrenheit` and the time zone; the second tick asks nothing; `weather` has the 7 days with emoji, words, high, low |
+| WX5 | the next local day's first tick; the fake answers 500, then 200 an hour later | old rows kept after the 500 and asked again only after 60 min; the 200 replaces them, yesterday's row gone |
+| WX6 | tick with `WEATHER_URL` empty, or no place | no request; `/calendar` `weather` is `[]` |
 
 ## 7A. Lists
 
@@ -3717,9 +3789,10 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
 A modal that opens over the calendar and is titled with the date ("Tue, Oct 6").
 It contains, in order:
 
-1. The holiday line(s).
-2. All-day events.
-3. Timed events in time order, each showing time, title, creator chip, assigned
+1. The day's weather, when there is a forecast for it (§7.11).
+2. The holiday line(s).
+3. All-day events.
+4. Timed events in time order, each showing time, title, creator chip, assigned
    chips and 🔔 if it has a reminder.
 
 Tapping an event opens the event form. **＋ Add event** at the bottom pre-fills
@@ -4892,7 +4965,7 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
 | DELETE | `/invites/{id}` | owner | revoke |
-| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[] }` (each occurrence carries `emoji`); recurring events expanded server-side with `recurrence.ts`; alarms and sun-timed events (§7.7) excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
+| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[], weather[] }` (each occurrence carries `emoji`; `weather` is the stored forecast days in the range, §7.11); recurring events expanded server-side with `recurrence.ts`; alarms and sun-timed events (§7.7) excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
 | GET | `/optional-events` | member | → `{ id, title, emoji, recurrence, startDate, on }[]` — every optional event, with this member's switch |
 | PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |
@@ -5532,6 +5605,10 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q197 | Pasting a link into an event (§7.9) | ⚑ Only a paste that is just one link reads the page (fetched, then looked up with web search, like a thing's link); a link inside other text is read as text |
 | Q198 | Things to bring (§7.10) | ⚑ A list to remember, shown in the event form and said in the reminder; no ticking things off as they're packed |
 | Q199 | How the reminder says the list (§7.10) | ⚑ "Reminder: Soccer — bring: shin guards, water bottle and snacks", on every alert of the reminder |
+| Q200 | Where the weather comes from (§7.11) | ⚑ Open-Meteo's free forecast (no key, no account), in °F, refreshed once a day just after midnight |
+| Q201 | Weather on past days (§7.11) | ⚑ None: only today and the next 6 days carry an emoji; yesterday's is dropped at the daily refresh |
+| Q202 | Where the weather emoji sits (§7.11) | ⚑ The day cell's top-right corner, apart from the two day icons; high and low only in the day sheet |
+| Q203 | Turning the weather off (§7.11) | ⚑ No switch: everyone sees it (it could become a row of Optional calendar items if wanted) |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5740,6 +5817,10 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Weather on the calendar** (v1.41.0, §7.11, §4.2zi; asked by MojoSOGO 2026-10-10; WX1–WX6, WX-M): the next 7 days
+each show the forecast emoji in the cell's corner, and the day sheet says the words, high and low. Open-Meteo, once a
+day from the minute tick, at the household place. Migration 0036. Q200–Q203 are ⚑ defaults. **Still owed:** see it
+live on the iPhone after the first refresh.
 **Things to bring** (v1.40.0, §7.10; asked by MojoSOGO 2026-10-10; EB1–EB5, EB-M): an event has an optional list
 of things to bring, edited under the Address, and its reminder says "— bring: a, b and c" on the phone and the
 speakers. Migration 0035. Q198–Q199 are ⚑ defaults. **Still owed:** hearing a real reminder with a list.

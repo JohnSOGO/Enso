@@ -40,6 +40,8 @@ SATELLITE_ENTITY = "assist_satellite.home_assistant_voice_09eb97_assist_satellit
 # SPEC §7E.2c — captions from home: SogoAI through the `sogoai` tunnel, behind the same Access service token.
 # The bearer CAPTIONS_TOKEN is a secret (`wrangler secret put`, never here).
 HOME_CAPTIONS_URL = "https://sogoai.sogodojo.com"
+# SPEC §7.11 — the daily forecast on the calendar (free, no key). Empty turns weather off.
+WEATHER_URL = "https://api.open-meteo.com"
 
 [triggers]
 crons = ["* * * * *"]
