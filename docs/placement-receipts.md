@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-10 — Steward pass, whole tree (code-steward)
+
+- **Run:** after the v1.42.0 (SPEC 2.71 §7D.6, dish washer and Clothes washer/dryer rename, migration 0037, PR #34) and v1.43.0 (SPEC 2.72 §7D.2–7D.3, Owner unknown on Done now, PR #35) releases; audited 55613b9 (= 00598da's code) against 494afb2.
+- **Verdict:** SOUND
+- **Top finding:** SPEC §7D.6 still said Done now preselects "me" for the dish washer; fixed with this report (Done now preselects Owner unknown; an unowned card reads "started by owner unknown").
+- **Handoffs:** 1 standing note to reorganizer (machines.ts 246/300: the §7D.5 alert-hours block → src/shared/machine-hours.ts, extract-first on the next §7D change). Report: `docs/steward/2026-10-10-eighth-pass.md`.
+- **Restraint:** no early machine-hours seam (24 lines of headroom, no feature waiting); MojoSOGO's verbatim "dryer" text, the laundry-only Fold & out refusal and the route's null-`to` refusal path left as they are.
+
 ## 2026-10-10 — Owner-unknown laundry loads on Done now (placement-advisor)
 
 - **Ask:** SPEC 2.72 §7D.2–7D.3 (v1.43.0, no migration; UK1–UK2). Done now on a free machine no longer assumes an owner: the load runs with owner_id NULL (free is derived from done_at), alerts say "Clothes washer finished; Owner unknown; Please cycle to dryer" / "Clothes dryer finished: Owner unknown: Please unload"; the chooser preselects Owner unknown; card and Ringing bar say "owner unknown". Also the washer's 45 min chip is dropped.
