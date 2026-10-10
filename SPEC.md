@@ -1587,7 +1587,7 @@ Runs from `scheduled()` every minute, and from `POST /api/v1/dev/tick` in dev.
    (§7B.7). Its asks are fire-less push deliveries, sent at once.
    3c. **Timer days start.** `timerStartTick` (`src/worker/timer-starts.ts`): the start announcement of each
    announcing timer whose window just opened (§5.5a). Fire-less deliveries; the push rows are sent at once.
-   3d. **Weather.** `weatherTick` (`src/worker/weather.ts`): the once-a-day forecast refresh (§7.11). It never
+   3d. **Weather.** `weatherTick` (`src/worker/weather-days.ts`): the once-a-day forecast refresh (§7.11). It never
    throws; a failure is logged and retried hourly.
 4. **Speak house.** `sendHouseDeliveries(env, now)` drains queued and stale-claimed `house`
    deliveries (§9.2).

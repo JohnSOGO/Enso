@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-10 — Steward pass, whole tree (code-steward)
+
+- **Run:** after the v1.41.0 release (SPEC 2.70 §7.11, weather on the calendar, migration 0036, PR #32); audited 6f118ad against 8813b07.
+- **Verdict:** SOUND
+- **Top finding:** two text leftovers from v1.41.0. SPEC §5.6 step 3d named `src/worker/weather.ts` (the file is weather-days.ts), and env.ts moved OPS_NOTIFY_TOKEN's §9.4 comment onto the WEATHER_URL line. Both fixed right after the pass by the thread that shipped the release.
+- **Handoffs:** 1 standing extract-first note for the placement-advisor (Calendar.tsx → DayCell.tsx at the next cell change); carried: 1 to reorganizer (alertMessage options), 2 to worker (read-text wording, notes-limit tidy), EventForm extract-first standing. Report: `docs/steward/2026-10-10-seventh-pass.md`.
+- **Restraint:** no early split of Calendar.tsx (2 commits this month, one coherent thing); tick.ts churn accepted (orchestration only, 77% of cap); step 3d's 10 s fetch before house speech accepted (once a day at midnight); WMO table kept out of vocab.ts (display data, ruled by the advisor).
+
 ## 2026-10-10 — Weather on the calendar (placement-advisor)
 
 - **Ask:** SPEC 2.70 §7.11 (v1.41.0, migration 0036, §4.2zi; §5.6 step 3d; §8.3; WX1–WX6, WX-M; ⚑ Q200–Q203). Once per household-local day (first tick; a failed try retried at most hourly) the Worker fetches Open-Meteo's 7-day daily forecast (weather_code, high, low °F) for the household place from WEATHER_URL (empty = off). Rows in weather_days(date PK, code, high_f, low_f, fetched_at), plus settings.weather_tried_at. GET /calendar adds `weather: { date, emoji, words, high, low }[]`. The cell shows the emoji in a corner (not the two-icon slot); the day sheet's first line is weatherText.
