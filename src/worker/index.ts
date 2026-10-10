@@ -19,6 +19,7 @@ import { messes } from './routes/messes';
 import { things } from './routes/things';
 import { thingPhotos } from './routes/thing-photos';
 import { announce } from './routes/announce';
+import { houseQuietRoutes } from './routes/house-quiet';
 import { machines } from './routes/machines';
 import { recipes } from './routes/recipes';
 import { recipePhotos } from './routes/recipe-photos';
@@ -58,6 +59,7 @@ api.route('/', messes); // §7B.7 whose mess?
 api.route('/', thingPhotos); // before things: /things/read-photo must not match /things/:id
 api.route('/', things);
 api.route('/', announce);
+api.route('/', houseQuietRoutes); // §9.2b
 api.route('/', machines);
 api.route('/', recipes);
 api.route('/', recipePhotos);

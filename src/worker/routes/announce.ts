@@ -6,13 +6,15 @@ import type { AppEnv } from '../env';
 import { announceError, announceMessage } from '../../shared/announce';
 import { audience } from '../../shared/optins';
 import type { Channel } from '../../shared/vocab';
-import { activeMemberIds, all, nowIso } from '../db';
+import { activeMemberIds, all, householdTz, nowIso } from '../db';
 import { houseDelivery, pushDelivery } from '../deliveries';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
 import { sendPushDeliveries } from '../push';
 import { sendHouseDeliveries } from '../house';
 import { deliverySpeakers } from '../speaker-choices';
+import { houseQuiet } from '../house-quiet';
+import { utcToLocal } from '../../shared/time';
 
 export const announce = new Hono<AppEnv>();
 
@@ -30,8 +32,13 @@ announce.post('/announce', requireMember, async (c) => {
   const pushIds: string[] = [];
   let houseId: string | null = null;
   const stmts: D1PreparedStatement[] = [];
+  // §9.2b: while the house is quiet nothing is spoken; House alone would send nothing, so say so.
+  const quiet = channels.includes('house') ? await houseQuiet(db, now) : null;
+  if (quiet && !channels.includes('push')) {
+    return fail(c, 409, 'house_quiet', `The house is quiet until ${utcToLocal(quiet.until, await householdTz(db)).time}.`);
+  }
   // §9.2a: for every active member, so on everyone's ticked speakers together; none ticked → not spoken.
-  const speakers = channels.includes('house') ? await deliverySpeakers(db, await activeMemberIds(db)) : [];
+  const speakers = channels.includes('house') && !quiet ? await deliverySpeakers(db, await activeMemberIds(db)) : [];
   if (speakers === null || speakers.length) {
     const d = houseDelivery(db, { message, speakers }, now);
     ids.push(houseId = d.id);

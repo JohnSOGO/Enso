@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.73 · **Date:** 2026-10-10 · **Owner:** MojoSOGO
+**Version:** 2.74 · **Date:** 2026-10-10 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -353,6 +353,7 @@ export const NOTICE_KIND  = ['login', 'new_sign_in'] as const;                  
 export const MESS_SETTLE  = ['paid', 'forgiven'] as const;                        // §7B.7 messes.settled_how
 export const MESS_STATUS  = ['open', 'discuss', 'owed', 'closed', 'settled'] as const; // §7B.7 a mess's state — derived, never stored
 export const LIST_ADD_RESULT = ['added', 'existing', 'reopened'] as const;       // §7A.1 POST /lists/{id}/items result
+export const HOUSE_QUIET_FOR = ['1h', '2h', '4h', 'today'] as const;       // §9.2b how long the house is quiet
 
 export type Channel = typeof CHANNEL[number];   // ...and so on for each
 ```
@@ -1386,6 +1387,18 @@ INSERT INTO machines (id, updated_at) VALUES ('dishwasher', '2026-10-10T00:00:00
 
 **Migration check (DW-M):** the washer and dryer rows (a running load included) and their open fires survive 0037
 unchanged; the dish washer is seeded free.
+
+### 4.2zk Schema change — `migrations/0038_house_quiet.sql`
+
+Asked by MojoSOGO 2026-10-10 (§9.2b).
+
+```sql
+-- §9.2b — quiet the house: speakers say nothing until this instant. Additive only.
+ALTER TABLE settings ADD COLUMN house_quiet_until TEXT;                     -- UTC ISO; NULL or past = not quiet
+ALTER TABLE settings ADD COLUMN house_quiet_by TEXT REFERENCES members(id); -- who set it
+```
+
+**Migration check (HQ-M):** the settings row survives 0038 unchanged with both columns NULL (not quiet).
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -3903,6 +3916,9 @@ Phone unticked** ⚑ Q36) and **Send** / **Cancel**. Send is disabled while the 
 blank or neither channel is ticked. A refusal from the server shows inside the box; on
 success the box closes (there is no toast in the app). What happens is §9.3.
 
+Right under it, **🤫 Quiet the house** (§9.2b): 1 hour · 2 hours · 4 hours · Rest of today, or, while quiet,
+how long is left, who set it, and **Turn off now**.
+
 Then three sections — Scheduled, Rolling timers, **Machines**. Scheduled and Rolling timers are
 single-line lists (per the table rules), each with a **＋ Add** button in its header; Machines is two
 fixed cards and has no ＋ Add. Chores moved to their own tab in v1.28.0 (§8.15).
@@ -4893,6 +4909,56 @@ no longer lists is shown as such and fails visibly when spoken. `GET /me` carrie
 | HS10 | `POST /announce` House with A `[game_room]`, B `[sogo]`, C disabled `[toasty]`; with everyone `[]` | one house row on game_room + sogo (not toasty); everyone `[]` + House only → 409 `no_speakers`, nothing written; with Phone too → 201, push rows only |
 | HS-M | migration 0024 | earlier rows intact, both columns NULL; `foreign_key_check` empty |
 
+### 9.2b Quiet the house — `src/shared/house-quiet.ts` — asked by MojoSOGO 2026-10-10
+
+"I need to be able to suppress house alerts (not phone alerts) for a few hours or rest of day." Anyone in the
+household can quiet the speakers for a while; phones carry on exactly as before.
+
+**Rules** (pure):
+- `HOUSE_QUIET_FOR = ['1h', '2h', '4h', 'today']` (§3) ⚑ Q209 — 1 hour, 2 hours, 4 hours, Rest of today.
+- `quietEnd(choice, tz, now)` → the UTC instant quiet ends: `now` + 1 / 2 / 4 h, or for `today` the next
+  household-local midnight (Oceanside time) ⚑ Q210.
+- `quietState(until, now)` → `until` when `until > now`, else `null` (not quiet). Quiet ends **on its own**:
+  nothing clears the column, a past instant simply reads as not quiet.
+- `quietError(v)` → a message or `null`: `v` is one of `HOUSE_QUIET_FOR`.
+  Message: "Choose how long: 1h, 2h, 4h or today."
+
+**What is quiet** — household-wide ⚑ Q211. While quiet, **no `house` row is written** by any writer: an alert's
+house row (tick step 2), a timer's start announcement (§5.5a) and an announcement (§9.3). It is the same path as
+"nobody ticked a speaker" (§9.2a, HS9): the fire still steps and every `push` row is written and sent unchanged.
+An alert that fires while quiet is **skipped on the speakers, not saved for later** ⚑ Q212; a reminder that
+repeats (a machine's, a renotify) is spoken again at its first alert after quiet ends. An announcement with
+**House only** while quiet → **409 `house_quiet`** "The house is quiet until {HH:MM}." (nothing would be
+said); with Phone too → 201, push rows only. A house row already queued when quiet starts is still spoken.
+
+**API** (member — anyone who can use alerts ⚑ Q211):
+- `GET /house/quiet` → `{ until: string | null, byName: string | null }` (`until` from `quietState`; `byName`
+  is the setter's display name, only while quiet).
+- `PUT /house/quiet { for }` → the same shape; sets `house_quiet_until = quietEnd(…)`, `house_quiet_by` = the
+  session member (setting again replaces it). 400 `invalid_input` with `quietError`'s message.
+- `DELETE /house/quiet` → `{ until: null, byName: null }`: **Turn off now** (both columns NULL).
+
+**The screen** (Alarms tab, right under 📢 Announce, §8.5):
+- Not quiet: a **🤫 Quiet the house** button. It shows one row of chips: **1 hour · 2 hours · 4 hours · Rest of
+  today**; one tap sets it (and closes the row).
+- Quiet: a line "🤫 House is quiet until {HH:MM} · {N h M min} left · set by {name}" and **[Turn off now]**.
+  Phones still ring; the line says "Phones still get alerts." in dim text beneath. The time left is redrawn
+  every minute and the line goes away when it reaches the end; it is re-read on every app refresh.
+- A refusal shows under the control with `role="alert"`. Chips are 44 px tall; nothing scrolls sideways at
+  320 px.
+
+**Acceptance (HQ — each row is a test):**
+
+| # | Check | Expected |
+|---|---|---|
+| HQ1 | `quietEnd`, `quietState`, `quietError` | 1h/2h/4h add hours; `today` at 15:00 Los Angeles → next 00:00 local (07:00Z in PDT); `quietState` past/equal → null, future → until; `'3h'`, `null` → message |
+| HQ2 | `PUT /house/quiet { for: '2h' }`, `GET`, `DELETE` | until = now + 2 h, `byName` the setter; GET the same; DELETE → nulls; bad `for` → 400; no session → 401 |
+| HQ3 | tick while quiet: a fire with Phone + House | the push row written and sent; no house row; zero HA calls; the fire steps |
+| HQ4 | tick after quiet ended (until in the past) | the house row is written and spoken as before |
+| HQ5 | `POST /announce` while quiet | House only → 409 `house_quiet`, nothing written; Phone + House → 201, push rows only |
+| HQ6 | a timer's start announcement while quiet | push rows only, no house row |
+| HQ-M | migration 0038 | settings row intact, both columns NULL |
+
 ### 9.3 Announcements — `src/shared/announce.ts`, `POST /announce`
 
 A member sends a house announcement **now** from the Alarms tab (§8.5; decided by MojoSOGO
@@ -5059,7 +5125,8 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | GET | `/push/vapid-key` | public | → `{ key }` |
 | GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff }`; PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
 | GET | `/status` | member | → `{ house: { state: HouseState, lastOkAt, lastFailedAt, lastError } (§9.2, derived, never stored), mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[] }` |
-| POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `no_recipients` (§9.3); 409 `no_speakers` (§9.2a); spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
+| GET / PUT / DELETE | `/house/quiet` | member | GET → `{ until, byName }`; PUT `{ for: '1h' \| '2h' \| '4h' \| 'today' }` → the same; DELETE turns quiet off; 400 `invalid_input` (§9.2b) |
+| POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `no_recipients` (§9.3); 409 `no_speakers` (§9.2a); 409 `house_quiet` (§9.2b); spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
 | POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 409 `no_recipients` (no founder yet) / 429 `rate_limited`, in that order |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek, areaCount }` (`thisWeek`/`nextWeek` = member id or null; `areaCount` §7B.6) |
 | POST | `/chores` | member | `{ title, doneMeans?, days, timing, time, nudge?, people, steps, channels, renotifyMin? }` → chore (201) |
@@ -5678,6 +5745,10 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q206 | When the dish washer's alerts sound (§7D.6) | ⚑ Like the laundry's: every phone and speaker, only in the machine alert hours (they wait outside them) |
 | Q207 | The dish washer's minutes (§7D.6) | ⚑ 60 / 90 / 120 / 150 min chips (dish cycles run longer than the laundry's) |
 | Q208 | The build stamp where a screen has no bottom inset (§8.1) | ⚑ The bar's bottom strip is at least 14 px tall so the stamp always shows |
+| Q209 | How long the house can be quiet (§9.2b) | ⚑ 1 hour, 2 hours, 4 hours or Rest of today |
+| Q210 | When "Rest of today" ends (§9.2b) | ⚑ At household-local midnight |
+| Q211 | Who can quiet the house, and for whom (§9.2b) | ⚑ Any member; the whole household's speakers at once; the line says who set it |
+| Q212 | What happens to alerts while quiet (§9.2b) | ⚑ Skipped on the speakers, not replayed later; phones are unchanged; announcements are quiet too (House only → refused); a repeating reminder speaks again after quiet ends |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5886,6 +5957,11 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Quiet the house** (v1.45.0, §9.2b, §4.2zk; asked by MojoSOGO 2026-10-10; HQ1–HQ6, HQ-M): Alarms → 🤫 Quiet the
+house for 1 hour, 2 hours, 4 hours or the rest of today. While quiet no speaker says anything (alerts, timer
+starts, announcements); phones get every alert as before. It ends on its own, or with Turn off now, and shows who
+set it. Migration 0038. Q209–Q212 are ⚑ defaults. **Still owed:** quiet the house on the iPhone and see a phone
+alert arrive while the speakers stay silent.
 **Tab bar flush + build stamp** (v1.44.0, §8.1; asked by MojoSOGO 2026-10-10): the app frame is fixed to the
 whole screen so the tab bar sits on the bottom edge of the installed iPhone app, and the opening screen's build
 stamp shows all the time under the tabs (Q208 ⚑). No migration. **Still owed:** see it on the iPhone.

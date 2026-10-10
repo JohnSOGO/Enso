@@ -5,6 +5,7 @@ import { activeMemberIds, all, householdTz, parseJson } from './db';
 import { houseDelivery, pushDelivery } from './deliveries';
 import { sendPushDeliveries } from './push';
 import { deliverySpeakers } from './speaker-choices';
+import { houseQuiet } from './house-quiet';
 import { audience } from '../shared/optins';
 import { timerWindow } from '../shared/engine';
 import { timerStartDue, timerStartMessage } from '../shared/timer-start';
@@ -21,7 +22,7 @@ export async function timerStartTick(env: Env, now: string): Promise<void> {
     `SELECT id, title, interval_min, channels, assigned_to, active_from, active_to, announced_on FROM timers
       WHERE deleted_at IS NULL AND running = 1 AND announce_start = 1 AND active_from IS NOT NULL AND active_to IS NOT NULL`);
   if (!timers.length) return;
-  const tz = await householdTz(db), activeIds = await activeMemberIds(db);
+  const tz = await householdTz(db), activeIds = await activeMemberIds(db), quiet = await houseQuiet(db, now); // §9.2b
   const pushIds: string[] = [];
   for (const t of timers) {
     const date = timerStartDue({ running: true, announceStart: true, announcedOn: t.announced_on },
@@ -41,7 +42,7 @@ export async function timerStartTick(env: Env, now: string): Promise<void> {
         stmts.push(d.stmt);
       }
     }
-    const speakers = channels.includes('house') && aud.house ? await deliverySpeakers(db, aud.push) : [];
+    const speakers = !quiet && channels.includes('house') && aud.house ? await deliverySpeakers(db, aud.push) : [];
     if (speakers === null || speakers.length) stmts.push(houseDelivery(db, { message, speakers }, now).stmt);
     if (stmts.length) await db.batch(stmts);
   }
