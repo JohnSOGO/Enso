@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-10 — Steward pass, whole tree (code-steward)
+
+- **Run:** after the v1.39.0 (SPEC 2.68 §7.9, paste a link) and v1.40.0 (SPEC 2.69 §7.10, things to bring, migration 0035) releases; audited 7bfebba.
+- **Verdict:** SOUND. Typecheck green, 722/722 tests (85 files), arch:audit quiet (nearest: EventForm.tsx and routes/recipes.ts at 87%, engine.ts at 86%).
+- **Placement audit:** 2 receipts reconciled against 3 commits (3c7598e, merge 18a19ee, 7bfebba), each landed as its verdict said; 0 code commits without a receipt; map rows, §14 and where-things-stand are accurate.
+- **Top finding:** alertMessage (engine.ts) has 7 positional params with 1 production caller → an options object that tick fills from Source (reorganizer).
+- **Handoffs:** reorganizer (alertMessage options object); worker (read-budget 429/503 wording for text and link after a §7.9 line; the EVENT_NOTES_MAX literal and event-reader's double import, with pass-5 item 2); placement-advisor standing note (EventForm 195/223: the next event-form change is extract-first → WhenFields.tsx). Carried: pass-5 items 1–2, pass-3 items 1 and 3. Report: `docs/steward/2026-10-10-sixth-pass.md`.
+
 ## 2026-10-10 — Things to bring on an event and in its reminder (placement-advisor)
 
 - **Ask:** SPEC 2.69 §7.10 (v1.40.0, migration 0035, §4.2zh; §5.7; §8.4; EB1–EB5, EB-M; ⚑ Q198, Q199). An optional `events.bring` list (≤ 20 lines of ≤ 80 characters), cleaned by `cleanBring` and carried on GET/POST/PATCH `/events`. An event reminder appends " — bring: a, b and c" before " (alert n)" on push and house. A Things to bring editor under Address in the event form.
