@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.70 · **Date:** 2026-10-10 · **Owner:** MojoSOGO
+**Version:** 2.71 · **Date:** 2026-10-10 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -225,7 +225,7 @@ Enso/
 │   │   ├── markets.ts      # §7.4
 │   │   ├── lists.ts        # §7A.1 item rules: itemKey, add/reopen decision, limits, 30-day window
 │   │   ├── item-reading.ts # §7A.3 naming a snapped item: the prompt, cleanItemName, the helper's report
-│   │   ├── machines.ts     # §7D the laundry loop: state, transitions, done message
+│   │   ├── machines.ts     # §7D the laundry loop + dish washer: state, transitions, done message
 │   │   ├── sun.ts          # §7.7 sunset per local date and place (NOAA)
 │   │   ├── recipes.ts      # §7E recipe rules: limits, YouTube link → video id, typed input, the wire
 │   │   ├── recipe-reading.ts # §7E.2, §7E.2b, §7E.2c reading a video: sources, creator's comments, transcript, cleaning a reading, captions from home
@@ -339,7 +339,7 @@ export const WEEKDAY      = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;
 export const CHORE_TIMING = ['at', 'by'] as const;                               // §7B
 export const THING_STATUS = ['idea', 'planned', 'done', 'dropped'] as const;     // §7C
 export const HOUSE_STATE  = ['ok', 'failing', 'not_configured', 'untried'] as const; // /status `house.state` (§9.2)
-export const MACHINE      = ['washer', 'dryer'] as const;                        // §7D, in load order
+export const MACHINE      = ['washer', 'dryer', 'dishwasher'] as const;          // §7D, card order: the laundry in load order, then the dish washer
 export const MACHINE_STATE = ['free', 'running', 'done'] as const;               // §7D, derived, never stored
 export const SUN_EVENT    = ['sunset'] as const;                                 // §7.7 events.start_sun
 export const RECIPE_SOURCE = ['description', 'captions', 'transcript', 'comments', 'page', 'typed'] as const; // §7E what a recipe was read from ('transcript': pasted, §7E.2b; 'page': any other link, §7E.6)
@@ -369,7 +369,8 @@ export type Channel = typeof CHANNEL[number];   // ...and so on for each
 | `missed` | A reminder was more than 60 min overdue when the engine first saw it (outage) — closed without alerting |
 | `chore` | A fire for one step of one chore run (§7B) |
 | `machine` | A fire for one load in one machine, due when the machine is done (§7D) |
-| `washer` / `dryer` | The two laundry machines (§7D); the washer's load moves on to the dryer |
+| `washer` / `dryer` | The two laundry machines, shown as **Clothes washer** / **Clothes dryer** (§7D); the washer's load moves on to the dryer |
+| `dishwasher` | The **Dish washer** (§7D.6): started and done like the laundry machines, on its own (no next machine) |
 | `free` / `running` / `done` | A machine's state (§7D): no load / a load, before done-at / a load, done-at passed — derived from the row and `now` |
 | `sunset` | An event whose start is the day's local sunset (§7.7, `events.start_sun`); there is no sunrise |
 | `description` / `captions` | A recipe was read from the video's description / its captions (§7E); a recipe can carry both |
@@ -926,6 +927,7 @@ its owner is set and `now ≥ done_at`.
 **Migration check (L13):** like C13 — fires of every earlier kind and their deliveries survive
 0014, `PRAGMA foreign_key_check` is empty, both machines are seeded free, and a `machine` fire
 without `machine_id` is refused by the CHECK.
+(0037 seeds a third machine, the dish washer, §4.2zj.)
 
 ### 4.2n Schema change — `migrations/0015_timer_window.sql`
 
@@ -1372,6 +1374,18 @@ ALTER TABLE settings ADD COLUMN weather_tried_at TEXT;  -- UTC ISO of the last r
 
 **Migration check (WX-M):** settings written under 0001–0035 survive 0036 unchanged with `weather_tried_at` NULL;
 `weather_days` starts empty.
+
+### 4.2zj Schema change — `migrations/0037_dishwasher.sql`
+
+Asked by MojoSOGO 2026-10-10 (§7D.6).
+
+```sql
+-- §7D.6 — the dish washer: a third machines row, seeded free. Additive only.
+INSERT INTO machines (id, updated_at) VALUES ('dishwasher', '2026-10-10T00:00:00.000Z');
+```
+
+**Migration check (DW-M):** the washer and dryer rows (a running load included) and their open fires survive 0037
+unchanged; the dish washer is seeded free.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -3058,10 +3072,11 @@ form the way a photo does (§7C.4): **nothing is saved**, only **empty** fields 
 
 ## 7D. The laundry loop — `src/shared/machines.ts` (pure)
 
-Decided by MojoSOGO 2026-10-03. Two machines, **Washer** and **Dryer**, each holding at most
-one load. A load turns once around: **start the washer → done → move to the dryer → done →
-fold & out**. The weekly Laundry chore (§7B) is separate and unchanged; the dishwasher is
-deferred.
+Decided by MojoSOGO 2026-10-03. Two laundry machines, **Clothes washer** and **Clothes dryer**
+(renamed from Washer and Dryer 2026-10-10; the ids stay `washer` and `dryer`), each holding at
+most one load. A load turns once around: **start the washer → done → move to the dryer → done →
+fold & out**. The weekly Laundry chore (§7B) is separate and unchanged. The **Dish washer**
+(§7D.6, asked by MojoSOGO 2026-10-10) is a third machine with the same start and done, on its own.
 
 ### 7D.1 A machine
 
@@ -3071,8 +3086,9 @@ deferred.
   - **running** — owner set, `now < done_at`: whose load, started, minutes, done-at;
   - **done** — owner set, `now ≥ done_at`: the card reads **DONE — waiting**.
 - `GET /machines` returns the server-derived `state`; the PWA never re-derives it.
-- The machines in load order are `MACHINE` (vocab): the washer's **next** machine is the dryer;
-  the dryer has none (it is the last).
+- The laundry machines in load order are `LAUNDRY` (`machines.ts`): the washer's **next**
+  machine is the dryer; the dryer has none (it is the last). `MACHINE` (vocab) is the card
+  order: the laundry, then the dish washer, which has no next machine and no machine before it.
 - Anyone may act on any machine. Every transition is one `db.batch` (§7D.2).
 
 ### 7D.2 Transitions — each returns `{ rows, closeFire?, newFire? }` or a refusal
@@ -3090,9 +3106,9 @@ deferred.
   member (the chooser defaults to me).
 - Refusals are **409** with a message, shown in place:
   - start on a machine that isn't free, or move while the dryer is full → `busy`,
-    "The dryer still has Sam's load." ("…has a load." when its owner is not an active member).
+    "The clothes dryer still has Sam's load." ("…has a load." when its owner is not an active member).
     The washer stays DONE — waiting; nothing moves automatically.
-  - move a washer that isn't done → `not_done` "The washer isn't done yet."
+  - move a washer that isn't done → `not_done` "The clothes washer isn't done yet."
   - move from the dryer, or Fold & out on the washer → `invalid_state` with a message naming
     what the machine does take.
   - clear a free machine → `already_free`.
@@ -3100,7 +3116,7 @@ deferred.
   - Done now on a done machine → `busy`; on a free one with no active `ownerId` → 400 `invalid_input`.
 - **Two taps at once:** every machine-row write is conditional on the row's `started_at` as it
   was read, inside the same batch as the fire writes; a row that changed under it aborts the
-  whole batch → **409 `conflict`** "Someone else just changed the washer — have another look."
+  whole batch → **409 `conflict`** "Someone else just changed the clothes washer — have another look."
   `uq_machine_open` also refuses a second open fire for one machine.
 - A machine fire is closed **only** by these routes; `POST /fires/{id}/actions` on one is 409
   `invalid_action` (§5.4). No new `ACTION` or `CLOSE_REASON`.
@@ -3117,7 +3133,7 @@ deferred.
   The `Everywhere` group is left out so no Echo speaks twice ⚑ Q161 (`everySpeaker`). When House
   is off or the list can't be read, the row is written with NULL: the default speakers. The
   message still names the load's owner.
-- Message (`doneMessage`): `"Sam, your laundry in the washer is done"` / `"… in the dryer is
+- Message (`doneMessage`): `"Sam, your laundry in the clothes washer is done"` / `"… in the clothes dryer is
   done"`; with no active owner `"The laundry in the washer is done"`. While the machine
   before it (the washer) holds a **done** load, every later dryer alert adds
   `" — Kai's load is waiting"` (`" — another load is waiting"` when that owner is not
@@ -3125,7 +3141,7 @@ deferred.
   time, never stored.
 - **Still loaded** (⚑ Q159): a fire due *after* the machine's done-at was restarted by Still
   loaded (`isStillLoaded`, derived, never stored). Its message says what the load needs next:
-  `"Sam, your laundry is still in the washer — move it to the dryer"` / `"… still in the dryer
+  `"Sam, your laundry is still in the clothes washer — move it to the clothes dryer"` / `"… still in the clothes dryer
   — take it out"`; with no active owner `"The laundry is still in the washer — …"`. The waiting
   suffix and `" (alert n)"` follow as above.
 - Phone notifications have **no buttons** for a machine (`pushActions('machine') = []`);
@@ -3152,24 +3168,46 @@ can edit them.
 | L1 | `machineState` before / at / after `done_at`, and with no owner | running / done / done / free |
 | L2 | `doneMessage` with an owner, with none, with a waiting load, waiting with an inactive owner | the four §7D.3 texts |
 | L3 | start the washer for A, 45 min | 200; washer `running`, `done_at = now + 45 min`; one `scheduled` machine fire due then |
-| L4 | tick at done-at | fire ringing; push to every active member (A and B) + one house delivery, message `A, your laundry in the washer is done` |
+| L4 | tick at done-at | fire ringing; push to every active member (A and B) + one house delivery, message `A, your laundry in the clothes washer is done` |
 | L5 | ticks every 15 min after | alerts 2, 3, 4 (`… (alert 4)`); a 5th tick sends nothing; washer state `done` |
 | L6 | move to the dryer, 60 min | washer free, its fire closed `done` by me; dryer running for A with a new fire |
-| L7 | start the washer for B, then move it while the dryer is still full | 409 `busy` "The dryer still has A's load."; the washer stays done; nothing moved |
-| L8 | tick the dryer's done-at while B's load waits in the washer | dryer message `A, your laundry in the dryer is done — B's load is waiting` |
+| L7 | start the washer for B, then move it while the dryer is still full | 409 `busy` "The clothes dryer still has A's load."; the washer stays done; nothing moved |
+| L8 | tick the dryer's done-at while B's load waits in the washer | dryer message `A, your laundry in the clothes dryer is done — B's load is waiting` |
 | L9 | Fold & out on the done dryer | dryer free; its fire closed `done` |
 | L10 | Clear a running machine | free; its fire closed `removed`; a later tick sends nothing |
 | L11 | two Start taps on one free machine at once | one 200, one 409; exactly one open fire |
 | L12 | minutes 20, an unknown owner, an unknown machine, `done` action on a machine fire | 400 / 400 / 404 / 409 `invalid_action`, each with a message |
 | L14 | `remindMachine` on a done washer / a running or free one; `doneMessage(…, still)` | the load stays, the open fire closes `superseded`, a new fire due now / `not_done`; the §7D.3 Still loaded texts |
-| L15 | Still loaded on a washer done 70 min ago, then ticks every 15 min | the old fire closed `superseded`; the new fire alerts 4 times (A's phone + house), message `A, your laundry is still in the washer — move it to the dryer` |
+| L15 | Still loaded on a washer done 70 min ago, then ticks every 15 min | the old fire closed `superseded`; the new fire alerts 4 times (A's phone + house), message `A, your laundry is still in the clothes washer — move it to the clothes dryer` |
 | L16 | `doneNowMachine` on a free washer for A / a running dryer / a done one; `parseDoneNow` | A's load done now, a fire due now / done-at now, old fire `superseded` / `busy`; owner required only when free |
-| L17 | Done now on a free washer for A, then tick | washer done for A; alert 1 to A's phone + house, `A, your laundry in the washer is done`; again → `busy`; a running dryer's Done now closes its fire `superseded` |
+| L17 | Done now on a free washer for A, then tick | washer done for A; alert 1 to A's phone + house, `A, your laundry in the clothes washer is done`; again → `busy`; a running dryer's Done now closes its fire `superseded` |
 | L18 (HS11) | a machine alert while A ticked only Game Room; HA lists Game Room, Everywhere, Toasty, the Voice PE; then HA down | the house row's speakers are Game Room, Toasty, the Voice PE; then NULL (the defaults) |
 | L19 | `machineQuietUntil`, defaults, Los Angeles: Mon 18:00 / 17:29 / 20:30; Fri 21:00; Sat 12:00; Sun 21:00; weekend any time: Fri 22:00, Sat 03:00; both any time | null / Mon 17:30 / Tue 17:30; Sat 09:00; null; Mon 17:30; Sat 00:00, null; null |
 | L20 | `stepFire` with `quietUntil`: a due scheduled fire; a ringing fire due its renotify; not yet due; silent past max | scheduled at quietUntil, count 0, no alert (twice); unchanged; unchanged |
 | L21 | `GET /machines/hours` after 0028; an admin PATCHes; a member PATCHes; from ≥ to | the defaults; saved and read back; 403; 400 with a message |
 | L13 | migration check (§4.2m) | fires and deliveries intact after 0014; machines seeded; CHECK refuses a machine fire without `machine_id` |
+| DW1 | `MACHINE_LABEL`; `nextMachine`/`previousMachine` of the dish washer; `machineMinutes` | Clothes washer, Clothes dryer, Dish washer; null / null; laundry 30–90, dish washer 60–150 |
+| DW2 | `doneMessage('dishwasher', …)` with a starter, none, still; a done load in the dryer | the four §7D.6 texts; never a waiting suffix |
+| DW3 | start the dish washer for A, 120 min; then 45 min; tick at done-at | 200, running, `done_at = now + 120 min`; 400 with the dish-washer chips; alert 1 to every phone + house, `The dish washer A started is done` |
+| DW4 | Emptied (finish) on the done dish washer; move on it | free, its fire closed `done`; 409 `invalid_state` "Dish washer loads don't move on — use Emptied." |
+| DW-M | migration check (§4.2zj) | washer/dryer rows and open fires unchanged; dish washer seeded free |
+
+### 7D.6 The dish washer
+
+Asked by MojoSOGO 2026-10-10: "add dish washer letting me have the same start and done now, and
+remember who started the dish washer".
+- One more `machines` row, `dishwasher` (§4.2zj), labelled **Dish washer** 🍽️ ⚑ Q204. Every §7D.2
+  transition works on it except **Move**: it has no next machine, so its done load ends with
+  **Finish**, shown as **Emptied** (not Fold & out) ⚑ Q205. **Still loaded** works as on the
+  laundry. Its alerts ring like any machine's (§7D.3), in the same alert hours (§7D.5) ⚑ Q206.
+- **Who started it:** the load's `owner_id` is the person who started the dish washer. Start and
+  Done now ask *Who started it?* (me preselected) instead of *Whose load?*; the card reads
+  **started by Sam · done ~14:05**, and the Ringing bar names them as for laundry.
+- **Minutes** (`machineMinutes(id)`): the dish washer's chips are **60 / 90 / 120 / 150** ⚑ Q207;
+  the laundry keeps 30 / 45 / 60 / 90. Any other value → 400 naming the machine's chips.
+- Message: `"The dish washer Sam started is done"`; Still loaded `"The dish washer Sam started
+  is still full — empty it"`; with no active starter `"The dish washer is done"` / `"… is still
+  full — empty it"`. No waiting suffix (no machine before it); `" (alert n)"` follows as usual.
 
 ---
 
@@ -3778,8 +3816,9 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
 - Timer row: `⏱ Check on the dog · ringing 45 min` with **[Ack]**
 - Chore row: `🧹 Laundry — Move to dryer · Sam` with **[Done]** (no snooze)
 - Thing row: `📌 Fall fair · to do` with **[Snooze 10m] [Done]** ⚑ glyph
-- Machine row: `🧺 Washer · Sam` with **[Move to dryer]** — it opens the same dryer-minutes
-  chooser the Machines card uses (§8.5); `🧺 Dryer · Sam` with **[Fold & out]**. No Done:
+- Machine row: `🧺 Clothes washer · Sam` with **[Move to clothes dryer]** — it opens the same
+  dryer-minutes chooser the Machines card uses (§8.5); `🧺 Clothes dryer · Sam` with **[Fold &
+  out]**; `🧺 Dish washer · Sam` (who started it, §7D.6) with **[Emptied]**. No Done:
   a machine fire is closed only by the `/machines` routes (§7D.2). ⚑ Q40
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
   "3 more ringing ▾".
@@ -3890,29 +3929,35 @@ each day**, channels, repeat alert every, assigned to, Delete).
   Filling only one, `from = to`, or an interval not shorter than the range is refused by the
   server; the message shows inside the form.
 
-**Machines** — the laundry loop (§7D), right after Rolling timers. One card per machine, in
-load order. Each card: the machine (🫧 Washer, 🌀 Dryer ⚑), a state badge (**free** neutral ·
+**Machines** — the laundry loop and the dish washer (§7D), right after Rolling timers. One card
+per machine, in `MACHINE` order. Each card: the machine (🫧 Clothes washer, 🌀 Clothes dryer,
+🍽️ Dish washer ⚑), a state badge (**free** neutral ·
 **running** green · **DONE — waiting** amber), whose load and the done-at time, and its
 actions on a second line. At 320 px:
 
 ```
 Machines
-Wash, move to the dryer, fold. Everyone hears when it's done.
+Wash, move to the dryer, fold. Run the dishes, then empty them. Everyone hears when it's done.
 🔔 Alerts sound weekdays 5:30pm–8:30pm, weekends 9:00am–9:00pm; outside those hours they wait. [Edit hours]
 ┌──────────────────────────────────────┐
-│ 🫧 Washer  DONE — waiting   Kai·14:05 │
-│ [Move to dryer] [Still loaded] [Clear]│
+│ 🫧 Clothes washer  DONE — waiting     │
+│ Kai·14:05                             │
+│ [Move to clothes dryer] [Still loaded]│
+│ [Clear]                               │
 ├──────────────────────────────────────┤
-│ 🌀 Dryer   running          Sam·14:50 │
-│                              [Clear] │
+│ 🌀 Clothes dryer   running            │
+│ Sam·~14:50                   [Clear] │
+├──────────────────────────────────────┤
+│ 🍽️ Dish washer     running            │
+│ started by Ana·~15:30 [Done now][Clear]│
 └──────────────────────────────────────┘
 ```
 
-| State | Washer actions | Dryer actions |
-|---|---|---|
-| free | **[Start]** [Done now] | **[Start]** [Done now] |
-| running | [Done now] [Clear] | [Done now] [Clear] |
-| done | **[Move to dryer]** [Still loaded] [Clear] | **[Fold & out]** [Still loaded] [Clear] |
+| State | Clothes washer actions | Clothes dryer actions | Dish washer actions |
+|---|---|---|---|
+| free | **[Start]** [Done now] | **[Start]** [Done now] | **[Start]** [Done now] |
+| running | [Done now] [Clear] | [Done now] [Clear] | [Done now] [Clear] |
+| done | **[Move to clothes dryer]** [Still loaded] [Clear] | **[Fold & out]** [Still loaded] [Clear] | **[Emptied]** [Still loaded] [Clear] |
 
 - **Alert hours** (§7D.5): one line under the heading. **Edit hours** (admins only) opens
   "Machine alert hours": Weekdays and Weekends, each two `<input type="time">` fields (16 px);
@@ -4979,7 +5024,7 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | GET | `/alarms` | member | → alarms: `{ id, title, time, days: Weekday[], channels, renotifyMin, assignedTo, createdBy, nextDueAt, ringing }` |
 | POST | `/alarms` | member | `{ title, time: "HH:MM", days: Weekday[], channels, renotifyMin?, assignedTo? }` → alarm |
 | PATCH/DELETE | `/alarms/{id}` | creator or owner | same fields as POST, all optional; closes future scheduled fires like an event edit |
-| GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Washer") and `personId` = the load's owner |
+| GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Clothes washer") and `personId` = the load's owner |
 | GET | `/machines` | member | → `Machine[]` in load order: `{ id, label, state: MachineState, ownerId, minutes, startedAt, doneAt, startedBy, next }` (`state` derived by the server, §7D.1; `next` = the next machine's id or null) |
 | POST | `/machines/{id}/start` | member | `{ ownerId, minutes }` → `Machine[]`; 409 `busy` when not free (§7D.2) |
 | POST | `/machines/{id}/move` | member | `{ minutes }` → `Machine[]`; 409 `busy` / `not_done` / `invalid_state` |
@@ -5609,6 +5654,10 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q201 | Weather on past days (§7.11) | ⚑ None: only today and the next 6 days carry an emoji; yesterday's is dropped at the daily refresh |
 | Q202 | Where the weather emoji sits (§7.11) | ⚑ The day cell's top-right corner, apart from the two day icons; high and low only in the day sheet |
 | Q203 | Turning the weather off (§7.11) | ⚑ No switch: everyone sees it (it could become a row of Optional calendar items if wanted) |
+| Q204 | The dish washer's name and icon (§7D.6) | ⚑ "Dish washer" 🍽️, after the clothes dryer on the Machines section |
+| Q205 | Ending a dish washer load (§7D.6) | ⚑ **Emptied** (the dryer's Fold & out, renamed for dishes); Still loaded restarts its reminders like the laundry |
+| Q206 | When the dish washer's alerts sound (§7D.6) | ⚑ Like the laundry's: every phone and speaker, only in the machine alert hours (they wait outside them) |
+| Q207 | The dish washer's minutes (§7D.6) | ⚑ 60 / 90 / 120 / 150 min chips (dish cycles run longer than the laundry's 30–90) |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5817,6 +5866,11 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Clothes washer, clothes dryer and dish washer** (v1.42.0, §7D.6, §4.2zj; asked by MojoSOGO 2026-10-10; DW1–DW4,
+DW-M): Washer and Dryer are now labelled Clothes washer and Clothes dryer (ids and data unchanged), and a third card,
+🍽️ Dish washer, starts, rings when done, Done now / Still loaded / Clear like the laundry, and ends with Emptied. The
+card shows who started it ("started by Sam"). Migration 0037. Q204–Q207 are ⚑ defaults. **Still owed:** a real
+dish washer load started and emptied on the iPhone.
 **Weather on the calendar** (v1.41.0, §7.11, §4.2zi; asked by MojoSOGO 2026-10-10; WX1–WX6, WX-M): the next 7 days
 each show the forecast emoji in the cell's corner, and the day sheet says the words, high and low. Open-Meteo, once a
 day from the minute tick, at the household place. Migration 0036. Q200–Q203 are ⚑ defaults. **Still owed:** see it

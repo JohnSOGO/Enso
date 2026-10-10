@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth**: §14 holds status and deviatio
 MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-10, v1.41.0, main = production.*
+*Last updated 2026-10-10, v1.42.0, main = production.*
 
 ## Running where
 
@@ -45,7 +45,7 @@ the working agreement in `CLAUDE.md`.
 - README has mis-encoded characters (`Â§`) in older sections.
 - Each person's speakers (v1.19.0, §9.2a) is live: check Home Assistant's real list in Settings → Me, and have each
   person tick theirs. Q125–Q129 are ⚑ defaults awaiting MojoSOGO.
-- Dishwasher (deferred by MojoSOGO). Phase C kitchen display (needs an AREC).
+- Phase C kitchen display (needs an AREC).
 - Real-phone checks still owed per SPEC §14 (Android push, Done/Snooze, the laundry and goat reminders in practice).
 - Code-steward: pass 1 items 6–10 wait until those files are next touched; pass 3 items 1–4 and pass 5 items 1–3 and pass 6 items 1–4 (pass 7: items 3–6 carry them)
   (one maps rule for things and events, and Plan it filling an event's Address; the read-text cap wording) wait on
@@ -53,5 +53,6 @@ the working agreement in `CLAUDE.md`.
 - Rolling timer day start (v1.36.0, §5.5a): hear it at a real window opening.
 - Event address and paste (v1.37.0–v1.38.0, §7.9, §7.9a): on the iPhone, Paste a copied text and a screenshot into a
   new event, and a "moved to…" text into an existing one; Open in Maps.
+- Dish washer (v1.42.0, §7D.6): start one on the iPhone, hear it done, tap Emptied. Q204–Q207 are ⚑ defaults.
 - Weather on the calendar (v1.41.0, §7.11): see the emojis on the iPhone after the first daily refresh. Q200–Q203 are ⚑ defaults.
 - Things to bring (v1.40.0, §7.10): hear a real event reminder that carries a list, on the phone and a speaker.

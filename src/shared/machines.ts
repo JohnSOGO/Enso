@@ -1,10 +1,9 @@
-// SPEC §7D — the laundry loop: a machine's state, its transitions, the done message, input rules.
+// SPEC §7D — the laundry loop and the dish washer: a machine's state, its transitions, the done message, input rules.
 // Pure: `now` is always a parameter. Imports engine + vocab + time; the engine never imports this.
 import { closeFire, newMachineFire, type AlertConfig, type FireRow, type NewFire } from './engine';
 import { MACHINE, isOneOf, type Channel, type MachineId, type MachineState } from './vocab';
 import { addDays, addMinutes, isTime, localToUtc, ms, utcToLocal, weekdayOf } from './time';
 
-export const MACHINE_MINUTES = [30, 45, 60, 90] as const;
 export const MACHINE_RENOTIFY_MIN = 15;
 export const MACHINE_MAX_ALERTS = 4;
 export const MACHINE_CHANNELS: readonly Channel[] = ['push', 'house'];
@@ -17,16 +16,25 @@ export const machineAlertConfig = (): AlertConfig =>
 export const machineAlert = (quietUntil: string | null): { assignedTo: string[]; allSpeakers: boolean; cfg: AlertConfig } =>
   ({ assignedTo: [], allSpeakers: true, cfg: { ...machineAlertConfig(), ...(quietUntil ? { quietUntil } : {}) } });
 
-export const MACHINE_LABEL: Record<MachineId, string> = { washer: 'Washer', dryer: 'Dryer' };
+export const MACHINE_LABEL: Record<MachineId, string> = { washer: 'Clothes washer', dryer: 'Clothes dryer', dishwasher: 'Dish washer' };
 const lower = (id: MachineId) => MACHINE_LABEL[id].toLowerCase();
 
-/** The machine a load moves on to (washer → dryer), or null for the last. */
+/** §7D.1 — the laundry machines in load order; a machine not in it (the dish washer, §7D.6) stands alone. */
+const LAUNDRY: readonly MachineId[] = ['washer', 'dryer'];
+export const isLaundry = (id: MachineId): boolean => LAUNDRY.includes(id);
+
+/** §7D.2, §7D.6 — the minute chips: dish cycles run longer. */
+export const machineMinutes = (id: MachineId): readonly number[] => (isLaundry(id) ? [30, 45, 60, 90] : [60, 90, 120, 150]);
+/** §8.5 — the button that ends a load in the last machine. */
+export const finishLabel = (id: MachineId): string => (isLaundry(id) ? 'Fold & out' : 'Emptied');
+
+/** The machine a load moves on to (washer → dryer), or null for the last or a lone machine. */
 export function nextMachine(id: MachineId): MachineId | null {
-  return MACHINE[MACHINE.indexOf(id) + 1] ?? null;
+  return isLaundry(id) ? LAUNDRY[LAUNDRY.indexOf(id) + 1] ?? null : null;
 }
-/** The machine whose load moves on to this one, or null for the first. */
+/** The machine whose load moves on to this one, or null for the first or a lone machine. */
 export function previousMachine(id: MachineId): MachineId | null {
-  return MACHINE[MACHINE.indexOf(id) - 1] ?? null;
+  return isLaundry(id) ? LAUNDRY[LAUNDRY.indexOf(id) - 1] ?? null : null;
 }
 
 export interface MachineRow {
@@ -139,8 +147,8 @@ export function refusalText(r: MachineRefusal, names: ReadonlyMap<string, string
     case 'not_done': return `The ${lower(r.machine.id)} isn't done yet.`;
     case 'already_free': return `The ${lower(r.machine.id)} is already free.`;
     case 'invalid_state': return r.why === 'no_next'
-      ? `${label} loads don't move on — use Fold & out.`
-      : `Fold & out is for the ${lower(MACHINE[MACHINE.length - 1])} — move this load on first.`;
+      ? `${label} loads don't move on — use ${finishLabel(r.machine.id)}.`
+      : `Fold & out is for the ${lower(LAUNDRY[LAUNDRY.length - 1])} — move this load on first.`;
   }
 }
 
@@ -151,6 +159,8 @@ export function refusalText(r: MachineRefusal, names: ReadonlyMap<string, string
  * message says what the load needs next.
  */
 export function doneMessage(id: MachineId, ownerName: string | null, waiting?: string | null, still = false): string {
+  // §7D.6 — a lone machine names who started it; nothing waits before it.
+  if (!isLaundry(id)) return `The ${lower(id)}${ownerName ? ` ${ownerName} started` : ''} is ${still ? 'still full — empty it' : 'done'}`;
   const next = nextMachine(id);
   const base = !still
     ? ownerName ? `${ownerName}, your laundry in the ${lower(id)} is done` : `The laundry in the ${lower(id)} is done`
@@ -166,15 +176,15 @@ export function waitingLoad(rows: readonly MachineRow[], id: MachineId, now: str
   return row && machineState(row, now) === 'done' ? row : null;
 }
 
-const MINUTES_TEXT = `Minutes must be one of ${MACHINE_MINUTES.join(', ')}.`;
-const isMinutes = (v: unknown): v is number => (MACHINE_MINUTES as readonly unknown[]).includes(v);
+const minutesText = (id: MachineId) => `Minutes must be one of ${machineMinutes(id).join(', ')}.`;
+const isMinutes = (id: MachineId, v: unknown): v is number => (machineMinutes(id) as readonly unknown[]).includes(v);
 
 export const isMachineId = (v: unknown): v is MachineId => isOneOf(MACHINE, v);
 
-/** Start's body: whose load (an active member) and a minute chip. Returns the input or a message. */
-export function parseStart(b: Record<string, unknown>, activeIds: readonly string[]): { ownerId: string; minutes: number } | string {
+/** Start's body: whose load (an active member) and one of the machine's minute chips. Returns the input or a message. */
+export function parseStart(b: Record<string, unknown>, id: MachineId, activeIds: readonly string[]): { ownerId: string; minutes: number } | string {
   if (typeof b.ownerId !== 'string' || !activeIds.includes(b.ownerId)) return 'Whose load must be an active member.';
-  if (!isMinutes(b.minutes)) return MINUTES_TEXT;
+  if (!isMinutes(id, b.minutes)) return minutesText(id);
   return { ownerId: b.ownerId, minutes: b.minutes };
 }
 
@@ -184,9 +194,9 @@ export function parseDoneNow(b: Record<string, unknown>, activeIds: readonly str
   return typeof b.ownerId === 'string' && activeIds.includes(b.ownerId) ? { ownerId: b.ownerId } : 'Whose load must be an active member.';
 }
 
-/** Move's body: the next machine's minute chip. */
-export function parseMove(b: Record<string, unknown>): { minutes: number } | string {
-  return isMinutes(b.minutes) ? { minutes: b.minutes } : MINUTES_TEXT;
+/** Move's body: a minute chip of the machine it moves to (`to`). */
+export function parseMove(b: Record<string, unknown>, to: MachineId): { minutes: number } | string {
+  return isMinutes(to, b.minutes) ? { minutes: b.minutes } : minutesText(to);
 }
 
 /** §7D.5 — when machine alerts may sound, household local HH:MM, from < to; null = any time that day. */
