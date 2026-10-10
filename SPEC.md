@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.68 · **Date:** 2026-10-09 · **Owner:** MojoSOGO
+**Version:** 2.69 · **Date:** 2026-10-10 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1343,6 +1343,17 @@ ALTER TABLE events ADD COLUMN address TEXT;  -- NULL = none; at most EVENT_ADDRE
 
 **Migration check (EA-M):** events written under 0001–0033 survive 0034 unchanged with `address` NULL.
 
+### 4.2zh Schema change — `migrations/0035_event_bring.sql`
+
+Asked by MojoSOGO 2026-10-10 (§7.10).
+
+```sql
+-- §7.10 — an event's things to bring (optional). Additive only.
+ALTER TABLE events ADD COLUMN bring TEXT;  -- NULL = none; else a JSON list of 1–EVENT_BRING_MAX lines
+```
+
+**Migration check (EB-M):** events written under 0001–0034 survive 0035 unchanged with `bring` NULL.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1581,7 +1592,7 @@ For one alert of one fire:
 - `push` in channels → one `deliveries` row **per recipient**, `member_id` set.
 - `house` in channels → **one** row, `member_id` NULL.
 - **Message text:**
-  - reminder: `"Reminder: {title}"`
+  - reminder: `"Reminder: {title}"`, plus `" — bring: {list}"` when the event has things to bring (§7.10)
   - timer: `"Timer: {title}"`
   - chore: `"Chore for {name}: {title}"`, plus `" — {step title}"` when the chore has
     more than one step. `{name}` is the step person's display name; with nobody,
@@ -2286,6 +2297,38 @@ reading)` (pure, `event-reading.ts`) ⚑ Q196:
 | EA6 | read-text with only a link, a fake page and a fake Claude (look-up, then fill) | 200 with the cleaned reading; the page fetched once; the fill request carries the page and the notes; one `photo_reads` row |
 | EA7 | read-text with a link that Claude refuses / that fails | 422 `link_refused` / 502 `link_reading_failed` |
 | EA-M | migration 0034 over events written before it | rows unchanged, `address` NULL |
+
+### 7.10 Things to bring — asked by MojoSOGO 2026-10-10
+
+"In calendar add checklist of things to bring and include in reminder." An event has an optional list of
+**things to bring**: short lines ("Shin guards", "Water bottle", "Snack for the team").
+
+- **Stored** in `events.bring` (migration 0035, §4.2zh) as a JSON list; none → null. At most `EVENT_BRING_MAX` =
+  20 lines of at most `EVENT_BRING_ITEM_MAX` = 80 characters (`alert-limits.ts`). `cleanBring` (pure) trims each
+  line, drops empty ones and repeats (ignoring case), keeps the order; an empty list → null. Events,
+  `GET /events/{id}`, POST and PATCH carry `bring` (a list, `[]` for none; null or absent on POST = none); anything
+  else, more than 20 lines or a longer line → 400 `invalid_input` "Things to bring must be a list of up to 20
+  lines, each up to 80 characters.". Alarms and sun-timed events never have one.
+- **In the form** (§8.4): **Things to bring** under the Address — each line with a ✕ to remove it, then an
+  **Add something to bring** box (at most 80 characters; Enter or **＋ Add** adds the line through the same
+  `cleanBring`, so a repeat is never added, and clears the box). Lines are kept in the order added. At 20 lines the
+  box is hidden and "That's the most a list holds (20)." shows instead. `/calendar` occurrences don't carry it. It is a list to remember, not a tick-off list: nothing is ticked or saved per day ⚑ Q198.
+- **In the reminder** (§5.7): an event's reminder appends `" — bring: {list}"` to its message, the lines joined by
+  `", "` with `" and "` before the last ("bring: shin guards, water bottle and snacks"); the lines keep their own
+  wording, first letter lowered unless the line starts with two capitals (an acronym) ⚑ Q199. It sits before
+  `" (alert {n})"`, so every repeat says it too, on the phone and on the speakers. `bringText(lines)` (pure) builds
+  the words; a sun-timed reminder has none.
+
+**Acceptance (each row a test):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| EB1 | POST an event with `bring: ["  Water ", "", "Snacks", "water"]`; GET; PATCH `{ title }`; PATCH `bring: []` | `["Water", "Snacks"]` stored and returned; kept by the title-only PATCH; cleared to `[]` |
+| EB2 | POST with 21 lines; with an 81-character line; with `"water"` (not a list); with `[3]` | 400 `invalid_input` each |
+| EB3 | `bringText` of `["Water"]`, `["Shin guards", "Water"]`, `["Shin guards", "Water", "GPS watch", "Snacks"]` | "bring: water"; "bring: shin guards and water"; "bring: shin guards, water, GPS watch and snacks" |
+| EB4 | `alertMessage` for a reminder with bring lines, first and second alert | "Reminder: Soccer — bring: shin guards and water"; the same with " (alert 2)" |
+| EB5 | tick an event reminder with bring lines, phone and house | the push and the house delivery both carry "Reminder: Soccer — bring: shin guards and water" |
+| EB-M | migration 0035 over events written before it | rows unchanged, `bring` NULL |
 
 ## 7A. Lists
 
@@ -3694,6 +3737,7 @@ Fields:
 - Start / end time (hidden when all-day)
 - End date (all-day only)
 - **Address** (optional, §7.9) with **Open in Maps**
+- **Things to bring** (optional, §7.10): one line each, ✕ to remove, an add box with **＋ Add**
 - Repeat: Never / Daily / Weekly (day checkboxes) / Every 2 weeks / Monthly on day N /
   Monthly on the nth weekday (e.g. "Monthly on the 3rd Friday", derived from the date) /
   **Monthly on certain weeks** — the date's weekday, with week chips **1st 2nd 3rd 4th
@@ -5486,11 +5530,13 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q195 | What 📋 Paste fills (§7.9) | ⚑ The whole form, like a screenshot (v1.37.0 filled only the Address; changed when MojoSOGO asked for existing events to take later info) |
 | Q196 | Later info on an existing event (§7.9a) | ⚑ What the paste names wins over what's saved, except the title (kept) and the notes (added under, never replaced); a date alone keeps the times; nothing saved until Save |
 | Q197 | Pasting a link into an event (§7.9) | ⚑ Only a paste that is just one link reads the page (fetched, then looked up with web search, like a thing's link); a link inside other text is read as text |
+| Q198 | Things to bring (§7.10) | ⚑ A list to remember, shown in the event form and said in the reminder; no ticking things off as they're packed |
+| Q199 | How the reminder says the list (§7.10) | ⚑ "Reminder: Soccer — bring: shin guards, water bottle and snacks", on every alert of the reminder |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
 
-## 14. Prototype status (2026-10-09)
+## 14. Prototype status (2026-10-10)
 
 Built: M0–M4 and M4a fully (alarms, with their API tests), plus the later §7 work:
 household days off (§7.3), grouped multi-day bars (§7.1), monthly-by-weekday repeat
@@ -5694,6 +5740,9 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Things to bring** (v1.40.0, §7.10; asked by MojoSOGO 2026-10-10; EB1–EB5, EB-M): an event has an optional list
+of things to bring, edited under the Address, and its reminder says "— bring: a, b and c" on the phone and the
+speakers. Migration 0035. Q198–Q199 are ⚑ defaults. **Still owed:** hearing a real reminder with a list.
 **Paste a link into an event** (v1.39.0, §7.9; asked by MojoSOGO 2026-10-09; EA6–EA7): Paste now finds a copied
 link on the iPhone (`text/uri-list`), and a paste that is one link reads the page (fetch, look-up, fill) on the same
 budget. No migration. Q197 is a ⚑ default. **Still owed:** pasting the incognitosd.com event link on the iPhone.

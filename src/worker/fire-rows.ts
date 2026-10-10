@@ -16,6 +16,8 @@ interface SourceRow {
   active_from?: string | null; active_to?: string | null; tz?: string;
   /** Reminders only (§7.7): a sun event, and the household place. */
   start_sun?: SunEvent | null; lat?: number | null; lon?: number | null;
+  /** Reminders only (§7.10): the event's things to bring, as JSON. */
+  bring?: string | null;
 }
 
 export function insertFire(db: D1Database, f: NewFire, ignoreConflict = false): D1PreparedStatement {
@@ -76,6 +78,8 @@ interface Source {
   sunsetAt?: string | null;
   /** §7D.3: spoken on every speaker HA lists, whatever anyone ticked. */
   allSpeakers?: boolean;
+  /** §7.10: an event reminder's things to bring. */
+  bring?: string[];
 }
 
 /** Loads the alert config + title for a fire from its event, timer, chore run, thing or machine (as of `now`). */
@@ -124,7 +128,7 @@ export async function sourceOf(
   }
   const row = fire.kind === 'reminder'
     ? await first<SourceRow>(db, `SELECT title, assigned_to, remind_channels AS channels, renotify_min, max_alerts, NULL AS interval_min, optional,
-        start_sun, timezone AS tz, latitude AS lat, longitude AS lon FROM events JOIN settings ON settings.id = 1 WHERE events.id = ?`, fire.event_id)
+        start_sun, bring, timezone AS tz, latitude AS lat, longitude AS lon FROM events JOIN settings ON settings.id = 1 WHERE events.id = ?`, fire.event_id)
     : await first<SourceRow>(db, `SELECT title, assigned_to, channels, renotify_min, max_alerts, interval_min, 0 AS optional,
         active_from, active_to, (SELECT timezone FROM settings WHERE id = 1) AS tz FROM timers WHERE id = ?`, fire.timer_id);
   if (!row) return null;
@@ -142,6 +146,7 @@ export async function sourceOf(
       ...(window ? { window } : {}),
     },
     ...(row.optional === 1 ? { optional: true, onIds: await onMemberIds(db, fire.event_id) } : {}),
+    ...(row.bring ? { bring: parseJson<string[]>(row.bring, []) } : {}),
     ...(row.start_sun ? { sunsetAt: sunset && row.tz ? utcToLocal(sunset, row.tz).time : null } : {}),
   };
 }
