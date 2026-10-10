@@ -126,6 +126,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/state.tsx` | App-wide state context + freshness polling (§10) — the home for cross-cutting client state |
 | `frontend/src/theme.css` | Theme tokens (§8.7) and global base styles |
 | `frontend/src/css-modules.d.ts` | Type shim for `*.module.css` imports |
+| `frontend/src/build-stamp.d.ts` | Ambient type for `__ENSO_BUILD__`, the §8.10 build stamp Vite `define` injects from vite.config.ts buildStamp() |
 | `frontend/src/components/Calendar.tsx` | Continuous calendar view (§7.1–7.2) |
 | `frontend/src/components/DaySheet.tsx` | Day sheet modal (§8.3) |
 | `frontend/src/components/EventForm.tsx` | Event form modal (§8.4); hosts EventFillBar (new and existing events, when the person can edit), AddressField and BringField |

@@ -1,5 +1,6 @@
 .app {
-  height: 100%;
+  /* §8.1: fixed to the whole screen; height: 100% left a gap under the bar on an installed iPhone. */
+  position: fixed; inset: 0;
   display: flex;
   flex-direction: column;
   padding-top: env(safe-area-inset-top);
@@ -25,7 +26,14 @@
   display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
   border-top: 1px solid var(--border);
   background: var(--surface);
-  padding-bottom: env(safe-area-inset-bottom);
+  /* §8.1, ⚑ Q208: at least 14 px so the build stamp shows where there is no bottom inset. */
+  padding-bottom: max(env(safe-area-inset-bottom), 14px);
+  position: relative;
+}
+/* The build stamp, in the bottom strip under the tabs; out of the grid so it is not a seventh column. */
+.build {
+  position: absolute; left: 8px; bottom: 1px; pointer-events: none;
+  font-size: .6rem; line-height: 12px; color: var(--text-dim); opacity: .7; font-variant-numeric: tabular-nums;
 }
 .tabs button {
   border: 0; border-radius: 0; background: none;
