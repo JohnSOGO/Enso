@@ -3102,7 +3102,8 @@ fold & out**. The weekly Laundry chore (§7B) is separate and unchanged. The **D
 | **Clear** | running or done | free; its open fire closes `removed`; nothing rings |
 | **Remind** — *Still loaded* ⚑ Q159 | done | the load stays; its open fire closes `superseded` (`closed_by` = me) and a new `machine` fire is due **now**, so the reminders run again from alert 1 (§7D.3) |
 
-- **Minutes** are chips: `MACHINE_MINUTES` = **30 / 45 / 60 / 90**. **Whose load** is one active
+- **Minutes** are chips, per machine (`machineMinutes`): the clothes washer **30 / 45 / 60 / 90 / 120**
+  (2 hours added by MojoSOGO 2026-10-10), the clothes dryer **30 / 45 / 60 / 90**, the dish washer §7D.6. **Whose load** is one active
   member (the chooser defaults to me).
 - Refusals are **409** with a message, shown in place:
   - start on a machine that isn't free, or move while the dryer is full → `busy`,
@@ -3186,7 +3187,7 @@ can edit them.
 | L20 | `stepFire` with `quietUntil`: a due scheduled fire; a ringing fire due its renotify; not yet due; silent past max | scheduled at quietUntil, count 0, no alert (twice); unchanged; unchanged |
 | L21 | `GET /machines/hours` after 0028; an admin PATCHes; a member PATCHes; from ≥ to | the defaults; saved and read back; 403; 400 with a message |
 | L13 | migration check (§4.2m) | fires and deliveries intact after 0014; machines seeded; CHECK refuses a machine fire without `machine_id` |
-| DW1 | `MACHINE_LABEL`; `nextMachine`/`previousMachine` of the dish washer; `machineMinutes` | Clothes washer, Clothes dryer, Dish washer; null / null; laundry 30–90, dish washer 60–150 |
+| DW1 | `MACHINE_LABEL`; `nextMachine`/`previousMachine` of the dish washer; `machineMinutes` | Clothes washer, Clothes dryer, Dish washer; null / null; washer 30–120, dryer 30–90, dish washer 60–150 |
 | DW2 | `doneMessage('dishwasher', …)` with a starter, none, still; a done load in the dryer | the four §7D.6 texts; never a waiting suffix |
 | DW3 | start the dish washer for A, 120 min; then 45 min; tick at done-at | 200, running, `done_at = now + 120 min`; 400 with the dish-washer chips; alert 1 to every phone + house, `The dish washer A started is done` |
 | DW4 | Emptied (finish) on the done dish washer; move on it | free, its fire closed `done`; 409 `invalid_state` "Dish washer loads don't move on — use Emptied." |
@@ -3204,7 +3205,7 @@ remember who started the dish washer".
   Done now ask *Who started it?* (me preselected) instead of *Whose load?*; the card reads
   **started by Sam · done ~14:05**, and the Ringing bar names them as for laundry.
 - **Minutes** (`machineMinutes(id)`): the dish washer's chips are **60 / 90 / 120 / 150** ⚑ Q207;
-  the laundry keeps 30 / 45 / 60 / 90. Any other value → 400 naming the machine's chips.
+  the laundry's are in §7D.2. Any other value → 400 naming the machine's chips.
 - Message: `"The dish washer Sam started is done"`; Still loaded `"The dish washer Sam started
   is still full — empty it"`; with no active starter `"The dish washer is done"` / `"… is still
   full — empty it"`. No waiting suffix (no machine before it); `" (alert n)"` follows as usual.
@@ -3970,7 +3971,7 @@ Wash, move to the dryer, fold. Run the dishes, then empty them. Everyone hears w
 
 - **The chooser** (a modal, exported from `Machines.tsx` and reused by the Ringing bar): for
   **Start**, titled "Start the washer" — *Whose load?* one member chip per active member, **me**
-  preselected; *How long?* the minute chips **30 · 45 · 60 · 90 min**. Tapping a minute chip
+  preselected; *How long?* the machine's minute chips (§7D.2), e.g. **30 · 45 · 60 · 90 · 120 min** for the clothes washer. Tapping a minute chip
   starts the machine at once and closes the box: **two taps** from the card (Start → 60). For
   **Move to dryer**, titled "Move Sam's load to the dryer" — only the minute chips.
 - Chips are at least 44 px tall; text is 16 px; nothing scrolls sideways at 320 px.
@@ -5657,7 +5658,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q204 | The dish washer's name and icon (§7D.6) | ⚑ "Dish washer" 🍽️, after the clothes dryer on the Machines section |
 | Q205 | Ending a dish washer load (§7D.6) | ⚑ **Emptied** (the dryer's Fold & out, renamed for dishes); Still loaded restarts its reminders like the laundry |
 | Q206 | When the dish washer's alerts sound (§7D.6) | ⚑ Like the laundry's: every phone and speaker, only in the machine alert hours (they wait outside them) |
-| Q207 | The dish washer's minutes (§7D.6) | ⚑ 60 / 90 / 120 / 150 min chips (dish cycles run longer than the laundry's 30–90) |
+| Q207 | The dish washer's minutes (§7D.6) | ⚑ 60 / 90 / 120 / 150 min chips (dish cycles run longer than the laundry's) |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5869,7 +5870,7 @@ captions (5 ingredients, 6 steps — it had been "watch it").
 **Clothes washer, clothes dryer and dish washer** (v1.42.0, §7D.6, §4.2zj; asked by MojoSOGO 2026-10-10; DW1–DW4,
 DW-M): Washer and Dryer are now labelled Clothes washer and Clothes dryer (ids and data unchanged), and a third card,
 🍽️ Dish washer, starts, rings when done, Done now / Still loaded / Clear like the laundry, and ends with Emptied. The
-card shows who started it ("started by Sam"). Migration 0037. Q204–Q207 are ⚑ defaults. **Still owed:** a real
+card shows who started it ("started by Sam"). The clothes washer gains a 2-hour (120 min) chip. Migration 0037. Q204–Q207 are ⚑ defaults. **Still owed:** a real
 dish washer load started and emptied on the iPhone.
 **Weather on the calendar** (v1.41.0, §7.11, §4.2zi; asked by MojoSOGO 2026-10-10; WX1–WX6, WX-M): the next 7 days
 each show the forecast emoji in the cell's corner, and the day sheet says the words, high and low. Open-Meteo, once a

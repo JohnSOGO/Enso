@@ -159,7 +159,9 @@ describe('L1–L2 the pure rules (machines.ts)', () => {
     expect(refusalText({ error: 'already_free', machine: row('washer') }, names)).toBe('The clothes washer is already free.');
     expect(parseStart({ ownerId: 'S', minutes: 45 }, 'washer', ['S'])).toEqual({ ownerId: 'S', minutes: 45 });
     expect(parseStart({ ownerId: 'X', minutes: 45 }, 'washer', ['S'])).toMatch(/active member/);
-    expect(parseStart({ ownerId: 'S', minutes: 20 }, 'washer', ['S'])).toMatch(/30, 45, 60, 90/);
+    expect(parseStart({ ownerId: 'S', minutes: 20 }, 'washer', ['S'])).toMatch(/30, 45, 60, 90, 120/);
+    expect(parseStart({ ownerId: 'S', minutes: 120 }, 'washer', ['S'])).toEqual({ ownerId: 'S', minutes: 120 });
+    expect(parseMove({ minutes: 120 }, 'dryer')).toMatch(/30, 45, 60, 90\./);
     expect(parseMove({ minutes: '60' }, 'dryer')).toMatch(/Minutes/);
     expect(parseStart({ ownerId: 'S', minutes: 120 }, 'dishwasher', ['S'])).toEqual({ ownerId: 'S', minutes: 120 });
     expect(parseStart({ ownerId: 'S', minutes: 45 }, 'dishwasher', ['S'])).toMatch(/60, 90, 120, 150/);
@@ -169,7 +171,8 @@ describe('L1–L2 the pure rules (machines.ts)', () => {
     expect(MACHINE_LABEL).toEqual({ washer: 'Clothes washer', dryer: 'Clothes dryer', dishwasher: 'Dish washer' });
     expect([nextMachine('washer'), nextMachine('dryer'), nextMachine('dishwasher')]).toEqual(['dryer', null, null]);
     expect([previousMachine('washer'), previousMachine('dryer'), previousMachine('dishwasher')]).toEqual([null, 'washer', null]);
-    expect(machineMinutes('washer')).toEqual([30, 45, 60, 90]);
+    expect(machineMinutes('washer')).toEqual([30, 45, 60, 90, 120]);
+    expect(machineMinutes('dryer')).toEqual([30, 45, 60, 90]);
     expect(machineMinutes('dishwasher')).toEqual([60, 90, 120, 150]);
     expect([finishLabel('dryer'), finishLabel('dishwasher')]).toEqual(['Fold & out', 'Emptied']);
     expect(refusalText({ error: 'invalid_state', machine: running('dishwasher', 'S', T), why: 'no_next' }, new Map()))

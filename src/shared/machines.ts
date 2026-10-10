@@ -23,8 +23,9 @@ const lower = (id: MachineId) => MACHINE_LABEL[id].toLowerCase();
 const LAUNDRY: readonly MachineId[] = ['washer', 'dryer'];
 export const isLaundry = (id: MachineId): boolean => LAUNDRY.includes(id);
 
-/** §7D.2, §7D.6 — the minute chips: dish cycles run longer. */
-export const machineMinutes = (id: MachineId): readonly number[] => (isLaundry(id) ? [30, 45, 60, 90] : [60, 90, 120, 150]);
+/** §7D.2, §7D.6 — each machine's minute chips: the washer has a 2-hour cycle, dish cycles run longer. */
+const MINUTES: Record<MachineId, readonly number[]> = { washer: [30, 45, 60, 90, 120], dryer: [30, 45, 60, 90], dishwasher: [60, 90, 120, 150] };
+export const machineMinutes = (id: MachineId): readonly number[] => MINUTES[id];
 /** §8.5 — the button that ends a load in the last machine. */
 export const finishLabel = (id: MachineId): string => (isLaundry(id) ? 'Fold & out' : 'Emptied');
 
