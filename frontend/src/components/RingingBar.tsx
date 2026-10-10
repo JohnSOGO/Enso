@@ -42,6 +42,7 @@ export function RingingBar() {
   const person = (id: string | null | undefined) => (id ? memberById(id)?.displayName ?? 'unknown member' : 'anyone');
   const sub = (f: Fire) => {
     if (f.kind === 'reminder') return f.startSun ? ' · sunset' : f.startTime ? ` · ${f.startTime}` : ' · all day'; // §7.7
+    if (f.kind === 'machine' && !f.personId) return ' · owner unknown'; // §7D.2 Done now with nobody named
     if (f.kind === 'chore' || f.kind === 'machine') return ` · ${person(f.personId)}`;
     if (f.kind === 'thing') return ' · to do'; // ⚑ (§8.2)
     return ` · ringing ${minsAgo(f.dueAt)} min`;

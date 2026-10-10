@@ -111,7 +111,9 @@ describe('L1–L2 the pure rules (machines.ts)', () => {
     expect(r.closeFire).toMatchObject({ close_reason: 'superseded', closed_by: 'B' });
     expect(r.newFire).toMatchObject({ machine_id: 'dryer', due_at: now });
     expect(doneNowMachine(running('dryer', 'K', T), null, null, 'B', T)).toMatchObject({ error: 'busy' });
-    expect(parseDoneNow({}, ['A'], true)).toBe('Whose load must be an active member.');
+    expect(parseDoneNow({}, ['A'], true)).toEqual({ ownerId: null }); // never assumed: owner unknown
+    expect(parseDoneNow({ ownerId: null }, ['A'], true)).toEqual({ ownerId: null });
+    expect(parseDoneNow({ ownerId: 'X' }, ['A'], true)).toBe('Whose load must be an active member.');
     expect(parseDoneNow({ ownerId: 'A' }, ['A'], true)).toEqual({ ownerId: 'A' });
     expect(parseDoneNow({}, ['A'], false)).toEqual({ ownerId: null });
   });
@@ -157,9 +159,9 @@ describe('L1–L2 the pure rules (machines.ts)', () => {
     expect(refusalText({ error: 'busy', machine: running('dryer', 'gone', T) }, names)).toBe('The clothes dryer still has a load.');
     expect(refusalText({ error: 'not_done', machine: running('washer', 'S', T) }, names)).toBe("The clothes washer isn't done yet.");
     expect(refusalText({ error: 'already_free', machine: row('washer') }, names)).toBe('The clothes washer is already free.');
-    expect(parseStart({ ownerId: 'S', minutes: 45 }, 'washer', ['S'])).toEqual({ ownerId: 'S', minutes: 45 });
-    expect(parseStart({ ownerId: 'X', minutes: 45 }, 'washer', ['S'])).toMatch(/active member/);
-    expect(parseStart({ ownerId: 'S', minutes: 20 }, 'washer', ['S'])).toMatch(/30, 45, 60, 90, 120/);
+    expect(parseStart({ ownerId: 'S', minutes: 60 }, 'washer', ['S'])).toEqual({ ownerId: 'S', minutes: 60 });
+    expect(parseStart({ ownerId: 'X', minutes: 60 }, 'washer', ['S'])).toMatch(/active member/);
+    expect(parseStart({ ownerId: 'S', minutes: 20 }, 'washer', ['S'])).toMatch(/30, 60, 90, 120/);
     expect(parseStart({ ownerId: 'S', minutes: 120 }, 'washer', ['S'])).toEqual({ ownerId: 'S', minutes: 120 });
     expect(parseMove({ minutes: 120 }, 'dryer')).toMatch(/30, 45, 60, 90\./);
     expect(parseMove({ minutes: '60' }, 'dryer')).toMatch(/Minutes/);
@@ -171,12 +173,25 @@ describe('L1–L2 the pure rules (machines.ts)', () => {
     expect(MACHINE_LABEL).toEqual({ washer: 'Clothes washer', dryer: 'Clothes dryer', dishwasher: 'Dish washer' });
     expect([nextMachine('washer'), nextMachine('dryer'), nextMachine('dishwasher')]).toEqual(['dryer', null, null]);
     expect([previousMachine('washer'), previousMachine('dryer'), previousMachine('dishwasher')]).toEqual([null, 'washer', null]);
-    expect(machineMinutes('washer')).toEqual([30, 45, 60, 90, 120]);
+    expect(machineMinutes('washer')).toEqual([30, 60, 90, 120]);
     expect(machineMinutes('dryer')).toEqual([30, 45, 60, 90]);
     expect(machineMinutes('dishwasher')).toEqual([60, 90, 120, 150]);
     expect([finishLabel('dryer'), finishLabel('dishwasher')]).toEqual(['Fold & out', 'Emptied']);
     expect(refusalText({ error: 'invalid_state', machine: running('dishwasher', 'S', T), why: 'no_next' }, new Map()))
       .toBe("Dish washer loads don't move on — use Emptied.");
+  });
+
+  it('UK1 doneMessage with the owner unknown (undefined) says so and what the load needs next; inactive (null) keeps its wording', () => {
+    expect(doneMessage('washer', undefined)).toBe('Clothes washer finished; Owner unknown; Please cycle to dryer');
+    expect(doneMessage('dryer', undefined)).toBe('Clothes dryer finished: Owner unknown: Please unload');
+    expect(doneMessage('washer', undefined, undefined, true)).toBe('Clothes washer finished; Owner unknown; Please cycle to dryer');
+    expect(doneMessage('dryer', undefined, 'Kai')).toBe("Clothes dryer finished: Owner unknown: Please unload — Kai's load is waiting");
+    expect(doneMessage('washer', null)).toBe('The laundry in the clothes washer is done');
+    expect(doneMessage('dishwasher', undefined)).toBe('The dish washer is done');
+    const f = doneNowMachine(row('washer'), null, null, 'B', T);
+    if ('error' in f) throw new Error(f.error);
+    expect(f.rows[0]).toMatchObject({ owner_id: null, done_at: T, started_by: 'B' });
+    expect(machineState(f.rows[0], T)).toBe('done');
   });
 
   it('DW2 doneMessage for the dish washer names who started it; nothing ever waits before it', () => {
@@ -252,11 +267,11 @@ describe('M4l /machines (L3–L12)', () => {
   });
 
   it('L3–L5 start the washer → a fire due at done-at; it rings for A by Phone + House, every 15 min, 4 times; then DONE — waiting', async () => {
-    const r = await o.post('/machines/washer/start', { ownerId: A, minutes: 45 });
+    const r = await o.post('/machines/washer/start', { ownerId: A, minutes: 60 });
     expect(r.status, JSON.stringify(r.json)).toBe(200);
     const w = r.json.find((m: any) => m.id === 'washer');
-    expect(w).toMatchObject({ state: 'running', ownerId: A, minutes: 45, startedBy: A });
-    expect(Date.parse(w.doneAt) - Date.parse(w.startedAt)).toBe(45 * 60_000);
+    expect(w).toMatchObject({ state: 'running', ownerId: A, minutes: 60, startedBy: A });
+    expect(Date.parse(w.doneAt) - Date.parse(w.startedAt)).toBe(60 * 60_000);
     const fire = await openFire('washer');
     expect(fire).toMatchObject({ kind: 'machine', state: 'scheduled', due_at: w.doneAt });
 
@@ -366,7 +381,7 @@ describe('M4l /machines (L3–L12)', () => {
   });
 
   it('L17 Done now on a washer the app thought was free: done now for A, its alert rings at once', async () => {
-    expect((await o.post('/machines/washer/done', {})).status).toBe(400);
+    expect((await o.post('/machines/washer/done', { ownerId: 'mem_nobody' })).status).toBe(400);
     const r = await bClient.post('/machines/washer/done', { ownerId: A });
     expect(r.status, JSON.stringify(r.json)).toBe(200);
     expect(r.json.find((m: any) => m.id === 'washer')).toMatchObject({ state: 'done', ownerId: A, minutes: null, startedBy: B });
@@ -443,6 +458,26 @@ describe('M4l /machines (L3–L12)', () => {
       expect(r.json.message).toBeTruthy();
     }
     expect((await new Client().get('/machines')).status).toBe(401);
+  });
+
+  it('UK2 Done now with nobody named: the washer rings "Owner unknown", moves on unowned, and the dryer says so too', async () => {
+    const r = await bClient.post('/machines/washer/done', {});
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    expect(r.json.find((m: any) => m.id === 'washer')).toMatchObject({ state: 'done', ownerId: null, startedBy: B });
+    const fire = await openFire('washer');
+    await tickAt(o, new Date().toISOString());
+    const sent = await deliveriesOf(fire.id);
+    expect(sent.filter((x) => x.channel === 'push').map((x) => x.member_id).sort()).toEqual([A, B].sort());
+    expect(sent.find((x) => x.channel === 'house').message).toBe('Clothes washer finished; Owner unknown; Please cycle to dryer');
+    const ringing = (await o.get('/fires?state=ringing')).json.find((f: any) => f.id === fire.id);
+    expect(ringing).toMatchObject({ machineId: 'washer', personId: null });
+
+    const mv = await o.post('/machines/washer/move', { minutes: 60 });
+    expect(mv.status, JSON.stringify(mv.json)).toBe(200);
+    expect(mv.json.find((m: any) => m.id === 'dryer')).toMatchObject({ state: 'running', ownerId: null });
+    const dryerFire = await openFire('dryer');
+    await tickAt(o, await finishedAgo('dryer', 0));
+    expect((await deliveriesOf(dryerFire.id)).find((x) => x.channel === 'house').message).toBe('Clothes dryer finished: Owner unknown: Please unload');
   });
 
   it('DW3–DW4 start the dish washer for A: it rings naming who started it; Emptied ends it; it never moves', async () => {

@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-10 — Owner-unknown laundry loads on Done now (placement-advisor)
+
+- **Ask:** SPEC 2.72 §7D.2–7D.3 (v1.43.0, no migration; UK1–UK2). Done now on a free machine no longer assumes an owner: the load runs with owner_id NULL (free is derived from done_at), alerts say "Clothes washer finished; Owner unknown; Please cycle to dryer" / "Clothes dryer finished: Owner unknown: Please unload"; the chooser preselects Owner unknown; card and Ringing bar say "owner unknown". Also the washer's 45 min chip is dropped.
+- **Verdict:** [EXISTING] src/shared/machines.ts (machineState, loaded/doneNowMachine/moveMachine with a null owner, parseDoneNow, doneMessage undefined = unknown, washer minutes); src/worker/fire-rows.ts (sourceOf passes undefined for a null owner_id); Machines.tsx (chooser default, card text); RingingBar.tsx (machine person label).
+- **Flow stage:** rules (machines.ts); source (fire-rows.ts sourceOf); render (Machines.tsx, RingingBar.tsx).
+- **Why:** what counts as free and what the done message says are machines.ts rules already; an unowned load reuses the machines row, so no new shape or migration. undefined (unknown) stays distinct from null (inactive owner), so the existing wording survives. Rejected: wording in fire-rows or the PWA; vocab.ts.
+- **Caps:** machines.ts ~250/300, fire-rows.ts ~152/300; nothing newly in the band; no reorganizer.
+
 ## 2026-10-10 — Dish washer joins the machines; laundry labels renamed (placement-advisor)
 
 - **Ask:** SPEC 2.71 §7D.6 (v1.42.0, migration 0037, §4.2zj; §8.5, §8.2; DW1–DW4, DW-M; ⚑ Q204–Q207). Washer/Dryer are labelled Clothes washer/Clothes dryer (ids unchanged); the washer gains a 120-min chip. A third machine `dishwasher` ("Dish washer") with Start / Done now / Still loaded / Clear, no Move, Emptied as its finish; chips 60/90/120/150; owner_id = who started it ("started by Sam"); done message "The dish washer Sam started is done".
