@@ -7,6 +7,16 @@ carry its result.
 
 ---
 
+## 2026-10-10 — Tab bar flush on iPhone; build stamp under the tabs (placement-advisor)
+
+- **Ask:** SPEC 2.73 §8.1 (v1.44.0). The app shell fills the screen (`.app` position: fixed; inset: 0 instead of height: 100%, which left a gap in iOS standalone with black-translucent), and the build stamp `v{version} · {commit}` shows all the time as tiny dim text in the tab bar's bottom safe-area strip (left, under the tabs, never overlapping), exposed through Vite `define` as `__ENSO_BUILD__`.
+- **Verdict:** [EXISTING] frontend/src/App.module.css (`.app`, `.tabs` position: relative, `.build`); frontend/src/App.tsx (one stamp element in the Shell's `<nav>`); frontend/vite.config.ts (buildStamp() called once into a const that feeds both transformIndexHtml and `define`). [NEW row] frontend/src/build-stamp.d.ts (`declare const __ENSO_BUILD__: string`).
+- **Flow stage:** render (plus build tooling, which is not scanned).
+- **Why:** the frame belongs to App.tsx and App.module.css. buildStamp() stays the one maker of the stamp, so the splash and the tab bar cannot disagree. The value is a build constant, so it does not go in state.tsx. Rejected: adding the declaration to css-modules.d.ts (a second concern for its row); fetching the version from the Worker (a second source for the same value); a plain grid child in `.tabs` (it would become a 7th column). Zero-inset screens: the strip is at least 14 px (⚑ Q208).
+- **Caps:** App.tsx 162 → 163/300; App.module.css 38 → 46/300; build-stamp.d.ts 2/300 (new); vite.config.ts outside the scanned roots. No ceiling moved, nothing newly in the band, no reorganizer.
+
+---
+
 ## 2026-10-10 — Steward pass, whole tree (code-steward)
 
 - **Run:** after the v1.42.0 (SPEC 2.71 §7D.6, dish washer and Clothes washer/dryer rename, migration 0037, PR #34) and v1.43.0 (SPEC 2.72 §7D.2–7D.3, Owner unknown on Done now, PR #35) releases; audited 55613b9 (= 00598da's code) against 494afb2.

@@ -18,12 +18,16 @@ function buildStamp(): string {
   }
 }
 
+/** Made once, so the opening screen and the tab bar (§8.1) can never show different stamps. */
+const stamp = buildStamp();
+
 export default defineConfig({
   root: 'frontend',
   plugins: [
     react(),
-    { name: 'enso-build-stamp', transformIndexHtml: (html) => html.replace('%ENSO_BUILD%', buildStamp()) },
+    { name: 'enso-build-stamp', transformIndexHtml: (html) => html.replace('%ENSO_BUILD%', stamp) },
   ],
+  define: { __ENSO_BUILD__: JSON.stringify(stamp) },
   build: { outDir: 'dist', emptyOutDir: true },
   server: {
     port: 5173,

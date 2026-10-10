@@ -94,6 +94,7 @@ function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boo
             <span aria-hidden className={s.icon}>{icon}</span>{label}
           </button>
         ))}
+        <span className={s.build} aria-hidden>{__ENSO_BUILD__}</span>
       </nav>
 
       {overlay?.kind === 'day' && (

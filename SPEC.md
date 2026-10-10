@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.72 · **Date:** 2026-10-10 · **Owner:** MojoSOGO
+**Version:** 2.73 · **Date:** 2026-10-10 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3795,6 +3795,17 @@ only the grey backdrop):
   between Lists and Settings (v1.11.0, ⚑ Q60). The bar is a grid with one equal column per tab
   (`grid-auto-flow: column`), icon above label, so all six fit one line at 320 px without wrapping or
   truncating (labels .7rem).
+- **Flush at the bottom** (asked by MojoSOGO 2026-10-10): the app frame is fixed to the whole screen
+  (`position: fixed; inset: 0`), never `height: 100%`, which on an installed iPhone left a strip of
+  page below the bar. The bar's own colour runs down through the home-indicator area.
+- **Build stamp under the tabs** (asked by MojoSOGO 2026-10-10, v1.44.0): the same `v{version} ·
+  {commit}` as the opening screen (§8.10) shows all the time as tiny dim text at the left of the
+  bar's bottom strip (the home-indicator area), below the tab buttons and never over them; it is
+  not tappable. Where the screen has no bottom inset (desktop, Android, older iPhones) the strip is
+  at least 14 px tall so the stamp still shows ⚑ Q208. It is the same build-time value as the
+  opening screen's (one `buildStamp()` feeds both), so it always names the build that is running.
+  **Check:** on the installed iPhone app, the bar touches the bottom edge with no page showing under
+  it, and the stamp under the tabs matches the opening screen's.
 - The **＋** floating button appears on Calendar only and creates an event. The
   Alarms tab has its own **＋ Add** button in each section header.
 - **Status badges:**
@@ -5666,6 +5677,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q205 | Ending a dish washer load (§7D.6) | ⚑ **Emptied** (the dryer's Fold & out, renamed for dishes); Still loaded restarts its reminders like the laundry |
 | Q206 | When the dish washer's alerts sound (§7D.6) | ⚑ Like the laundry's: every phone and speaker, only in the machine alert hours (they wait outside them) |
 | Q207 | The dish washer's minutes (§7D.6) | ⚑ 60 / 90 / 120 / 150 min chips (dish cycles run longer than the laundry's) |
+| Q208 | The build stamp where a screen has no bottom inset (§8.1) | ⚑ The bar's bottom strip is at least 14 px tall so the stamp always shows |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5874,6 +5886,9 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Tab bar flush + build stamp** (v1.44.0, §8.1; asked by MojoSOGO 2026-10-10): the app frame is fixed to the
+whole screen so the tab bar sits on the bottom edge of the installed iPhone app, and the opening screen's build
+stamp shows all the time under the tabs (Q208 ⚑). No migration. **Still owed:** see it on the iPhone.
 **Owner unknown on Done now** (v1.43.0, §7D.2–7D.3; asked by MojoSOGO 2026-10-10; UK1–UK2): Done now on a free
 machine no longer assumes an owner (Owner unknown is preselected). A load with no owner alerts "Clothes washer
 finished; Owner unknown; Please cycle to dryer" / "Clothes dryer finished: Owner unknown: Please unload", moves on
