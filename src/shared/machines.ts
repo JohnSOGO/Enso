@@ -23,8 +23,8 @@ const lower = (id: MachineId) => MACHINE_LABEL[id].toLowerCase();
 const LAUNDRY: readonly MachineId[] = ['washer', 'dryer'];
 export const isLaundry = (id: MachineId): boolean => LAUNDRY.includes(id);
 
-/** §7D.2, §7D.6 — each machine's minute chips: the washer has a 2-hour cycle, dish cycles run longer. */
-const MINUTES: Record<MachineId, readonly number[]> = { washer: [30, 45, 60, 90, 120], dryer: [30, 45, 60, 90], dishwasher: [60, 90, 120, 150] };
+/** §7D.2, §7D.6 — each machine's minute chips: the washer has a 2-hour cycle and no 45, dish cycles run longer. */
+const MINUTES: Record<MachineId, readonly number[]> = { washer: [30, 60, 90, 120], dryer: [30, 45, 60, 90], dishwasher: [60, 90, 120, 150] };
 export const machineMinutes = (id: MachineId): readonly number[] => MINUTES[id];
 /** §8.5 — the button that ends a load in the last machine. */
 export const finishLabel = (id: MachineId): string => (isLaundry(id) ? 'Fold & out' : 'Emptied');
@@ -48,9 +48,9 @@ export interface MachineRow {
   updated_at: string | null;
 }
 
-/** §7D.1 — free (no owner), running (before done-at), done (done-at passed). Derived, never stored. */
+/** §7D.1 — free (no load), running (before done-at), done (done-at passed). Derived, never stored; a load's owner may be unknown. */
 export function machineState(row: MachineRow, now: string): MachineState {
-  if (row.owner_id === null || row.done_at === null) return 'free';
+  if (row.done_at === null) return 'free';
   return ms(now) < ms(row.done_at) ? 'running' : 'done';
 }
 
@@ -64,7 +64,7 @@ export type MachineResult = MachineChange | MachineRefusal;
 
 const freed = (row: MachineRow, now: string): MachineRow =>
   ({ ...row, owner_id: null, minutes: null, started_at: null, done_at: null, started_by: null, updated_at: now });
-const loaded = (row: MachineRow, ownerId: string, minutes: number, by: string, now: string): MachineRow =>
+const loaded = (row: MachineRow, ownerId: string | null, minutes: number, by: string, now: string): MachineRow =>
   ({ ...row, owner_id: ownerId, minutes, started_at: now, done_at: addMinutes(now, minutes), started_by: by, updated_at: now });
 
 /** Start a free machine for `ownerId`; its fire is due at done-at. */
@@ -81,7 +81,7 @@ export function moveMachine(
   if (!to || nextMachine(from.id) !== to.id) return { error: 'invalid_state', machine: from, why: 'no_next' };
   if (machineState(from, now) !== 'done') return { error: 'not_done', machine: from };
   if (machineState(to, now) !== 'free') return { error: 'busy', machine: to };
-  const started = loaded(to, from.owner_id!, minutes, by, now);
+  const started = loaded(to, from.owner_id, minutes, by, now);
   return {
     rows: [freed(from, now), started],
     closeFire: openFire ? closeFire(openFire, 'done', by, now) : undefined,
@@ -98,14 +98,14 @@ export function finishMachine(row: MachineRow, openFire: FireRow | null, by: str
 
 /**
  * Done now: the household's real state when the app missed it — a free machine whose load was
- * never started here (`ownerId` names it), or a running one that finished early. Done at `now`;
+ * never started here (`ownerId` names it, or null: owner unknown), or a running one that finished early. Done at `now`;
  * any open fire closes `superseded` and a new one rings now (§7D.2).
  */
 export function doneNowMachine(row: MachineRow, ownerId: string | null, openFire: FireRow | null, by: string, now: string): MachineResult {
   const state = machineState(row, now);
   if (state === 'done') return { error: 'busy', machine: row };
   const next: MachineRow = state === 'free'
-    ? { ...loaded(row, ownerId!, 0, by, now), minutes: null }
+    ? { ...loaded(row, ownerId, 0, by, now), minutes: null }
     : { ...row, done_at: now, updated_at: now };
   return {
     rows: [next],
@@ -154,16 +154,19 @@ export function refusalText(r: MachineRefusal, names: ReadonlyMap<string, string
 }
 
 /**
- * §7D.3 — the done message. `ownerName`: the owner if still active, else null. `waiting`: the
+ * §7D.3 — the done message. `ownerName`: the owner if still active, else null; undefined when the
+ * load has no owner (Done now with nobody named), which says so and what the load needs next. `waiting`: the
  * name of a done load waiting in the machine before (null when that owner is not active), or
  * undefined when no load is waiting. `still`: the reminders were restarted by Still loaded, so the
  * message says what the load needs next.
  */
-export function doneMessage(id: MachineId, ownerName: string | null, waiting?: string | null, still = false): string {
+export function doneMessage(id: MachineId, ownerName: string | null | undefined, waiting?: string | null, still = false): string {
   // §7D.6 — a lone machine names who started it; nothing waits before it.
   if (!isLaundry(id)) return `The ${lower(id)}${ownerName ? ` ${ownerName} started` : ''} is ${still ? 'still full — empty it' : 'done'}`;
   const next = nextMachine(id);
-  const base = !still
+  const base = ownerName === undefined
+    ? (next ? `${MACHINE_LABEL[id]} finished; Owner unknown; Please cycle to dryer` : `${MACHINE_LABEL[id]} finished: Owner unknown: Please unload`) // MojoSOGO's words
+    : !still
     ? ownerName ? `${ownerName}, your laundry in the ${lower(id)} is done` : `The laundry in the ${lower(id)} is done`
     : `${ownerName ? `${ownerName}, your laundry is` : 'The laundry is'} still in the ${lower(id)} — ${next ? `move it to the ${lower(next)}` : 'take it out'}`;
   if (waiting === undefined) return base;
@@ -189,9 +192,9 @@ export function parseStart(b: Record<string, unknown>, id: MachineId, activeIds:
   return { ownerId: b.ownerId, minutes: b.minutes };
 }
 
-/** Done now's body: whose load, needed only when the machine is free. */
+/** Done now's body: whose load when the machine is free — optional, never assumed (absent or null = owner unknown). */
 export function parseDoneNow(b: Record<string, unknown>, activeIds: readonly string[], free: boolean): { ownerId: string | null } | string {
-  if (!free) return { ownerId: null };
+  if (!free || b.ownerId === undefined || b.ownerId === null) return { ownerId: null };
   return typeof b.ownerId === 'string' && activeIds.includes(b.ownerId) ? { ownerId: b.ownerId } : 'Whose load must be an active member.';
 }
 

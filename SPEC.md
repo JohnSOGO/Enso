@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.71 · **Date:** 2026-10-10 · **Owner:** MojoSOGO
+**Version:** 2.72 · **Date:** 2026-10-10 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3082,9 +3082,9 @@ fold & out**. The weekly Laundry chore (§7B) is separate and unchanged. The **D
 
 - One `machines` row per machine (§4.2m), seeded free. Its **state** is derived, never stored
   (`machineState(row, now)`):
-  - **free** — no owner;
-  - **running** — owner set, `now < done_at`: whose load, started, minutes, done-at;
-  - **done** — owner set, `now ≥ done_at`: the card reads **DONE — waiting**.
+  - **free** — no load (`done_at` NULL); a load's owner may be unknown (NULL, §7D.2 Done now);
+  - **running** — `now < done_at`: whose load, started, minutes, done-at;
+  - **done** — `now ≥ done_at`: the card reads **DONE — waiting**.
 - `GET /machines` returns the server-derived `state`; the PWA never re-derives it.
 - The laundry machines in load order are `LAUNDRY` (`machines.ts`): the washer's **next**
   machine is the dryer; the dryer has none (it is the last). `MACHINE` (vocab) is the card
@@ -3098,12 +3098,12 @@ fold & out**. The weekly Laundry chore (§7B) is separate and unchanged. The **D
 | **Start** `{ ownerId, minutes }` | the machine is free | owner, minutes, `started_at = now`, `done_at = now + minutes`, `started_by` = me; a new `machine` fire due at `done_at` |
 | **Move** `{ minutes }` (washer → dryer) | the washer is done **and** the dryer is free | washer free, its open fire closes `done` (`closed_by` = me); the dryer starts with the **washer's owner** and its own minutes; a new dryer fire |
 | **Finish** — *Fold & out* | the last machine (dryer) is done | dryer free; its open fire closes `done` — the load's loop ends |
-| **Done now** `{ ownerId }` ⚑ Q160 | free or running | the app catches up with the real machine: a **free** one gets `ownerId`'s load (`minutes` null, `started_at = done_at = now`, `started_by` = me); a **running** one keeps its load, `done_at = now`. Any open fire closes `superseded`; a new `machine` fire is due **now**. `ownerId` is required only when free |
+| **Done now** `{ ownerId? }` ⚑ Q160 | free or running | the app catches up with the real machine: a **free** one gets `ownerId`'s load, or a load with **owner unknown** (`owner_id` NULL) when none is named — never assumed (MojoSOGO 2026-10-10) (`minutes` null, `started_at = done_at = now`, `started_by` = me); a **running** one keeps its load, `done_at = now`. Any open fire closes `superseded`; a new `machine` fire is due **now**. `ownerId` is optional; a named one must be an active member |
 | **Clear** | running or done | free; its open fire closes `removed`; nothing rings |
 | **Remind** — *Still loaded* ⚑ Q159 | done | the load stays; its open fire closes `superseded` (`closed_by` = me) and a new `machine` fire is due **now**, so the reminders run again from alert 1 (§7D.3) |
 
-- **Minutes** are chips, per machine (`machineMinutes`): the clothes washer **30 / 45 / 60 / 90 / 120**
-  (2 hours added by MojoSOGO 2026-10-10), the clothes dryer **30 / 45 / 60 / 90**, the dish washer §7D.6. **Whose load** is one active
+- **Minutes** are chips, per machine (`machineMinutes`): the clothes washer **30 / 60 / 90 / 120**
+  (2 hours added and 45 dropped by MojoSOGO 2026-10-10), the clothes dryer **30 / 45 / 60 / 90**, the dish washer §7D.6. **Whose load** is one active
   member (the chooser defaults to me).
 - Refusals are **409** with a message, shown in place:
   - start on a machine that isn't free, or move while the dryer is full → `busy`,
@@ -3114,7 +3114,7 @@ fold & out**. The weekly Laundry chore (§7B) is separate and unchanged. The **D
     what the machine does take.
   - clear a free machine → `already_free`.
   - Still loaded on a machine that isn't done → `not_done`.
-  - Done now on a done machine → `busy`; on a free one with no active `ownerId` → 400 `invalid_input`.
+  - Done now on a done machine → `busy`; on a free one naming someone who is not an active member → 400 `invalid_input`.
 - **Two taps at once:** every machine-row write is conditional on the row's `started_at` as it
   was read, inside the same batch as the fire writes; a row that changed under it aborts the
   whole batch → **409 `conflict`** "Someone else just changed the clothes washer — have another look."
@@ -3135,7 +3135,10 @@ fold & out**. The weekly Laundry chore (§7B) is separate and unchanged. The **D
   is off or the list can't be read, the row is written with NULL: the default speakers. The
   message still names the load's owner.
 - Message (`doneMessage`): `"Sam, your laundry in the clothes washer is done"` / `"… in the clothes dryer is
-  done"`; with no active owner `"The laundry in the washer is done"`. While the machine
+  done"`; when the owner is no longer an active member `"The laundry in the clothes washer is done"`.
+  With the **owner unknown** (no owner, §7D.2 Done now; MojoSOGO's words, every alert and Still
+  loaded alike): `"Clothes washer finished; Owner unknown; Please cycle to dryer"` / `"Clothes dryer
+  finished: Owner unknown: Please unload"`. While the machine
   before it (the washer) holds a **done** load, every later dryer alert adds
   `" — Kai's load is waiting"` (`" — another load is waiting"` when that owner is not
   active). From the second alert on, `" (alert n)"` (§5.7). "Waiting" is derived at alert
@@ -3180,14 +3183,16 @@ can edit them.
 | L12 | minutes 20, an unknown owner, an unknown machine, `done` action on a machine fire | 400 / 400 / 404 / 409 `invalid_action`, each with a message |
 | L14 | `remindMachine` on a done washer / a running or free one; `doneMessage(…, still)` | the load stays, the open fire closes `superseded`, a new fire due now / `not_done`; the §7D.3 Still loaded texts |
 | L15 | Still loaded on a washer done 70 min ago, then ticks every 15 min | the old fire closed `superseded`; the new fire alerts 4 times (A's phone + house), message `A, your laundry is still in the clothes washer — move it to the clothes dryer` |
-| L16 | `doneNowMachine` on a free washer for A / a running dryer / a done one; `parseDoneNow` | A's load done now, a fire due now / done-at now, old fire `superseded` / `busy`; owner required only when free |
+| L16 | `doneNowMachine` on a free washer for A / a running dryer / a done one; `parseDoneNow` | A's load done now, a fire due now / done-at now, old fire `superseded` / `busy`; owner optional, a named one active |
+| UK1 | `doneMessage` with the owner unknown: washer, dryer, still, waiting; inactive owner; dish washer | the §7D.3 Owner unknown texts (suffixes as usual); `The laundry in the clothes washer is done`; `The dish washer is done` |
+| UK2 | Done now on a free washer naming nobody, tick, move to the dryer, tick its done-at | done, owner null; `Clothes washer finished; Owner unknown; Please cycle to dryer` to every phone + house; the dryer runs unowned; `Clothes dryer finished: Owner unknown: Please unload` |
 | L17 | Done now on a free washer for A, then tick | washer done for A; alert 1 to A's phone + house, `A, your laundry in the clothes washer is done`; again → `busy`; a running dryer's Done now closes its fire `superseded` |
 | L18 (HS11) | a machine alert while A ticked only Game Room; HA lists Game Room, Everywhere, Toasty, the Voice PE; then HA down | the house row's speakers are Game Room, Toasty, the Voice PE; then NULL (the defaults) |
 | L19 | `machineQuietUntil`, defaults, Los Angeles: Mon 18:00 / 17:29 / 20:30; Fri 21:00; Sat 12:00; Sun 21:00; weekend any time: Fri 22:00, Sat 03:00; both any time | null / Mon 17:30 / Tue 17:30; Sat 09:00; null; Mon 17:30; Sat 00:00, null; null |
 | L20 | `stepFire` with `quietUntil`: a due scheduled fire; a ringing fire due its renotify; not yet due; silent past max | scheduled at quietUntil, count 0, no alert (twice); unchanged; unchanged |
 | L21 | `GET /machines/hours` after 0028; an admin PATCHes; a member PATCHes; from ≥ to | the defaults; saved and read back; 403; 400 with a message |
 | L13 | migration check (§4.2m) | fires and deliveries intact after 0014; machines seeded; CHECK refuses a machine fire without `machine_id` |
-| DW1 | `MACHINE_LABEL`; `nextMachine`/`previousMachine` of the dish washer; `machineMinutes` | Clothes washer, Clothes dryer, Dish washer; null / null; washer 30–120, dryer 30–90, dish washer 60–150 |
+| DW1 | `MACHINE_LABEL`; `nextMachine`/`previousMachine` of the dish washer; `machineMinutes` | Clothes washer, Clothes dryer, Dish washer; null / null; washer 30–120 (no 45), dryer 30–90, dish washer 60–150 |
 | DW2 | `doneMessage('dishwasher', …)` with a starter, none, still; a done load in the dryer | the four §7D.6 texts; never a waiting suffix |
 | DW3 | start the dish washer for A, 120 min; then 45 min; tick at done-at | 200, running, `done_at = now + 120 min`; 400 with the dish-washer chips; alert 1 to every phone + house, `The dish washer A started is done` |
 | DW4 | Emptied (finish) on the done dish washer; move on it | free, its fire closed `done`; 409 `invalid_state` "Dish washer loads don't move on — use Emptied." |
@@ -3964,14 +3969,15 @@ Wash, move to the dryer, fold. Run the dishes, then empty them. Everyone hears w
   "Machine alert hours": Weekdays and Weekends, each two `<input type="time">` fields (16 px);
   both empty = any time. Save refuses from ≥ to inside the box.
 - **Done now** (⚑ Q160) is for a load the app missed. On a free machine it opens the chooser
-  titled "The washer is done": *Whose load?* (me preselected), then **[It's done]**. On a
+  titled "The clothes washer is done": *Whose load?* with **Owner unknown** preselected (never assumed;
+  a member chip names one), then **[It's done]**. On a
   running machine it is one tap. Either way the done alerts start at once.
 - **Still loaded** (⚑ Q159) restarts the reminders (§7D.2) with one tap, no confirm; the action
   line wraps at 320 px.
 
 - **The chooser** (a modal, exported from `Machines.tsx` and reused by the Ringing bar): for
   **Start**, titled "Start the washer" — *Whose load?* one member chip per active member, **me**
-  preselected; *How long?* the machine's minute chips (§7D.2), e.g. **30 · 45 · 60 · 90 · 120 min** for the clothes washer. Tapping a minute chip
+  preselected; *How long?* the machine's minute chips (§7D.2), e.g. **30 · 60 · 90 · 120 min** for the clothes washer. Tapping a minute chip
   starts the machine at once and closes the box: **two taps** from the card (Start → 60). For
   **Move to dryer**, titled "Move Sam's load to the dryer" — only the minute chips.
 - Chips are at least 44 px tall; text is 16 px; nothing scrolls sideways at 320 px.
@@ -5610,7 +5616,7 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q157 | Lists' emojis | ⚑ A list without its own shows one picked from its name (keyword table in §7A.1, else 📋); Today 🧹, Things to do ✅, Movies & shows 🎬 are fixed |
 | Q158 | When the Lists popup opens | ⚑ On every tap of the bottom tab's 🛒 Lists (and the list button), not when the app opens on Lists; closing it stays on the remembered list |
 | Q159 | A done load nobody has moved (§7D.2, §8.5) | ⚑ A done washer or dryer offers **Still loaded**: the reminders start over now (alert 1, then every 15 min, 4 in all, Phone + House), saying "… is still in the washer — move it to the dryer" / "… still in the dryer — take it out". Move, Fold & out or Clear stops them as before |
-| Q160 | A load nobody started in the app, or one that finished early (§7D.2, §8.5) | ⚑ A free or running machine offers **Done now**: free asks whose load; the machine shows DONE — waiting and the done alerts ring at once, then Still loaded works as usual |
+| Q160 | A load nobody started in the app, or one that finished early (§7D.2, §8.5) | ⚑ A free or running machine offers **Done now**: free asks whose load, Owner unknown preselected (MojoSOGO 2026-10-10: "don't assume an owner"); the machine shows DONE — waiting and the done alerts ring at once, then Still loaded works as usual |
 | Q161 | Machine alerts on "all devices" (§7D.3) | Everyone's phones and every speaker HA lists (decided by MojoSOGO 2026-10-05); ⚑ the `Everywhere` group is left out so each Echo speaks once; HA unreadable → the default speakers |
 | Q162 | A machine alert outside its hours (§7D.5) | ⚑ It waits and the reminders start over when the hours open (not dropped); only admins edit the hours, on the Machines section |
 | Q163 | Who may change what done looks like (§7B.6) | The chore's creator or an admin, like the chore itself (MojoSOGO 2026-10-07, §6.3) |
@@ -5867,10 +5873,15 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Owner unknown on Done now** (v1.43.0, §7D.2–7D.3; asked by MojoSOGO 2026-10-10; UK1–UK2): Done now on a free
+machine no longer assumes an owner (Owner unknown is preselected). A load with no owner alerts "Clothes washer
+finished; Owner unknown; Please cycle to dryer" / "Clothes dryer finished: Owner unknown: Please unload", moves on
+unowned, and the card and Ringing bar say "owner unknown". The clothes washer's 45 min chip is dropped. No migration.
+**Still owed:** a Done now with nobody named, heard on a speaker.
 **Clothes washer, clothes dryer and dish washer** (v1.42.0, §7D.6, §4.2zj; asked by MojoSOGO 2026-10-10; DW1–DW4,
 DW-M): Washer and Dryer are now labelled Clothes washer and Clothes dryer (ids and data unchanged), and a third card,
 🍽️ Dish washer, starts, rings when done, Done now / Still loaded / Clear like the laundry, and ends with Emptied. The
-card shows who started it ("started by Sam"). The clothes washer gains a 2-hour (120 min) chip. Migration 0037. Q204–Q207 are ⚑ defaults. **Still owed:** a real
+card shows who started it ("started by Sam"). The clothes washer's chips are 30 / 60 / 90 / 120. Migration 0037. Q204–Q207 are ⚑ defaults. **Still owed:** a real
 dish washer load started and emptied on the iPhone.
 **Weather on the calendar** (v1.41.0, §7.11, §4.2zi; asked by MojoSOGO 2026-10-10; WX1–WX6, WX-M): the next 7 days
 each show the forecast emoji in the cell's corner, and the day sheet says the words, high and low. Open-Meteo, once a

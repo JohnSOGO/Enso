@@ -96,7 +96,7 @@ export async function sourceOf(
     if (!m) return null;
     const nameOf = async (id: string | null) => id === null ? null
       : (await first<{ display_name: string }>(db, 'SELECT display_name FROM members WHERE id = ? AND disabled_at IS NULL', id))?.display_name ?? null;
-    const owner = await nameOf(m.owner_id);
+    const owner = m.owner_id === null ? undefined : await nameOf(m.owner_id); // §7D.3: no owner → "Owner unknown"
     const waiting = waitingLoad(rows, m.id, now);
     const st = (await first<Parameters<typeof machineHoursOf>[0] & { timezone: string }>(db, 'SELECT * FROM settings WHERE id = 1'))!;
     const quietUntil = machineQuietUntil(machineHoursOf(st), st.timezone, now);

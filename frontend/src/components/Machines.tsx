@@ -31,7 +31,7 @@ export function MachineChooser({ from, mode, ownerId, onClose }: {
   from: MachineId; mode: 'start' | 'move' | 'done'; ownerId?: string | null; onClose: () => void;
 }) {
   const { me, members, memberById, refresh } = useApp();
-  const [owner, setOwner] = useState(me.id);
+  const [owner, setOwner] = useState<string | null>(mode === 'done' ? null : me.id); // §7D.2: Done now never assumes an owner
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const to = mode === 'move' ? nextMachine(from) : null;
@@ -55,6 +55,12 @@ export function MachineChooser({ from, mode, ownerId, onClose }: {
           <div className="field" role="group" aria-label={who}>
             <span className="muted" style={{ fontSize: '.8rem' }}>{who}</span>
             <div className="row wrap" style={{ marginTop: 4 }}>
+              {mode === 'done' && (
+                <button className="chip" aria-pressed={owner === null} onClick={() => setOwner(null)}
+                  style={{ ...bigChip, borderWidth: owner === null ? 2 : 1, fontWeight: owner === null ? 600 : 400 }}>
+                  {owner === null ? '✓ ' : ''}Owner unknown
+                </button>
+              )}
               {members.filter((m) => !m.disabledAt).map((m) => (
                 <button key={m.id} className="chip" aria-pressed={owner === m.id} onClick={() => setOwner(m.id)}
                   style={{ ...bigChip, borderColor: m.color, borderWidth: owner === m.id ? 2 : 1, fontWeight: owner === m.id ? 600 : 400 }}>
@@ -96,7 +102,7 @@ export function MachinesSection() {
   }
 
   const load = (m: Machine) => m.state === 'free' ? ''
-    : `${isLaundry(m.id) ? '' : 'started by '}${m.ownerId ? memberById(m.ownerId)?.displayName ?? 'unknown member' : 'nobody'} · ${m.doneAt ? `done ${m.state === 'running' ? '~' : ''}${localTime(m.doneAt)}` : '—'}`;
+    : `${isLaundry(m.id) ? '' : 'started by '}${m.ownerId ? memberById(m.ownerId)?.displayName ?? 'unknown member' : 'owner unknown'} · ${m.doneAt ? `done ${m.state === 'running' ? '~' : ''}${localTime(m.doneAt)}` : '—'}`;
 
   return (
     <section className={s.section} aria-label="Machines">
