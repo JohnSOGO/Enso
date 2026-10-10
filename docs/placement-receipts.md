@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-10 — Weather on the calendar (placement-advisor)
+
+- **Ask:** SPEC 2.70 §7.11 (v1.41.0, migration 0036, §4.2zi; §5.6 step 3d; §8.3; WX1–WX6, WX-M; ⚑ Q200–Q203). Once per household-local day (first tick; a failed try retried at most hourly) the Worker fetches Open-Meteo's 7-day daily forecast (weather_code, high, low °F) for the household place from WEATHER_URL (empty = off). Rows in weather_days(date PK, code, high_f, low_f, fetched_at), plus settings.weather_tried_at. GET /calendar adds `weather: { date, emoji, words, high, low }[]`. The cell shows the emoji in a corner (not the two-icon slot); the day sheet's first line is weatherText.
+- **Verdict:** `src/shared/weather.ts` [NEW row] (weatherOf, forecastUrl, parseForecast, weatherDue, weatherText, ForecastDay/WeatherDay). `src/worker/weather-days.ts` [NEW row] (weatherTick as tick step 3d; weatherBetween). [EXISTING]: tick.ts (one step), routes/events.ts (/calendar field), env.ts, wrangler.toml, vitest.config.ts (WEATHER_URL ''), Calendar.tsx + Calendar.module.css (.wx corner), DaySheet.tsx (first line). Schema: migrations/0036_weather.sql.
+- **Flow stage:** rules (shared/weather.ts) / persist + fetch (weather-days.ts, tick step 3d) / route (events.ts /calendar) / render (Calendar, DaySheet).
+- **Why:** the timer-start.ts / timer-starts.ts pattern: a pure leaf decides and a worker table owner does the I/O as a tick step, so tick.ts and events.ts each grow by about 2 lines and no hub is touched. Three corrections to the coordinating session's proposal: the worker file is weather-days.ts (one name in two layers reads ambiguously; the concern is the table); weatherBetween returns finished wire rows through weatherOf, so the route never learns WMO codes; the day-sheet sentence is weatherText in shared. The claim is a conditional UPDATE of settings.weather_tried_at, so overlapping ticks fetch once. Rejected: the WMO table in vocab.ts (display data, no CHECK, like HOLIDAYS); fetching through page-fetch.ts (owns link readings); widening db.ts or engine.ts; mapping codes in the PWA. Spec gaps sent back and settled in §7.11: no place → off; an unknown code leaves that day out; the aria-label carries the words; no per-member switch (Q203); weather above the holiday lines; nothing on /status.
+- **Watch:** Calendar.tsx is about 263/302 with the band at 272. The next calendar-cell change is extract-first: the per-day cell → DayCell.tsx (or buildDays/weekSpans → a calendar-days module).
+- **Caps:** shared/weather.ts ~65/300 (new); worker/weather-days.ts ~50/300 (new); tick.ts 111 → 114/148; routes/events.ts 114 → 116/147; Calendar.tsx 258 → ~263/302; DaySheet.tsx 52 → 54/300; env.ts 46 → 47/300. No ceiling moved, nothing newly in the band, no reorganizer.
+
 ## 2026-10-10 — Steward pass, whole tree (code-steward)
 
 - **Run:** after the v1.39.0 (SPEC 2.68 §7.9, paste a link) and v1.40.0 (SPEC 2.69 §7.10, things to bring, migration 0035) releases; audited 7bfebba.

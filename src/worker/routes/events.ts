@@ -12,6 +12,7 @@ import { requireMember } from '../session';
 import { canChange } from '../../shared/roles';
 import { eventView, insertEventStatement, onEventIds, optInStatement, parseEventInput, removeFutureFires, type EventRow } from '../event-rows';
 import { daysOff } from './household';
+import { weatherBetween } from '../weather-days';
 
 const MAX_RANGE_DAYS = 120;
 
@@ -47,7 +48,8 @@ events.get('/calendar', requireMember, async (c) => {
     }
   }
   occ.sort((a, b) => (a.date + (a.startTime ?? '')).localeCompare(b.date + (b.startTime ?? '')));
-  return c.json({ occurrences: occ, publicHolidays: publicHolidaysBetween(from, to, await daysOff(c.env.DB)), marketDays: marketDaysBetween(from, to) });
+  return c.json({ occurrences: occ, publicHolidays: publicHolidaysBetween(from, to, await daysOff(c.env.DB)), marketDays: marketDaysBetween(from, to),
+    weather: await weatherBetween(c.env.DB, from, to) });
 });
 
 events.post('/events', requireMember, async (c) => {

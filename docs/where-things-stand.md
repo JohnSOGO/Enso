@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth**: §14 holds status and deviatio
 MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-10, v1.40.0, main = production.*
+*Last updated 2026-10-10, v1.41.0, main = production.*
 
 ## Running where
 
@@ -14,6 +14,7 @@ the working agreement in `CLAUDE.md`.
 | App (Worker + PWA) | https://enso.sogodojo.com | Cloudflare Worker `enso`, D1 `enso`, R2 photos. The opening screen shows the live version and commit. |
 | Home Assistant voice | ha.sogodojo.com → HA (192.168.0.123) | Cloudflare tunnel `haosdojo` (HA Cloudflared add-on), Access service token `enso-worker`. SPEC §9.2. |
 | Home helper | sogoai.sogodojo.com → SogoAI 127.0.0.1:8790 | Tunnel `sogoai` (Cloudflared service on SogoAI), the same Access token plus Bearer `CAPTIONS_TOKEN`. It fetches YouTube captions (§7E.2c) and names item photos with LM Studio's `qwen-uncensored` (§7A.3). Built from `home/` with `npm run build:home`. Its notes on SogoAI: `C:\Users\Public\git\SogolAI\ENSO-HOME-HELPER.md`. |
+| Weather forecast | api.open-meteo.com (free, no key) | `WEATHER_URL` var in wrangler.toml; fetched once a day by the tick (§7.11). Empty turns weather off. |
 | Claude → MojoSOGO's phone | `POST /api/v1/ops/notify` | Bearer `OPS_NOTIFY_TOKEN` (README "Ping MojoSOGO's phone"). Always goes to the founder, John Redman, who is MojoSOGO. |
 
 ## Secrets: where the values live (never in the repo)
@@ -52,4 +53,5 @@ the working agreement in `CLAUDE.md`.
 - Rolling timer day start (v1.36.0, §5.5a): hear it at a real window opening.
 - Event address and paste (v1.37.0–v1.38.0, §7.9, §7.9a): on the iPhone, Paste a copied text and a screenshot into a
   new event, and a "moved to…" text into an existing one; Open in Maps.
+- Weather on the calendar (v1.41.0, §7.11): see the emojis on the iPhone after the first daily refresh. Q200–Q203 are ⚑ defaults.
 - Things to bring (v1.40.0, §7.10): hear a real event reminder that carries a list, on the phone and a speaker.

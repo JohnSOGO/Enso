@@ -25,7 +25,7 @@
   all: unset;
   box-sizing: border-box;
   display: flex; flex-direction: column; gap: 2px;
-  min-width: 0; overflow: hidden;
+  min-width: 0; overflow: hidden; position: relative;
   padding: 3px 3px 2px;
   border-right: 1px solid rgba(51, 65, 85, .45);
   border-bottom: 1px solid rgba(51, 65, 85, .45);
@@ -36,6 +36,9 @@
 .toneB { background: var(--month-b); }
 .past .num { opacity: .6; }
 
+/* §7.11 the day's forecast: top-right corner; on phones bottom-right, where the date line is already full. */
+.wx { position: absolute; top: 3px; right: 3px; font-size: .8rem; line-height: 1; pointer-events: none; }
+.narrow .wx { top: auto; bottom: 3px; right: 2px; font-size: .62rem; }
 .hEmoji { font-size: .8rem; line-height: 1; white-space: nowrap; }
 /* Phone widths (§7.2): two day icons stay on the number's line — a little smaller, a little tighter. */
 .narrow .cell { padding-left: 2px; padding-right: 2px; }

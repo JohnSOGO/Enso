@@ -1,7 +1,8 @@
-// SPEC §8.3 — the day sheet: holidays, all-day events, timed events, then "+ Add event".
+// SPEC §8.3 — the day sheet: weather (§7.11), holidays, all-day events, timed events, then "+ Add event".
 import { Modal } from './Modal';
 import { useApp } from '../state';
 import type { DayData, Occurrence } from './Calendar';
+import { weatherText } from '../../../src/shared/weather';
 import s from './Lists.module.css';
 
 export function longDate(date: string) {
@@ -40,6 +41,7 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
 
   return (
     <Modal title={longDate(date)} onClose={onClose} footer={<button className="primary" onClick={onAdd}>＋ Add event</button>}>
+      {data?.weather && <p className={s.holiday}>{weatherText(data.weather)}</p>}
       {!!me.showPublicHolidays && data?.publicHolidays.map((h) => <p key={h.name} className={s.holiday} style={{ background: 'var(--holiday-public-cell)', borderRadius: 6, padding: '2px 8px' }}>{h.emoji} {h.name} — day off</p>)}
       {!!me.showOptionsExpiration && data?.marketDays.map((m) => <p key={m.name} className={s.holiday}>{m.emoji} {m.name}</p>)}
       {items.length === 0 && <p className="muted">Nothing on this day.</p>}

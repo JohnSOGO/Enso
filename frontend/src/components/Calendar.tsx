@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { get } from '../api';
 import { useApp } from '../state';
 import { addDays, diffDays, startOfWeek } from '../../../src/shared/time';
+import type { WeatherDay } from '../../../src/shared/weather';
 import s from './Calendar.module.css';
 
 export interface Occurrence {
@@ -14,6 +15,7 @@ export interface DayData {
   items: (Occurrence & { continued: boolean })[];
   publicHolidays: { name: string; emoji: string }[];
   marketDays: { name: string; emoji: string }[];
+  weather?: WeatherDay; // §7.11
 }
 
 const WEEKS_BACK = 520; // ±10 years of scrollable weeks
@@ -76,6 +78,7 @@ function buildDays(json: any, from: string, to: string): Map<string, DayData> {
   }
   for (const h of json.publicHolidays) day(h.date).publicHolidays.push({ name: h.name, emoji: h.emoji });
   for (const m of json.marketDays ?? []) day(m.date).marketDays.push({ name: m.name, emoji: m.emoji });
+  for (const w of (json.weather ?? []) as WeatherDay[]) day(w.date).weather = w;
   return days;
 }
 
@@ -178,6 +181,7 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
         new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }),
         items.length ? `${items.length} event${items.length > 1 ? 's' : ''}` : '',
         ...pub.map((h) => h.name), ...market.map((m) => m.name),
+        data?.weather ? `${data.weather.words}, high ${data.weather.high}°, low ${data.weather.low}°` : '',
       ].filter(Boolean).join(', ');
       cells.push(
         <button key={date} className={cls} aria-label={label} onClick={() => onOpenDay(date, data)}
@@ -195,6 +199,7 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
               <span className={s.hEmoji} aria-hidden title={[...pub.map((h) => h.name), ...market.map((m) => m.name), ...withEmoji.map((o) => o.title)].join(', ')}>{icons.map((x) => x.emoji).join('')}</span>
             )}
           </span>
+          {data?.weather && <span className={s.wx} aria-hidden title={data.weather.words}>{data.weather.emoji}</span>}
           {lanes > 0 && <span aria-hidden style={{ height: lanes * (barH + 1), flex: 'none' }} />}
           {narrow ? (
             <span className={s.dots}>
