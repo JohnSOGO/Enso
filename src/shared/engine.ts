@@ -3,6 +3,7 @@ import type { Action, AlertKind, Channel, CloseReason, FireState, SunEvent, Time
 import { addDays, addMinutes, localToUtc, ms, utcToLocal } from './time';
 import { occurrences, type Recurrence } from './recurrence';
 import { sunsetUtc, type Place } from './sun';
+import { bringText } from './bring';
 
 export const MATERIALIZE_AHEAD_H = 36;
 export const MISSED_AFTER_MIN = 60;
@@ -237,9 +238,11 @@ const h12 = (hhmm: string) => `${Number(hhmm.slice(0, 2)) % 12 || 12}:${hhmm.sli
  */
 export function alertMessage(
   kind: AlertKind, title: string, alertNumber: number, chore?: ChoreAlertText, startsToday = false, sunsetAt?: string | null,
+  bring?: string[] | null,
 ): string {
   const base = kind === 'reminder'
     ? (sunsetAt !== undefined ? `${title} — ${sunsetAt === null ? 'before sunset' : `sunset at ${h12(sunsetAt)}`}` : `Reminder: ${title}`)
+      + (bring?.length ? ` — ${bringText(bring)}` : '')
     : kind === 'timer' ? `Timer: ${title}`
     : kind === 'thing' ? `To do: ${title}${startsToday ? ' — starts today' : ''}`
     : kind === 'machine' ? title // the whole sentence, from machines.ts doneMessage (§7D.3)

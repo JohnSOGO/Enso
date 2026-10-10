@@ -69,7 +69,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
     const stmts = [updateFire(db, next)];
     if (alert) {
       summary.alerts++;
-      const message = alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sunsetAt);
+      const message = alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sunsetAt, src.bring);
       const base = { fireId: next.id, alertNumber: next.alert_count };
       // §5.7, §7.5: who it is for. Nobody → the fire still steps, nothing is delivered.
       const aud = audience({

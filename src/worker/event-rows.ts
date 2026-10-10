@@ -5,12 +5,15 @@ import { CHANNEL, isOneOf, type Channel, type SunEvent } from '../shared/vocab';
 import { isDate, isTime } from '../shared/time';
 import { recurrenceError, type Recurrence } from '../shared/recurrence';
 import { emojiError } from '../shared/emoji';
-import { ALERT_TITLE_MAX, EVENT_ADDRESS_MAX } from '../shared/alert-limits';
+import { ALERT_TITLE_MAX, EVENT_ADDRESS_MAX, EVENT_BRING_ITEM_MAX, EVENT_BRING_MAX } from '../shared/alert-limits';
+import { cleanBring } from '../shared/bring';
 import { all, parseJson } from './db';
 import { intIn, optStr, str } from './http';
 
 export interface EventRow {
   id: string; title: string; notes: string | null; address: string | null;
+  /** §7.10: JSON list of things to bring; NULL = none. */
+  bring: string | null;
   start_date: string; start_time: string | null; end_date: string; end_time: string | null;
   recurrence: string | null; exdates: string; assigned_to: string;
   remind_offset_min: number | null; remind_channels: string | null; renotify_min: number | null; max_alerts: number;
@@ -22,7 +25,7 @@ export interface EventRow {
 
 export function eventView(e: EventRow) {
   return {
-    id: e.id, title: e.title, notes: e.notes, address: e.address,
+    id: e.id, title: e.title, notes: e.notes, address: e.address, bring: parseJson<string[]>(e.bring, []),
     startDate: e.start_date, startTime: e.start_time, endDate: e.end_date, endTime: e.end_time,
     allDay: e.start_time === null,
     recurrence: parseJson<Recurrence | null>(e.recurrence, null),
@@ -48,6 +51,8 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
   if (notes === undefined && b.notes !== undefined) return 'Notes must be text (up to 2000 characters).';
   const address = optStr(b.address, EVENT_ADDRESS_MAX);
   if (address === undefined && b.address !== undefined) return `Address must be text (up to ${EVENT_ADDRESS_MAX} characters).`;
+  const bring = b.bring === undefined || b.bring === null ? [] : cleanBring(b.bring);
+  if (bring === null) return `Things to bring must be a list of up to ${EVENT_BRING_MAX} lines, each up to ${EVENT_BRING_ITEM_MAX} characters.`;
   if (!isDate(b.startDate)) return 'Start date must be YYYY-MM-DD.';
   const allDay = b.startTime === null || b.startTime === undefined;
   let endDate = (b.endDate ?? b.startDate) as unknown;
@@ -93,7 +98,7 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
     remind = { remind_offset_min: offset, remind_channels: JSON.stringify([...new Set(channels)]), renotify_min: renotify, max_alerts: maxAlerts };
   }
   return {
-    title, notes: notes ?? null, address: address?.trim() || null, start_date: b.startDate, start_time: startTime, end_date: endDate as string, end_time: endTime,
+    title, notes: notes ?? null, address: address?.trim() || null, bring: bring.length ? JSON.stringify(bring) : null, start_date: b.startDate, start_time: startTime, end_date: endDate as string, end_time: endTime,
     recurrence: recurrence === null ? null : JSON.stringify(recurrence), assigned_to: JSON.stringify(assigned), ...remind,
     optional: b.optional ? 1 : 0, emoji: emoji as string | null,
   };
@@ -109,10 +114,10 @@ export function removeFutureFires(db: D1Database, eventId: string, now: string):
 /** One new event row — POST /events, and Plan it (§7C.2) with its `thingId`. */
 export function insertEventStatement(db: D1Database, id: string, input: EventInput, memberId: string, now: string, thingId: string | null = null): D1PreparedStatement {
   return db.prepare(
-    `INSERT INTO events (id, title, notes, address, start_date, start_time, end_date, end_time, recurrence, assigned_to,
+    `INSERT INTO events (id, title, notes, address, bring, start_date, start_time, end_date, end_time, recurrence, assigned_to,
        remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at, thing_id, optional, emoji)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(id, input.title, input.notes, input.address, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(id, input.title, input.notes, input.address, input.bring, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
     input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, memberId, now, now, thingId, input.optional, input.emoji);
 }
 

@@ -1,4 +1,4 @@
-// SPEC §4.2, §4.2a, §5.4, §7.9 — the input limits of the things that ring, shared by the routes and the forms. Pure.
+// SPEC §4.2, §4.2a, §5.4, §7.9, §7.10 — the input limits of the things that ring, shared by the routes and the forms. Pure.
 
 /** Title of an event, alarm or timer: at most this many characters. */
 export const ALERT_TITLE_MAX = 120;
@@ -9,3 +9,6 @@ export const TIMER_INTERVAL_MAX = 1440;
 export const EVENT_NOTES_MAX = 2000;
 /** An event's address (§7.9): at most this many characters. */
 export const EVENT_ADDRESS_MAX = 200;
+/** An event's things to bring (§7.10): at most this many lines, each at most this many characters. */
+export const EVENT_BRING_MAX = 20;
+export const EVENT_BRING_ITEM_MAX = 80;

@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-10 — Things to bring on an event and in its reminder (placement-advisor)
+
+- **Ask:** SPEC 2.69 §7.10 (v1.40.0, migration 0035, §4.2zh; §5.7; §8.4; EB1–EB5, EB-M; ⚑ Q198, Q199). An optional `events.bring` list (≤ 20 lines of ≤ 80 characters), cleaned by `cleanBring` and carried on GET/POST/PATCH `/events`. An event reminder appends " — bring: a, b and c" before " (alert n)" on push and house. A Things to bring editor under Address in the event form.
+- **Verdict:** `src/shared/bring.ts` [NEW] (cleanBring, bringText); `frontend/src/components/BringField.tsx` [NEW]. [EXISTING]: alert-limits.ts (EVENT_BRING_MAX, EVENT_BRING_ITEM_MAX); engine.ts alertMessage (one optional trailing `bring` param, reminder arm only); fire-rows.ts sourceOf (Source.bring); tick.ts (passes it); event-rows.ts (row, view, parse, insert); routes/events.ts (PATCH UPDATE); EventForm.tsx (field wiring, hosts BringField). Schema: migrations/0035_event_bring.sql.
+- **Flow stage:** rules (bring.ts, alert-limits, engine) / route + persist (event-rows, events) / deliver (unchanged; tick's one message reaches push and house) / render (BringField, EventForm).
+- **Why:** the limits join EVENT_NOTES_MAX and EVENT_ADDRESS_MAX. The cleaner and the joining are a pure concern shared by Worker and PWA, so they get a leaf rather than widening the limits-only file or the engine hub (255/300). The wording stays in alertMessage, the §5.7 owner; folding it into the title in sourceOf would split the format rule. Alarms and Plan it never pass `bring`, so it stays NULL with no special case; sun-timed events never pass the event routes. BringField is a value/onChange leaf like AddressField, keeping EventForm (pinned 223, band at 201) under the band. RecipeView's andList stays put (bringText's lowering rule makes it a different concern). Spec gaps sent back and settled in §7.10: the add box at 20 lines, cleanBring on Add, maxLength, `/calendar` doesn't carry it.
+- **Watch:** alertMessage now has 7 positional params; an options object is steward material.
+- **Caps:** bring.ts ~25/300 (new); BringField.tsx ~30/300 (new); engine.ts ~258/300; fire-rows.ts ~150/300; tick.ts 111/148; event-rows.ts ~142/300; routes/events.ts 114/147; EventForm.tsx 195/223. No ceiling moved, nothing newly in the band, no reorganizer.
+
 ## 2026-10-09 — Paste a link into an event (placement-advisor)
 
 - **Ask:** SPEC 2.68 §7.9 "A link" (v1.39.0, EA6–EA7, ⚑ Q197). The fill bar's Paste takes text from text/plain, then text/uri-list, then text/html, then readText(). read-text sends a paste that is only a readable link to a new readEventLink (fetchPage, then the look-up with web search and web fetch, then a fill with the event schema and a third `link` prompt wording), with `link_refused` / `link_reading_failed`.
