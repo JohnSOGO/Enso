@@ -7,6 +7,16 @@ carry its result.
 
 ---
 
+## 2026-10-10 — Steward pass, whole tree (code-steward)
+
+- **Run:** after the v1.44.0 release (SPEC 2.73 §8.1, tab bar flush via `.app` position: fixed, build stamp under the tabs via Vite `define` `__ENSO_BUILD__`, new frontend/src/build-stamp.d.ts, PR #37); audited 31e101f against f756118.
+- **Verdict:** SOUND
+- **Top finding:** docs/where-things-stand.md still said v1.43.0 and did not list the v1.44.0 iPhone check (flush bar, stamp visible, ⚑ Q208); fixed in the same commit as this receipt.
+- **Handoffs:** 1 to worker (the where-things-stand update, done); 0 new to reorganizer (pass 8's machine-hours extract-first note still stands); none to placement-advisor.
+- **Restraint:** the 2-line build-stamp.d.ts is kept as its own row (one concern; folding it into css-modules.d.ts was rejected); no test for the stamp text (a build constant, low risk); engine.ts and Settings.tsx at 86% are below the band and this release did not touch them.
+
+---
+
 ## 2026-10-10 — Tab bar flush on iPhone; build stamp under the tabs (placement-advisor)
 
 - **Ask:** SPEC 2.73 §8.1 (v1.44.0). The app shell fills the screen (`.app` position: fixed; inset: 0 instead of height: 100%, which left a gap in iOS standalone with black-translucent), and the build stamp `v{version} · {commit}` shows all the time as tiny dim text in the tab bar's bottom safe-area strip (left, under the tabs, never overlapping), exposed through Vite `define` as `__ENSO_BUILD__`.
