@@ -286,12 +286,15 @@ curl -sS -m 10 -X POST https://enso.sogodojo.com/api/v1/ops/notify -H "Authoriza
 The FunHouse bridge on the dev PC listens only on 127.0.0.1:8765, so the dev PC pulls: `home/funhouse-poller.ts`
 asks `GET /api/v1/ops/pings` every 15 s and hands Claude's pings (🤖 / 🧵) and every alert with 🎪 FunHouse ticked (§9.4b)
 to the bridge. It reads the same token
-file. Build it and start it at logon (once, in a normal PowerShell on the dev PC):
+file. Build it and start it at logon, and every 5 minutes if it is not running (a closed console or Ctrl+C ends it and
+the restart setting does not count that as a failure; it was down for 15 h on 2026-10-11). Once, in a normal
+PowerShell on the dev PC:
 
 ```powershell
 cd C:\Users\Public\git\Enso; git pull; npm run build:home
 $action  = New-ScheduledTaskAction -Execute 'C:\Users\Public\git\Enso\home\funhouse-poller.cmd' -WorkingDirectory 'C:\Users\Public\git\Enso\home'
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+$trigger = @(New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"),
+            (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5))  # back within 5 min if it stops
 $settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -MultipleInstances IgnoreNew
 Register-ScheduledTask -TaskName 'Enso FunHouse poller' -Action $action -Trigger $trigger -Settings $settings -Force
 Start-ScheduledTask -TaskName 'Enso FunHouse poller'; Start-Sleep 3
