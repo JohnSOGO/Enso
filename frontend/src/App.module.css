@@ -5,8 +5,8 @@
   flex-direction: column;
   padding-top: env(safe-area-inset-top);
 }
-/* §8.1: the installed iPhone app's fixed box stops above the home-indicator area; its 100vh is the whole screen. */
-@media (display-mode: standalone) { .app { bottom: auto; height: 100vh; } }
+/* §8.1: in the installed iPhone app, 100% and dvh are short by the top inset; only lvh is the whole screen. */
+@media (display-mode: standalone) { .app { bottom: auto; height: 100lvh; } }
 
 .badges { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 12px 0; }
 .badges button { min-height: 28px; padding: 3px 10px; }

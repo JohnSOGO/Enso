@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.60.3: standalone document height 100lvh so the tab bar isn't clipped (placement-advisor)
+
+- **Ask:** SPEC 3.05 §8.1 "Flush at the bottom", follow-up to v1.60.2. On the iOS 26 installed app (viewport-fit=cover, black-translucent) the tab bar was cut off about 59pt above the screen bottom: `html` 100%/dvh is short by the top safe-area inset, `body { overflow: hidden }` clips there, only 100lvh is the full screen. Add `@media (display-mode: standalone) { html { height: 100lvh; } }` in theme.css; `.app`'s standalone `height: 100vh` becomes `100lvh`.
+- **Verdict:** `frontend/src/theme.css` (html base sizing) + `frontend/src/App.module.css` (`.app` override) [EXISTING]
+- **Flow stage:** render
+- **Why:** each rule goes to the owner of the box it sizes. v1.60.2 rejected theme.css while only `.app` looked short; the device moved the clip to `html`/`body`. Scoped to standalone so browser tabs keep 100% / `inset: 0`. Only `html` overridden; body/#root inherit. A JS viewport measure was rejected (turns a CSS fact into state).
+- **Caps:** theme.css about 103/300, App.module.css about 49/300. No file newly in the warning band.
+
 ## 2026-10-11 — Steward pass 18, whole tree (code-steward)
 
 - **Run:** after the v1.60.0 release (SPEC 3.02 §7B.8, a bounty's picture, migration 0046). Also covers v1.59.0 (done photo, migration 0045) and v1.59.1 (Point at it label). Audited 265334e..50328a3 (the v1.60.0 head; v1.60.1–v1.60.2 landed after).
