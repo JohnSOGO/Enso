@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.90 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.91 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4804,7 +4804,10 @@ also carries the FunHouse alerts, each ping with its `channel` (§9.4b).
 - The token is read from `%USERPROFILE%\.enso\ops-notify-token` at start (the same file §9.4 uses; no new copy).
   Missing or empty → it logs that and exits 1. The token is never logged.
 - Every `FUNHOUSE_POLL_MS = 15000` ⚑ it asks `https://enso.sogodojo.com/api/v1/ops/pings?after=<the last handled at>`; at start `after` is
-  10 minutes ago ⚑ (a restart re-sends at most those; the bridge drops a repeated `id`).
+  the one it saved last (`%USERPROFILE%\.enso\funhouse-poller-after`, written whenever it changes) when that is
+  within the last 10 minutes, else 10 minutes ago ⚑ Q244. So a restart re-sends nothing already handled (the bridge
+  does **not** drop a repeated `id`; MojoSOGO heard repeats after each restart, 2026-10-11, "DUP"); after more than
+  10 minutes down, older notices are skipped.
 - **Which pings:** a title starting with 🤖 or 🧵 (Claude's) ⚑ Q228. Others (🏛️ Ozymandias, which already
   reaches the FunHouse itself) are skipped and counted as handled.
 - **At most one notice a poll** (the bridge allows one per 10 s). It POSTs raw UTF-8 JSON
@@ -4822,6 +4825,7 @@ also carries the FunHouse alerts, each ping with its `channel` (§9.4b).
 | FP4 | `funhouseNotice` / `forFunhouse` | the body above; 🤖 and 🧵 titles → true, "🏛️ Ozymandias" → false |
 | FP5 | one poll with a fake Ensō and bridge: a 🏛️ ping then two 🧵 pings | one bridge POST (the first 🧵), `after` = its `at`; next poll sends the second |
 | FP6 | the bridge answers 503; then 400 | `after` unchanged, sent again next poll; then handled, not retried |
+| FP7 | `startAfter(saved, now)`: saved 30 s ago (with a newline); none; nonsense; an hour old; in the future | the saved instant; 10 min back for the other four |
 
 ### 9.4b FunHouse as a place alerts go — `channel = 'funhouse'` — asked by MojoSOGO 2026-10-11
 

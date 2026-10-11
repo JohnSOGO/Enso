@@ -1,7 +1,7 @@
 // SPEC §9.4a (FP4–FP6) — the FunHouse poller's pure parts and one poll over a fake Ensō and a fake bridge (no
 // network, no filesystem); FH6 (§9.4b) FunHouse alerts. Claude's pings and FunHouse alerts only, at most one bridge POST a poll, 503 retried, 4xx not.
 import { expect, it } from 'vitest';
-import { BRIDGE_URL, ENSO_API, forFunhouse, funhouseNotice, pollOnce, type Ping } from '../home/funhouse-poller';
+import { BRIDGE_URL, ENSO_API, FUNHOUSE_START_BACK_MS, forFunhouse, funhouseNotice, pollOnce, startAfter, type Ping } from '../home/funhouse-poller';
 
 const TOKEN = 'poller-test-token';
 const ping = (id: string, title: string, at: string, channel: Ping['channel'] = 'push'): Ping => ({ id, channel, title, text: `text ${id}`, at });
@@ -71,4 +71,14 @@ it('FH6: a FunHouse alert is always forwarded, with source Ensō', async () => {
   const w = world([OZY, fh], []);
   expect(await pollOnce('2026-10-11T00:50:00.000Z', w.deps)).toBe(fh.at);
   expect(w.sent).toEqual([funhouseNotice(fh)]);
+});
+
+it('FP7: startAfter keeps a saved after within 10 min, so a restart re-sends nothing; else 10 min back', () => {
+  const now = Date.parse('2026-10-11T18:13:00.000Z');
+  const back = new Date(now - FUNHOUSE_START_BACK_MS).toISOString();
+  expect(startAfter('2026-10-11T18:12:28.204Z\n', now)).toBe('2026-10-11T18:12:28.204Z');
+  expect(startAfter(null, now)).toBe(back);
+  expect(startAfter('nonsense', now)).toBe(back);
+  expect(startAfter('2026-10-11T17:00:00.000Z', now)).toBe(back); // too old
+  expect(startAfter('2026-10-11T19:00:00.000Z', now)).toBe(back); // in the future
 });

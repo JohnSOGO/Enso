@@ -3,13 +3,13 @@
 // pings and FunHouse alerts (§9.4b) after the last one handled, and hands Claude's pings (🤖 / 🧵) and every FunHouse
 // alert to the FunHouse bridge on 127.0.0.1:8765, at most one a poll. The bridge is local only, so the PC pulls; nothing inbound. Node globals and node:fs only —
 // `npm run build:home` bundles it into home/dist/funhouse-poller.mjs. The token is never logged.
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 export const ENSO_API = 'https://enso.sogodojo.com/api/v1';
 export const BRIDGE_URL = 'http://127.0.0.1:8765/notify';
 /** ⚑ How often Ensō is asked. */
 export const FUNHOUSE_POLL_MS = 15_000;
-/** ⚑ How far back the first poll reaches; the bridge drops a repeated id. */
+/** ⚑ How far back the first poll reaches when no saved `after` is newer (the bridge does not drop a repeated id). */
 export const FUNHOUSE_START_BACK_MS = 10 * 60_000;
 
 /** Mirrors OpsPing in src/worker/deliveries.ts (the HTTP contract). */
@@ -58,6 +58,13 @@ export async function pollOnce(after: string, deps: PollDeps): Promise<string> {
   return next;
 }
 
+/** §9.4a — the first `after`: the saved one when it is a valid instant within FUNHOUSE_START_BACK_MS, else that far back. */
+export function startAfter(saved: string | null, nowMs: number): string {
+  const back = nowMs - FUNHOUSE_START_BACK_MS;
+  const t = saved ? Date.parse(saved.trim()) : NaN;
+  return Number.isFinite(t) && t > back && t <= nowMs ? new Date(t).toISOString() : new Date(back).toISOString();
+}
+
 const stamp = (line: string) => `${new Date().toISOString()} ${line}`;
 
 /** The loop: the only node:fs and clock user. */
@@ -65,13 +72,20 @@ export function main(home: string | undefined): number {
   let token = '';
   try { token = readFileSync(`${home}\\.enso\\ops-notify-token`, 'utf8').trim(); } catch { /* reported below */ }
   if (!token) { console.error(stamp('no token in %USERPROFILE%\\.enso\\ops-notify-token')); return 1; }
-  let after = new Date(Date.now() - FUNHOUSE_START_BACK_MS).toISOString();
+  const afterFile = `${home}\\.enso\\funhouse-poller-after`; // so a restart never re-sends what was handled
+  let saved: string | null = null;
+  try { saved = readFileSync(afterFile, 'utf8'); } catch { /* none yet */ }
+  let after = startAfter(saved, Date.now());
   let busy = false;
   const deps: PollDeps = { fetch, token, log: (line) => console.log(stamp(line)) };
   const tick = () => {
     if (busy) return;
     busy = true;
-    pollOnce(after, deps).then((a) => { after = a; }).finally(() => { busy = false; });
+    pollOnce(after, deps).then((a) => {
+      if (a === after) return;
+      after = a;
+      try { writeFileSync(afterFile, after); } catch (err) { deps.log(`after file → ${err instanceof Error ? err.message : String(err)}`); }
+    }).finally(() => { busy = false; });
   };
   console.log(stamp(`funhouse poller: ${ENSO_API} → ${BRIDGE_URL} every ${FUNHOUSE_POLL_MS / 1000}s`));
   tick();
