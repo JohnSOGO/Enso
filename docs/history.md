@@ -473,10 +473,17 @@ OK or drop. **Still owed:** BS2 with the camera on a real phone.
 **◎ shows by default** (v1.60.1, §8.16, Q234 revised; MojoSOGO 2026-10-11: "I don't see the faint circle bottom left"):
 the switch was off on his phone; like Ozymandias the ◎ now shows on every device unless Settings → 🙂 Me turns it off, and
 it is a little less faint (opacity .6).
+**No photo on an admin's own Done** (v1.60.3, §8.15b, Q261; steward pass 18 finding 1, MojoSOGO picked FIX): an
+admin's Done is OK'd at once, so the Done sheet no longer offers them 📷 (it used to end in a false "already OK'd" error).
+**Still owed:** BS4 on a real phone.
 **A bounty's picture** (v1.60.0, §7B.8, §8.15b, migration 0046, Q260; asked by MojoSOGO 2026-10-11 "if I create a
 bounty, let me add a picture"): ＋ Bounty has 📷 Add photo (sent after Post; Post again retries only the picture);
 the card shows it to everyone; an admin's card has 📷 Add / Replace. Deleted once paid (OK, or an admin's own Done)
 or deleted. **Still owed:** try it on a real phone.
+**Tab bar not cut off on the installed iPhone app** (v1.60.4, §8.1; MojoSOGO 2026-10-11 screenshot "now cutoff and not
+at bottom still"): v1.60.2's `100vh` frame was clipped about 59pt above the screen bottom, because iOS 26 standalone WebKit
+makes `html` 100% / dvh short by the top inset and body's `overflow: hidden` clips there. In standalone, `html` and the
+frame are now `100lvh`. **Still owed:** his look on the iPhone.
 **Tab bar flush on the installed iPhone app** (v1.60.2, §8.1; MojoSOGO 2026-10-11 "on phone app, the bottom icon bar is
 not at the bottom of the screen"): v1.44.0's `position: fixed; inset: 0` still stopped above the home-indicator area in
 standalone WebKit. In `display-mode: standalone` the frame is now `height: 100vh` (the whole screen there). Browser tabs
@@ -491,7 +498,7 @@ is tapped, or Esc (Alt+P toggles on a keyboard); every tap while on is swallowed
 CSS selector), `Screen:`, build stamp. A mouse gets an outline and a crosshair. Checked in headless Chromium, mouse and
 touch: two picks in a row each landed on the clipboard with the tab unchanged, the bar and Esc stop it, taps work after.
 **Still owed:** PA3–PA4 on the iPhone.
-**No stale FunHouse notices** (v1.60.3, §9.4a, Q261; MojoSOGO 2026-10-11: "getting stale alerts on funhouse"): the
+**No stale FunHouse notices** (v1.60.5, §9.4a, Q262; MojoSOGO 2026-10-11: "getting stale alerts on funhouse"): the
 poller skips any notice older than 10 minutes, so a backlog left while the board was off USB is dropped, not replayed.
 **Shorter FunHouse thread pings** (v1.57.1, §9.4a; MojoSOGO 2026-10-11: "the prefix has too many words"): a 🧵
 thread ping reaches the FunHouse as its text alone, which threads now write as `Enso:<thread title> "<ACTION what>"`.

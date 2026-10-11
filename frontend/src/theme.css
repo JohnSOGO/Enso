@@ -23,6 +23,8 @@
 * { box-sizing: border-box; margin: 0; }
 
 html, body, #root { height: 100%; }
+/* §8.1: installed iPhone app: 100% is short by the top inset and body's overflow clips there; lvh is the whole screen. */
+@media (display-mode: standalone) { html { height: 100lvh; } }
 
 body {
   background: var(--bg);
