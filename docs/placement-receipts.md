@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.60.4: standalone document height 100lvh so the tab bar isn't clipped (placement-advisor)
+
+- **Ask:** SPEC 3.06 §8.1 "Flush at the bottom", follow-up to v1.60.2. On the iOS 26 installed app (viewport-fit=cover, black-translucent) the tab bar was cut off about 59pt above the screen bottom: `html` 100%/dvh is short by the top safe-area inset, `body { overflow: hidden }` clips there, only 100lvh is the full screen. Add `@media (display-mode: standalone) { html { height: 100lvh; } }` in theme.css; `.app`'s standalone `height: 100vh` becomes `100lvh`.
+- **Verdict:** `frontend/src/theme.css` (html base sizing) + `frontend/src/App.module.css` (`.app` override) [EXISTING]
+- **Flow stage:** render
+- **Why:** each rule goes to the owner of the box it sizes. v1.60.2 rejected theme.css while only `.app` looked short; the device moved the clip to `html`/`body`. Scoped to standalone so browser tabs keep 100% / `inset: 0`. Only `html` overridden; body/#root inherit. A JS viewport measure was rejected (turns a CSS fact into state).
+- **Caps:** theme.css about 103/300, App.module.css about 49/300. No file newly in the warning band.
+
 ## 2026-10-11 — v1.60.3: no photo on an admin's own Done (placement-advisor)
 
 - **Ask:** Do not offer 📷 Add photo on the one-off Done sheet to an admin, whose Done is OK'd at once (⚑ Q252). The sheet shows Done / Cancel and a line saying the points count at once. No server change. SPEC 3.05 §8.15b, ⚑ Q261, from steward pass 18 finding 1.
