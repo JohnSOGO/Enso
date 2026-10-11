@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Steward pass 13, whole tree (code-steward)
+
+- **Run:** after the v1.49.0 release (SPEC 2.79 §8.6 Settings as a menu of buttons, Q226–Q227, PR #46) and the v1.49.1 patch (PR #48); audited 2542f2c against 507a0ef.
+- **Verdict:** SOUND. Typecheck green, 765/765 tests (99 files), arch:audit quiet (nearest at 87%: EventForm.tsx, Calendar.tsx, routes/recipes.ts; tick.ts 117/148; Settings.tsx 59/99 after its re-pin).
+- **Placement audit:** 3 receipts checked against 3 code commits (0eb8538 reorganizer split, baa23fd feature, 7d79079 patch); each landed as its verdict said. 0 code commits without a receipt. The map rows for Settings, SettingsMe / Household / Members / Status, PickGrid, ListPicker and App match their files.
+- **Top finding:** none. Settings.tsx is a menu that holds only which area is open, each Settings* file is one area, and PickGrid has two real callers (ListPicker, Settings) plus PickFace for the Lists button.
+- **Handoffs:** none new. Still open, all LOW, each for its area's next touch: pass 11's two §7D notes (machinesView alertId null for an inactive member; the stale "default speakers" comment in fire-rows.ts), pass 10's house-row helper note, and the snooze-keeps-away test.
+- **Restraint:** the App.tsx banner texts that name Settings areas are left as prose (no shared label import). Settings*'s use of Lists.module.css is its documented shared role. The small Settings* files are areas, not fragments. PickGrid's extra / chosen options are moved Lists behavior. No frontend component tests for SM1–SM3, per project convention (SM4 is manual and listed as owed).
+
 ## 2026-10-11 — v1.49.2: Away silences phones too; tick skips push rows for an away fire (placement-advisor)
 
 - **Ask:** SPEC §9.2c (SPEC 2.81), MojoSOGO picked ALL: while fires.away_by is set, tick step 2 writes no push row as well as no house row. The alert still steps.
