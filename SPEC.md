@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.87 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.88 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -857,6 +857,19 @@ Notes on it:
 **Migration check (FH-M):** every delivery row survives 0042 with every column unchanged; a `funhouse` row can be
 written; a `bogus` channel is still refused.
 
+### 4.2zp Schema change — `migrations/0043_cooking.sql`
+
+Asked by MojoSOGO 2026-10-11 (§7D.8).
+
+Schema: [`migrations/0043_cooking.sql`](migrations/0043_cooking.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §7D.8 — a cooking timer is a `machines` row created on demand, so a `machine` fire can point at it unchanged:
+  `cook_kind` (NULL for the three fixed machines), `name`, `created_at`, `closed_at`. Additive only; it runs before
+  the deploy.
+
+**Migration check (CK-M):** see §7D.8.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -992,7 +1005,7 @@ app's Ringing bar (§8.2) until someone acts.
 | `snooze` | reminder, `ringing` | `scheduled`, `due_at = now + SNOOZE_MIN`, `alert_count = 0` |
 | `done` | chore, `ringing` | advances the run one step (§7B.3) — the route calls `advanceRun`; the fire closes `done` |
 | `ack` | timer, `ringing` **or** `scheduled` | `closed`, reason `acked`; **next** = new timer fire `due_at = nextTimerDue(now, intervalMin, window)` (= `now + intervalMin` without a window) |
-| any | machine | `invalid_action` — a machine fire is closed only by the `/machines` routes (§7D) |
+| any | machine | `invalid_action` — a machine fire is closed only by the `/machines` and `/cooking` routes (§7D, §7D.8) |
 | anything else | — | `{ error: 'invalid_action' }` → HTTP 409 |
 
 Any member may act on any fire. ⚑ DEFAULT
@@ -1073,6 +1086,7 @@ Runs from `scheduled()` every minute, and from `POST /api/v1/dev/tick` in dev.
    announcing timer whose window just opened (§5.5a). Fire-less deliveries; the push rows are sent at once.
    3d. **Weather.** `weatherTick` (`src/worker/weather-days.ts`): the once-a-day forecast refresh (§7.11). It never
    throws; a failure is logged and retried hourly.
+   3e. **Cooking timers' end of day.** Close every open cooking timer `cookExpired` names (§7D.8).
 4. **Speak house.** `sendHouseDeliveries(env, now)` drains queued and stale-claimed `house`
    deliveries (§9.2).
 5. Use a D1 `batch()` per fire for the writes. D1 has no `BEGIN`/`COMMIT`.
@@ -2714,6 +2728,63 @@ to." (The dish washer had just finished and every speaker in the house spoke wit
 | AL5 | start the washer for A alerting B; move to the dryer; tick its done-at and the next | the dryer's `alert_id` is B; alert 1 phones (phone first), alert 2 adds the house row |
 | AL6 | start for A alerting B, then disable B; tick | phones only, no house row |
 
+### 7D.8 Cooking timers — asked by MojoSOGO 2026-10-11
+
+"Break machines into washing machines and cooking machines; add cooking machines: air fryer, stove, microwave… we
+actually have multiple air fryers and stoves and ovens, so maybe it is the generic create and it launches an instance
+of the timer. Don't despawn until explicitly closed because [I] may need to edit, give red X and auto clear end of day
+assuming timer isn't active."
+
+The washing machines (§7D.1–7D.7) are unchanged. A **cooking timer** is not a fixed machine: anyone **creates** one
+each time something goes in, as many as they like at once, and it stays on the list until someone closes it.
+- **Stored** as one more `machines` row (§4.2zp): id `cook_…`, `cook_kind` (`COOK_KIND`, vocab), an optional `name`
+  (≤ 40 characters, "Oven 2"), `created_at`, and `closed_at` (NULL = on the list). Its load uses the machine
+  columns: `minutes`, `started_at`, `done_at`, `alert_id`; `owner_id` and `started_by` = who started it. Its
+  fire is an ordinary `machine` fire on that row. A closed timer's row stays (its fires point at it) and is never shown again.
+  `GET /machines` still lists only the fixed machines.
+- **Kinds** ⚑ Q239: Air fryer 🍟 · Stove 🍳 · Oven 🔥 · Microwave ⚡ · Other ⏲️. Its **label** is its name, else its
+  kind ("Air fryer").
+- **State** is `machineState` (§7D.1): **running** before done-at, **done** after, **off** (free) when stopped or
+  turned off. Rules are pure in `src/shared/cooking.ts`.
+
+| Action | Valid when | Result |
+|---|---|---|
+| **Create** `{ kind, name?, minutes, alertId? }` | always | a new timer, running: `started_at = now`, `done_at = now + minutes`, a `machine` fire due then |
+| **Off** | done | off; its open fire closes `done` (`closed_by` = me). Kind, name, minutes and alert person stay |
+| **Stop** | running | off; its open fire closes `removed`; nothing rings |
+| **Start again** | off | running again with its saved minutes and alert person, a new fire |
+| **Edit** `{ kind?, name?, minutes?, alertId? }` | any state | saved. New minutes on a running or done timer move its done-at to `started_at + minutes` (never before now): the open fire closes `superseded` and a new one is due then, so a timer edited to an earlier time is done now |
+| **Close** — the red ✕ | any state | `closed_at = now`; its open fire closes `removed`; gone from the list |
+
+- **Minutes:** a whole number 1–600 ⚑ Q240; anything else → 400 "Minutes must be a whole number from 1 to 600.".
+  **Alert when done** works as §7D.7: absent on Create → me; null → nobody (phones only); a person → also every
+  speaker. Kind not in `COOK_KIND`, or a name over 40 characters → 400 with a message.
+- Refusals are 409 with a message: Off on a timer that isn't done → `not_done`; Stop on one that isn't running →
+  `not_running`; Start again on one that isn't off → `busy`; any action on a closed or unknown timer → 404. Two taps at
+  once → 409 `conflict`, as §7D.2.
+- **Ringing** (§7D.3 plumbing): every active member's phones, plus one House announcement on every speaker when it has
+  someone to alert; Quiet the house, Away and phone first on top as for any machine. Unlike the washing machines it
+  rings **at any hour** (no alert hours, §7D.5) and every **5 minutes**, 4 alerts ⚑ Q241. Message:
+  `"Sam, the air fryer is done"` / `"Sam, Oven 2 is done"`; with nobody to alert (or not active) `"The air fryer is
+  done"` / `"Oven 2 is done"`; `" (alert n)"` as usual. A ringing cooking fire's one button is **Off**.
+- **End of day** ⚑ Q242: each tick (§5.6 step 3e) closes, as ✕ does (`closed_by` NULL), every open cooking timer
+  that is **not active** and whose last change (its `updated_at`, or its done-at when later) was before today's local
+  midnight. **Active** = running, or done with alerts still to send (its open fire has fewer than 4 alerts). So a
+  timer still counting down at midnight stays until it has rung out, and is cleared at the next midnight unless used.
+
+| # | Setup / call | Expected |
+|---|---|---|
+| CK1 | `cookLabel` with and without a name; `cookMessage` with an alert person, without, with a name | "Oven 2" / "Air fryer"; the four texts above |
+| CK2 | `parseCreate` / `parseEdit`: minutes 0, 601, 2.5, 12; kind `grill`; a 41-character name; alertId absent / null / a stranger | 400 texts; 12 ok; kind and name texts; me / null / a message |
+| CK3 | Create an air fryer for 12 min, then tick at done-at | 201, running, one fire due in 12 min; alert 1 to every phone, alert 2 (5 min later) adds the house (phone first, §9.2d), `A, the air fryer is done` |
+| CK4 | Create with `alertId: null`; ticks at done-at and 5 min later | phones only on both alerts, no house row; never waits for the machine alert hours |
+| CK5 | Off on the done timer; Start again; Stop | off, fire closed `done`; running with a new fire; off, fire closed `removed` |
+| CK6 | Edit minutes 12 → 20 on a running timer started 10 min ago; then → 5 | done-at = start + 20, old fire `superseded`, a new one; done-at = now, done |
+| CK7 | ✕ on a running timer; then GET and any action on it | fire closed `removed`; not listed; 404 |
+| CK8 | `cookExpired`: off since yesterday 18:00; running across midnight; done 23:58 with 2 alerts sent; done yesterday with 4 sent; off since today 00:05 (Los Angeles) | true / false / false / true / false |
+| CK9 | tick after local midnight with an off timer from yesterday and a running one | the off one closed (`closed_by` NULL), the running one stays |
+| CK-M | migration check (§4.2zp) | the three machines and their open fires unchanged; a cooking row and its fire can be written |
+
 ---
 
 ## 7E. Recipes — `src/shared/recipes.ts` (pure)
@@ -3335,7 +3406,7 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
 - Machine row: `🧺 Clothes washer · Sam` with **[Move to clothes dryer]** — it opens the same
   dryer-minutes chooser the Machines card uses (§8.5); `🧺 Clothes dryer · Sam` with **[Fold &
   out]**; `🧺 Dish washer · Sam` (who started it, §7D.6) with **[Emptied]**. No Done:
-  a machine fire is closed only by the `/machines` routes (§7D.2). ⚑ Q40
+  a machine fire is closed only by the `/machines` routes (§7D.2), or `/cooking` (§7D.8). ⚑ Q40
 - **Away** (§9.2c) on every row not yet away: "I've seen it, I'm not home." The speakers and phones stop for that alert;
   the row stays. An away row shows `· away ({name})` instead of the button.
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
@@ -3518,6 +3589,18 @@ Start a machine. When it's done, every phone hears; the speakers too when someon
 - A refusal (§7D.2) renders inside the chooser, or above the cards for Clear / Fold & out,
   with `role="alert"`. Clear asks once ("Clear the washer? Nothing will ring.").
 - Done-at is household local time; the cards re-read `/machines` on every app refresh.
+
+**Two groups** (§7D.8, MojoSOGO 2026-10-11): the Machines modal has **🧺 Washing machines** (the cards above, with
+the intro and alert-hours lines, unchanged) and below it **🍳 Cooking** ⚑ Q243:
+- a **＋ Cooking timer** button opens the create box: *What?* one chip per `COOK_KIND` (Air fryer preselected), an
+  optional *Name* field ("Oven 2", 16 px), *🔔 Alert when done (optional)* as in the chooser (me preselected),
+  *How long?* a minutes field with chips **1 · 3 · 5 · 10 · 15 · 20 · 30 · 45 · 60** that fill it, and **[Start]**.
+- one card per open timer, oldest first: emoji + label, a **red ✕** at its top right, the badge (running green /
+  **DONE** amber / off neutral), `~14:05` (or `done 14:05`, or `12 min` when off) and `· alerts Sam` / `· phones only`.
+  Actions: running **[Edit] [Stop]**; done **[Off]** **[Edit]**; off **[Start again]** **[Edit]**. Edit opens the
+  same box titled "Edit Oven 2" with **[Save]**. ✕ on a running timer asks once ("Close Oven 2? It won't ring.");
+  otherwise it closes at once. With no timers the group shows "Nothing cooking."
+- The cards re-read `/cooking` on every app refresh, like the machines.
 
 **The chore list** — on the 🧹 Chores tab since v1.28.0 (§8.15), under "All chores", with its own
 **＋ Add**. One line per chore, sorted by time:
@@ -4882,7 +4965,7 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | GET | `/alarms` | member | → alarms: `{ id, title, time, days: Weekday[], channels, renotifyMin, assignedTo, createdBy, nextDueAt, ringing }` |
 | POST | `/alarms` | member | `{ title, time: "HH:MM", days: Weekday[], channels, renotifyMin?, assignedTo? }` → alarm |
 | PATCH/DELETE | `/alarms/{id}` | creator or owner | same fields as POST, all optional; closes future scheduled fires like an event edit |
-| GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Clothes washer") and `personId` = the load's owner; every fire carries `awayBy` (§9.2c) |
+| GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Clothes washer") and `personId` = the load's owner (a cooking timer's fire: its label, §7D.8); every fire carries `awayBy` (§9.2c) |
 | GET | `/machines` | member | → `Machine[]` in load order: `{ id, label, state: MachineState, ownerId, minutes, startedAt, doneAt, startedBy, next }` (`state` derived by the server, §7D.1; `next` = the next machine's id or null) |
 | POST | `/machines/{id}/start` | member | `{ ownerId, minutes, alertId? }` (§7D.7) → `Machine[]`; 409 `busy` when not free (§7D.2) |
 | POST | `/machines/{id}/move` | member | `{ minutes }` → `Machine[]`; 409 `busy` / `not_done` / `invalid_state` |
@@ -4891,6 +4974,10 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | POST | `/machines/{id}/done` | member | Done now `{ ownerId?, alertId? }` (required when free) → `Machine[]`; 409 `busy` when already done, 400 `invalid_input` (§7D.2) |
 | POST | `/machines/{id}/remind` | member | Still loaded → `Machine[]`; 409 `not_done` (§7D.2) |
 | POST | `/machines/{id}/clear` | member | → `Machine[]`; 409 `already_free`. Every `/machines` write: 404 for an unknown machine, 400 `invalid_input`, 409 `conflict` when another tap changed the machine first |
+| GET | `/cooking` | member | → `Cooking[]`, open timers oldest first: `{ id, kind, name, label, state: MachineState, minutes, startedAt, doneAt, alertId, startedBy }` (§7D.8) |
+| POST | `/cooking` | member | Create `{ kind, name?, minutes, alertId? }` → 201 `Cooking[]`; 400 `invalid_input` |
+| PATCH | `/cooking/{id}` | member | Edit `{ kind?, name?, minutes?, alertId? }` → `Cooking[]` |
+| POST | `/cooking/{id}/off` · `/stop` · `/start` · `/close` | member | → `Cooking[]`; 409 `not_done` / `not_running` / `busy` / `conflict`; 404 for an unknown or closed timer (§7D.8) |
 | POST | `/fires/{id}/actions` | member | `{ action: Action }` → fire (+ next); 409 on `invalid_action` |
 | POST | `/fires/{id}/away` | member | "I'm away": → the fire with `awayBy`; its speakers stop, it stays open (§9.2c); 404; 409 `invalid_action` when closed |
 | POST | `/push/subscriptions` | member | `PushSubscriptionJSON` + userAgent → `{ id }` (upserted by endpoint) |

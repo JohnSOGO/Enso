@@ -4,6 +4,7 @@ import { DEFAULT_MAX_ALERTS, choreFireContext, choreFromRow, planChoreRuns, type
 import { isStartReminder, type ThingRow } from '../shared/things';
 import { doneMessage, isMachineId, isStillLoaded, machineAlert, waitingLoad, type MachineRow } from '../shared/machines';
 import { machineHoursOf, machineQuietUntil } from '../shared/machine-hours';
+import { cookAlert, cookMessage, isCookId, type CookRow } from '../shared/cooking';
 import type { Channel, SunEvent } from '../shared/vocab';
 import { utcToLocal } from '../shared/time';
 import { sunsetUtc } from '../shared/sun';
@@ -91,12 +92,19 @@ export async function sourceOf(
   if (fire.kind === 'machine') {
     // §7D.5: outside the alert hours an alert waits for them (quietUntil). §7D.3: every active member's phones and the default speakers, naming the load's owner; a done load waiting
     // in the machine before this one is named at alert time; a fire restarted by Still loaded says what's next.
-    if (!isMachineId(fire.machine_id)) return null;
-    const rows = await all<MachineRow>(db, 'SELECT * FROM machines');
-    const m = rows.find((r) => r.id === fire.machine_id);
-    if (!m) return null;
     const nameOf = async (id: string | null) => id === null ? null
       : (await first<{ display_name: string }>(db, 'SELECT display_name FROM members WHERE id = ? AND disabled_at IS NULL', id))?.display_name ?? null;
+    if (isCookId(fire.machine_id)) {
+      // §7D.8: a cooking timer rings at any hour, every 5 minutes, naming who is alerted; nobody active → phones only.
+      const k = await first<CookRow>(db, 'SELECT * FROM machines WHERE id = ?', fire.machine_id);
+      if (!k) return null;
+      const alertName = await nameOf(k.alert_id);
+      return { title: cookMessage(k, alertName), ...cookAlert(alertName !== null ? k.alert_id : null) };
+    }
+    if (!isMachineId(fire.machine_id)) return null;
+    const rows = await all<MachineRow>(db, 'SELECT * FROM machines WHERE cook_kind IS NULL');
+    const m = rows.find((r) => r.id === fire.machine_id);
+    if (!m) return null;
     const owner = m.owner_id === null ? undefined : await nameOf(m.owner_id); // §7D.3: no owner → "Owner unknown"
     const waiting = waitingLoad(rows, m.id, now);
     const st = (await first<Parameters<typeof machineHoursOf>[0] & { timezone: string }>(db, 'SELECT * FROM settings WHERE id = 1'))!;

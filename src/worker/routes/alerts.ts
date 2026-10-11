@@ -1,7 +1,7 @@
 // SPEC §5.4, §5.5, §10 — timers and fires (the things that ring).
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
-import { ACTION, CHANNEL, TIMER_CMD, isOneOf, type Channel } from '../../shared/vocab';
+import { ACTION, CHANNEL, TIMER_CMD, isOneOf, type Channel, type CookKind } from '../../shared/vocab';
 import { applyAction, applyTimerCmd, timerWindow, timerWindowError, type FireRow } from '../../shared/engine';
 import { all, first, householdTz, newId, nowIso, parseJson, run } from '../db';
 import { isTime } from '../../shared/time';
@@ -14,6 +14,7 @@ import { insertFire, loadChoreRun, sourceOf, updateFire } from '../fire-rows';
 import { completeStep } from './chores';
 import { isOnFor } from '../../shared/optins';
 import { MACHINE_LABEL, isMachineId } from '../../shared/machines';
+import { cookLabel } from '../../shared/cooking';
 import { onEventIds } from '../event-rows';
 import { ANNOUNCE_NEEDS_WINDOW } from '../../shared/timer-start';
 
@@ -140,10 +141,11 @@ alerts.post('/timers/:id/commands', requireMember, async (c) => {
 async function fireViews(db: D1Database, me: string, where: string, binds: unknown[], hideOff = true) {
   const rows = await all<Record<string, unknown> & {
     kind: string; choreRunId: string | null; optional: number | null; machineId: string | null; machineOwner: string | null;
+    cookKind: CookKind | null; cookName: string | null;
   }>(db,
     `SELECT f.id, f.kind, f.due_at AS dueAt, f.state, f.alert_count AS alertCount, f.occurrence_date AS occurrenceDate,
             f.event_id AS eventId, f.timer_id AS timerId, f.chore_run_id AS choreRunId, f.thing_id AS thingId,
-            f.machine_id AS machineId, m.owner_id AS machineOwner, f.away_by AS awayBy,
+            f.machine_id AS machineId, m.owner_id AS machineOwner, m.cook_kind AS cookKind, m.name AS cookName, f.away_by AS awayBy,
             COALESCE(e.title, t.title, th.title) AS title, e.start_time AS startTime, e.start_sun AS startSun, e.optional
        FROM fires f LEFT JOIN events e ON e.id = f.event_id LEFT JOIN timers t ON t.id = f.timer_id
        LEFT JOIN things th ON th.id = f.thing_id LEFT JOIN machines m ON m.id = f.machine_id
@@ -151,12 +153,13 @@ async function fireViews(db: D1Database, me: string, where: string, binds: unkno
       ORDER BY f.due_at DESC`, ...binds);
   const on = await onEventIds(db, me);
   const out = [];
-  for (const { choreRunId, optional, machineId, machineOwner, ...r } of rows) {
+  for (const { choreRunId, optional, machineId, machineOwner, cookKind, cookName, ...r } of rows) {
     // §7.5: a reminder of an optional event is hidden from whoever doesn't have it on.
     if (hideOff && r.kind === 'reminder' && !isOnFor({ optional: optional ?? 0 }, me, on.has(r.eventId as string) ? [me] : [])) continue;
     // §10: machine fires carry the machine, its label as the title, and the load's owner.
     if (r.kind === 'machine') {
-      out.push({ ...r, machineId, title: isMachineId(machineId) ? MACHINE_LABEL[machineId] : null, personId: machineOwner });
+      const title = isMachineId(machineId) ? MACHINE_LABEL[machineId] : cookKind ? cookLabel({ cook_kind: cookKind, name: cookName }) : null; // §7D.8
+      out.push({ ...r, machineId, title, personId: machineOwner });
       continue;
     }
     if (r.kind !== 'chore') { out.push(r); continue; }

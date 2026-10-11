@@ -56,7 +56,7 @@ export interface MachineRow {
 }
 
 /** §7D.1 — free (no load), running (before done-at), done (done-at passed). Derived, never stored; a load's owner may be unknown. */
-export function machineState(row: MachineRow, now: string): MachineState {
+export function machineState(row: Pick<MachineRow, 'done_at'>, now: string): MachineState {
   if (row.done_at === null) return 'free';
   return ms(now) < ms(row.done_at) ? 'running' : 'done';
 }

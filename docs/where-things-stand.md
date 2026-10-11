@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-11, v1.53.0, main = production.*
+*Last updated 2026-10-11, v1.54.0, main = production.*
 
 ## Running where
 
@@ -48,6 +48,8 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- Cooking timers (v1.54.0, §7D.8): on the iPhone at 320 px, Alarms → 🫧 Machines → ＋ Cooking timer, start an air fryer
+  for 1 minute, Edit it, hear it done, tap Off, then the red ✕. Q239–Q243 are ⚑ defaults.
 - Alarms tab as a menu (v1.53.0, §8.5): on the iPhone at 320 px, open each of ⏰ Alarms, ⏱ Rolling timers, 🫧 Machines;
   ＋ Add an alarm and Save, land back on the list (AM1–AM3). Q238 is a ⚑ default.
 - 🎯 Point at it (v1.52.0–v1.52.1, §8.16): on the iPhone, turn it on in Settings → 🙂 Me, then pick a tick box, a button, a text field and a select (none should act, each lands on the clipboard) and one inside a modal (PA3–PA4). Q234–Q237 are ⚑ defaults.

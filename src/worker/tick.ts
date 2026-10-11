@@ -18,6 +18,7 @@ import { speaksOnHouse } from '../shared/phone-first';
 import { messTick } from './mess-asks';
 import { timerStartTick } from './timer-starts';
 import { weatherTick } from './weather-days';
+import { cookDayTick } from './cook-rows';
 
 export interface TickSummary { materialized: number; stepped: number; alerts: number; deliveries: number }
 
@@ -114,6 +115,8 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
   await timerStartTick(env, now);
   // 3d. Refresh the forecast once a day (§7.11).
   await weatherTick(env, now);
+  // 3e. Close the cooking timers whose day is over (§7D.8).
+  await cookDayTick(env, now);
   // 4. Speak the queued and stale-claimed house deliveries (§9.2).
   await sendHouseDeliveries(env, now);
   return summary;

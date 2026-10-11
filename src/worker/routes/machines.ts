@@ -13,7 +13,7 @@ import { body, fail } from '../http';
 import { requireMember, requireOwner } from '../session';
 import { insertFire, updateFire } from '../fire-rows';
 
-const loadRows = (db: D1Database) => all<MachineRow>(db, 'SELECT * FROM machines');
+const loadRows = (db: D1Database) => all<MachineRow>(db, 'SELECT * FROM machines WHERE cook_kind IS NULL'); // §7D.8: the fixed machines only
 
 function machinesView(rows: MachineRow[], now: string) {
   return MACHINE.map((id) => rows.find((r) => r.id === id)).filter((r): r is MachineRow => !!r).map((r) => ({
