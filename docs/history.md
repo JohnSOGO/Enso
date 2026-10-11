@@ -477,6 +477,10 @@ it is a little less faint (opacity .6).
 bounty, let me add a picture"): ＋ Bounty has 📷 Add photo (sent after Post; Post again retries only the picture);
 the card shows it to everyone; an admin's card has 📷 Add / Replace. Deleted once paid (OK, or an admin's own Done)
 or deleted. **Still owed:** try it on a real phone.
+**Tab bar flush on the installed iPhone app** (v1.60.2, §8.1; MojoSOGO 2026-10-11 "on phone app, the bottom icon bar is
+not at the bottom of the screen"): v1.44.0's `position: fixed; inset: 0` still stopped above the home-indicator area in
+standalone WebKit. In `display-mode: standalone` the frame is now `height: 100vh` (the whole screen there). Browser tabs
+unchanged. **Still owed:** a look on the real iPhone (no WebKit standalone in the test rig).
 **Point at it label matches ◎** (v1.59.1, §8.16; steward pass 17): the Settings → 🙂 Me switch label said "tap 🎯 …
 get a line"; it now says tap ◎ bottom left, tap anything, tap ◎ again to stop.
 **🎯 Pick mode like Ozymandias** (v1.58.0, §8.16, Q236–Q237 revised; MojoSOGO 2026-10-11: "look at ozymandias and do

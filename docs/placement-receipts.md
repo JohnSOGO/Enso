@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.60.2: standalone PWA frame flush to screen bottom (placement-advisor)
+
+- **Ask:** SPEC 3.04 §8.1 "Flush at the bottom". On the installed iPhone app the fixed `.app` box (`inset: 0`) stops above the bottom safe area, so the tab bar floats. Add `@media (display-mode: standalone) { .app { bottom: auto; height: 100vh; } }`.
+- **Verdict:** `frontend/src/App.module.css` [EXISTING]
+- **Flow stage:** render
+- **Why:** the bug is in `.app`, owned by App.tsx's frame (§8.1) under the `frontend/src/*.module.css` row. Pure presentation. Scoped to standalone so browser tabs keep `inset: 0`; theme.css (global base) rejected. `.tabs` safe-area padding and `.fab` offset unchanged; check on device.
+- **Caps:** App.module.css about 50/300. No file newly in the warning band.
+
 ## 2026-10-11 — v1.60.1: Point at it on by default, ◎ more visible (placement-advisor)
 
 - **Ask:** SPEC 3.03 §8.16 ⚑ Q234. The ◎ now shows by default on every device, as on Ozymandias. The Settings → 🙂 Me switch now turns it off (`enso.pointAt === '0'` means off, anything else means on). The floating ◎ opacity goes from .45 to .6 because MojoSOGO couldn't see it.
@@ -15,6 +23,7 @@ carry its result.
 - **Why:** PointAtButton.tsx is the only module that reads or writes the device switch, so flipping the default there moves SettingsMe and PointAt together and creates no second copy. The server snapshot is also a statement of the default, so it flips with `read`. Rejected: the default in SettingsMe (a restatement) or state.tsx (device-local, not account state).
 - **Caps:** PointAtButton.tsx 30/300; PointAt.module.css ~35/300. Nothing in the band.
 - **Sources read:** PointAtButton.tsx, PointAt.module.css, SettingsMe.tsx (28–35), scripts/arch.ts, docs/module-ownership.md, docs/placement-receipts.md, SPEC.md §8.16.
+
 ## 2026-10-11 — v1.60.0: A bounty's picture (placement-advisor)
 
 - **Ask:** SPEC 3.02 §7B.8 "A bounty's picture":
