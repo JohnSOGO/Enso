@@ -470,6 +470,10 @@ captions (5 ingredients, 6 steps — it had been "watch it").
 to snap a photo of completed work so adult can approve remotely"): Done on a one-off opens a sheet with an optional
 photo; a chore run's photo is added from Waiting for OK; admins see it there full size and OK or send back. Deleted on
 OK or drop. **Still owed:** BS2 with the camera on a real phone.
+**Tab bar flush on the installed iPhone app** (v1.59.2, §8.1; MojoSOGO 2026-10-11 "on phone app, the bottom icon bar is
+not at the bottom of the screen"): v1.44.0's `position: fixed; inset: 0` still stopped above the home-indicator area in
+standalone WebKit. In `display-mode: standalone` the frame is now `height: 100vh` (the whole screen there). Browser tabs
+unchanged. **Still owed:** a look on the real iPhone (no WebKit standalone in the test rig).
 **Point at it label matches ◎** (v1.59.1, §8.16; steward pass 17): the Settings → 🙂 Me switch label said "tap 🎯 …
 get a line"; it now says tap ◎ bottom left, tap anything, tap ◎ again to stop.
 **🎯 Pick mode like Ozymandias** (v1.58.0, §8.16, Q236–Q237 revised; MojoSOGO 2026-10-11: "look at ozymandias and do

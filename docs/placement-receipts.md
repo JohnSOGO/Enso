@@ -16,6 +16,14 @@ carry its result.
 - **Handoffs:** waiting on MojoSOGO's pick: (1) the Done re-throw plus the losing-tap tests (absorbs pass 16's conflict-guard item); (2) wording: PickGrid's caller list now missing Chores (stop listing callers). The pick-mode wording slips (SettingsMe label, PointAtButton header, PointAt map row, where-things-stand header) were fixed at once as v1.59.1 by the thread that shipped v1.58.0. Still open, all LOW: pass 11's two §7D notes, pass 10's house-row helper, the snooze-keeps-away test, the machines.ts alert-hours seam. Pass 6 items 1, 3 and 4 (alertMessage options, read-budget wording, EVENT_NOTES_MAX) fell off the carry list without a decision; MojoSOGO to retire or re-list them.
 - **Restraint:** the PickGrid + Modal menu glue now has three copies (Settings, Alarms, Chores), about 4 lines each with no rule, so no PickMenu until a fourth; the active-admins query twice; the name lookup twice; /take's SQL mirroring dibHolds (atomic guard); /earnings ok's unconditional UPDATE (a dropped earning never scores); the finisherOf route import; selectorFor kept in point-line.ts.
 
+## 2026-10-11 — v1.59.2: standalone PWA frame flush to screen bottom (placement-advisor)
+
+- **Ask:** SPEC 3.02 §8.1 "Flush at the bottom". On the installed iPhone app the fixed `.app` box (`inset: 0`) stops above the bottom safe area, so the tab bar floats. Add `@media (display-mode: standalone) { .app { bottom: auto; height: 100vh; } }`.
+- **Verdict:** `frontend/src/App.module.css` [EXISTING]
+- **Flow stage:** render
+- **Why:** the bug is in `.app`, owned by App.tsx's frame (§8.1) under the `frontend/src/*.module.css` row. Pure presentation. Scoped to standalone so browser tabs keep `inset: 0`; theme.css (global base) rejected. `.tabs` safe-area padding and `.fab` offset unchanged; check on device.
+- **Caps:** App.module.css about 50/300. No file newly in the warning band.
+
 ## 2026-10-11 — v1.59.1: Point at it label and comment match ◎ (placement-advisor)
 
 - **Ask:** SPEC 3.01 §8.16 wording only. The Settings → 🙂 Me switch label still said "tap 🎯 … get a line naming it", but since v1.58.0 the button is ◎, pick mode stays on, and it copies several lines. The PointAtButton header comment still said "🎯 button".
