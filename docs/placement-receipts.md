@@ -7,15 +7,37 @@ carry its result.
 
 ---
 
-## 2026-10-11 — v1.54.4: Opening-screen tagline (placement-advisor)
+## 2026-10-11 — v1.55.1: Opening-screen tagline (placement-advisor)
 
-- **Ask:** SPEC 2.92 §8.10: the tagline "Closing the loop. Peace of mind, every day." under the "Ensō" heading on the opening screen, and the iPhone splash PNGs re-rendered from that screen.
+- **Ask:** SPEC 2.94 §8.10: the tagline "Closing the loop. Peace of mind, every day." under the "Ensō" heading on the opening screen, and the iPhone splash PNGs re-rendered from that screen.
 - **Verdict:** `frontend/index.html` (#splash) [EXISTING, reuse; no new module]
 - **Flow stage:** render
 - **Why:** §8.10 makes the opening screen plain HTML in index.html so it paints before any script. A static tagline is one `<p>` there plus its CSS. index.html is outside `SOURCE_EXT`, with no cap, map row or fan-in.
 - **Rejected:** a React component in frontend/src/ (would show only after the bundle loads, and copy the screen); `vocab.ts` (display copy, and the splash cannot import it); the sign-in screens (no logo there); drawing the PNGs separately (§8.10 says they are rendered from this screen).
 - **Caps:** none affected. No file enters the warning band.
 - **Sources read:** frontend/index.html, scripts/arch.ts, docs/module-ownership.md.
+
+---
+
+## 2026-10-11 — v1.55.0: Chores tab becomes a section menu (placement-advisor)
+
+- **Ask:** Make the 🧹 Chores tab a menu like Alarms/Settings: heading Chores, a PickGrid of ✅ Today · 🧽 Messes · 📋 All chores, and a tap opens that section in a Modal titled emoji + name, with nothing inside the sections changing (SPEC 2.93 §8.15, ⚑ Q245).
+- **Verdict:** frontend/src/components/Chores.tsx [EXISTING]. The All chores list moves into a local AllChoresSection in the same file. The map row is reworded to describe the menu.
+- **Flow stage:** render
+- **Why:** This only regroups the sections Chores.tsx already lays out, using the pattern from Alarms.tsx (§8.5, v1.53.0) and Settings.tsx (§8.6) with PickGrid and Modal, which hold no state. No rule, route or vocabulary involved. The fetch stays in ChoresTab because ChoresToday's 📋 needs the chores list while All chores is closed. Rejected: a new ChoresAll.tsx (needless at about 120 lines). Rejected: a shared section-menu helper for Alarms/Settings/Chores (speculative). Rejected: dropping Messes' own h2 (widens scope into Messes.tsx against "nothing inside changes").
+- **Caps:** Chores.tsx 84/300 → about 120/300. No file enters the band; CEILINGS unchanged.
+- **Reorganizer:** none needed.
+
+---
+
+## 2026-10-11 — v1.54.4: Alarms tab splits Machines into Washing machines and Cooking machines (placement-advisor)
+
+- **Ask:** SPEC 2.92 §8.5: the Alarms tab PickGrid goes from three buttons to four (⏰ Alarms, ⏱ Rolling timers, 🧺 Washing machines, 🍳 Cooking machines). Each machines button opens its own modal: MachinesSection alone, CookingSection alone. The groups' own h3 headings go, since the modal title names them.
+- **Verdict:** frontend/src/components/Alarms.tsx (SECTIONS and body map); Machines.tsx and Cooking.tsx (heading removal only) [EXISTING]
+- **Flow stage:** render
+- **Why:** Alarms.tsx already owns which section is open, so a fourth PickGrid entry is a data change in its SECTIONS list. Each group file keeps its single concern and only loses the heading the Modal title now provides; Cooking keeps its ＋ Cooking timer row with a flex spacer. Rejected: a new "MachinesMenu" wrapper (a hop for no concern). Ownership rows for Alarms, Machines, Cooking and MachineHours corrected in the same commit.
+- **Caps:** Alarms.tsx about 172/300, Machines.tsx about 173/300, Cooking.tsx about 71/300. None in the warning band.
+- **Sources read:** Alarms.tsx, Machines.tsx, Cooking.tsx, docs/module-ownership.md, scripts/arch.ts, SPEC.md §8.5.
 
 ## 2026-10-11 — v1.54.2: Cooking box custom minutes box in the chip row (placement-advisor)
 
