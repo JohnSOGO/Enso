@@ -226,4 +226,6 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q223 | A timer start announcement in My alerts (§9.5) | ⚑ "Announcement" (the row carries nothing that tells it apart) |
 | Q224 | Deleting alerts (§9.5) | ⚑ Each person's own list only; ❌ hides one with no asking; Clear all asks first |
 | Q225 | A notification tapped while signed out (§9.5) | ⚑ Sign in first, then the card opens |
+| Q226 | Settings as a menu (§8.6) | ⚑ Eight buttons in this order: Me, Calendar items, Phone alerts, Speakers, Alerts, Household, Members, Status; each opens in a modal, closing returns to the menu |
+| Q227 | Where Log out sits (§8.6) | ⚑ Under the Settings grid, not inside Me |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |

@@ -14,14 +14,5 @@
 .whoWhen { flex: none; white-space: nowrap; font-size: .8rem; }
 .edit { flex: none; min-width: 44px; min-height: 44px; color: var(--text-dim); }
 
-/* The list button and the ListPicker popup's buttons (§8.8): emoji, name (truncates), open count. */
+/* The list button (§8.8); its face and the popup's buttons are PickGrid's. */
 .chosen { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 8px; text-align: left; }
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-@media (max-width: 359px) { .grid { grid-template-columns: 1fr; } }
-.pick { min-height: 52px; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 6px 8px; text-align: left; }
-.pick[aria-pressed='true'] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.pickEmoji { flex: none; font-size: 1.3rem; line-height: 1; }
-.pickName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pickCount { flex: none; font-size: .85rem; font-variant-numeric: tabular-nums; }
-/* In the popup a long name wraps to two lines rather than cutting off. */
-.grid .pickName { white-space: normal; overflow-wrap: break-word; hyphens: auto; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }

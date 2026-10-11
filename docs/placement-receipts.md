@@ -7,6 +7,31 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Settings as a menu of buttons (placement-advisor)
+
+- **Ask:** SPEC §8.6 (v1.49.0, SPEC 2.79), asked by MojoSOGO: "clean up settings similar to lists". The Settings tab becomes a grid of buttons in the Lists-popup style: 🙂 Me, 📅 Calendar items, 📱 Phone alerts, 🔊 Speakers, 🔔 Alerts, 🏠 Household, 👥 Members, 📊 Status, with Log out under the grid. A tap opens that area in the shared Modal; ✕, Escape or the backdrop returns to the menu; the Alerts notification tap opens Alerts directly. Layout and navigation only.
+- **Verdict:**
+  - [REORGANIZER FIRST, after the Alerts thread merged] the Me name/color, Household, Members and Status sections move out of Settings.tsx into SettingsMe / SettingsHousehold / SettingsMembers / SettingsStatus [NEW rows]; the pick grid moves out of HouseholdLists.module.css into PickGrid.tsx + PickGrid.module.css [NEW row]. Done, entry below.
+  - [EXISTING] frontend/src/components/Settings.tsx: the menu (PickGrid), the open area in Modal, the deep-link prop, Log out. Re-pinned at its final size (59) + WORKING_BUFFER.
+  - [EXISTING] frontend/src/App.tsx: the two banner texts name the new areas.
+  - OptionalItems, PhoneAlerts, HouseSpeakers, Invites, MyAlerts reused unchanged except for their path wording; SettingsMembers drops its "Members" heading (the Modal titles it).
+- **Flow stage:** render only. No route, rule, persist or delivery change.
+- **Why:** choosing which area is open is Settings' own concern (fan-in 1); a separate SettingsMenu.tsx would leave an empty shell. Importing the Lists stylesheet from Settings, or copying it, was rejected for PickGrid. Area ids stay client-local like NAV.
+- **Caps:** Settings.tsx 41 → 59/99; PickGrid ~35/300; App.tsx unchanged in size. Nothing in the band.
+
+## 2026-10-11 — Split Settings into its areas, shared PickGrid (reorganizer, ahead of v1.49.0)
+
+- **Trigger:** placement-advisor verdict REORGANIZER FIRST for v1.49.0: Settings.tsx (180/207, Me + Household + Members + Status in one file) is the owner the next Settings change lands near, and the Lists popup grid is about to gain a second user in Settings.
+- **Seam moved:**
+  - Me's display name + color controls from `frontend/src/components/Settings.tsx` to `SettingsMe.tsx` [NEW row].
+  - Household's name / time zone form + DaysOff to `SettingsHousehold.tsx` [NEW row].
+  - The members table (setAdmin and its asks, Disable / Enable) + Invites to `SettingsMembers.tsx` [NEW row].
+  - StatusSection, HouseLine, STATUS_BADGE to `SettingsStatus.tsx` [NEW row].
+  - (Done by the coordinating session, reviewed here) the pick grid styles from `HouseholdLists.module.css` to `PickGrid.tsx` + `PickGrid.module.css` [NEW row]; ListPicker renders PickGrid, the Lists button renders PickFace.
+- **Room opened:** Settings.tsx: 180 → 41 lines; cap 207 → 81 (41 + WORKING_BUFFER). New files 31–53 lines, all under 300.
+- **Behavior:** preserved; typecheck, npm test and arch:audit green. Settings.tsx keeps the Section wrapper and composes the same sections, headings (h3 Days off, Members) and controls in the same order. It shows Status only once status has loaded, as before. The requests are unchanged (PATCH /me, PATCH /settings, PATCH /members/{id}, POST /auth/logout, GET /settings). PickGrid has byte-identical CSS rules, aria-pressed still boolean on list entries and absent on ＋ New list…, and the Lists button still truncates (the two-line wrap applies only inside the grid). One deliberate difference: each area has its own useAction, so a failed name / color save now shows its error above the Display name field (it used to show at the top of Me), and a failed members action shows under the Members heading (it used to show at the top of Household). Nothing changes on screen when no action fails.
+- **Restraint:** one file per area the advisor named, no new abstraction. MyAlerts, OptionalItems, PhoneAlerts and HouseSpeakers are untouched, and so are the h3 headings and Section. No pick grid in Settings yet; that is the feature's work.
+
 ## 2026-10-11 — Steward pass 12, whole tree (code-steward)
 
 - **Run:** after the v1.48.0 release (SPEC 2.77 §9.5 My alerts, migration 0041, PR #44); audited e8c9471 against c19bd94.

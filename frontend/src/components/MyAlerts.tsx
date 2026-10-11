@@ -1,4 +1,4 @@
-// SPEC §9.5 — Settings → Alerts: every push I got, newest first; a red ❌ hides one, Clear all hides them all, a tap
+// SPEC §9.5 — Settings → 🔔 Alerts: every push I got, newest first; a red ❌ hides one, Clear all hides them all, a tap
 // opens its card. A tapped phone notification lands here on its card (useAlertLink). Titles and sources are the
 // server's, shown as given.
 import { useCallback, useEffect, useRef, useState } from 'react';

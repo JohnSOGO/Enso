@@ -32,7 +32,7 @@ const TABS: readonly Tab[] = NAV.map(([id]) => id);
 /** §8.1 ⚑ Q38 — the House badge per server-reported state; `ok` and `untried` show none. */
 const HOUSE_BADGE: Partial<Record<HouseState, { label: string; title: string; text: string }>> = {
   failing: { label: '🔇 House failing', title: 'House failing',
-    text: 'The last house announcement did not get through to Home Assistant (over the Cloudflare tunnel at ha.sogodojo.com), so alerts set to “House” may not be spoken. Check that Home Assistant and its Cloudflared add-on are running; the error is in Settings → Status. Alerts still show in the Ringing bar.' },
+    text: 'The last house announcement did not get through to Home Assistant (over the Cloudflare tunnel at ha.sogodojo.com), so alerts set to “House” may not be spoken. Check that Home Assistant and its Cloudflared add-on are running; the error is in Settings → 📊 Status. Alerts still show in the Ringing bar.' },
   not_configured: { label: '🔇 House not set up', title: 'House not set up',
     text: 'This server has no Home Assistant connection set up (the tunnel address, the HA token or the Cloudflare Access service token is missing), so alerts set to “House” are not spoken. Alerts still show in the Ringing bar.' },
 };
@@ -49,7 +49,7 @@ type Overlay =
 function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: () => void; justJoined: boolean; openAlert: string | null; onAlertOpened: () => void }) {
   const { me, status, today } = useApp();
   const [tab, setTab] = useState<Tab>(() => {
-    if (openAlert) return 'settings'; // §9.5 — a tapped notification opens its card in Settings → Alerts
+    if (openAlert) return 'settings'; // §9.5 — a tapped notification opens its card in Settings → 🔔 Alerts
     try { const t = localStorage.getItem('enso.tab') as Tab; return TABS.includes(t) ? t : 'calendar'; } catch { return 'calendar'; }
   });
   const [overlay, setOverlay] = useState<Overlay>(null);
@@ -73,7 +73,7 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
           )}
           {phoneOff && (
             <button className="badge bad" onClick={() => setOverlay({ kind: 'explain', title: 'Phone alerts off',
-              text: 'This account has no phone subscribed for push alerts, so “Phone” alerts cannot reach you. Turn them on in Settings → Me → Phone alerts (on iPhone: from the Ensō app on the Home Screen). See Settings → Status for each delivery.' })}>
+              text: 'This account has no phone subscribed for push alerts, so “Phone” alerts cannot reach you. Turn them on in Settings → 📱 Phone alerts (on iPhone: from the Ensō app on the Home Screen). See Settings → 📊 Status for each delivery.' })}>
               📵 Phone alerts off
             </button>
           )}

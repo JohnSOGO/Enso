@@ -1,4 +1,4 @@
-// SPEC §9.1 — Settings → Me → Phone alerts: this phone's state, honestly, and Turn on / Turn off / Send a test.
+// SPEC §9.1 — Settings → 📱 Phone alerts: this phone's state, honestly, and Turn on / Turn off / Send a test.
 import { useCallback, useEffect, useState } from 'react';
 import { errorText, get, post } from '../api';
 import { useApp } from '../state';
@@ -67,7 +67,7 @@ export function PhoneAlerts() {
       </div>
       {sentText && <p className="muted" role="status" style={note}>{sentText}</p>}
       {state === 'unset' && <p className="muted" style={note}>This server has no push keys, so phones cannot be sent alerts. Alerts still show in the Ringing bar.</p>}
-      {state === 'ios-home' && <p className="muted" style={note}>iPhone allows alerts only in the Home Screen app: tap Share → Add to Home Screen, open Ensō from there, and turn alerts on in Settings → Me.</p>}
+      {state === 'ios-home' && <p className="muted" style={note}>iPhone allows alerts only in the Home Screen app: tap Share → Add to Home Screen, open Ensō from there, and turn alerts on in Settings → 📱 Phone alerts.</p>}
       {state === 'blocked' && <p className="muted" style={note}>
         {here!.isIOS ? 'Notifications for Ensō are turned off. Change it in iPhone Settings → Notifications → Ensō, then come back here.'
           : 'This browser blocks notifications for Ensō. Allow them in the browser’s site settings for this address, then come back here.'}

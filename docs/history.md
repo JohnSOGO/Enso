@@ -466,6 +466,12 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Settings menu** (v1.49.0, §8.6; asked by MojoSOGO 2026-10-11; SM1–SM4): the Settings tab is a grid of eight
+buttons like the Lists popup (shared `PickGrid`): Me, Calendar items, Phone alerts, Speakers, Alerts, Household,
+Members, Status (the admin two hidden from others). Each opens its area in a modal; closing returns to the grid. Log
+out is under the grid. A tapped alert notification opens Alerts on its card. No setting changed; §8.6 no longer lists
+push subscriptions under Status, which was never built there (Phone alerts shows this phone's state). Q226–Q227 are
+⚑ defaults. **Still owed:** check the grid and each area on the iPhone at 320 px.
 **My alerts** (v1.48.0, §9.5, §4.2zn; asked by MojoSOGO 2026-10-11; MA1–MA8, MA-M): Settings → Alerts lists every
 push I got (newest 200), each line with a red ❌, Clear all at the top, a tap opens its card with the whole message,
 time, source and result. Tapping a phone notification opens the app on that card. Migration 0041. Q221–Q225 are ⚑
