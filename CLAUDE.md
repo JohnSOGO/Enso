@@ -10,9 +10,11 @@ in `README.md`. Modularity doctrine: `docs/modularity.md`. **Start a new session
 `SPEC.md` is the source of truth. **Every change starts there.**
 
 1. **Spec first.** Write the behavior, schema (a new numbered migration plus a §4.2x
-   section), API row, screen, and the acceptance check that proves it. Bump the
-   version line. A product or UI decision the spec doesn't already settle is
-   MojoSOGO's: ask, or build it as a ⚑ DEFAULT and list it in §13.
+   section that says why and links the file; the SQL lives only in the migration),
+   API row, screen, and the acceptance check that proves it. Bump the version line.
+   The spec holds behavior only: what is derivable from code is pointed at, not
+   copied. A product or UI decision the spec doesn't already settle is MojoSOGO's:
+   ask, or build it as a ⚑ DEFAULT and add it to `docs/decisions.md`.
 2. **Placement, before any code is explored or written — every code change, through
    the agents.** The session coordinating the work calls the **`placement-advisor`**
    with the spec section and gets the owner before anything is built. No change skips
@@ -26,8 +28,8 @@ in `README.md`. Modularity doctrine: `docs/modularity.md`. **Start a new session
 3. **Build to the spec**, inside the named owner and only to the spec. If something
    isn't written there, it isn't built (§0.6). Parallel slices each get their own
    worktree and file boundary.
-4. **Make the spec true again.** Update §14 (status and deviations) and anything that
-   building showed to be wrong. Commit spec and code together.
+4. **Make the spec true again.** Record status and deviations in `docs/history.md` §14
+   and fix anything that building showed to be wrong. Commit spec and code together.
 5. **Verify and audit.** `npm run typecheck && npm test` pass, run by the coordinating
    session itself. Then `npm run arch:audit`. A file newly in the warning band is the
    *next* agent's job (`placement-advisor` for one file, `code-steward` for several),

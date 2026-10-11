@@ -57,7 +57,7 @@ placement-advisor or the worker.
    check "did the code land where the receipt said," and a code commit that
    skipped the advisor ships with no receipt at all. Find your last run (a `(code-steward)` entry) and review
    everything since.
-5. `SPEC.md` §14 (status and deviations) and `docs/where-things-stand.md` — what the
+5. `docs/history.md` §14 (status and deviations) and `docs/where-things-stand.md` — what the
    project believes is true; spec/code drift is a finding (CLAUDE.md: never let it sit).
 
 ## The canon you judge against
@@ -94,7 +94,7 @@ pushing toward fragmentation rather than real separation.
   recurrence/DST, migrations and the house/push contracts.
 - **Sibling-path drift** — parallel paths (push vs house, alarm vs timer vs chore,
   the reading pipelines) fallen out of parity.
-- **Map/spec drift** — the map, SPEC §14 or where-things-stand describing a
+- **Map/spec drift** — the map, `docs/history.md` §14 or where-things-stand describing a
   structure the code no longer has.
 - **Receipt drift** — a receipt whose commit landed code elsewhere than its verdict,
   a receipt that named a seam "for the next agent" that nobody took, or a code commit

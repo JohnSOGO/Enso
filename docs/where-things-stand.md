@@ -1,8 +1,8 @@
 # Where Ensō stands
 
 A hand-off page for a new session (any Claude surface, or a person). It points to the real sources and doesn't
-restate them. **SPEC.md is the source of truth**: §14 holds status and deviations, §13 holds the ⚑ defaults
-MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
+restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md` holds status and deviations
+(§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
 *Last updated 2026-10-11, v1.48.0, main = production.*
@@ -46,7 +46,7 @@ the working agreement in `CLAUDE.md`.
 - Each person's speakers (v1.19.0, §9.2a) is live: check Home Assistant's real list in Settings → Me, and have each
   person tick theirs. Q125–Q129 are ⚑ defaults awaiting MojoSOGO.
 - Phase C kitchen display (needs an AREC).
-- Real-phone checks still owed per SPEC §14 (Android push, Done/Snooze, the laundry and goat reminders in practice).
+- Real-phone checks still owed per `docs/history.md` §14 (Android push, Done/Snooze, the laundry and goat reminders in practice).
 - Code-steward: pass 1 items 6–10 wait until those files are next touched; pass 3 items 1–4 and pass 5 items 1–3 and pass 6 items 1–4 (pass 7: items 3–6 carry them; pass 8 carries them too and adds the machine-hours extract-first note; pass 9 after v1.44.0: sound, nothing new; pass 10 after v1.46.0: sound, a standing house-row-helper note for the next house-gate change, a snooze-keeps-away test and migration-test tidying wait on MojoSOGO's pick; pass 11 after v1.47.0: sound, two LOW fold-ins for the next machines change)
   (one maps rule for things and events, and Plan it filling an event's Address; the read-text cap wording) wait on
   MojoSOGO's pick. Reports are in `docs/steward/`.
