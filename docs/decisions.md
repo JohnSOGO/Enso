@@ -232,7 +232,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q228 | Which founder pings the FunHouse poller shows (§9.4a) | ⚑ Titles starting 🤖 or 🧵 (Claude's); others, such as 🏛️ Ozymandias which reaches the FunHouse itself, are skipped |
 | Q229 | How a ping looks on the FunHouse (§9.4a) | ⚑ source "Claude", level `attention`, beep `look`, sig ⭕🔁🏠, text "title: text" |
 | Q230 | Who sees the 🎪 FunHouse tick (§9.4b) | **Decided by MojoSOGO 2026-10-11:** only the founder (on by default for his new alerts); others don't see it unless the alert already has it |
-| Q231 | Machines and the FunHouse (§9.4b) | ⚑ Machines keep Phone + House; no FunHouse |
+| Q231 | Machines and the FunHouse (§9.4b) | Decided by MojoSOGO 2026-10-11 ("not getting funhouse alerts on completion"): every machine fire, washing and cooking, also goes to the FunHouse; Away still stops it |
 | Q232 | Which rules the FunHouse follows (§9.4b) | ⚑ The phone's: Away stops it, Quiet the house does not, phone first does not delay it |
 | Q233 | How an Ensō alert looks on the FunHouse (§9.4b) | ⚑ As a ping (Q229) with source "Ensō" |
 | Q234 | Where 🎯 Point at it is turned on (§8.16) | ⚑ A switch in Settings → 🙂 Me, off by default, for this device only (kept in the browser); any member may turn it on |

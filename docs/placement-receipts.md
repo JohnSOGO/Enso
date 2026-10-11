@@ -7,6 +7,16 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.54.1: Machine fires also ring the 🎪 FunHouse (placement-advisor)
+
+- **Ask:** SPEC 2.89 §7D.3 / §7D.7 / §7D.8 + §9.4b, Q231 decided. MojoSOGO: "I am not getting funhouse alerts on completion". Machine fires (washer, dryer, dish washer, cooking timers) also go to the FunHouse channel, both when there is someone to alert and when there is nobody.
+- **Verdict:** [EXISTING] src/shared/machines.ts: MACHINE_CHANNELS becomes ['push','house','funhouse']; machineAlert's nobody case becomes ['push','funhouse']; the doc comment is updated to match. Tests: test/machine-alert.test.ts AL1 updated and AL7 added there; test/cooking.test.ts assertions updated (cookAlert inherits from machineAlert); machines.test.ts delivery counts updated. No reorganizer, no CEILINGS change.
+- **Flow stage:** rules (machines.ts). Deliver is unchanged: tick.ts already writes the funhouse row on `aud.funhouse && !fire.away_by`, and optins.ts audience() reads it from cfg.channels.
+- **Why:** The channel set is a decision machines.ts already owns, so changing two literals there is the smallest change. A funhouse special case in tick.ts or fire-rows.ts was rejected: it would put a rule in the Worker and split the machine alert across two homes. 'funhouse' is already in vocab.ts CHANNEL. The phone-first rule is unaffected.
+- **Caps:** machines.ts 228/300 before, about the same after; nothing newly in the warning band.
+
+---
+
 ## 2026-10-11 — v1.54.0: Cooking timers, a second group under Machines (placement-advisor)
 
 - **Ask:** SPEC 2.88 §7D.8 (cooking timers, asked by MojoSOGO), §4.2zp (migration 0043: machines gains cook_kind, name, created_at, closed_at), §5.6 step 3e (end-of-day close), §8.5 "Two groups" (🧺 Washing machines / 🍳 Cooking), §10 /cooking rows. Anyone creates as many as they like (Air fryer, Stove, Oven, Microwave, Other); Off / Stop / Start again / Edit / ✕ close; rings every 5 min ×4 at any hour; cleared after midnight when not active. CK1–CK9, CK-M.
