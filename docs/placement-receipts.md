@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.49.1: drop alertUrl, pin sw.js `?alert=` in MA8; deliveries row notes the alertSource mirror (placement-advisor)
+
+- **Ask:** patch, no behavior change; steward pass 12's two LOW handoffs (SPEC §9.5), picked by MojoSOGO ("NOW"). (1) Delete the unused `alertUrl` from src/shared/alert-history.ts, its MA1 lines, map row mention and §9.5 line; extend MA8 to pin `${ALERTS_PATH}?alert=` in sw.js. (2) The deliveries.ts map row notes that alertSource mirrors the opsPingsSince ping rule.
+- **Verdict:** src/shared/alert-history.ts (delete), test/my-alerts.test.ts (MA1 trim, MA8 extend), docs/module-ownership.md, SPEC.md §9.5 [EXISTING]. No sw.js change.
+- **Flow stage:** rules (alert-history.ts, removal only); the rest is tests and docs.
+- **Why:** alertUrl's only caller was MA1; sw.js builds the tap URL from its own ALERTS_PATH copy, so the helper restated a rule nothing checked against the shipping code (§0.5). Pinning the raw sw.js text guards the real path. The deliveries row note makes the SQL/TS mirror visible without a shared predicate (pass 12 declined one).
+- **Caps:** alert-history.ts shrinks; test/my-alerts.test.ts ~115. Nothing in the band; no reorganizer.
+
 ## 2026-10-11 — Settings as a menu of buttons (placement-advisor)
 
 - **Ask:** SPEC §8.6 (v1.49.0, SPEC 2.79), asked by MojoSOGO: "clean up settings similar to lists". The Settings tab becomes a grid of buttons in the Lists-popup style: 🙂 Me, 📅 Calendar items, 📱 Phone alerts, 🔊 Speakers, 🔔 Alerts, 🏠 Household, 👥 Members, 📊 Status, with Log out under the grid. A tap opens that area in the shared Modal; ✕, Escape or the backdrop returns to the menu; the Alerts notification tap opens Alerts directly. Layout and navigation only.
