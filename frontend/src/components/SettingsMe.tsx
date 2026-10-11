@@ -30,7 +30,7 @@ export function SettingsMe() {
       </div>
       <label className="row" style={{ marginTop: 12 }}>
         <input type="checkbox" checked={pointAt} onChange={(e) => setPointAtOn(e.target.checked)} />
-        <span>🎯 Point at it (this device): tap 🎯, then tap anything to get a line naming it to paste to Claude</span>
+        <span>🎯 Point at it (this device): tap ◎ bottom left, then tap anything to copy where it is for Claude; tap ◎ again to stop</span>
       </label>
     </>
   );
