@@ -213,7 +213,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q210 | When "Rest of today" ends (§9.2b) | ⚑ At household-local midnight |
 | Q211 | Who can quiet the house, and for whom (§9.2b) | ⚑ Any member; the whole household's speakers at once; the line says who set it |
 | Q212 | What happens to alerts while quiet (§9.2b) | ⚑ Skipped on the speakers, not replayed later; phones are unchanged; announcements are quiet too (House only → refused); a repeating reminder speaks again after quiet ends |
-| Q213 | What "I'm away" on an alert does (§9.2c) | ⚑ Stops that alert's speakers; phones keep reminding; the alert stays open and is not snoozed; it is in the app's Ringing bar, not a phone notification button |
+| Q213 | What "I'm away" on an alert does (§9.2c) | Stops that alert's speakers **and every phone ping** (MojoSOGO 2026-10-11: ALL; was ⚑ phones keep reminding); the alert stays open and is not snoozed; it is in the app's Ringing bar, not a phone notification button |
 | Q214 | How long "I'm away" lasts (§9.2c) | ⚑ Until that alert is closed; whatever replaces it (next timer countdown, Still loaded, next step) speaks again. No "back home" undo |
 | Q215 | Which alerts go phone first (§9.2d) | ⚑ Every alert kind with both Phone and House ticked; House-only alerts speak from the first; Announce and timer start announcements unchanged |
 | Q216 | Phone first on an alert that doesn't repeat (§9.2d) | ⚑ It is spoken on its one alert, so a House alert is never silently dropped |

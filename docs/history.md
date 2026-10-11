@@ -471,6 +471,9 @@ pings of the last hour, and `home/funhouse-poller.ts` on the dev PC polls it eve
 the FunHouse bridge on 127.0.0.1:8765, one a poll. Project threads in the cloud ping with the title "🧵 Thread needs
 you" once their environment carries `ENSO_OPS_NOTIFY_TOKEN` and allows enso.sogodojo.com. Q228–Q229 are ⚑ defaults.
 **Still owed:** start the poller on the dev PC (README); a real thread ping seen on the phone and the FunHouse.
+**Away silences phones too** (v1.49.2, §9.2c; MojoSOGO 2026-10-11 "mojosogo still getting tostig notifications and
+he away", picked ALL): an away alert writes no push row either, so nobody's phone rings for it; it still steps and stays in
+the Ringing bar. Machine loads were the case: they ping every phone (§7D.3). AW2/AW4 now expect no delivery rows.
 **Settings menu** (v1.49.0, §8.6; asked by MojoSOGO 2026-10-11; SM1–SM4): the Settings tab is a grid of eight
 buttons like the Lists popup (shared `PickGrid`): Me, Calendar items, Phone alerts, Speakers, Alerts, Household,
 Members, Status (the admin two hidden from others). Each opens its area in a modal; closing returns to the grid. Log

@@ -177,7 +177,7 @@ alerts.get('/fires', requireMember, async (c) => {
   return c.json(await fireViews(c.env.DB, c.get('member').id, state === 'ringing' ? "f.state = 'ringing'" : "f.state != 'closed'", []));
 });
 
-/** §9.2c — "I'm away": this fire's speakers stop; it stays open, phones keep reminding. Saying it again replaces who. */
+/** §9.2c — "I'm away": this fire's speakers and phones stop; it stays open. Saying it again replaces who. */
 alerts.post('/fires/:id/away', requireMember, async (c) => {
   const db = c.env.DB, id = c.req.param('id'), me = c.get('member').id;
   const fire = await first<{ id: string; state: string }>(db, 'SELECT id, state FROM fires WHERE id = ?', id);

@@ -4,7 +4,7 @@
 import { env } from 'cloudflare:test';
 import { expect, it } from 'vitest';
 import {
-  ALERT_HISTORY_MAX, ALERTS_PATH, PUSH_TITLE, alertIdFrom, alertSource, alertUrl, pushTitle,
+  ALERT_HISTORY_MAX, ALERTS_PATH, PUSH_TITLE, alertIdFrom, alertSource, pushTitle,
 } from '../src/shared/alert-history';
 import { ANNOUNCE_TITLE } from '../src/shared/announce';
 import { member, owner, tickAt, type Client } from './helpers';
@@ -17,7 +17,7 @@ declare global {
 
 const none = { hasFire: false, kind: null, isAlarm: false, notice: null, messId: null, title: null };
 
-it('MA1: pushTitle, alertSource, alertUrl and alertIdFrom', () => {
+it('MA1: pushTitle, alertSource and alertIdFrom', () => {
   expect(pushTitle({ hasFire: true, title: 'x' })).toBe(PUSH_TITLE);
   expect(pushTitle({ hasFire: false, title: '🏛️ Ozymandias' })).toBe('🏛️ Ozymandias');
   expect(pushTitle({ hasFire: false, title: null })).toBe(ANNOUNCE_TITLE);
@@ -29,7 +29,6 @@ it('MA1: pushTitle, alertSource, alertUrl and alertIdFrom', () => {
   expect(alertSource({ ...none, messId: 'mess_1', title: 'Whose mess?' })).toBe('Whose mess?');
   expect(alertSource({ ...none, title: '🏛️ Ozymandias' })).toBe('🏛️ Ozymandias');
   expect(alertSource(none)).toBe('Announcement');
-  expect(alertUrl('dlv_1')).toBe('/settings/alerts?alert=dlv_1');
   expect(alertIdFrom(ALERTS_PATH, '?alert=dlv_1')).toBe('dlv_1');
   expect(alertIdFrom('/', '?alert=dlv_1')).toBeNull();
   expect(alertIdFrom(ALERTS_PATH, '')).toBeNull();
@@ -109,7 +108,7 @@ it('MA6: only the newest ALERT_HISTORY_MAX are listed', async () => {
   expect(list.map((r) => r.id)).not.toContain(ids[0]);
 });
 
-it('MA8: the service worker opens ALERTS_PATH with the alertId', () => {
+it('MA8: the service worker opens ALERTS_PATH?alert={alertId}', () => {
   expect(env.SW_JS).toContain(`'${ALERTS_PATH}'`);
-  expect(env.SW_JS).toContain('alertId');
+  expect(env.SW_JS).toContain('${ALERTS_PATH}?alert=${encodeURIComponent(data.alertId)}');
 });

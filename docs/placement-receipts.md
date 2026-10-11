@@ -9,13 +9,38 @@ carry its result.
 
 ## 2026-10-11 — The same pings on the FunHouse: GET /ops/pings + home poller (placement-advisor)
 
-- **Ask:** SPEC §9.4a (v1.50.0, SPEC 2.80) and the API row `GET /ops/pings?after=`, asked by MojoSOGO ("also not msg funhouse; that best"). The read route lists the founder pings of the last hour after `after`, with the same bearer as `/ops/notify`; the home-side `home/funhouse-poller.ts` (+ `.cmd`, built by `npm run build:home`) polls it and POSTs Claude's pings (🤖 / 🧵) to the FunHouse bridge at 127.0.0.1:8765, at most one per poll.
+- **Ask:** SPEC §9.4a (v1.50.0, SPEC 2.82) and the API row `GET /ops/pings?after=`, asked by MojoSOGO ("also not msg funhouse; that best"). The read route lists the founder pings of the last hour after `after`, with the same bearer as `/ops/notify`; the home-side `home/funhouse-poller.ts` (+ `.cmd`, built by `npm run build:home`) polls it and POSTs Claude's pings (🤖 / 🧵) to the FunHouse bridge at 127.0.0.1:8765, at most one per poll.
 - **Verdict:** [EXISTING] `src/worker/routes/ops.ts` — the GET handler; the 503/401 check becomes one file-local guard shared with POST; `after` parsed and normalised with toISOString in the route. [EXISTING] `src/worker/deliveries.ts` — `opsPingsAfter` beside `opsPingsSince`, both over one file-local founder-ping predicate. [NEW row] `home/funhouse-poller.ts` — pure forFunhouse / funhouseNotice, pollOnce with injected fetch and token, `main` the only node:fs user. The Home table heading loses "SogoAI". `scripts/arch.ts` home/ LAYERS: `package:node:fs` allowed, `why` updated; `build:home` bundles both entries to home/dist.
 - **Flow stage:** route + persist-read (Worker); deliver (home poller).
 - **Why:** ops.ts already owns the ops token door and deliveries.ts "what is a founder ping"; a second copy of that WHERE clause would let the §9.4 hourly count and the §9.4a list drift, so the predicate is shared. The poller is an outbound poller, not SogoAI's inbound server, so a leaf module rather than a second concern in captions-helper.ts. `src/shared/ops.ts` rejected for the bridge helpers (one consumer; the spec keeps the poller to its own file). node:fs is allowed for all of home/; the owner row records the poller as its only user. No module-level `let`.
 - **Caps:** routes/ops.ts 52 → ~70/300; deliveries.ts 45 → ~60/300; home/funhouse-poller.ts new, ~90/300. Nothing in the band; no CEILINGS change.
 
 ---
+
+## 2026-10-11 — Steward pass 13, whole tree (code-steward)
+
+- **Run:** after the v1.49.0 release (SPEC 2.79 §8.6 Settings as a menu of buttons, Q226–Q227, PR #46) and the v1.49.1 patch (PR #48); audited 2542f2c against 507a0ef.
+- **Verdict:** SOUND. Typecheck green, 765/765 tests (99 files), arch:audit quiet (nearest at 87%: EventForm.tsx, Calendar.tsx, routes/recipes.ts; tick.ts 117/148; Settings.tsx 59/99 after its re-pin).
+- **Placement audit:** 3 receipts checked against 3 code commits (0eb8538 reorganizer split, baa23fd feature, 7d79079 patch); each landed as its verdict said. 0 code commits without a receipt. The map rows for Settings, SettingsMe / Household / Members / Status, PickGrid, ListPicker and App match their files.
+- **Top finding:** none. Settings.tsx is a menu that holds only which area is open, each Settings* file is one area, and PickGrid has two real callers (ListPicker, Settings) plus PickFace for the Lists button.
+- **Handoffs:** none new. Still open, all LOW, each for its area's next touch: pass 11's two §7D notes (machinesView alertId null for an inactive member; the stale "default speakers" comment in fire-rows.ts), pass 10's house-row helper note, and the snooze-keeps-away test.
+- **Restraint:** the App.tsx banner texts that name Settings areas are left as prose (no shared label import). Settings*'s use of Lists.module.css is its documented shared role. The small Settings* files are areas, not fragments. PickGrid's extra / chosen options are moved Lists behavior. No frontend component tests for SM1–SM3, per project convention (SM4 is manual and listed as owed).
+
+## 2026-10-11 — v1.49.2: Away silences phones too; tick skips push rows for an away fire (placement-advisor)
+
+- **Ask:** SPEC §9.2c (SPEC 2.81), MojoSOGO picked ALL: while fires.away_by is set, tick step 2 writes no push row as well as no house row. The alert still steps.
+- **Verdict:** `src/worker/tick.ts` [EXISTING]. Comment-only edits in `src/worker/routes/alerts.ts` and `frontend/src/state.tsx`. Tests in `test/fire-away-api.test.ts` (AW2/AW4).
+- **Flow stage:** persist (which delivery rows a fire's alert writes).
+- **Why:** tick.ts step 2 is the only place that plans a fire's alert deliveries (other pushDelivery callers are announce, ops, phone-login, mess-asks, timer-starts, none per-fire). The away gate already sits there for speakers, so one condition on the push block keeps both gates together. A src/shared/ rule was rejected: a gate on a stored column, not a decision the PWA shares.
+- **Caps:** tick.ts 118/148, not in the band. routes/alerts.ts 211/300, state.tsx 101/300 (comments only). No reorganizer.
+
+## 2026-10-11 — v1.49.1: drop alertUrl, pin sw.js `?alert=` in MA8; deliveries row notes the alertSource mirror (placement-advisor)
+
+- **Ask:** patch, no behavior change; steward pass 12's two LOW handoffs (SPEC §9.5), picked by MojoSOGO ("NOW"). (1) Delete the unused `alertUrl` from src/shared/alert-history.ts, its MA1 lines, map row mention and §9.5 line; extend MA8 to pin `${ALERTS_PATH}?alert=` in sw.js. (2) The deliveries.ts map row notes that alertSource mirrors the opsPingsSince ping rule.
+- **Verdict:** src/shared/alert-history.ts (delete), test/my-alerts.test.ts (MA1 trim, MA8 extend), docs/module-ownership.md, SPEC.md §9.5 [EXISTING]. No sw.js change.
+- **Flow stage:** rules (alert-history.ts, removal only); the rest is tests and docs.
+- **Why:** alertUrl's only caller was MA1; sw.js builds the tap URL from its own ALERTS_PATH copy, so the helper restated a rule nothing checked against the shipping code (§0.5). Pinning the raw sw.js text guards the real path. The deliveries row note makes the SQL/TS mirror visible without a shared predicate (pass 12 declined one).
+- **Caps:** alert-history.ts shrinks; test/my-alerts.test.ts ~115. Nothing in the band; no reorganizer.
 
 ## 2026-10-11 — Settings as a menu of buttons (placement-advisor)
 
