@@ -235,7 +235,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q231 | Machines and the FunHouse (§9.4b) | Decided by MojoSOGO 2026-10-11 ("not getting funhouse alerts on completion"): every machine fire, washing and cooking, also goes to the FunHouse; Away still stops it |
 | Q232 | Which rules the FunHouse follows (§9.4b) | ⚑ The phone's: Away stops it, Quiet the house does not, phone first does not delay it |
 | Q233 | How an Ensō alert looks on the FunHouse (§9.4b) | ⚑ As a ping (Q229) with source "Ensō" |
-| Q234 | Where 🎯 Point at it is turned on (§8.16) | ⚑ A switch in Settings → 🙂 Me, off by default, for this device only (kept in the browser); any member may turn it on |
+| Q234 | Where 🎯 Point at it is turned on (§8.16) | ⚑ Since v1.59.2 on by default (like Ozymandias); a switch in Settings → 🙂 Me turns it off for this device only (kept in the browser) |
 | Q235 | Where the 🎯 sits while on (§8.16) | ⚑ Since v1.58.0 a small faint round ◎ (like Ozymandias), bottom left just above the tab bar on every tab, and one in every modal header beside ✕; amber while pick mode is on |
 | Q236 | How long pick mode lasts (§8.16) | ⚑ Since v1.58.0 (like Ozymandias): stays on until a ◎ or the bar is tapped, or Esc; Alt+P toggles while the switch is on (was one tap) |
 | Q237 | What the pick text says (§8.16) | ⚑ Since v1.58.0, Ozymandias's PDASH pick lines: `Enso pick:` tab / `Where:` modals > groups / `Element:` kind "name" / `Selector:` CSS / `Screen:` WxH / build stamp (was one 📍 line) |

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.01 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 3.02 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4457,8 +4457,8 @@ so I don't have to over explain", without clashing with what a tap already does.
 Ozymandias dashboard's pick mode (MojoSOGO 2026-10-11: "look at ozymandias and do it like that"): a **pick mode** that
 stays on, where every tap is captured, swallowed, and copied as a few lines he pastes into a Claude thread.
 
-- **Off by default.** Settings → 🙂 Me has a switch **🎯 Point at it** (its label says how: tap ◎ bottom left, tap anything, tap ◎ again to stop) that turns it on **for this device only**
-  (kept in the browser, not the account) ⚑ (Q234). Any member can turn it on.
+- **On by default** since v1.59.2, like Ozymandias's always-there ◎ (MojoSOGO 2026-10-11: "I don't see the faint circle"). Settings → 🙂 Me has a switch **🎯 Point at it** (its label says how: tap ◎ bottom left, tap anything, tap ◎ again to stop) that turns it off or on **for this device only**
+  (kept in the browser, not the account) ⚑ (Q234). Any member can turn it off.
 - **While the switch is on**, a small faint round **◎** button sits in the bottom left corner just above the tab bar on
   every tab, and a **◎** sits in every modal's header beside ✕ ⚑ (Q235). Like Ozymandias's (MojoSOGO 2026-10-11: "I like
   the way ozymandias has the bottom left circle activator"), every ◎ turns amber while pick mode is on. Nothing else
