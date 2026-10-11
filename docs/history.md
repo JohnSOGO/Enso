@@ -470,7 +470,7 @@ captions (5 ingredients, 6 steps — it had been "watch it").
 to snap a photo of completed work so adult can approve remotely"): Done on a one-off opens a sheet with an optional
 photo; a chore run's photo is added from Waiting for OK; admins see it there full size and OK or send back. Deleted on
 OK or drop. **Still owed:** BS2 with the camera on a real phone.
-**Losing taps tested; a failed bounty Done is a 500** (v1.60.6, §7B.8, §7D.8; steward pass 17 items 1–2, MojoSOGO "BOTH"):
+**Losing taps tested; a failed bounty Done is a 500** (v1.60.7, §7B.8, §7D.8; steward pass 17 items 1–2, MojoSOGO "BOTH"):
 POST /bounties/:id/done re-throws any save error that is not the `uq_earning_bounty` constraint, as machines and cooking
 do, so a real failure is no longer told "That bounty is waiting for OK". BT23–BT24 and CK10 race two taps; machines'
 race was already L10. PickGrid's comment and map row stop listing callers.
@@ -484,6 +484,9 @@ admin's Done is OK'd at once, so the Done sheet no longer offers them 📷 (it u
 bounty, let me add a picture"): ＋ Bounty has 📷 Add photo (sent after Post; Post again retries only the picture);
 the card shows it to everyone; an admin's card has 📷 Add / Replace. Deleted once paid (OK, or an admin's own Done)
 or deleted. **Still owed:** try it on a real phone.
+**Tab bar lower, build stamp centered** (v1.60.6, §8.1, Q208; MojoSOGO 2026-10-11 iPhone screenshot "Better… lower more
+and center version"): the bar's bottom strip is the inset less 12 px (at least 14 px), so the buttons sit lower; the stamp
+is centered just under the buttons, above the home indicator. The Calendar ＋ keeps its 16 px gap.
 **Tab bar not cut off on the installed iPhone app** (v1.60.4, §8.1; MojoSOGO 2026-10-11 screenshot "now cutoff and not
 at bottom still"): v1.60.2's `100vh` frame was clipped about 59pt above the screen bottom, because iOS 26 standalone WebKit
 makes `html` 100% / dvh short by the top inset and body's `overflow: hidden` clips there. In standalone, `html` and the
