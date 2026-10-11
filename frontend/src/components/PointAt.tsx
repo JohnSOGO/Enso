@@ -1,6 +1,6 @@
 // SPEC §8.16 ⚑ Q235–Q236 — the pick layer, rendered once by the frame: the floating 🎯, the armed state, the bar
 // (inside the topmost open modal so it is never behind it), the capture-phase listeners that swallow the one next
-// tap, then the 📍 Pointed at modal. What the line says is point-line.ts's.
+// tap, then the line straight to the clipboard and the 📍 Pointed at modal. What the line says is point-line.ts's.
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { describeTap, pointLine } from '../point-line';
@@ -22,18 +22,29 @@ export function PointAtLayer({ tab }: { tab: string }) {
   useEffect(() => {
     if (!armed) return;
     let picked: Element | null = null;
+    let text: string | null = null;
+    let copying = false;
     let timer = 0;
+    const take = (e: Event) => {
+      if (picked || !(e.target instanceof Element)) return;
+      picked = e.target;
+      if (!picked.closest('[data-point-at]')) text = pointLine(describeTap(picked, tab, __ENSO_BUILD__, `${innerWidth}×${innerHeight}`));
+    };
+    // Copied inside the tap's own handlers: phones allow the clipboard only during a user gesture (iOS: touchend).
+    const copyNow = () => {
+      if (!text || copying || !navigator.clipboard) return;
+      copying = true;
+      navigator.clipboard.writeText(text).then(() => setCopied(true), () => { copying = false; });
+    };
     const finish = () => {
       clearTimeout(timer);
       setArmed(false);
-      if (picked && !picked.closest('[data-point-at]')) {
-        setLine(pointLine(describeTap(picked, tab, __ENSO_BUILD__, `${innerWidth}×${innerHeight}`)));
-      }
+      if (text) setLine(text);
     };
     const swallow = (e: Event) => { if (e.cancelable) e.preventDefault(); e.stopImmediatePropagation(); };
-    const down = (e: Event) => { swallow(e); if (!picked && e.target instanceof Element) picked = e.target; };
-    const up = (e: Event) => { swallow(e); if (picked) { clearTimeout(timer); timer = window.setTimeout(finish, CLICK_WAIT_MS); } };
-    const click = (e: Event) => { swallow(e); if (!picked && e.target instanceof Element) picked = e.target; finish(); };
+    const down = (e: Event) => { swallow(e); take(e); copyNow(); };
+    const up = (e: Event) => { swallow(e); copyNow(); if (picked) { clearTimeout(timer); timer = window.setTimeout(finish, CLICK_WAIT_MS); } };
+    const click = (e: Event) => { swallow(e); take(e); copyNow(); finish(); };
     const plan: [string, (e: Event) => void][] = [
       ['pointerdown', down], ['touchstart', down], ['mousedown', down],
       ['pointerup', up], ['touchend', up], ['mouseup', up], ['contextmenu', swallow], ['click', click],
@@ -53,8 +64,9 @@ export function PointAtLayer({ tab }: { tab: string }) {
       {armed && createPortal(<div className={s.bar} data-point-at role="status">🎯 Tap the thing you mean · tap here to cancel</div>, barHome)}
       {line && (
         <Modal title="📍 Pointed at" onClose={() => setLine(null)}
-          footer={<><button onClick={copy}>{copied ? 'Copied' : 'Copy'}</button><button onClick={armPick}>Pick again</button></>}>
+          footer={<><button onClick={copy}>{copied ? '✓ Copied' : 'Copy'}</button><button onClick={armPick}>Pick again</button></>}>
           <p className={s.line}>{line}</p>
+          {copied && <p className="muted" style={{ marginTop: 8 }}>✓ Copied. Paste it into Claude.</p>}
         </Modal>
       )}
     </>
