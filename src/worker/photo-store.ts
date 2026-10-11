@@ -4,7 +4,7 @@ import type { Context } from 'hono';
 import { randomBase32 } from './db';
 import { fail } from './http';
 
-export type PhotoPrefix = 'things' | 'list-items' | 'recipes' | 'chore-areas' | 'messes' | 'earnings';
+export type PhotoPrefix = 'things' | 'list-items' | 'recipes' | 'chore-areas' | 'messes' | 'earnings' | 'bounties';
 
 /** `{prefix}/{ownerId}/{random}.jpg`. */
 export const photoKey = (prefix: PhotoPrefix, ownerId: string) => `${prefix}/${ownerId}/${randomBase32(16).toLowerCase()}.jpg`;

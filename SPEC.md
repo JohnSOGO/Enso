@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.02 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 3.03 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -181,7 +181,7 @@ Cloudflare Tunnel + Access**.
 | Styling | CSS Modules + CSS custom properties | Follow `C:\Users\Public\git\MOJOSOGO-PREFERENCES.md` and the `phone-ui` skill |
 | Push | Web Push (VAPID) from the Worker via **`@block65/webcrypto-web-push` 2.0.0** (pinned exactly) | WebCrypto only. Sends `Content-Encoding: aes128gcm` (RFC 8291) + `Authorization: vapid t=…, k=…` (RFC 8292) — the legacy `aesgcm` that some libraries send is refused by Apple. The 2026-10-03 spike decrypted its output under Node **and** workerd, and cross-checked it with `http_ece`. |
 | House delivery | The Worker calls Home Assistant's REST API through **Cloudflare Tunnel + Access** (§9.2) | `src/worker/house.ts`; no process at home besides HA itself. |
-| Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Six attachments, all through `src/worker/photo-store.ts`: a thing's photo (`things/…`, §7C.3), a list item's photo (`list-items/…`, §7A.3), chore-area photos (`chore-areas/…`, §7B.6), mess photos (`messes/…`, §7B.7), a bounty's done photo (`earnings/…`, §7B.8) and a recipe's picture (`recipes/…`, §7E.2b, §8.12). Private: photos are served only through the API to signed-in members. |
+| Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Seven attachments, all through `src/worker/photo-store.ts`: a thing's photo (`things/…`, §7C.3), a list item's photo (`list-items/…`, §7A.3), chore-area photos (`chore-areas/…`, §7B.6), mess photos (`messes/…`, §7B.7), a bounty's picture and its done photo (`bounties/…`, `earnings/…`, §7B.8) and a recipe's picture (`recipes/…`, §7E.2b, §8.12). Private: photos are served only through the API to signed-in members. |
 | Reading photos and recipes | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4, §7A.3, §7E) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). One caller of the SDK: `src/worker/claude.ts`. A snapped list item is read by SogoAI first and by Claude only when SogoAI gives no name (§7A.3). |
 | Naming a snapped item at home | **LM Studio** on SogoAI, `http://127.0.0.1:1234/v1/chat/completions` (OpenAI-compatible), the always-loaded vision model named by `IDENTIFY_MODEL` (`qwen-uncensored`) (§7A.3) | Free. Reached only by the SogoAI helper, never by the Worker directly. |
 | Recipes from videos | **YouTube Data API v3** `videos.list?part=snippet&id=…` and `commentThreads.list?part=snippet&videoId=…&order=relevance&maxResults=20&textFormat=plainText` (§7E) | Secret `YOUTUBE_API_KEY`; 1 quota unit per call, so 2 per read ⚑ Q82. Plus an **unofficial, keyless** captions attempt (YouTube's player endpoint asked as its Android app), which may be blocked — a failure is recorded and shown, never faked. |
@@ -899,6 +899,15 @@ Schema: [`migrations/0045_earning_photo.sql`](migrations/0045_earning_photo.sql)
 
 `earnings.photo_key` — the done photo's private R2 key; NULL = none, or deleted on OK or drop. Additive only; it runs
 before the deploy. **Migration check (BT-M2):** see §7B.8.
+
+### 4.2zs Schema change — `migrations/0046_bounty_photo.sql`
+
+Asked by MojoSOGO 2026-10-11 (§7B.8, a bounty's picture).
+
+Schema: [`migrations/0046_bounty_photo.sql`](migrations/0046_bounty_photo.sql). The migration is the schema; it is not copied here.
+
+`bounties.photo_key` — the picture's private R2 key; NULL = none, or deleted when paid or deleted. Additive only; it
+runs before the deploy. **Migration check (BT-M3):** see §7B.8.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -2460,7 +2469,7 @@ it** less than `TAKE_HOURS` ago) · `open`. A deleted bounty is gone from every 
 - Push texts: `newBountyMessage(title, points)` → `"{title} · {points} points. Open Ensō → Chores → Bounties."`, title
   `NEW_BOUNTY_TITLE` "🪙 New bounty"; `waitingMessage(name, title, points)` → `"{name} says done: {title} · {points}
   points. OK it in Chores → Bounties."`, title `WAITING_TITLE` "🪙 Waiting for OK".
-- Wire types: `Bounty` `{ id, title, note, points, createdBy, createdAt, status, takenBy, doneBy, earningId }`
+- Wire types: `Bounty` `{ id, title, note, points, createdBy, createdAt, status, takenBy, doneBy, earningId, hasPhoto }`
   (`takenBy` only while `taken`; `doneBy` and `earningId` the live earning's while `pending` or `paid`). `Earning`
   `{ id, kind: 'chore' | 'bounty', title, points, memberId, doneAt, hasPhoto }` (the waiting list; the key never on
   the wire). `Score` above.
@@ -2487,6 +2496,11 @@ Everyone may see it (the score is public, PUB). The photo is deleted from R2 (an
 earning is OK'd or dropped (Not yet, the run's Undo, the bounty deleted): it is evidence for one decision, not a
 keepsake ⚑ Q258.
 
+**A bounty's picture** (v1.60.0, asked by MojoSOGO 2026-10-11: "if I create a bounty, let me add a picture"). An admin
+may attach one picture to a one-off: what the job looks like, or where it is. Optional; a second replaces the first;
+everyone sees it on the card. It is deleted from R2 (and `bounties.photo_key` set NULL) when the bounty is paid (its
+earning OK'd) or deleted ⚑ Q260.
+
 **The routes** — `src/worker/routes/bounties.ts`:
 
 - `GET /bounties` → `{ bounties: Bounty[], waiting: Earning[], scores: Score[] }`: one-offs `open`, `taken` and
@@ -2498,6 +2512,9 @@ keepsake ⚑ Q258.
 - `PUT /chores/{id}/bounty { points: 1–10 | null }` (admin) → `{ choreId, bounty }`.
 - `POST /earnings/{id}/ok { memberId? }` (admin) → 204; `memberId`, when given, must be an active member.
   `POST /earnings/{id}/not-yet` (admin) → 204.
+- `PUT /bounties/{id}/photo` the raw image (`photoBody`) → 204, admins only, not once paid (409). R2 key
+  `bounties/{id}/{random}.jpg`, private; replacing deletes the old object. `GET /bounties/{id}/photo` → the image,
+  `private, max-age=3600`; 404 once gone.
 - `PUT /earnings/{id}/photo` the raw image (`photoBody`, §7C.3's limits) → 204; only the earner (else 403
   "Only the one who did it can add the photo."), only while pending (else 409). R2 key `earnings/{id}/{random}.jpg`,
   private; replacing deletes the old object. `GET /earnings/{id}/photo` → the image, `private, max-age=3600`; 404
@@ -2534,6 +2551,8 @@ keepsake ⚑ Q258.
 | BT19 | B says Done on a one-off, then PUTs a photo to its `earningId` | 204; `waiting` shows `hasPhoto: true`; anyone GETs the bytes with `private, max-age=3600` |
 | BT20 | C (not the earner) PUTs a photo; B PUTs one after OK; a bad type | 403; 409; 400 |
 | BT21 | B PUTs a second photo; an admin OKs; another earning with a photo gets Not yet; a chore run with a photo is undone | one object (the old one gone); the object gone and GET → 404 after OK; gone after Not yet; gone after Undo |
+| BT22 | an admin posts a bounty and PUTs a picture; a member PUTs one; the bounty is OK'd; another is deleted | 204 and `hasPhoto: true`, anyone GETs it; 403; the object gone after OK; gone after delete |
+| BT-M3 | migration check (§4.2zs) | bounties written before 0046 survive with `photo_key` NULL; `foreign_key_check` empty |
 | BT-M2 | migration check (§4.2zr) | earnings written before 0045 survive with `photo_key` NULL; `foreign_key_check` empty |
 | BT-M | migration check (§4.2zq) | rows written before 0044 survive; `chores.bounty` and the new `deliveries` columns NULL on them; `foreign_key_check` empty |
 
@@ -4431,12 +4450,14 @@ Chore bounties                                   (admins only)
 - **Done** on a one-off opens a small sheet: **📷 Add photo** (optional), then **Done** / **Cancel**. Done sends the
   Done, then the photo to the new earning; if the photo fails, the Done stands and the refusal shows with 📷 Add photo
   still on the waiting row.
-- **Bounties**: each one-off, newest first: title, 🪙 points, the note as a dim second line, and "{name} is on it"
-  while taken ("You're on it" for mine). Buttons by what I may do (§7B.8): **I'll do it**, **Done**, **Let it go**.
+- **Bounties**: each one-off, newest first: title, 🪙 points, the note as a dim second line, its picture as a
+  thumbnail when there is one (tap for full size), and "{name} is on it" while taken ("You're on it" for mine). Buttons by what I may do (§7B.8): **I'll do it**, **Done**, **Let it go**.
   An admin also gets ✕ **Delete** (accessible name "Delete Clean the toilet"; asks first). None → "No bounties right
   now."
 - **＋ Bounty** (admins) opens a sheet: **Title** (one line, `maxLength` 60), **Points** (a select 1–10, default 1),
-  **Note** (one line, `maxLength` 120), then **Post** / **Cancel**. A refusal shows inside the sheet.
+  **Note** (one line, `maxLength` 120), **📷 Add photo** (optional; camera or library, shrunk as a thing's photo), then
+  **Post** / **Cancel**. Post sends the bounty, then the picture; if the picture fails, the bounty stands and the
+  refusal shows. An admin's card also has **📷 Add photo** / **Replace photo**.
 - **Chore bounties** (admins): every chore with a select of None, 1–10; a change saves at once.
 - A chore with a bounty shows **🪙 n** after its title on Today and in All chores (§8.15), for everyone.
 - Buttons ≥ 44 px; nothing red.
@@ -4457,7 +4478,7 @@ so I don't have to over explain", without clashing with what a tap already does.
 Ozymandias dashboard's pick mode (MojoSOGO 2026-10-11: "look at ozymandias and do it like that"): a **pick mode** that
 stays on, where every tap is captured, swallowed, and copied as a few lines he pastes into a Claude thread.
 
-- **On by default** since v1.59.2, like Ozymandias's always-there ◎ (MojoSOGO 2026-10-11: "I don't see the faint circle"). Settings → 🙂 Me has a switch **🎯 Point at it** (its label says how: tap ◎ bottom left, tap anything, tap ◎ again to stop) that turns it off or on **for this device only**
+- **On by default** since v1.60.1, like Ozymandias's always-there ◎ (MojoSOGO 2026-10-11: "I don't see the faint circle"). Settings → 🙂 Me has a switch **🎯 Point at it** (its label says how: tap ◎ bottom left, tap anything, tap ◎ again to stop) that turns it off or on **for this device only**
   (kept in the browser, not the account) ⚑ (Q234). Any member can turn it off.
 - **While the switch is on**, a small faint round **◎** button sits in the bottom left corner just above the tab bar on
   every tab, and a **◎** sits in every modal's header beside ✕ ⚑ (Q235). Like Ozymandias's (MojoSOGO 2026-10-11: "I like
@@ -5351,8 +5372,8 @@ Captured from v1.0-draft so nothing is lost:
   actions need network, and buttons show disabled "offline".
 - Queued offline acks
 - Photos anywhere other than Things to do (§7C.3), list items (§7A.3), a chore's areas (§7B.6), a mess
-  report (§7B.7, kept at most 30 days), a bounty's done photo (§7B.8, kept until OK or Not yet) and a recipe's picture
-  (§7E.2b, §8.12), the only six attachments. A picture a show is looked up from (§7F.2) is read once and never stored, so it is not one. A recipe's video
+  report (§7B.7, kept at most 30 days), a bounty's picture and done photo (§7B.8, kept until paid or dropped) and a recipe's picture
+  (§7E.2b, §8.12), the only seven attachments. A picture a show is looked up from (§7F.2) is read once and never stored, so it is not one. A recipe's video
   thumbnail (§7E.1) is hotlinked from YouTube — not stored, not in R2, not an attachment — so it
   is not one. Transcript screenshots (§7E.2b) are read once and never stored — not in R2, not an
   attachment — so they are not one either ⚑ Q93, except the one kept as a recipe's picture (§7E.2b ⚑ Q174),
