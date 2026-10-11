@@ -466,6 +466,9 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Away silences phones too** (v1.49.2, §9.2c; MojoSOGO 2026-10-11 "mojosogo still getting tostig notifications and
+he away", picked ALL): an away alert writes no push row either, so nobody's phone rings for it; it still steps and stays in
+the Ringing bar. Machine loads were the case: they ping every phone (§7D.3). AW2/AW4 now expect no delivery rows.
 **Settings menu** (v1.49.0, §8.6; asked by MojoSOGO 2026-10-11; SM1–SM4): the Settings tab is a grid of eight
 buttons like the Lists popup (shared `PickGrid`): Me, Calendar items, Phone alerts, Speakers, Alerts, Household,
 Members, Status (the admin two hidden from others). Each opens its area in a modal; closing returns to the grid. Log

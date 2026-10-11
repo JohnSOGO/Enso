@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.80 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.81 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3321,8 +3321,8 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
   dryer-minutes chooser the Machines card uses (§8.5); `🧺 Clothes dryer · Sam` with **[Fold &
   out]**; `🧺 Dish washer · Sam` (who started it, §7D.6) with **[Emptied]**. No Done:
   a machine fire is closed only by the `/machines` routes (§7D.2). ⚑ Q40
-- **Away** (§9.2c) on every row not yet away: "I've seen it, I'm not home." The speakers stop for that alert;
-  phones keep reminding and the row stays. An away row shows `· away ({name})` instead of the button.
+- **Away** (§9.2c) on every row not yet away: "I've seen it, I'm not home." The speakers and phones stop for that alert;
+  the row stays. An away row shows `· away ({name})` instead of the button.
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
   "3 more ringing ▾".
 
@@ -4461,7 +4461,7 @@ said); with Phone too → 201, push rows only. A house row already queued when q
 
 "Give them an option to say they ack but they are away and suppress house reminders but action still not
 complete." The person has seen the alert and can't do it right now because they're not home, so there's no
-point in the speakers repeating it; it stays open and the phones keep reminding.
+point in reminding anyone; it stays open in the Ringing bar, silent.
 
 **Rules:**
 - **`POST /fires/{id}/away`** (member) — on an open fire (`ringing` or `scheduled`) of any kind, a machine's
@@ -4470,7 +4470,10 @@ point in the speakers repeating it; it stays open and the phones keep reminding.
   `GET /fires` shows it. 404 `not_found` for an unknown fire; 409 `invalid_action` "That alert is already
   finished." for a closed one.
 - **While a fire is away, no `house` row is written for its alerts** (tick step 2, the same path as §9.2b);
-  its `push` rows are written and sent unchanged ⚑ Q213.
+  **and no `push` row either**: the alert goes silent everywhere ⚑ Q213. It still steps (alert count, due) and
+  stays in the Ringing bar until someone closes it. MojoSOGO 2026-10-11: "mojosogo still getting tostig
+  notifications and he away" → **ALL** (a machine pings every phone, §7D.3, so Tostig's load kept pinging
+  everyone after Tostig said Away).
 - It lasts **for that fire only**, until it is closed (done, acked, cleared, moved) ⚑ Q214. A fire that
   replaces it (a timer's next countdown after Ack, a machine's Still loaded, a chore's next step, a reminder's
   next occurrence) starts without it, so the speakers speak again. Snooze keeps the same fire, so it stays away.
@@ -4484,9 +4487,9 @@ button). An away row shows `· away ({name})` after its sub line, and no Away bu
 | # | Check | Expected |
 |---|---|---|
 | AW1 | `POST /fires/{id}/away` on a ringing reminder | 200 with `awayBy` = the caller; state, due and alert count unchanged; `GET /fires` shows `awayBy`; unknown → 404; closed → 409; no session → 401 |
-| AW2 | the reminder's next renotify after Away | a push row per member, no house row, zero HA calls |
+| AW2 | the reminder's next renotify after Away | no delivery row at all (no push, no house), zero HA calls; the alert count still steps |
 | AW3 | a timer that is away, then Ack | the next countdown fire has `away_by` NULL (its alerts follow §9.2d like any fire) |
-| AW4 | Away on a ringing machine fire | 200; its next reminder has push rows only |
+| AW4 | Away on a ringing machine fire | 200; its next reminder writes no delivery row |
 | AW-M | migration 0039 | fires and deliveries intact; both columns NULL |
 
 ### 9.2d Phone first, then the house — asked by MojoSOGO 2026-10-10
