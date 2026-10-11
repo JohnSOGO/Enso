@@ -466,7 +466,7 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
-**Settings → About** (v1.56.0, §8.6, Q246–Q247; asked by MojoSOGO 2026-10-11): a ℹ️ About button, last in the
+**Settings → About** (v1.56.0, §8.6, Q247–Q248; asked by MojoSOGO 2026-10-11): a ℹ️ About button, last in the
 Settings grid, opens the opening screen's look (logo, Ensō, tagline, build stamp) and "Developed by MojoSOGO · with
 Claude". The tagline is written once in `SettingsAbout.tsx`; a test holds `index.html` to it.
 **Opening-screen tagline** (v1.55.1, §8.10; MojoSOGO 2026-10-11): "Closing the loop. Peace of mind, every day." sits

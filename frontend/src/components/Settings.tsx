@@ -20,7 +20,7 @@ import { SettingsAbout } from './SettingsAbout';
 
 type Area = 'me' | 'calendar' | 'phone' | 'speakers' | 'alerts' | 'household' | 'members' | 'status' | 'about';
 
-/** ⚑ Q226, Q246 — the buttons in order; `admin` ones show only to admins. */
+/** ⚑ Q226, Q247 — the buttons in order; `admin` ones show only to admins. */
 const AREAS: readonly { value: Area; emoji: string; label: string; admin?: true }[] = [
   { value: 'me', emoji: '🙂', label: 'Me' }, { value: 'calendar', emoji: '📅', label: 'Calendar items' },
   { value: 'phone', emoji: '📱', label: 'Phone alerts' }, { value: 'speakers', emoji: '🔊', label: 'Speakers' },

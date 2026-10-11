@@ -1,4 +1,4 @@
-// SPEC §8.6 ⚑ Q246–Q247 — Settings → ℹ️ About: the opening screen's look (§8.10) in the modal, its build stamp as the
+// SPEC §8.6 ⚑ Q247–Q248 — Settings → ℹ️ About: the opening screen's look (§8.10) in the modal, its build stamp as the
 // revision, and who made it. Nothing to change, nothing fetched.
 import s from './SettingsAbout.module.css';
 
