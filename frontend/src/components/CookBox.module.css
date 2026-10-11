@@ -1,0 +1,11 @@
+/* SPEC §8.5 — the cooking box's small custom-minutes box, right after the 60 chip. */
+.custom {
+  width: 5.5em;
+  min-height: 44px;
+  font-size: 16px;
+  padding: 0 8px;
+  text-align: center;
+}
+.custom::placeholder {
+  color: #9CA3AF;
+}

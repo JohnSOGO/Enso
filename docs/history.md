@@ -466,6 +466,8 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Custom minutes box** (v1.54.2, §8.5; asked by MojoSOGO 2026-10-11): in the cooking box the minutes field sits in the
+chip row right after 60, a small box with a light gray "custom" hint; a chip and the box clear each other.
 **Machines ring the FunHouse** (v1.54.1, §7D.3 / §7D.7 / §9.4b, Q231; MojoSOGO 2026-10-11: "I am not getting funhouse
 alerts on completion"): the cause was Q231's ⚑ default, which kept machines on Phone + House only. Every machine fire
 (washer, dryer, dish washer, cooking timers) now also writes the 🎪 FunHouse row, with or without someone to alert; Away
