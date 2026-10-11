@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.99 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 3.00 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2480,7 +2480,7 @@ but the poster once (`deliveries.bounty_id` set); a pending earning pushes every
 (`deliveries.earning_id` set). No repeats. Neither counts toward the `/ops/notify` limit nor reaches the FunHouse
 list (§9.4, §9.4a).
 
-**A done photo** (v1.58.0, asked by MojoSOGO 2026-10-11: "allow child to snap a photo of completed work so adult can
+**A done photo** (v1.59.0, asked by MojoSOGO 2026-10-11: "allow child to snap a photo of completed work so adult can
 approve remotely"). The one who did the work may attach one photo to their **pending** earning, a one-off's or a chore
 run's alike, so an admin can OK or send it back from anywhere. Optional ⚑ Q257. A second photo replaces the first.
 Everyone may see it (the score is public, PUB). The photo is deleted from R2 (and `photo_key` set NULL) when the
@@ -4453,40 +4453,57 @@ kid's points this week and the House row.
 ### 8.16 🎯 Point at it — name what I tapped
 
 Asked by MojoSOGO 2026-10-11: "click the screen and the control … its location/path in the display can be captured
-so I don't have to over explain", without clashing with what a tap already does. A **pick mode**: one tap, captured
-and swallowed, turned into a line he pastes into a Claude thread.
+so I don't have to over explain", without clashing with what a tap already does. Since v1.58.0 it works like the
+Ozymandias dashboard's pick mode (MojoSOGO 2026-10-11: "look at ozymandias and do it like that"): a **pick mode** that
+stays on, where every tap is captured, swallowed, and copied as a few lines he pastes into a Claude thread.
 
 - **Off by default.** Settings → 🙂 Me has a switch **🎯 Point at it** that turns it on **for this device only**
   (kept in the browser, not the account) ⚑ (Q234). Any member can turn it on.
-- **While on**, a small round **🎯** button sits at the bottom left above the tab bar on every tab, and a **🎯** sits
-  in every modal's header beside ✕ ⚑ (Q235). Nothing else changes; every other tap works as before.
-- **Tapping 🎯 arms one pick.** A bar across the top (inside the topmost open modal when one is open, so it is never
-  hidden behind it) says **"🎯 Tap the thing you mean · tap here to cancel"**.
-- **The next tap is captured, not acted on:** whatever is under the finger does nothing (no button press, no tick,
-  no field focus, no keyboard, no select opening, no link). Tapping the bar or a 🎯 cancels instead. Pick mode then
-  ends: it is always one tap ⚑ (Q236).
-- **The line goes straight to the clipboard** at that tap (asked by MojoSOGO 2026-10-11: "it should go to the
-  clipboard, so I can paste into claude"), written inside the tap's own touch or click handling, the only moment a
-  phone allows it. **The result** then opens as a modal **📍 Pointed at** with the line, "✓ Copied. Paste it into
-  Claude." when the copy worked, a **Copy** button (shows "✓ Copied"; the fallback when the browser refused) and **Pick
-  again**. The line, pieces joined by ` › ` ⚑ (Q237):
-  1. the open tab, as on the tab bar (`⚙ Settings`);
-  2. the title of each open modal, bottom to top, up to the one holding the tap (`🔔 Alerts`);
-  3. inside that, from the outside in: each named group around the tap (an `aria-label`, a fieldset's legend) and
-     the first words (up to 30 characters) of the list row holding it;
-  4. the thing itself: its name in quotes (its `aria-label`, else its label's text, its own text, title, placeholder
-     or picture text; up to 40 characters) and its kind (`button`, `checkbox`, `field`, `select`, `link`,
-     `picture`, `text`);
-  5. after ` · `, the build stamp (§8.1) and the screen size `390×844`.
+- **While the switch is on**, a small faint round **◎** button sits in the bottom left corner just above the tab bar on
+  every tab, and a **◎** sits in every modal's header beside ✕ ⚑ (Q235). Like Ozymandias's (MojoSOGO 2026-10-11: "I like
+  the way ozymandias has the bottom left circle activator"), every ◎ turns amber while pick mode is on. Nothing else
+  changes; every other tap works as before.
+- **Tapping ◎ turns pick mode on; it stays on** until a ◎ or the bar is tapped again, or **Esc** is pressed. On a
+  keyboard **Alt+P** turns it on and off (only while the switch is on) ⚑ (Q236). While on:
+  - a bar across the top (inside the topmost open modal when one is open, so it is never hidden behind it) says
+    **"◎ Pick mode: tap anything to copy where it is · tap here or ◎ to stop"**;
+  - with a mouse, the thing under the pointer gets an outline and the pointer is a crosshair;
+  - **every tap is captured, not acted on:** whatever is under the finger does nothing (no button press, no tick, no
+    field focus, no keyboard, no select opening, no link).
+- **Each pick goes straight to the clipboard**, written inside the tap's own touch or click handling, the only moment a
+  phone allows it. A small box near the bottom shows the text under **"✓ Copied. Paste it into Claude."** for 4
+  seconds; when the browser refused the copy it says **"Copy blocked: press and hold to select this text."** and stays
+  15 seconds. Tapping the box does not pick it.
+- **The text**, one piece per line, modeled on Ozymandias's `PDASH pick` ⚑ (Q237):
+  1. `Enso pick: ` and the open tab, as on the tab bar (`⚙ Settings`);
+  2. `Where: ` and, joined by ` > `, the title of each open modal bottom to top up to the one holding the tap, then
+     each named group around the tap from the outside in (an `aria-label`, a fieldset's legend, the first words (up to
+     30 characters) of the list row holding it); the line is left out when there are none;
+  3. `Element: ` and the thing's kind (`button`, `checkbox`, `field`, `select`, `link`, `picture`, `text`) and its name
+     in quotes (its `aria-label`, else its label's text, its own text, title, placeholder or picture text; up to 40
+     characters), or the kind alone when it has no name;
+  4. `Selector: ` and a CSS selector for the thing: from it outward, stopping at the nearest `id`; each step is the tag,
+     its first two classes, and `:nth-of-type(n)` when a sibling has the same tag; steps joined by ` > `;
+  5. `Screen: ` and the window size `390x844`, with ` (phone)` when under 700 wide;
+  6. the build stamp (§8.1).
 
-  Example: `📍 ⚙ Settings › 🔔 Alerts › Morning pills › "FunHouse" checkbox · v1.52.0 · 1a2b3c4 · 430×932`.
-- The line names what is already on screen; it reads no data from the server and is stored nowhere.
+  Example:
+  ```
+  Enso pick: ⚙ Settings
+  Where: 🔔 Alerts > Morning pills
+  Element: checkbox "FunHouse"
+  Selector: dialog > div._body_x1 > label:nth-of-type(2) > input
+  Screen: 430x932 (phone)
+  v1.58.0 · 1a2b3c4
+  ```
+- It names what is already on screen; it reads no data from the server and is stored nowhere.
 
-**Acceptance (PA1–PA4):** PA1 the line is built as above from its pieces (tab, modals, groups, thing, kind, stamp,
-size), names are cut to their lengths, and empty pieces are left out; PA2 off, no 🎯 shows anywhere; PA3 (manual, on
-the iPhone) on, armed, tapping a tick box, a button, a text field and a select does none of their actions and shows
-the right line, already on the clipboard (paste it into a Claude thread), and tapping the bar cancels; PA4 (manual) a pick inside an open modal names the modal and the bar
-shows above it.
+**Acceptance (PA1–PA4):** PA1 the text is built as above from its pieces (tab, modals, groups, thing, kind, selector,
+size, stamp), names are cut to their lengths, empty pieces are left out, and the selector stops at an id and adds
+`:nth-of-type` only where a sibling shares the tag; PA2 switch off, no ◎ shows anywhere and Alt+P does nothing;
+PA3 (manual, on the iPhone) on, tapping a tick box, a button, a text field and a select does none of their actions and
+each lands on the clipboard (paste into a Claude thread); tapping the bar or ◎ stops it and taps work normally after;
+PA4 (manual) a pick inside an open modal names the modal and the bar shows above it.
 
 ### 8.7 Theme
 
