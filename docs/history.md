@@ -466,6 +466,10 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Alarms tab as a menu; Machines wording** (v1.53.0, §8.5; asked by MojoSOGO 2026-10-11): Announce and Quiet the house
+stay on the tab; Alarms, Rolling timers and Machines are buttons that open in a modal, as Settings does. The Machines
+intro no longer reads as laundry only, and Edit hours says "Machine alerts". No behavior change. Q238 is a ⚑ default.
+**Still owed:** AM1–AM3 on the iPhone at 320 px.
 **🎯 Point at it copies at the tap** (v1.52.1, §8.16; asked by MojoSOGO 2026-10-11): the line is written to the
 clipboard inside the picked tap's own handlers (iOS allows it only there); the sheet says "✓ Copied" and keeps Copy as
 the fallback. Checked in headless Chromium with mouse and touch: the clipboard held the line after each pick.

@@ -1,6 +1,8 @@
-// SPEC §8.5 — Alarms tab: 📢 Announce (§9.3), 🤫 Quiet the house (§9.2b), Scheduled alarms (days of week + time), Rolling timers and Machines.
-import { useEffect, useMemo, useState } from 'react';
+// SPEC §8.5 — Alarms tab: 📢 Announce (§9.3), 🤫 Quiet the house (§9.2b), then a menu of three sections (Alarms: days of
+// week + time, Rolling timers, Machines), the tapped one in a Modal. Holds which section is open.
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Modal } from './Modal';
+import { PickGrid } from './PickGrid';
 import { TimersSection, type Timer } from './Timers';
 import { MachinesSection } from './Machines';
 import { Announce } from './Announce';
@@ -37,7 +39,7 @@ function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
   return (
     <section className={s.section} aria-label="Scheduled alarms">
       <div className="row" style={{ marginBottom: 6 }}>
-        <h2 style={{ flex: 1, marginBottom: 0 }}>Scheduled</h2>
+        <span style={{ flex: 1 }} />
         <button onClick={() => onEdit(null)}>＋ Add</button>
       </div>
       <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>Ring at a set time on the days you pick, every week. Kept off the calendar.</p>
@@ -140,15 +142,29 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
   );
 }
 
+type Section = 'alarms' | 'timers' | 'machines';
+
+/** ⚑ Q238 — the menu under Announce and Quiet the house, as on Settings (§8.6). */
+const SECTIONS: readonly { value: Section; emoji: string; label: string }[] = [
+  { value: 'alarms', emoji: '⏰', label: 'Alarms' }, { value: 'timers', emoji: '⏱', label: 'Rolling timers' },
+  { value: 'machines', emoji: '🫧', label: 'Machines' },
+];
+
 export function Alarms({ onEditAlarm, onEditTimer }: { onEditAlarm: (a: Alarm | null) => void; onEditTimer: (t: Timer | null) => void }) {
+  const [open, setOpen] = useState<Section | null>(null);
+  const shown = SECTIONS.find((x) => x.value === open);
+  const body: Record<Section, () => ReactNode> = {
+    alarms: () => <ScheduledSection onEdit={onEditAlarm} />,
+    timers: () => <TimersSection onEdit={onEditTimer} />,
+    machines: () => <MachinesSection />,
+  };
   return (
     <div style={{ padding: 12, overflowY: 'auto', height: '100%' }}>
       <h1 style={{ fontSize: '1.15rem', marginBottom: 12 }}>Alarms</h1>
       <Announce />
       <HouseQuiet />
-      <ScheduledSection onEdit={onEditAlarm} />
-      <TimersSection onEdit={onEditTimer} />
-      <MachinesSection />
+      <PickGrid entries={SECTIONS} onPick={(v) => setOpen(v as Section)} />
+      {shown && <Modal title={`${shown.emoji} ${shown.label}`} onClose={() => setOpen(null)}>{body[shown.value]()}</Modal>}
     </div>
   );
 }

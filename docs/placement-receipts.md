@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.53.0: Alarms tab becomes a menu of three sections; Machines wording (placement-advisor)
+
+- **Ask:** SPEC 2.87 §8.5 (v1.53.0), UI only, asked by MojoSOGO. Announce and Quiet the house stay at the top of the Alarms tab. Below them a PickGrid of ⏰ Alarms, ⏱ Rolling timers and 🫧 Machines opens the tapped section in a titled Modal, as Settings does (§8.6). The sections drop their h2 and keep ＋ Add. The Machines intro line is shorter and no longer implies laundry only. MachineHours "Washer and dryer alerts…" becomes "Machine alerts…".
+- **Verdict:** frontend/src/components/Alarms.tsx `Alarms` [EXISTING] for the grid and its open-section state. Timers.tsx, Machines.tsx and MachineHours.tsx [EXISTING] get the heading and wording edits. No new file.
+- **Flow stage:** render
+- **Why:** `Alarms` is already the tab frame that puts Announce, HouseQuiet and the three sections together, so a grid with one open-section state is the same concern laid out differently. An AlarmsMenu.tsx was rejected: Settings.tsx is menu-only because every area has its own file, but here `Alarms` already is the frame and Alarms.tsx keeps ScheduledSection and AlarmForm, which App imports. The pattern is copied from Settings.tsx (const list, `useState`, `body` record, Modal titled emoji + label), not its file split. App's alarm/timer form overlays stack over the section Modal through showModal, as MachineChooser already does. Future seam if the file grows: ScheduledSection + AlarmForm → AlarmsScheduled.tsx.
+- **Caps:** Alarms.tsx 154 → ~170/300; Timers.tsx, Machines.tsx, MachineHours.tsx unchanged in size. No CEILINGS change. Nothing in the band.
+- **Reorganizer:** none needed.
+
+---
+
 ## 2026-10-11 — v1.52.1: 🎯 pick copies straight to the clipboard (placement-advisor)
 
 - **Ask:** SPEC 2.86 §8.16 (v1.52.1), asked by MojoSOGO. The picked line goes to the clipboard inside the pick's own capture handlers, because iOS allows the clipboard only during the gesture. The 📍 Pointed at modal says "✓ Copied. Paste it into Claude." The Copy button stays as the fallback.

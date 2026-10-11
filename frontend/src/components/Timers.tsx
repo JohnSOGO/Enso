@@ -60,7 +60,7 @@ export function TimersSection({ onEdit }: { onEdit: (t: Timer | null) => void })
   return (
     <section className={s.section} aria-label="Rolling timers">
       <div className="row" style={{ marginBottom: 6 }}>
-        <h2 style={{ flex: 1, marginBottom: 0 }}>Rolling timers</h2>
+        <span style={{ flex: 1 }} />
         <button onClick={() => onEdit(null)}>＋ Add</button>
       </div>
       <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>
