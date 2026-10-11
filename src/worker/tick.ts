@@ -14,6 +14,7 @@ import { sendPushDeliveries } from './push';
 import { allHouseSpeakers, sendHouseDeliveries } from './house';
 import { deliverySpeakers } from './speaker-choices';
 import { houseQuiet } from './house-quiet';
+import { speaksOnHouse } from '../shared/phone-first';
 import { messTick } from './mess-asks';
 import { timerStartTick } from './timer-starts';
 import { weatherTick } from './weather-days';
@@ -59,7 +60,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
   }
 
   // 2. Step every open fire.
-  const open = await all<FireRow>(db, `SELECT * FROM fires WHERE state != 'closed' ORDER BY due_at`);
+  const open = await all<FireRow & { away_by: string | null }>(db, `SELECT * FROM fires WHERE state != 'closed' ORDER BY due_at`);
   const newDeliveryIds: string[] = [];
   let everySpeakerNow: Promise<string[] | null> | undefined; // asked of HA at most once a tick (§7D.3)
   const quiet = await houseQuiet(db, now); // §9.2b: while quiet, no house row at all
@@ -86,8 +87,8 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
           stmts.push(d.stmt);
         }
       }
-      // §9.2a: on the speakers of everyone it is for — none ticked by any of them, or the house quiet (§9.2b) → not spoken (§7D.3: a machine, every speaker).
-      const speakers = quiet || !(src.cfg.channels.includes('house') && aud.house) ? []
+      // §9.2a: on the speakers of everyone it is for — none ticked by any of them, the house quiet (§9.2b) or someone away from this alert (§9.2c), or a phone-first alert 1 (§9.2d) → not spoken (§7D.3: a machine, every speaker).
+      const speakers = quiet || fire.away_by || !(aud.house && speaksOnHouse(next.alert_count, src.cfg)) ? []
         : src.allSpeakers ? (everySpeakerNow ??= allHouseSpeakers(env), await everySpeakerNow) : await deliverySpeakers(db, aud.push);
       if (speakers === null || speakers.length) {
         stmts.push(houseDelivery(db, { ...base, message, speakers }, now).stmt);

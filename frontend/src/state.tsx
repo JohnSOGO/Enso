@@ -22,6 +22,8 @@ export interface Fire {
   choreRunId?: string | null; stepTitle?: string | null; personId?: string | null;
   /** Machine fires only (§10): the machine; `title` is its label and `personId` the load's owner. */
   machineId?: string | null;
+  /** §9.2c: who said "I'm away" on it (its speakers stop), else null. */
+  awayBy: string | null;
 }
 export interface Status {
   /** §9.2 — the server's verdict; shown as given, never re-derived here. */

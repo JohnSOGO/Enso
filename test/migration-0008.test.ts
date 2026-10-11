@@ -44,7 +44,7 @@ it('D12 every fire kind and delivery is intact after 0008', async () => {
   await applyD1Migrations(db, env.TEST_MIGRATIONS);
 
   const after = (await db.prepare('SELECT * FROM fires ORDER BY id').all<Record<string, unknown>>()).results;
-  expect(after).toEqual(before.map((f) => ({ ...f, thing_id: null, machine_id: null }))); // 0014 adds machine_id
+  expect(after).toEqual(before.map((f) => ({ ...f, thing_id: null, machine_id: null, away_by: null, away_at: null }))); // 0014 adds machine_id, 0039 the away columns
   // Every later migration is applied too: 0022 (§4.2u) adds deliveries.title, 0024 (§4.2w) speakers, 0025 (§4.2x) notice and url, and 0032 (§4.2ze) mess_id,
   // NULL on every older row.
   expect((await db.prepare('SELECT * FROM deliveries ORDER BY id').all()).results)

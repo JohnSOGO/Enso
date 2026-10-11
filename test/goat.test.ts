@@ -49,17 +49,19 @@ describe('M4n the goat alert (G3–G7)', () => {
     expect(await deliveriesOf(f.id)).toEqual([]);
   });
 
-  it('G5 one member opted in → one push to them and one house row: "Put the goats away — sunset at h:mm"', async () => {
+  it('G5 one member opted in → pushes to them, and one house row from the second alert (§9.2d): "Put the goats away — sunset at h:mm"', async () => {
     expect((await B.put(`/events/${GOAT}/optin`, {})).status).toBe(204);
     await tickAt(A, dueOn('2026-10-05'));
     const f = await fireOn('2026-10-05');
     expect(f).toMatchObject({ state: 'ringing', due_at: dueOn('2026-10-05') });
     const text = `Put the goats away — sunset at ${h12(utcToLocal(sunsetUtc('2026-10-05', OCEANSIDE)!, 'America/Los_Angeles').time)}`;
     expect(text).toMatch(/^Put the goats away — sunset at 6:\d\d$/);
-    expect(await deliveriesOf(f.id)).toEqual([
-      { channel: 'house', member_id: null, message: text },
-      { channel: 'push', member_id: bId, message: text },
-    ]);
+    // §9.2d: it repeats, so its first alert is phone only; the house joins at the second, 15 min later.
+    expect(await deliveriesOf(f.id)).toEqual([{ channel: 'push', member_id: bId, message: text }]);
+    await tickAt(A, addMinutes(dueOn('2026-10-05'), 15));
+    const after = await deliveriesOf(f.id);
+    expect(after.map((d: any) => [d.channel, d.member_id])).toEqual([['house', null], ['push', bId], ['push', bId]]);
+    expect(after[0].message).toMatch(/^Put the goats away — sunset at 6:\d\d/);
     expect(aId).not.toBe(bId);
   });
 

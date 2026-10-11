@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.74 · **Date:** 2026-10-10 · **Owner:** MojoSOGO
+**Version:** 2.75 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1400,6 +1400,18 @@ ALTER TABLE settings ADD COLUMN house_quiet_by TEXT REFERENCES members(id); -- w
 
 **Migration check (HQ-M):** the settings row survives 0038 unchanged with both columns NULL (not quiet).
 
+### 4.2zl Schema change — `migrations/0039_fire_away.sql`
+
+Asked by MojoSOGO 2026-10-10 (§9.2c).
+
+```sql
+-- §9.2c — "I'm away" on one alert: its speakers stop, it stays open. Additive only.
+ALTER TABLE fires ADD COLUMN away_by TEXT REFERENCES members(id); -- who said they're away; NULL = not
+ALTER TABLE fires ADD COLUMN away_at TEXT;                        -- UTC ISO
+```
+
+**Migration check (AW-M):** fires and deliveries survive 0039 unchanged with both columns NULL.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -2209,7 +2221,7 @@ audience is not empty), Done / Snooze, renotify, `missed`. What is new:
 | G2 | the same event planned with `place = null` | `[]` — nothing at 09:00 |
 | G3 | `/calendar` for the month, as a member who has it on | no goat occurrences |
 | G4 | `GET /optional-events` | lists the goat item, `on: false` for a member who has not opted in |
-| G5 | one member opted in; tick at sunset − 30 | that member gets one push and the house one row, both with the text `"Put the goats away — sunset at h:mm"` (that day's sunset) |
+| G5 | one member opted in; tick at sunset − 30, then 15 min on | that member gets a push each time and the house one row from the second alert (§9.2d), all with the text `"Put the goats away — sunset at h:mm"` (that day's sunset) |
 | G6 | nobody opted in; tick | the fire steps, no deliveries |
 | G7 | `GET /fires` carries `startSun: 'sunset'` for its fire; `GET /events/{id}` → 404 | |
 
@@ -3851,6 +3863,8 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
   dryer-minutes chooser the Machines card uses (§8.5); `🧺 Clothes dryer · Sam` with **[Fold &
   out]**; `🧺 Dish washer · Sam` (who started it, §7D.6) with **[Emptied]**. No Done:
   a machine fire is closed only by the `/machines` routes (§7D.2). ⚑ Q40
+- **Away** (§9.2c) on every row not yet away: "I've seen it, I'm not home." The speakers stop for that alert;
+  phones keep reminding and the row stays. An away row shows `· away ({name})` instead of the button.
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
   "3 more ringing ▾".
 
@@ -4959,6 +4973,67 @@ said); with Phone too → 201, push rows only. A house row already queued when q
 | HQ6 | a timer's start announcement while quiet | push rows only, no house row |
 | HQ-M | migration 0038 | settings row intact, both columns NULL |
 
+### 9.2c "I'm away" on one alert — asked by MojoSOGO 2026-10-10
+
+"Give them an option to say they ack but they are away and suppress house reminders but action still not
+complete." The person has seen the alert and can't do it right now because they're not home, so there's no
+point in the speakers repeating it; it stays open and the phones keep reminding.
+
+**Rules:**
+- **`POST /fires/{id}/away`** (member) — on an open fire (`ringing` or `scheduled`) of any kind, a machine's
+  included: sets `away_by` = the session member and `away_at` = now. Nothing else changes: the state, due time
+  and alert count stay; the fire is not done, acked or snoozed. Saying it again replaces who. → 200 the fire as
+  `GET /fires` shows it. 404 `not_found` for an unknown fire; 409 `invalid_action` "That alert is already
+  finished." for a closed one.
+- **While a fire is away, no `house` row is written for its alerts** (tick step 2, the same path as §9.2b);
+  its `push` rows are written and sent unchanged ⚑ Q213.
+- It lasts **for that fire only**, until it is closed (done, acked, cleared, moved) ⚑ Q214. A fire that
+  replaces it (a timer's next countdown after Ack, a machine's Still loaded, a chore's next step, a reminder's
+  next occurrence) starts without it, so the speakers speak again. Snooze keeps the same fire, so it stays away.
+- `GET /fires` carries `awayBy` (member id or null) on every fire.
+
+**The screen** (Ringing bar, §8.2): every row that is not away gets an **Away** button (before the row's main
+button). An away row shows `· away ({name})` after its sub line, and no Away button; its other buttons stay.
+
+**Acceptance (AW — each row is a test):**
+
+| # | Check | Expected |
+|---|---|---|
+| AW1 | `POST /fires/{id}/away` on a ringing reminder | 200 with `awayBy` = the caller; state, due and alert count unchanged; `GET /fires` shows `awayBy`; unknown → 404; closed → 409; no session → 401 |
+| AW2 | the reminder's next renotify after Away | a push row per member, no house row, zero HA calls |
+| AW3 | a timer that is away, then Ack | the next countdown fire has `away_by` NULL (its alerts follow §9.2d like any fire) |
+| AW4 | Away on a ringing machine fire | 200; its next reminder has push rows only |
+| AW-M | migration 0039 | fires and deliveries intact; both columns NULL |
+
+### 9.2d Phone first, then the house — asked by MojoSOGO 2026-10-10
+
+"First announcement should be phone only, then phone and house if selected." An alert that has both Phone and
+House ticked and repeats gives people a quiet chance on their phones first; the speakers join from the second
+alert on.
+
+**Rule** (pure): `speaksOnHouse(alertNumber, cfg)` → whether this alert of a fire gets a house row:
+- House not in `cfg.channels` → no (as before);
+- Phone not in `cfg.channels` (House only) → yes, from the first alert ⚑ Q215;
+- `alertNumber ≥ 2` → yes;
+- the first alert of a fire that **will not alert again** (`renotifyMin` null, or `maxAlerts ≤ 1`) → yes: it would
+  otherwise never be spoken ⚑ Q216;
+- otherwise (the first of several) → no.
+
+It applies to every fire kind (reminders, timers, chores, things, machines) ⚑ Q215; `alertNumber` is the fire's
+`alert_count` after the step, so a snoozed or waited fire (alert count back to 0) starts phone-first again. Fire-less
+house rows — a timer's start announcement (§5.5a) and 📢 Announce (§9.3) — are unchanged. It joins the §9.2b and
+§9.2c gates in tick step 2; push rows are unchanged. Earlier acceptance rows that counted a house row on a repeating
+Phone + House fire's first alert (G5, the T1–T10 timer, L3–L5, L15, HS11) now count from its second alert; the
+machine wording checks read the push row, which carries the same words.
+
+**Acceptance (PF — each row is a test):**
+
+| # | Check | Expected |
+|---|---|---|
+| PF1 | `speaksOnHouse` | Phone+House repeating: 1 → false, 2 → true; House only: 1 → true; Phone+House with renotify null or maxAlerts 1: 1 → true; Phone only: false |
+| PF2 | tick: a Phone+House reminder repeating every 5 min | alert 1: push rows, no house row, zero HA calls; alert 2: push rows and one house row, spoken |
+| PF3 | tick: a Phone+House reminder with no repeat | its one alert is spoken |
+
 ### 9.3 Announcements — `src/shared/announce.ts`, `POST /announce`
 
 A member sends a house announcement **now** from the Alarms tab (§8.5; decided by MojoSOGO
@@ -5109,7 +5184,7 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | GET | `/alarms` | member | → alarms: `{ id, title, time, days: Weekday[], channels, renotifyMin, assignedTo, createdBy, nextDueAt, ringing }` |
 | POST | `/alarms` | member | `{ title, time: "HH:MM", days: Weekday[], channels, renotifyMin?, assignedTo? }` → alarm |
 | PATCH/DELETE | `/alarms/{id}` | creator or owner | same fields as POST, all optional; closes future scheduled fires like an event edit |
-| GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Clothes washer") and `personId` = the load's owner |
+| GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Clothes washer") and `personId` = the load's owner; every fire carries `awayBy` (§9.2c) |
 | GET | `/machines` | member | → `Machine[]` in load order: `{ id, label, state: MachineState, ownerId, minutes, startedAt, doneAt, startedBy, next }` (`state` derived by the server, §7D.1; `next` = the next machine's id or null) |
 | POST | `/machines/{id}/start` | member | `{ ownerId, minutes }` → `Machine[]`; 409 `busy` when not free (§7D.2) |
 | POST | `/machines/{id}/move` | member | `{ minutes }` → `Machine[]`; 409 `busy` / `not_done` / `invalid_state` |
@@ -5119,6 +5194,7 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | POST | `/machines/{id}/remind` | member | Still loaded → `Machine[]`; 409 `not_done` (§7D.2) |
 | POST | `/machines/{id}/clear` | member | → `Machine[]`; 409 `already_free`. Every `/machines` write: 404 for an unknown machine, 400 `invalid_input`, 409 `conflict` when another tap changed the machine first |
 | POST | `/fires/{id}/actions` | member | `{ action: Action }` → fire (+ next); 409 on `invalid_action` |
+| POST | `/fires/{id}/away` | member | "I'm away": → the fire with `awayBy`; its speakers stop, it stays open (§9.2c); 404; 409 `invalid_action` when closed |
 | POST | `/push/subscriptions` | member | `PushSubscriptionJSON` + userAgent → `{ id }` (upserted by endpoint) |
 | POST | `/push/test` | member | one test push to my subscriptions → `{ sent }`; 409 when I have none (§9.1) |
 | DELETE | `/push/subscriptions/{id}` | owner of the subscription | |
@@ -5749,6 +5825,10 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q210 | When "Rest of today" ends (§9.2b) | ⚑ At household-local midnight |
 | Q211 | Who can quiet the house, and for whom (§9.2b) | ⚑ Any member; the whole household's speakers at once; the line says who set it |
 | Q212 | What happens to alerts while quiet (§9.2b) | ⚑ Skipped on the speakers, not replayed later; phones are unchanged; announcements are quiet too (House only → refused); a repeating reminder speaks again after quiet ends |
+| Q213 | What "I'm away" on an alert does (§9.2c) | ⚑ Stops that alert's speakers; phones keep reminding; the alert stays open and is not snoozed; it is in the app's Ringing bar, not a phone notification button |
+| Q214 | How long "I'm away" lasts (§9.2c) | ⚑ Until that alert is closed; whatever replaces it (next timer countdown, Still loaded, next step) speaks again. No "back home" undo |
+| Q215 | Which alerts go phone first (§9.2d) | ⚑ Every alert kind with both Phone and House ticked; House-only alerts speak from the first; Announce and timer start announcements unchanged |
+| Q216 | Phone first on an alert that doesn't repeat (§9.2d) | ⚑ It is spoken on its one alert, so a House alert is never silently dropped |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -5957,6 +6037,14 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Phone first, then the house** (v1.46.0, §9.2d; asked by MojoSOGO 2026-10-10; PF1–PF3): an alert with Phone and House
+that repeats rings phones only the first time and adds the speakers from the second alert. House-only and one-shot
+alerts speak at once. Q215–Q216 are ⚑ defaults. **Still owed:** hear it on a real repeating alert.
+**I'm away on an alert** (v1.46.0, §9.2c, §4.2zl; asked by MojoSOGO 2026-10-10; AW1–AW4, AW-M): every Ringing bar
+row has **Away**: that alert stops speaking on the house speakers, stays open, and phones keep reminding until it is
+done. Migration 0039. Q213–Q214 are ⚑ defaults. Built as: the Away answer returns the caller's fire even when it is an
+optional reminder hidden from their own list (§7.5). **Still owed:** tap Away on a real repeating alert and hear the
+speakers stay quiet while the phone keeps buzzing.
 **Quiet the house** (v1.45.0, §9.2b, §4.2zk; asked by MojoSOGO 2026-10-10; HQ1–HQ6, HQ-M): Alarms → 🤫 Quiet the
 house for 1 hour, 2 hours, 4 hours or the rest of today. While quiet no speaker says anything (alerts, timer
 starts, announcements); phones get every alert as before. It ends on its own, or with Turn off now, and shows who

@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Phone first, then the house (placement-advisor)
+
+- **Ask:** SPEC §9.2d (PF1–PF3; ⚑ Q215–Q216). Every fire kind with both Phone and House ticked that will alert again sends alert 1 to phones only; the speakers join from alert 2. House-only alerts and fires that won't alert again are spoken from the first. Fire-less house rows (§5.5a, §9.3) are unchanged.
+- **Verdict:** [NEW row] src/shared/phone-first.ts (speaksOnHouse(alertNumber, cfg), pure, type-only import of engine's AlertConfig); [EXISTING] src/worker/tick.ts step 2 (one more term in the house condition, beside §9.2b quiet and §9.2c away, before the speaker lookup). Tests: test/phone-first.test.ts (PF1), test/phone-first-tick.test.ts (PF2–PF3).
+- **Flow stage:** rules (phone-first.ts) / gate at the persist step (tick step 2).
+- **Why:** a delivery-channel rule, so it lives in src/shared. engine.ts rejected (258/300, the biggest hub, never needs it); speakers.ts (which speakers) and optins.ts audience() (§7.5) rejected (each would gain an "…and also…"). A small leaf with fan-in 1 follows the timer-start.ts precedent. Evaluated before the speaker lookup, so phone-first alerts make zero HA calls. Flagged a spec conflict (AW3, and older tick tests expecting a house row on alert 1 of a repeating Phone + House fire): resolved in SPEC first (§9.2c AW3 wording, the §9.2d note naming G5, T1–T10, L3–L5, L15, HS11).
+- **Caps:** phone-first.ts new, ~10/300; tick.ts 116 → 118/148 (band 133). engine.ts untouched. Nothing newly in the band; no re-pin; no reorganizer.
+
+## 2026-10-11 — I'm away on one alert (placement-advisor)
+
+- **Ask:** SPEC §9.2c (with §4.2zl migration 0039, the §10 rows POST /fires/{id}/away and GET /fires `awayBy`, §8.2 Ringing bar; AW1–AW4, AW-M; ⚑ Q213–Q214). A member says "I've seen it, I'm not home" on one open fire. Tick writes no house row for its alerts; push carries on; the fire stays open until closed, and the fire that replaces it starts without it.
+- **Verdict:** [EXISTING] src/worker/routes/alerts.ts (POST /fires/:id/away beside /actions; GET /fires and the away answer through one file-local fireViews; `f.away_by AS awayBy`); src/worker/tick.ts (step 2: `fire.away_by` joins `quiet` in the existing speakers condition, read through a local `FireRow & { away_by }` row type); frontend/src/state.tsx (Fire.awayBy); frontend/src/components/RingingBar.tsx (Away button, "· away (name)"). Migration 0039 with test/migration-0039.test.ts; test/fire-away-api.test.ts. Row amendments to alerts.ts, tick.ts, RingingBar.tsx; no new rows.
+- **Flow stage:** route + persist (alerts.ts, 0039) / gate at the one persister of fire house rows (tick step 2) / render (RingingBar.tsx).
+- **Why:** Away is a member's action on a fire, so alerts.ts ("fires + actions"). Kept out of engine.ts (never reads the flag; 86%, highest fan-in); updateFire and insertFire list their columns, so the flag survives snooze and a racing tick and is NULL on every replacement fire (Q214) with no code. The POST answers through the same helper as GET /fires so the two cannot drift; it returns the caller's own fire even when §7.5 would hide it from their list.
+- **Caps:** alerts.ts 192 → ~205/300; tick.ts → 118/148; RingingBar.tsx 76 → 78/300; state.tsx +2. Nothing newly in the band; no re-pin; no reorganizer.
+
 ## 2026-10-10 — Quiet the house (placement-advisor)
 
 - **Ask:** SPEC §9.2b (with §4.2zk migration 0038, the §10 `/house/quiet` row, §8.5; HQ1–HQ6, HQ-M; ⚑ Q209–Q212). Any member can quiet the household's speakers for 1 h / 2 h / 4 h / rest of today. While quiet, no `house` row is written by tick step 2, timer start announcements or POST /announce (House only → 409 `house_quiet`); phones carry on unchanged.

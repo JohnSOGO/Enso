@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth**: §14 holds status and deviatio
 MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-10, v1.45.0, main = production.*
+*Last updated 2026-10-10, v1.46.0, main = production.*
 
 ## Running where
 
@@ -54,6 +54,8 @@ the working agreement in `CLAUDE.md`.
 - Event address and paste (v1.37.0–v1.38.0, §7.9, §7.9a): on the iPhone, Paste a copied text and a screenshot into a
   new event, and a "moved to…" text into an existing one; Open in Maps.
 - Dish washer (v1.42.0, §7D.6): start one on the iPhone, hear it done, tap Emptied. Q204–Q207 are ⚑ defaults.
+- Away on an alert and phone first (v1.46.0, §9.2c–9.2d): tap Away on a real repeating alert (speakers stop, phone keeps
+  buzzing); hear a Phone + House repeating alert reach the speakers only from its second alert. Q213–Q216 are ⚑ defaults.
 - Quiet the house (v1.45.0, §9.2b): quiet it on the iPhone, see a phone alert arrive while the speakers stay silent.
   Q209–Q212 are ⚑ defaults.
 - Tab bar flush + build stamp (v1.44.0, §8.1): on the installed iPhone, no gap under the bar and the stamp visible under

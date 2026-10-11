@@ -280,13 +280,13 @@ describe('M4l /machines (L3–L12)', () => {
     expect(await openFire('washer')).toMatchObject({ state: 'ringing', alert_count: 1 });
     const first = await deliveriesOf(fire.id);
     expect(first.filter((d) => d.channel === 'push').map((d) => d.member_id).sort()).toEqual([A, B].sort());
-    expect(first.filter((d) => d.channel === 'house')).toHaveLength(1);
+    expect(first.filter((d) => d.channel === 'house')).toHaveLength(0); // §9.2d: alert 1 is phone only
     expect(first.every((d) => d.message === `${A_NAME}, your laundry in the clothes washer is done`)).toBe(true);
 
     for (const n of [1, 2, 3]) await tickAt(o, addMinutes(doneAt, 15 * n));
     await tickAt(o, addMinutes(doneAt, 60)); // a 5th would be here
     const all = await deliveriesOf(fire.id);
-    expect(all).toHaveLength(12);
+    expect(all).toHaveLength(11); // 4 alerts × A and B's phones + the house from alert 2 (§9.2d)
     expect(Math.max(...all.map((d) => d.alert_number))).toBe(4);
     expect(all.find((d) => d.alert_number === 4 && d.channel === 'house').message).toBe(`${A_NAME}, your laundry in the clothes washer is done (alert 4)`);
     expect(await view('washer')).toMatchObject({ state: 'done', ownerId: A });
@@ -373,8 +373,8 @@ describe('M4l /machines (L3–L12)', () => {
 
     for (const n of [0, 1, 2, 3, 4]) await tickAt(o, addMinutes(fresh.due_at, 15 * n));
     const sent = await deliveriesOf(fresh.id);
-    expect(sent).toHaveLength(12); // 4 alerts × (A and B's phones + the house)
-    expect(sent.find((d) => d.alert_number === 1 && d.channel === 'house').message)
+    expect(sent).toHaveLength(11); // 4 alerts × A and B's phones + the house from alert 2 (§9.2d)
+    expect(sent.find((d) => d.alert_number === 1 && d.channel === 'push').message)
       .toBe(`${A_NAME}, your laundry is still in the clothes washer — move it to the clothes dryer`);
     expect(sent.find((d) => d.alert_number === 4 && d.channel === 'push').message)
       .toBe(`${A_NAME}, your laundry is still in the clothes washer — move it to the clothes dryer (alert 4)`);
@@ -389,7 +389,7 @@ describe('M4l /machines (L3–L12)', () => {
     await tickAt(o, fire.due_at);
     const sent = await deliveriesOf(fire.id);
     expect(sent.filter((d) => d.channel === 'push').map((d) => d.member_id).sort()).toEqual([A, B].sort());
-    expect(sent.find((d) => d.channel === 'house').message).toBe(`${A_NAME}, your laundry in the clothes washer is done`);
+    expect(sent.find((d) => d.channel === 'push').message).toBe(`${A_NAME}, your laundry in the clothes washer is done`);
     expect((await o.post('/machines/washer/done', {})).json).toMatchObject({ error: 'busy' });
     // The dryer, running, finishes early: its old fire is replaced by one due now.
     await o.post('/machines/dryer/start', { ownerId: B, minutes: 60 });
@@ -468,7 +468,7 @@ describe('M4l /machines (L3–L12)', () => {
     await tickAt(o, new Date().toISOString());
     const sent = await deliveriesOf(fire.id);
     expect(sent.filter((x) => x.channel === 'push').map((x) => x.member_id).sort()).toEqual([A, B].sort());
-    expect(sent.find((x) => x.channel === 'house').message).toBe('Clothes washer finished; Owner unknown; Please cycle to dryer');
+    expect(sent.find((x) => x.channel === 'push').message).toBe('Clothes washer finished; Owner unknown; Please cycle to dryer');
     const ringing = (await o.get('/fires?state=ringing')).json.find((f: any) => f.id === fire.id);
     expect(ringing).toMatchObject({ machineId: 'washer', personId: null });
 
@@ -477,7 +477,7 @@ describe('M4l /machines (L3–L12)', () => {
     expect(mv.json.find((m: any) => m.id === 'dryer')).toMatchObject({ state: 'running', ownerId: null });
     const dryerFire = await openFire('dryer');
     await tickAt(o, await finishedAgo('dryer', 0));
-    expect((await deliveriesOf(dryerFire.id)).find((x) => x.channel === 'house').message).toBe('Clothes dryer finished: Owner unknown: Please unload');
+    expect((await deliveriesOf(dryerFire.id)).find((x) => x.channel === 'push').message).toBe('Clothes dryer finished: Owner unknown: Please unload');
   });
 
   it('DW3–DW4 start the dish washer for A: it rings naming who started it; Emptied ends it; it never moves', async () => {
@@ -491,7 +491,7 @@ describe('M4l /machines (L3–L12)', () => {
     await tickAt(o, await finishedAgo('dishwasher', 0));
     const sent = await deliveriesOf(fire.id);
     expect(sent.filter((x) => x.channel === 'push').map((x) => x.member_id).sort()).toEqual([A, B].sort());
-    expect(sent.find((x) => x.channel === 'house').message).toBe(`The dish washer ${A_NAME} started is done`);
+    expect(sent.find((x) => x.channel === 'push').message).toBe(`The dish washer ${A_NAME} started is done`);
 
     const mv = await o.post('/machines/dishwasher/move', { minutes: 60 });
     expect(mv.status).toBe(409);
@@ -511,6 +511,6 @@ describe('M4l /machines (L3–L12)', () => {
     await tickAt(o, doneAt);
     const d = await deliveriesOf(fire.id);
     expect(d.filter((x) => x.channel === 'push').map((x) => x.member_id).sort()).toEqual([A, B].sort());
-    expect(d.find((x) => x.channel === 'house').message).toBe('The laundry in the clothes washer is done');
+    expect(d.find((x) => x.channel === 'push').message).toBe('The laundry in the clothes washer is done');
   });
 });
