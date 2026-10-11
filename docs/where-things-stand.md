@@ -32,6 +32,13 @@ the working agreement in `CLAUDE.md`.
 
 ## Deploy routine (one session at a time)
 
+A cloud thread deploys through a Remote Control session on SogoGamerPC (folder `C:\Users\Public\git\Enso`), not by
+handing MojoSOGO commands. Since 2026-10-11 that checkout's `.claude/settings.local.json` (on the PC only, never
+committed) allows these steps by name: typecheck, test, arch:audit, build:home, deploy, db:migrate:remote (also with
+`CI=1`) and `git pull`. Run each as its own plain command, exactly as written, so the rule matches. If the permission
+check still refuses, say so in the thread: that is the trigger for slice 2 of
+`/mnt/project-files/arec-pc-job-runner.md` (a named-job runner on the PC).
+
 1. Merge the topic branch to `main`, then run `npm run typecheck && npm test && npm run arch:audit`. A test-run crash
    with exit -1073740791 is a known flake; rerun it.
 2. Additive migration: `CI=1 npm run db:migrate:remote`, **then** `npm run deploy`. Dropping migrations go after the deploy.
