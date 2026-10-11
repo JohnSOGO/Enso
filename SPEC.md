@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.84 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.85 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3545,7 +3545,7 @@ Settings
 [ Log out ]
 ```
 
-- **🙂 Me:** name, color.
+- **🙂 Me:** name, color, and **🎯 Point at it** on this device (§8.16).
 - **📅 Calendar items:** **Optional calendar items** — Public holidays, 📈 options expiration, then one line
   per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5).
 - **📱 Phone alerts:** this phone's state and Turn on / Turn off / Send a test (§9.1).
@@ -4123,6 +4123,41 @@ Balances
   with its photo, note and date, and — for the one owed or an admin — **Paid back** and **Let it go**. An admin
   also sees **Whose was it?** there, to correct one (⚑ Q182).
 - Nothing in red; the section reads the same for everyone apart from the buttons a person may use.
+
+### 8.16 🎯 Point at it — name what I tapped
+
+Asked by MojoSOGO 2026-10-11: "click the screen and the control … its location/path in the display can be captured
+so I don't have to over explain", without clashing with what a tap already does. A **pick mode**: one tap, captured
+and swallowed, turned into a line he pastes into a Claude thread.
+
+- **Off by default.** Settings → 🙂 Me has a switch **🎯 Point at it** that turns it on **for this device only**
+  (kept in the browser, not the account) ⚑ (Q234). Any member can turn it on.
+- **While on**, a small round **🎯** button sits at the bottom left above the tab bar on every tab, and a **🎯** sits
+  in every modal's header beside ✕ ⚑ (Q235). Nothing else changes; every other tap works as before.
+- **Tapping 🎯 arms one pick.** A bar across the top (inside the topmost open modal when one is open, so it is never
+  hidden behind it) says **"🎯 Tap the thing you mean · tap here to cancel"**.
+- **The next tap is captured, not acted on:** whatever is under the finger does nothing (no button press, no tick,
+  no field focus, no keyboard, no select opening, no link). Tapping the bar or a 🎯 cancels instead. Pick mode then
+  ends: it is always one tap ⚑ (Q236).
+- **The result** opens as a modal **📍 Pointed at** with the line, a **Copy** button (shows "Copied") and **Pick
+  again**. The line, pieces joined by ` › ` ⚑ (Q237):
+  1. the open tab, as on the tab bar (`⚙ Settings`);
+  2. the title of each open modal, bottom to top, up to the one holding the tap (`🔔 Alerts`);
+  3. inside that, from the outside in: each named group around the tap (an `aria-label`, a fieldset's legend) and
+     the first words (up to 30 characters) of the list row holding it;
+  4. the thing itself: its name in quotes (its `aria-label`, else its label's text, its own text, title, placeholder
+     or picture text; up to 40 characters) and its kind (`button`, `checkbox`, `field`, `select`, `link`,
+     `picture`, `text`);
+  5. after ` · `, the build stamp (§8.1) and the screen size `390×844`.
+
+  Example: `📍 ⚙ Settings › 🔔 Alerts › Morning pills › "FunHouse" checkbox · v1.52.0 · 1a2b3c4 · 430×932`.
+- The line names what is already on screen; it reads no data from the server and is stored nowhere.
+
+**Acceptance (PA1–PA4):** PA1 the line is built as above from its pieces (tab, modals, groups, thing, kind, stamp,
+size), names are cut to their lengths, and empty pieces are left out; PA2 off, no 🎯 shows anywhere; PA3 (manual, on
+the iPhone) on, armed, tapping a tick box, a button, a text field and a select does none of their actions and shows
+the right line, and tapping the bar cancels; PA4 (manual) a pick inside an open modal names the modal and the bar
+shows above it.
 
 ### 8.7 Theme
 
