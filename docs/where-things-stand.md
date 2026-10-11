@@ -48,7 +48,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
-- Cooking timers (v1.54.0, §7D.8): on the iPhone at 320 px, Alarms → 🫧 Machines → ＋ Cooking timer, start an air fryer
+- Cooking timers (v1.54.0, §7D.8): on the iPhone at 320 px, Alarms → 🍳 Cooking machines → ＋ Cooking timer, start an air fryer
   for 1 minute, Edit it, hear it done, tap Off, then the red ✕. Q239–Q243 are ⚑ defaults.
 - Alarms tab as a menu (v1.53.0, §8.5): on the iPhone at 320 px, open each of ⏰ Alarms, ⏱ Rolling timers, 🫧 Machines;
   ＋ Add an alarm and Save, land back on the list (AM1–AM3). Q238 is a ⚑ default.

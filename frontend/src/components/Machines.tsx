@@ -1,4 +1,4 @@
-// SPEC §8.5, §7D — the 🧺 Washing machines group of the Machines section (clothes washer and dryer, dish washer) and its
+// SPEC §8.5, §7D — the 🧺 Washing machines section of the Alarms tab (clothes washer and dryer, dish washer) and its
 // chooser, which the Ringing bar reuses for Move to dryer (§8.2). Its chips and Alert when done are shared with Cooking.tsx.
 import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
@@ -102,7 +102,7 @@ export function MachineChooser({ from, mode, ownerId, onClose }: {
   );
 }
 
-/** The 🧺 Washing machines group of the Machines section (SPEC §8.5): one card per machine, in `MACHINE` order. */
+/** The 🧺 Washing machines section of the Alarms tab (SPEC §8.5): one card per machine, in `MACHINE` order. */
 export function MachinesSection() {
   const { version, localTime, memberById, refresh } = useApp();
   const [machines, setMachines] = useState<Machine[] | null>(null);
@@ -126,7 +126,6 @@ export function MachinesSection() {
 
   return (
     <section className={s.section} aria-label="Washing machines">
-      <h3 style={{ fontSize: '1rem', marginBottom: 6 }}>🧺 Washing machines</h3>
       <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>
         Start a machine. When it's done, every phone hears; the speakers too when someone is picked.
       </p>
