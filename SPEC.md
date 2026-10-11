@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.76 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.77 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1425,6 +1425,18 @@ UPDATE machines SET alert_id = owner_id WHERE done_at IS NOT NULL;
 
 **Migration check (AL-M):** machine rows and open fires survive 0040; a loaded machine's `alert_id` is its owner,
 a free or owner-unknown one NULL.
+
+### 4.2zn Schema change — `migrations/0041_alert_dismiss.sql`
+
+Asked by MojoSOGO 2026-10-11 (§9.5).
+
+```sql
+-- §9.5 — a push I hid from my Alerts list; the row is kept (Status and the ping limit still count it). Additive only.
+ALTER TABLE deliveries ADD COLUMN dismissed_at TEXT;
+CREATE INDEX idx_deliveries_member ON deliveries(member_id, created_at);
+```
+
+**Migration check (MA-M):** delivery rows survive 0041 unchanged, each with `dismissed_at` NULL.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -4104,6 +4116,8 @@ Time      Chore            Days        This week
   per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); name,
   color, enable phone alerts (subscribe), **🔊 Speak my alerts on** (§9.2a),
   log out.
+- **Alerts** (§9.5): every push this phone's member got, newest first — tap a line for its card, a red ❌ on each
+  line hides it, **Clear all** at the top. A tapped phone notification opens here, on its card.
 - **Household (admins):** name, timezone, days off (§7.3), **invites (§8.9)**, members list:
   one line per member — name · **Owner** / **Admin** chip (nothing for a regular member) ·
   **Make admin** / **Remove admin** (asks first; never on the founder) · **Disable** /
@@ -4723,10 +4737,11 @@ Each person turns phone alerts on **once per phone**, in Settings → Me (decide
   /icon-192.png`, `data: { fireId, url }`, `actions` (ignored on iOS).
 - `notificationclick` → with an action: `POST /api/v1/fires/{id}/actions {action}` (same-origin
   cookie) and close; without an action but with `data.url` (a sign-in request, §6.6): focus an open app window
-  and `navigate(url)` it, or — when there is none, or it cannot be navigated — `openWindow(url)`; otherwise
-  focus the open app or open `/`.
+  and `navigate(url)` it, or — when there is none, or it cannot be navigated — `openWindow(url)`; otherwise, with
+  `data.alertId` (§9.5), the same for `/settings/alerts?alert={alertId}`; otherwise focus the open app or open `/`.
 
-**Payload** (JSON, encrypted): `{ fireId, kind, tag, title, body, actions, url }`, under Apple's 4 KB:
+**Payload** (JSON, encrypted): `{ fireId, kind, tag, title, body, actions, url, alertId }`, under Apple's 4 KB
+(`alertId`: the delivery's id, so a tap opens its card, §9.5; `null` on the test push, which has no row):
 `title` **"Ensō"**, `body` = the delivery's `message` (already "Reminder: …", "Chore for
 Sam: …"), `kind` from the delivery's fire, `actions` from the engine's `pushActions(kind)` —
 the same table the Ringing bar's buttons follow. ⚑
@@ -5186,6 +5201,63 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | ON9 | the titles of other pushes | an announcement's push is still "📢 Announcement"; a fire's push keeps "Ensō" and `tag` = its `fireId` |
 | ON-M | migration 0022 | §4.2u's check |
 
+### 9.5 My alerts — `src/shared/alert-history.ts`, `/me/alerts` — asked by MojoSOGO 2026-10-11
+
+"If Ensō sends an alert from Ozy, I tap it but it goes away with no detail." Every push is already a `deliveries`
+row with its whole message (§9.1); this shows each member their own, and a tap on the phone opens it.
+
+**What is listed:** my push deliveries (`channel = 'push'`, `member_id` = me) that I haven't hidden
+(`dismissed_at` NULL), newest first, at most `ALERT_HISTORY_MAX = 200` ⚑ (Q221) — older ones are simply not shown;
+nothing is deleted. Every kind of push is there: a fire's alert, an announcement, a timer start announcement, a
+founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push has no row and is not.
+
+**Rules** (`src/shared/alert-history.ts`, pure, imports vocab and announce only):
+- `PUSH_TITLE = "Ensō"` (moved from push.ts). `pushTitle({ hasFire, title })` → the title the phone showed: a fire's
+  push → `PUSH_TITLE`; else `title ?? ANNOUNCE_TITLE`. push.ts sends it and the list shows it — one copy.
+- `alertSource({ kind, isAlarm, notice, messId, title, hasFire })` → where it came from, in this order: a fire →
+  its kind (`reminder` → "Reminder", or "Alarm" when the event `is_alarm` ⚑ Q222; `timer` → "Rolling timer";
+  `chore` → "Chore"; `thing` → "Thing to do"; `machine` → "Machine"); a `notice` → "Sign-in"; a `mess_id` →
+  "Whose mess?"; a `title` → that title (a ping: "🏛️ Ozymandias", "🤖 Claude"); else "Announcement" (a timer
+  start announcement too ⚑ Q223). The ping branch matches `opsPingsSince` (§9.4).
+- `ALERTS_PATH = "/settings/alerts"`, `alertUrl(id)` → `/settings/alerts?alert={id}`, `alertIdFrom(pathname,
+  search)` → the id when the path is `ALERTS_PATH` and `alert` is set, else null. sw.js carries its own copy of
+  the path (a test pins it).
+
+**API** (`src/worker/routes/my-alerts.ts`, member):
+- `GET /me/alerts` → `{ alerts: MyAlert[] }`, `MyAlert = { id, title, message, source, kind, alertNumber, status,
+  detail, createdAt }` — `kind` and `alertNumber` only for a fire's push (else null).
+- `DELETE /me/alerts/{id}` → 204, sets `dismissed_at`; **404 `not_found`** when it isn't my push or is already
+  hidden.
+- `DELETE /me/alerts` → `{ cleared }`, the number newly hidden (all of mine, not just the 200 shown).
+- Only this file reads or writes `dismissed_at`: Status (§8.6), the ping limit (§9.4) and mess asks still count
+  hidden rows.
+
+**Screen** (Settings → **Alerts**, between Me and Household; `frontend/src/components/MyAlerts.tsx`):
+- **Clear all** at the top (asks "Clear all your alerts?"; disabled when empty) ⚑ Q224; "No alerts yet." when empty.
+- One line per alert: the title, the message (one line, cut with …), the time; a red **❌** at the end hides it at
+  once, no asking ⚑ Q224.
+- Tapping a line opens its **card** (a titled modal): the title, the whole message, when (date and time), From (the
+  source), the alert number (a fire's push), and how it went (sent / failed with the detail). **Delete** and
+  **Close** at the bottom.
+- **Opened from a push:** a tap on a notification (no action button) opens `/settings/alerts?alert={id}`
+  (§9.1). On start the app reads it, clears the address to `/`, shows Settings and opens that card — after
+  signing in first, if needed ⚑ Q225. An id not in my list → the card says "This alert is no longer in your list."
+- A sign-in request's push still opens its approve page (§6.6); its line is in the list too.
+
+**Acceptance (M4u — each row is a test):**
+
+| # | Check | Expected |
+|---|---|---|
+| MA1 | `pushTitle` / `alertSource` / `alertUrl` / `alertIdFrom` | a fire → "Ensō"; titled → the title; neither → "📢 Announcement"; each source branch in order (a fire with a title stays its kind; an alarm → "Alarm"); `alertUrl("dlv_1")` = `/settings/alerts?alert=dlv_1`; `alertIdFrom` on that → `dlv_1`, on `/` or without `alert` → null |
+| MA2 | a ping to the founder, then `GET /me/alerts` as the founder; as another member | one alert `{ title: "🏛️ Ozymandias", message: <the whole text>, source: "🏛️ Ozymandias", kind: null, alertNumber: null, status }`; the other member's list is empty |
+| MA3 | a reminder's push and an announcement | the reminder's: title "Ensō", source "Reminder", kind `reminder`, alertNumber 1; newest first |
+| MA4 | `DELETE /me/alerts/{id}` mine; again; another member's; a house row's id | 204, gone from my list, the row still in `deliveries`; 404; 404; 404 |
+| MA5 | `DELETE /me/alerts` with 3 of mine (1 already hidden) and 1 of someone else's | `{ cleared: 2 }`; my list empty; theirs untouched; `/status` still lists all four |
+| MA6 | more than 200 of mine | the newest 200 |
+| MA7 | the push payload of a fire, an announcement, a ping; the test push | `alertId` = the delivery id; the test push's `null` |
+| MA8 | sw.js | contains `ALERTS_PATH` and reads `alertId` |
+| MA-M | migration 0041 | §4.2zn's check |
+
 ---
 
 ## 10. API — `/api/v1`
@@ -5245,6 +5317,9 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | GET | `/push/vapid-key` | public | → `{ key }` |
 | GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff }`; PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
 | GET | `/status` | member | → `{ house: { state: HouseState, lastOkAt, lastFailedAt, lastError } (§9.2, derived, never stored), mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[] }` |
+| GET | `/me/alerts` | member | → `{ alerts: { id, title, message, source, kind, alertNumber, status, detail, createdAt }[] }` — my pushes not hidden, newest first, ≤ 200 (§9.5) |
+| DELETE | `/me/alerts/{id}` | member (my push) | → 204, hidden from my list; 404 `not_found` otherwise (§9.5) |
+| DELETE | `/me/alerts` | member | → `{ cleared }`, all of mine hidden (§9.5) |
 | GET / PUT / DELETE | `/house/quiet` | member | GET → `{ until, byName }`; PUT `{ for: '1h' \| '2h' \| '4h' \| 'today' }` → the same; DELETE turns quiet off; 400 `invalid_input` (§9.2b) |
 | POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `no_recipients` (§9.3); 409 `no_speakers` (§9.2a); 409 `house_quiet` (§9.2b); spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
 | POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 409 `no_recipients` (no founder yet) / 429 `rate_limited`, in that order |
@@ -5877,6 +5952,11 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q218 | Does the dish washer's starter get the alert (§7D.7) | ⚑ Preselected (the chooser follows the owner chip) but can be cleared to Nobody |
 | Q219 | An alert person who is no longer active (§7D.7) | ⚑ Treated as nobody: phones only |
 | Q220 | Changing who is alerted on a load already running (§7D.7) | ⚑ Not offered; Clear and start again. Move carries it to the dryer |
+| Q221 | How many alerts My alerts keeps (§9.5) | ⚑ The newest 200 shown; nothing is deleted from the database |
+| Q222 | An alarm's push in My alerts (§9.5) | ⚑ "Alarm", apart from "Reminder" |
+| Q223 | A timer start announcement in My alerts (§9.5) | ⚑ "Announcement" (the row carries nothing that tells it apart) |
+| Q224 | Deleting alerts (§9.5) | ⚑ Each person's own list only; ❌ hides one with no asking; Clear all asks first |
+| Q225 | A notification tapped while signed out (§9.5) | ⚑ Sign in first, then the card opens |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -6085,6 +6165,10 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**My alerts** (v1.48.0, §9.5, §4.2zn; asked by MojoSOGO 2026-10-11; MA1–MA8, MA-M): Settings → Alerts lists every
+push I got (newest 200), each line with a red ❌, Clear all at the top, a tap opens its card with the whole message,
+time, source and result. Tapping a phone notification opens the app on that card. Migration 0041. Q221–Q225 are ⚑
+defaults. **Still owed:** tap a real Ozymandias ping on the iPhone and land on its card.
 **Alert when done** (v1.47.0, §7D.7, §4.2zm; asked by MojoSOGO 2026-10-11; AL1–AL6, AL-M): starting a machine (or
 Done now) asks *Alert when done* — Nobody · phones only, or a member (preselected to whose load). With nobody, every
 phone hears it and no speaker does; with someone, as before. Owner unknown on Done now means nobody. Loads already

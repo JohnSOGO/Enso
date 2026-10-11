@@ -1,4 +1,4 @@
-// SPEC §8.6 — Me, Household (owner), Status.
+// SPEC §8.6 — Me, Alerts (§9.5), Household (owner), Status.
 import { useEffect, useState, type ReactNode } from 'react';
 import { get, patch, post } from '../api';
 import { useApp, type Status } from '../state';
@@ -9,6 +9,7 @@ import { Invites } from './Invites';
 import { OptionalItems } from './OptionalItems';
 import { PhoneAlerts } from './PhoneAlerts';
 import { HouseSpeakers } from './HouseSpeakers';
+import { MyAlerts } from './MyAlerts';
 import s from './Lists.module.css';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -164,12 +165,14 @@ function StatusSection() {
   );
 }
 
-export function Settings({ onLogout }: { onLogout: () => void }) {
+/** `openAlert`: a tapped notification's alert, whose card opens in Alerts (§9.5). */
+export function Settings({ onLogout, openAlert, onAlertOpened }: { onLogout: () => void; openAlert: string | null; onAlertOpened: () => void }) {
   const { me } = useApp();
   return (
     <div style={{ padding: 12, overflowY: 'auto', height: '100%' }}>
       <h1 style={{ fontSize: '1.15rem', marginBottom: 12 }}>Settings</h1>
       <MeSection onLogout={onLogout} />
+      <Section title="Alerts"><MyAlerts openId={openAlert} onOpened={onAlertOpened} /></Section>
       {isAdmin(me) && <HouseholdSection />}
       <StatusSection />
     </div>

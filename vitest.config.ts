@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers';
 import { defineConfig } from 'vitest/config';
@@ -15,6 +16,8 @@ export default defineConfig(async () => {
             TEST_MIGRATIONS: migrations,
             // SPEC §2.5 — the source tree measured in Node; test/architecture.test.ts asserts on it.
             ARCH: JSON.parse(JSON.stringify(scan(path.resolve('.')))),
+            // §9.5 MA8 — the service worker's text (plain JS, not importable), checked against ALERTS_PATH.
+            SW_JS: readFileSync(path.resolve('frontend/public/sw.js'), 'utf8'),
             SETUP_TOKEN: 'test-setup-token',
             DEV_ENDPOINTS: '1',
             // §7C.4 — pinned empty so a local .dev.vars key can never reach the real Anthropic API from a test.

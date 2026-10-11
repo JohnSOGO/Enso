@@ -25,6 +25,7 @@ import { recipes } from './routes/recipes';
 import { recipePhotos } from './routes/recipe-photos';
 import { shows } from './routes/shows';
 import { ops } from './routes/ops';
+import { myAlerts } from './routes/my-alerts';
 import { phoneLogin } from './routes/phone-login';
 
 const api = new Hono<AppEnv>();
@@ -65,6 +66,7 @@ api.route('/', recipes);
 api.route('/', recipePhotos);
 api.route('/', shows); // §7F; /shows/look-up is registered before /shows/:id in its file
 api.route('/', ops);
+api.route('/', myAlerts); // §9.5 /me/alerts
 
 api.post('/dev/tick', async (c) => {
   if (c.env.DEV_ENDPOINTS !== '1') return fail(c, 404, 'not_found', 'Not found.');

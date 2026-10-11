@@ -102,7 +102,7 @@ describe('M5 Web Push (§9.1)', () => {
     expect(v.claims).toMatchObject({ aud: 'https://p3.push.test', sub: env.VAPID_SUBJECT });
     // P9 — the test-side RFC 8291 decryptor reads back exactly the payload.
     expect(JSON.parse(await decryptPush(sub, req.body))).toEqual({
-      fireId, kind: 'reminder', tag: fireId, title: 'Ensō', body: 'Reminder: Take the bins out', actions: ['done', 'snooze'], url: null,
+      fireId, kind: 'reminder', tag: fireId, title: 'Ensō', body: 'Reminder: Take the bins out', actions: ['done', 'snooze'], url: null, alertId: expect.any(String),
     });
     expect(await deliveriesOf(fireId)).toEqual([{ status: 'sent', detail: null }]);
     const [s] = (await a.client.get('/status')).json.mySubscriptions;
@@ -197,7 +197,7 @@ describe('M5 Web Push (§9.1)', () => {
     for (const s of [s1, s2]) {
       const [p] = to(s);
       expect(p.headers.get('topic')).toBeNull(); // AN7
-      expect(JSON.parse(await decryptPush(s, p.body))).toEqual({ fireId: null, kind: null, tag: 'enso-test', title: 'Ensō', body: 'Ensō test — phone alerts work', actions: [], url: null });
+      expect(JSON.parse(await decryptPush(s, p.body))).toEqual({ fireId: null, kind: null, tag: 'enso-test', title: 'Ensō', body: 'Ensō test — phone alerts work', actions: [], url: null, alertId: null });
     }
     const c = await member(o);
     const none = await c.client.post('/push/test');
@@ -241,7 +241,7 @@ describe('M5 Web Push (§9.1)', () => {
     const id = byMember[withPhone.id].id;
     expect(req.headers.get('topic')).toBeNull();
     expect(JSON.parse(await decryptPush(sub, req.body))).toEqual({
-      fireId: null, kind: null, tag: id, title: '📢 Announcement', body: 'MojoSOGO says: Dinner is ready', actions: [], url: null,
+      fireId: null, kind: null, tag: id, title: '📢 Announcement', body: 'MojoSOGO says: Dinner is ready', actions: [], url: null, alertId: id,
     });
   });
 });
