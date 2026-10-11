@@ -7,6 +7,10 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Steward pass 16 handoff TXT: wording only (no placement needed for code)
+
+- **Ask:** MojoSOGO picked TXT from pass 16 (and said no to TST): PickGrid's header comment and map row now name its three callers (§8.5 Alarms, §8.6 Settings, §8.8 Lists); SPEC 2.95 §8.2 gains the cooking timer's Ringing bar row (`🍳 label · person` with **[Off]**, glyph fixed, ⚑ Q246). Comment and docs only; no behavior change, no version bump, no deploy.
+
 ## 2026-10-11 — v1.55.1: Opening-screen tagline (placement-advisor)
 
 - **Ask:** SPEC 2.94 §8.10: the tagline "Closing the loop. Peace of mind, every day." under the "Ensō" heading on the opening screen, and the iPhone splash PNGs re-rendered from that screen.

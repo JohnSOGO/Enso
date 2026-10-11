@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.94 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.95 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3408,6 +3408,8 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
   dryer-minutes chooser the Machines card uses (§8.5); `🧺 Clothes dryer · Sam` with **[Fold &
   out]**; `🧺 Dish washer · Sam` (who started it, §7D.6) with **[Emptied]**. No Done:
   a machine fire is closed only by the `/machines` routes (§7D.2), or `/cooking` (§7D.8). ⚑ Q40
+- Cooking timer row (§7D.8): `🍳 Air fryer · Sam` (its label, then who started it) with **[Off]**. The glyph is 🍳 for
+  every kind ⚑ Q246.
 - **Away** (§9.2c) on every row not yet away: "I've seen it, I'm not home." The speakers and phones stop for that alert;
   the row stays. An away row shows `· away ({name})` instead of the button.
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
