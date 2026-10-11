@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.92 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.93 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4123,8 +4123,19 @@ Hoosiers  1986            🍅 —    💵 Rent
 ### 8.15 Chores (the 🧹 tab) — asked by MojoSOGO 2026-10-05
 
 "Chores needs its own section." The **🧹 Chores** tab holds everything about chores that used to be split between
-Alarms → Chores and Lists → Today ⚑ Q166: **Today** at the top (ticking off is the daily use), then **All chores**
-(the chore list of §8.5, with ＋ Add), and from either, a chore's **What done looks like** sheet.
+Alarms → Chores and Lists → Today ⚑ Q166: **Today** (ticking off is the daily use), **Messes** (§8.15a) and **All
+chores** (the chore list of §8.5, with ＋ Add), and from Today or All chores, a chore's **What done looks like** sheet.
+
+**A menu** (v1.55.0, asked by MojoSOGO 2026-10-11: "Chores needs a modal after pressed, which chore sub category are
+we pushing into") ⚑ Q245: under the heading "Chores", the same grid as Settings and Alarms (§8.6, `PickGrid`) of
+**✅ Today**, **🧽 Messes**, **📋 All chores**, Today first. A tap opens that section in a modal titled with its emoji
+and name; ✕, Escape or a tap outside closes it back to the tab. A chore form, What done looks like sheet or Report a
+mess sheet opens on top of its section and closing it returns there. Nothing inside a section changed; only where it
+sits. The mess banner (§8.15a) stays on every screen.
+
+Acceptance (CM1–CM3): CM1 the tab shows the three buttons and no list; CM2 each button opens its section in a modal
+and ✕ returns to the grid; CM3 ticking a Today step, tapping a chore row, and 📸 Report a mess all work from inside
+their modal.
 
 **Today** — a switch **Mine | Everyone** (default Mine; remembered):
 
@@ -4198,7 +4209,7 @@ Today row's 📋:
 - The photo is a small thumbnail (tap for full size). The two buttons are ≥ 44 px. Answering removes the row.
 - It is not red and makes no sound; it stays until I answer, even while the mess is on To talk about.
 
-**Messes** — a section of the 🧹 Chores tab between Today and All chores:
+**Messes** — a section of the 🧹 Chores tab, the 🧽 Messes button of its menu (§8.15):
 
 ```
 Messes                                    [📸 Report a mess]
