@@ -168,7 +168,7 @@ bounties.post('/earnings/:id/not-yet', requireMember, requireOwner, async (c) =>
   if (e instanceof Response) return e;
   const db = c.env.DB, now = nowIso();
   const stmts = [db.prepare('UPDATE earnings SET dropped_at = ? WHERE id = ?').bind(now, e.id)];
-  // ⚑ Q248: a one-off goes back to the one who said Done, as a fresh dib.
+  // ⚑ Q251: a one-off goes back to the one who said Done, as a fresh dib.
   if (e.bounty_id) stmts.push(db.prepare('UPDATE bounties SET taken_by = ?, taken_at = ? WHERE id = ?').bind(e.member_id, now, e.bounty_id));
   await db.batch(stmts);
   return c.body(null, 204);

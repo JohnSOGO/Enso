@@ -24,7 +24,7 @@ export interface Chore {
 
 type Section = 'today' | 'bounties' | 'messes' | 'all' | 'score';
 
-/** ⚑ Q245, Q252 — the menu, as on Settings (§8.6) and Alarms (§8.5); Today first. */
+/** ⚑ Q245, Q255 — the menu, as on Settings (§8.6) and Alarms (§8.5); Today first. */
 const SECTIONS: readonly { value: Section; emoji: string; label: string }[] = [
   { value: 'today', emoji: '✅', label: 'Today' }, { value: 'bounties', emoji: '🪙', label: 'Bounties' },
   { value: 'messes', emoji: '🧽', label: 'Messes' }, { value: 'all', emoji: '📋', label: 'All chores' },

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.95 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.97 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2419,14 +2419,14 @@ points earned from the house. The two are never mixed: Balances stay mess points
 - **A chore bounty** — an admin puts points on a chore (`chores.bounty`, 1–10). Every run of it then pays whoever
   finishes it: when a run's last step is done (§7B.3), an **earning** is written for `done_by` with the chore's points
   at that moment. Turns, rings and Today are unchanged; anyone could already finish anyone's run (§6.3). A multi-step
-  chore pays whoever finishes the last step ⚑ Q247. **Undo** of a finished run (§7B.3) drops its earning, OK'd or not.
+  chore pays whoever finishes the last step ⚑ Q250. **Undo** of a finished run (§7B.3) drops its earning, OK'd or not.
   Changing or clearing a chore's bounty never changes earnings already written.
 - **A one-off bounty** — an admin posts a job with a title, an optional note and points. It is done once.
 
 **An earning** is points a member has done the work for: pending until an admin taps **OK**, then it counts. An admin
 may name someone else when OK-ing ("it was Sam who took the can in"). **Not yet** drops it: no points; a one-off goes
-back to the one who said Done as their dib, fresh ⚑ Q248; a chore run stays done but pays nothing. When the one who
-finishes is an admin, the earning is OK'd by them at once ⚑ Q249.
+back to the one who said Done as their dib, fresh ⚑ Q251; a chore run stays done but pays nothing. When the one who
+finishes is an admin, the earning is OK'd by them at once ⚑ Q252.
 
 **A one-off's state** — `bountyStatus(b, earning, now)`, derived, never stored (`BOUNTY_STATUS`, §3), first match
 wins: `paid` (its live earning is OK'd) · `pending` (its live earning waits for OK) · `taken` (someone said **I'll do
@@ -2434,19 +2434,19 @@ it** less than `TAKE_HOURS` ago) · `open`. A deleted bounty is gone from every 
 
 **The rules** (pure; imports only vocab and time):
 
-- `POINTS_MIN` = 1, `POINTS_MAX` = 10 ⚑ Q246, `BOUNTY_TITLE_MAX` = 60, `BOUNTY_NOTE_MAX` = 120, `TAKE_HOURS` = 3 ⚑ Q248.
+- `POINTS_MIN` = 1, `POINTS_MAX` = 10 ⚑ Q249, `BOUNTY_TITLE_MAX` = 60, `BOUNTY_NOTE_MAX` = 120, `TAKE_HOURS` = 3 ⚑ Q251.
 - `parsePoints(v)` → an integer 1–10, or a message. `parseBountyInput({ title, note, points })` → the trimmed fields
   or a message naming the field (title 1–60, note empty → null, at most 120).
 - `takeError(status, takenBy, me, myOtherDib)` → why **I'll do it** is refused, or null: not `open` (taken by someone
-  else, pending, paid); or I already hold a live dib on another one-off (one at a time) ⚑ Q248.
+  else, pending, paid); or I already hold a live dib on another one-off (one at a time) ⚑ Q251.
 - `doneError(status, takenBy, me)` → why **Done** is refused, or null: `pending` / `paid`; or `taken` by someone else.
   No dib is needed to say Done.
 - `scoresOf(earnings, activeIds, today, tz)` → `Score[]` (`{ memberId, week, month }`) for every active member, zeros
   included: the sum of the points of OK'd, live earnings whose `done_at` falls (household time) in this week
-  (Sunday-start, as turns, §7B.1) and in this calendar month ⚑ Q250. Never negative, never ranked.
+  (Sunday-start, as turns, §7B.1) and in this calendar month ⚑ Q253. Never negative, never ranked.
 - `runEarningChange(before, after)` → `'earn'` when a run's `done_at` goes from null to set, `'drop'` when it goes
   from set to null, else null. `okAtOnce(finisher, now)` → `{ ok_by, ok_at }` when the finisher is an admin, else
-  null (Q249). `scoreSince(today, tz)` → the UTC start of the earlier of this week's Sunday and the 1st of the month,
+  null (Q252). `scoreSince(today, tz)` → the UTC start of the earlier of this week's Sunday and the 1st of the month,
   so the route reads every earning a score can need and decides no window itself.
 - Push texts: `newBountyMessage(title, points)` → `"{title} · {points} points. Open Ensō → Chores → Bounties."`, title
   `NEW_BOUNTY_TITLE` "🪙 New bounty"; `waitingMessage(name, title, points)` → `"{name} says done: {title} · {points}
@@ -2465,7 +2465,7 @@ it** less than `TAKE_HOURS` ago) · `open`. A deleted bounty is gone from every 
 | OK (optionally naming who) / Not yet | admins (CNF) | a pending earning |
 | See the bounties, the waiting list and everyone's score | everyone (PUB) | — |
 
-**Delivery.** Fire-less push deliveries (§9.1), **never `house`** ⚑ Q251: posting a one-off pushes everyone active
+**Delivery.** Fire-less push deliveries (§9.1), **never `house`** ⚑ Q254: posting a one-off pushes everyone active
 but the poster once (`deliveries.bounty_id` set); a pending earning pushes every active admin once
 (`deliveries.earning_id` set). No repeats. Neither counts toward the `/ops/notify` limit nor reaches the FunHouse
 list (§9.4, §9.4a). A done photo is not part of v1 (§12.5).
@@ -3537,6 +3537,8 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
   dryer-minutes chooser the Machines card uses (§8.5); `🧺 Clothes dryer · Sam` with **[Fold &
   out]**; `🧺 Dish washer · Sam` (who started it, §7D.6) with **[Emptied]**. No Done:
   a machine fire is closed only by the `/machines` routes (§7D.2), or `/cooking` (§7D.8). ⚑ Q40
+- Cooking timer row (§7D.8): `🍳 Air fryer · Sam` (its label, then who started it) with **[Off]**. The glyph is 🍳 for
+  every kind ⚑ Q246.
 - **Away** (§9.2c) on every row not yet away: "I've seen it, I'm not home." The speakers and phones stop for that alert;
   the row stays. An away row shows `· away ({name})` instead of the button.
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
@@ -3776,6 +3778,7 @@ Settings
 [ 📱 Phone alerts  ] [ 🔊 Speakers       ]
 [ 🔔 Alerts        ] [ 🏠 Household      ]   ← Household and Members: admins only
 [ 👥 Members       ] [ 📊 Status         ]
+[ ℹ️ About         ]
 [ Log out ]
 ```
 
@@ -3796,11 +3799,16 @@ Settings
   (good) with the last success time; `failing` → "failing since {lastFailedAt}" (bad) with
   `lastError` beneath; `not_configured` → "not set up" (bad); `untried` → "not tried yet"
   (neutral). Then the last 20 deliveries with their status badge.
+- **ℹ️ About** (asked by MojoSOGO 2026-10-11, last in the grid, for everyone ⚑ Q247): the opening screen's look
+  (§8.10) inside the modal: the ensō logo, **Ensō**, the tagline, and the build stamp as the revision; then
+  **"Developed by MojoSOGO · with Claude"** ⚑ (Q248). Nothing to change, nothing fetched.
 - **Log out** sits under the grid, not inside an area ⚑ (Q227). No menu button is marked chosen.
 
 **Acceptance (SM1–SM4):** SM1 the tab shows the grid, with Household and Members only for an admin; SM2 each
 button opens its area titled with its name, and closing returns to the grid; SM3 a tapped alert notification opens
-Settings → 🔔 Alerts on its card, and closing the card leaves the Alerts list open; SM4 every setting listed above is
+Settings → 🔔 Alerts on its card, and closing the card leaves the Alerts list open; SM5 ℹ️ About shows the logo,
+Ensō, the same tagline as the opening screen (a test holds `frontend/index.html` to it) and the same build stamp as
+under the tabs; SM4 every setting listed above is
 reachable and behaves as before (manual, on the iPhone at 320 px: the grid is two columns, one under 360 px).
 
 ### 8.8 Lists screen
@@ -4261,7 +4269,7 @@ chores** (the chore list of §8.5, with ＋ Add), and from Today or All chores, 
 **A menu** (v1.55.0, asked by MojoSOGO 2026-10-11: "Chores needs a modal after pressed, which chore sub category are
 we pushing into") ⚑ Q245: under the heading "Chores", the same grid as Settings and Alarms (§8.6, `PickGrid`) of
 **✅ Today**, **🪙 Bounties**, **🧽 Messes**, **📋 All chores**, **🏅 Score**, Today first (Bounties and Score
-since v1.56.0, §8.15b ⚑ Q252). A tap opens that section in a modal titled with its emoji
+since v1.57.0, §8.15b ⚑ Q255). A tap opens that section in a modal titled with its emoji
 and name; ✕, Escape or a tap outside closes it back to the tab. A chore form, What done looks like sheet or Report a
 mess sheet opens on top of its section and closing it returns there. Nothing inside a section changed; only where it
 sits. The mess banner (§8.15a) stays on every screen.

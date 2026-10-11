@@ -5,10 +5,10 @@ import type { BountyStatus } from './vocab';
 import { addMinutes, localToUtc, startOfWeek, utcToLocal } from './time';
 
 export const POINTS_MIN = 1;
-export const POINTS_MAX = 10; // ⚑ Q246
+export const POINTS_MAX = 10; // ⚑ Q249
 export const BOUNTY_TITLE_MAX = 60;
 export const BOUNTY_NOTE_MAX = 120;
-export const TAKE_HOURS = 3; // ⚑ Q248
+export const TAKE_HOURS = 3; // ⚑ Q251
 export const NEW_BOUNTY_TITLE = '🪙 New bounty';
 export const WAITING_TITLE = '🪙 Waiting for OK';
 
@@ -88,7 +88,7 @@ export function runEarningChange(before: { done_at: string | null }, after: { do
   return null;
 }
 
-/** An admin's own earning is OK'd by them at once (⚑ Q249). */
+/** An admin's own earning is OK'd by them at once (⚑ Q252). */
 export const okAtOnce = (finisher: { id: string; admin: boolean }, now: string): { ok_by: string; ok_at: string } | null =>
   finisher.admin ? { ok_by: finisher.id, ok_at: now } : null;
 

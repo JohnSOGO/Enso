@@ -244,14 +244,17 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q240 | Cooking timer minutes (§7D.8) | ⚑ Any whole number 1–600, with quick chips 1–60 |
 | Q241 | How a cooking timer rings (§7D.8) | ⚑ At any hour (not the machine alert hours), every 5 minutes, 4 alerts; phones always, speakers when someone is picked |
 | Q242 | Cooking timers' end of day (§7D.8) | ⚑ At local midnight every timer not running and not still alerting is closed; one still going stays until it rings out |
+| Q246 | A cooking timer's glyph in the Ringing bar (§8.2) | ⚑ 🍳 for every kind (the fire view carries no kind); the card in Cooking machines shows the kind's own glyph |
 | Q243 | Where cooking timers sit (§8.5) | **Decided by MojoSOGO 2026-10-11:** their own 🍳 Cooking machines button on the Alarms tab, beside 🧺 Washing machines (was ⚑ one Machines modal with two groups) |
 | Q244 | Where the FunHouse poller starts after a restart (§9.4a) | ⚑ From the `after` it saved last when within 10 min (nothing repeats); else 10 min back (older notices from a longer outage are skipped) |
 | Q245 | How the Chores tab shows its sections (§8.15) | ⚑ A menu of ✅ Today · 🧽 Messes · 📋 All chores, each in its own modal, as Settings and Alarms (was all three stacked on the tab) |
-| Q246 | Bounty points (§7B.8) | ⚑ Whole points 1–10 per job |
-| Q247 | Who a multi-step chore bounty pays (§7B.8) | ⚑ Whoever finishes the last step (the run's `done_by`); Undo of a finished run drops it |
-| Q248 | A one-off's dib (§7B.8) | ⚑ I'll do it holds it 3 h, then it lapses by itself; one live dib per person; Not yet gives the doer a fresh dib |
-| Q249 | An admin's own Done (§7B.8) | ⚑ OK'd at once by them; no waiting push |
-| Q250 | Score windows (§7B.8) | ⚑ This week (Sunday-start, as turns) and this calendar month, by the day the work was done, OK'd points only |
-| Q251 | Bounty pushes (§7B.8) | ⚑ A new one-off pushes everyone but the poster once; a pending earning pushes every admin once; never spoken in the house; no repeats |
-| Q252 | Where bounties sit (§8.15) | ⚑ 🪙 Bounties and 🏅 Score join the Chores menu: Today · Bounties · Messes · All chores · Score |
-| Q253 | Who sets, approves and sees bounties (§7B.8) | **Decided by MojoSOGO 2026-10-11:** only admins set them (ADM); points count after an admin's OK (CNF, "child claims bounty and it goes pending; then gets adults approval via app"); everyone sees everyone's score, no ranks (PUB) |
+| Q247 | Where Settings → ℹ️ About sits (§8.6) | ⚑ Last button in the grid, after 📊 Status, for every member |
+| Q248 | The About credit line (§8.6) | ⚑ "Developed by MojoSOGO · with Claude" (no other author is named in SPEC or README) |
+| Q249 | Bounty points (§7B.8) | ⚑ Whole points 1–10 per job |
+| Q250 | Who a multi-step chore bounty pays (§7B.8) | ⚑ Whoever finishes the last step (the run's `done_by`); Undo of a finished run drops it |
+| Q251 | A one-off's dib (§7B.8) | ⚑ I'll do it holds it 3 h, then it lapses by itself; one live dib per person; Not yet gives the doer a fresh dib |
+| Q252 | An admin's own Done (§7B.8) | ⚑ OK'd at once by them; no waiting push |
+| Q253 | Score windows (§7B.8) | ⚑ This week (Sunday-start, as turns) and this calendar month, by the day the work was done, OK'd points only |
+| Q254 | Bounty pushes (§7B.8) | ⚑ A new one-off pushes everyone but the poster once; a pending earning pushes every admin once; never spoken in the house; no repeats |
+| Q255 | Where bounties sit (§8.15) | ⚑ 🪙 Bounties and 🏅 Score join the Chores menu: Today · Bounties · Messes · All chores · Score |
+| Q256 | Who sets, approves and sees bounties (§7B.8) | **Decided by MojoSOGO 2026-10-11:** only admins set them (ADM); points count after an admin's OK (CNF, "child claims bounty and it goes pending; then gets adults approval via app"); everyone sees everyone's score, no ranks (PUB) |
