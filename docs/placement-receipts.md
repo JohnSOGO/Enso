@@ -7,6 +7,16 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.52.1: 🎯 pick copies straight to the clipboard (placement-advisor)
+
+- **Ask:** SPEC 2.86 §8.16 (v1.52.1), asked by MojoSOGO. The picked line goes to the clipboard inside the pick's own capture handlers, because iOS allows the clipboard only during the gesture. The 📍 Pointed at modal says "✓ Copied. Paste it into Claude." The Copy button stays as the fallback.
+- **Verdict:** frontend/src/components/PointAt.tsx [EXISTING]
+- **Flow stage:** render (capture intent)
+- **Why:** PointAt.tsx already owns the capture-phase listeners and the result modal (v1.52.0 row). The copy has to run inside those handlers to count as part of the user's gesture, so no other file could do it. point-line.ts (the naming rule) and PointAtButton.tsx (the switch and arm signal) were rejected because neither touches the gesture. The pick state is `let`s scoped to the effect, and nothing new is at module level.
+- **Caps:** PointAt.tsx 74/300. Nothing in the band.
+
+---
+
 ## 2026-10-11 — v1.52.0: 🎯 Point at it, a one-tap pick mode that names what was tapped (placement-advisor)
 
 - **Ask:** SPEC 2.85 §8.16 (with the §8.6 🙂 Me line), asked by MojoSOGO: a per-device switch in Settings → 🙂 Me; while on, a 🎯 floats above the tab bar and another sits in every modal header beside ✕. A 🎯 tap arms one pick, the next tap is captured and swallowed, and a 📍 Pointed at modal shows the line (tab › modals › groups › "name" kind · stamp · size) with Copy / Pick again. PA1–PA4. Frontend only: no server, no migration.

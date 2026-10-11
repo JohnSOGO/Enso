@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.85 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.86 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4139,7 +4139,10 @@ and swallowed, turned into a line he pastes into a Claude thread.
 - **The next tap is captured, not acted on:** whatever is under the finger does nothing (no button press, no tick,
   no field focus, no keyboard, no select opening, no link). Tapping the bar or a 🎯 cancels instead. Pick mode then
   ends: it is always one tap ⚑ (Q236).
-- **The result** opens as a modal **📍 Pointed at** with the line, a **Copy** button (shows "Copied") and **Pick
+- **The line goes straight to the clipboard** at that tap (asked by MojoSOGO 2026-10-11: "it should go to the
+  clipboard, so I can paste into claude"), written inside the tap's own touch or click handling, the only moment a
+  phone allows it. **The result** then opens as a modal **📍 Pointed at** with the line, "✓ Copied. Paste it into
+  Claude." when the copy worked, a **Copy** button (shows "✓ Copied"; the fallback when the browser refused) and **Pick
   again**. The line, pieces joined by ` › ` ⚑ (Q237):
   1. the open tab, as on the tab bar (`⚙ Settings`);
   2. the title of each open modal, bottom to top, up to the one holding the tap (`🔔 Alerts`);
@@ -4156,7 +4159,7 @@ and swallowed, turned into a line he pastes into a Claude thread.
 **Acceptance (PA1–PA4):** PA1 the line is built as above from its pieces (tab, modals, groups, thing, kind, stamp,
 size), names are cut to their lengths, and empty pieces are left out; PA2 off, no 🎯 shows anywhere; PA3 (manual, on
 the iPhone) on, armed, tapping a tick box, a button, a text field and a select does none of their actions and shows
-the right line, and tapping the bar cancels; PA4 (manual) a pick inside an open modal names the modal and the bar
+the right line, already on the clipboard (paste it into a Claude thread), and tapping the bar cancels; PA4 (manual) a pick inside an open modal names the modal and the bar
 shows above it.
 
 ### 8.7 Theme

@@ -466,6 +466,9 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**🎯 Point at it copies at the tap** (v1.52.1, §8.16; asked by MojoSOGO 2026-10-11): the line is written to the
+clipboard inside the picked tap's own handlers (iOS allows it only there); the sheet says "✓ Copied" and keeps Copy as
+the fallback. Checked in headless Chromium with mouse and touch: the clipboard held the line after each pick.
 **🎯 Point at it** (v1.52.0, §8.16; asked by MojoSOGO 2026-10-11; PA1 green, PA2–PA4 manual): a per-device switch in
 Settings → 🙂 Me shows a 🎯 above the tab bar and in every modal header; it arms one pick, the next tap is captured and
 swallowed, and 📍 Pointed at shows the line to paste into a thread (tab › modals › groups › "name" kind · stamp · size).
