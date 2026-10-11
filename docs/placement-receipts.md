@@ -7,6 +7,16 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.52.0: 🎯 Point at it, a one-tap pick mode that names what was tapped (placement-advisor)
+
+- **Ask:** SPEC 2.85 §8.16 (with the §8.6 🙂 Me line), asked by MojoSOGO: a per-device switch in Settings → 🙂 Me; while on, a 🎯 floats above the tab bar and another sits in every modal header beside ✕. A 🎯 tap arms one pick, the next tap is captured and swallowed, and a 📍 Pointed at modal shows the line (tab › modals › groups › "name" kind · stamp · size) with Copy / Pick again. PA1–PA4. Frontend only: no server, no migration.
+- **Verdict:** [NEW rows] `frontend/src/components/PointAtButton.tsx` (the device switch store, the arm signal, the 🎯 button), `frontend/src/components/PointAt.tsx` (PointAtLayer: floating 🎯, armed state, the bar portalled into the topmost open dialog, capture listeners while armed, the result Modal), `frontend/src/point-line.ts` (describeTap DOM walk → pieces; pure pointLine, tested by test/point-at.test.ts PA1 through a dynamic import). [EXISTING] Modal.tsx gets `<PointAtButton/>` in its header; App.tsx Shell renders `<PointAtLayer tab=…/>` once, the label built from NAV; SettingsMe.tsx gets the switch row and a widened map row. No reorganizer, no CEILINGS change.
+- **Flow stage:** render and capture intent (PWA only); point-line.ts is the PWA's own naming rule.
+- **Why:** One PointAt.tsx was rejected twice over: Modal (23 importers) would import it while it imports Modal for the result, an import cycle through the PWA's busiest hub (a leaf PointAtButton.tsx breaks it); and it would bundle capturing the tap with naming it, the rule PA1 tests, which gets a non-React file. state.tsx was rejected for the switch: Modal also renders outside AppProvider, and the setting belongs to the browser, not the account. src/shared/ was rejected because the Worker never uses the rule. The tab label is passed from NAV, not read back from the nav's aria-current. The armed flag is React state in the layer; the only module-level values are `const`.
+- **Caps:** Modal.tsx 62 → 64/300; App.tsx 167 → 169/300; SettingsMe.tsx 31 → 37/300; new PointAtButton ~30, PointAt ~70, point-line ~95, all /300. Nothing in the band.
+
+---
+
 ## 2026-10-11 — v1.51.1: FunHouse tick founder-only, default on for him (placement-advisor)
 
 - **Ask:** SPEC 2.84 §9.4b Q230 (decided by MojoSOGO 2026-10-11): only the founder sees the 🎪 FunHouse tick; his new alerts and Announce box open with it ticked; nobody else sees it unless the alert they open already has it. Server unchanged. FH8 (flagsOf).

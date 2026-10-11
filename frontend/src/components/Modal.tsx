@@ -2,6 +2,7 @@
 // titled, dirty form asks before closing, focus returns to the opener, failures render inside.
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { PointAtButton } from './PointAtButton';
 import s from './Modal.module.css';
 
 interface Props {
@@ -48,6 +49,7 @@ export function Modal({ title, onClose, dirty = false, confirmCloseText = 'Disca
       <div className={s.panel}>
         <header className={s.head}>
           <h2 className={s.title}>{title}</h2>
+          <PointAtButton />
           <button className="plain" aria-label="Close" title="Close" onClick={requestClose}>✕</button>
         </header>
         <div className={s.body}>

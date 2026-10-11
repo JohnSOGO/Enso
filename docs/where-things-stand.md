@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-11, v1.51.1, main = production.*
+*Last updated 2026-10-11, v1.52.0, main = production.*
 
 ## Running where
 
@@ -48,6 +48,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 🎯 Point at it (v1.52.0, §8.16): on the iPhone, turn it on in Settings → 🙂 Me, then pick a tick box, a button, a text field and a select (none should act) and one inside a modal (PA3–PA4). Q234–Q237 are ⚑ defaults.
 - FunHouse alerts (v1.51.0, §9.4b): rebuild + restart the PC poller, then tick 🎪 FunHouse on a real alert and see it on the desk. Q230–Q233 are ⚑ defaults.
 - Prune about 25 old merged topic branches.
 - Look into the intermittent test-runner crash.

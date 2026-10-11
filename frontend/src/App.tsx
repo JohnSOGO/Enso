@@ -23,6 +23,7 @@ import { Welcome } from './components/Welcome';
 import { JOIN_PATH } from '../../src/shared/invite-link';
 import type { HouseState } from '../../src/shared/vocab';
 import { Modal } from './components/Modal';
+import { PointAtLayer } from './components/PointAt';
 import s from './App.module.css';
 
 /** The bottom tab bar (§8.1): the one list of tabs — id, icon, label. */
@@ -117,6 +118,7 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
         </Modal>
       )}
       {justJoined && <Welcome me={me} />}
+      <PointAtLayer tab={NAV.filter(([id]) => id === tab).map(([, icon, label]) => `${icon} ${label}`)[0]} />
     </div>
   );
 }

@@ -466,6 +466,12 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**🎯 Point at it** (v1.52.0, §8.16; asked by MojoSOGO 2026-10-11; PA1 green, PA2–PA4 manual): a per-device switch in
+Settings → 🙂 Me shows a 🎯 above the tab bar and in every modal header; it arms one pick, the next tap is captured and
+swallowed, and 📍 Pointed at shows the line to paste into a thread (tab › modals › groups › "name" kind · stamp · size).
+Checked in headless Chromium with mouse and touch: a button, a tick box, a text field and a button inside a modal did
+nothing and were named right; the bar cancels; taps work normally after. Q234–Q237 are ⚑ defaults. **Still owed:** the
+iPhone check (PA3–PA4).
 **FunHouse tick only for the founder** (v1.51.1, §9.4b Q230 decided by MojoSOGO 2026-10-11, FH8): only the founder sees
 🎪 FunHouse, and his new alerts and Announce box open with it ticked; others see it only on an alert that already has it.
 **FunHouse as a place alerts go** (v1.51.0, §9.4b, migration 0042; asked by MojoSOGO 2026-10-11; FH1–FH7, FH-M): a third

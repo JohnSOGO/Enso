@@ -1,0 +1,18 @@
+/* §8.16 — the floating 🎯 at the bottom left above the tab bar (the ＋ is at the right). */
+.float {
+  position: fixed;
+  left: 12px;
+  bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom));
+  width: 40px; height: 40px; min-height: 0; padding: 0; border-radius: 99px;
+  background: var(--surface); border: 1px solid var(--border); font-size: 1.2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .4);
+  z-index: 5;
+}
+/* The pick bar: fixed across the top; inside an open dialog when there is one, so the top layer never hides it. */
+.bar {
+  position: fixed; top: env(safe-area-inset-top); left: 0; right: 0;
+  padding: 12px 14px; text-align: center; font-weight: 600;
+  background: var(--accent); color: #fff;
+  z-index: 50;
+}
+.line { user-select: text; -webkit-user-select: text; overflow-wrap: anywhere; font-family: ui-monospace, monospace; font-size: .9rem; }
