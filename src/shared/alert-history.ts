@@ -33,9 +33,6 @@ export function alertSource(r: SourceFacts): string {
   return r.title ?? 'Announcement'; // ⚑ Q223: a timer start announcement too
 }
 
-/** The page a tapped notification opens: its card in Settings → Alerts. */
-export const alertUrl = (id: string) => `${ALERTS_PATH}?alert=${encodeURIComponent(id)}`;
-
 /** The alert id an address asks to open, or null. */
 export function alertIdFrom(pathname: string, search: string): string | null {
   if (pathname !== ALERTS_PATH) return null;

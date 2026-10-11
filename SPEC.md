@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.79 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.80 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4644,7 +4644,7 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
   `chore` → "Chore"; `thing` → "Thing to do"; `machine` → "Machine"); a `notice` → "Sign-in"; a `mess_id` →
   "Whose mess?"; a `title` → that title (a ping: "🏛️ Ozymandias", "🤖 Claude"); else "Announcement" (a timer
   start announcement too ⚑ Q223). The ping branch matches `opsPingsSince` (§9.4).
-- `ALERTS_PATH = "/settings/alerts"`, `alertUrl(id)` → `/settings/alerts?alert={id}`, `alertIdFrom(pathname,
+- `ALERTS_PATH = "/settings/alerts"`; a tap opens `/settings/alerts?alert={id}`, built in sw.js. `alertIdFrom(pathname,
   search)` → the id when the path is `ALERTS_PATH` and `alert` is set, else null. sw.js carries its own copy of
   the path (a test pins it).
 
@@ -4673,14 +4673,14 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 
 | # | Check | Expected |
 |---|---|---|
-| MA1 | `pushTitle` / `alertSource` / `alertUrl` / `alertIdFrom` | a fire → "Ensō"; titled → the title; neither → "📢 Announcement"; each source branch in order (a fire with a title stays its kind; an alarm → "Alarm"); `alertUrl("dlv_1")` = `/settings/alerts?alert=dlv_1`; `alertIdFrom` on that → `dlv_1`, on `/` or without `alert` → null |
+| MA1 | `pushTitle` / `alertSource` / `alertIdFrom` | a fire → "Ensō"; titled → the title; neither → "📢 Announcement"; each source branch in order (a fire with a title stays its kind; an alarm → "Alarm"); `alertIdFrom` on `/settings/alerts?alert=dlv_1` → `dlv_1`, on `/` or without `alert` → null |
 | MA2 | a ping to the founder, then `GET /me/alerts` as the founder; as another member | one alert `{ title: "🏛️ Ozymandias", message: <the whole text>, source: "🏛️ Ozymandias", kind: null, alertNumber: null, status }`; the other member's list is empty |
 | MA3 | a reminder's push and an announcement | the reminder's: title "Ensō", source "Reminder", kind `reminder`, alertNumber 1; newest first |
 | MA4 | `DELETE /me/alerts/{id}` mine; again; another member's; a house row's id | 204, gone from my list, the row still in `deliveries`; 404; 404; 404 |
 | MA5 | `DELETE /me/alerts` with 3 of mine (1 already hidden) and 1 of someone else's | `{ cleared: 2 }`; my list empty; theirs untouched; `/status` still lists all four |
 | MA6 | more than 200 of mine | the newest 200 |
 | MA7 | the push payload of a fire, an announcement, a ping; the test push | `alertId` = the delivery id; the test push's `null` |
-| MA8 | sw.js | contains `ALERTS_PATH` and reads `alertId` |
+| MA8 | sw.js | contains `ALERTS_PATH` and builds `${ALERTS_PATH}?alert=` from `data.alertId` (v1.49.1, steward pass 12) |
 | MA-M | migration 0041 | §4.2zn's check |
 
 ---
