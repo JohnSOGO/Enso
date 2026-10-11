@@ -1,9 +1,10 @@
 // SPEC §9.4a (FP4–FP6) — the FunHouse poller's pure parts and one poll over a fake Ensō and a fake bridge (no
 // network, no filesystem); FH6 (§9.4b) FunHouse alerts. Claude's pings and FunHouse alerts only, at most one bridge POST a poll, 503 retried, 4xx not.
 import { expect, it } from 'vitest';
-import { BRIDGE_URL, ENSO_API, FUNHOUSE_START_BACK_MS, forFunhouse, funhouseNotice, pollOnce, startAfter, type Ping } from '../home/funhouse-poller';
+import { BRIDGE_URL, ENSO_API, FUNHOUSE_STALE_MS, forFunhouse, funhouseNotice, pollOnce, startAfter, type Ping } from '../home/funhouse-poller';
 
 const TOKEN = 'poller-test-token';
+const NOW = () => Date.parse('2026-10-11T01:05:00.000Z');
 const ping = (id: string, title: string, at: string, channel: Ping['channel'] = 'push'): Ping => ({ id, channel, title, text: `text ${id}`, at });
 const OZY = ping('dlv_o', '🏛️ Ozymandias', '2026-10-11T01:00:00.000Z');
 const A = ping('dlv_a', '🧵 Thread needs you', '2026-10-11T01:01:00.000Z');
@@ -25,7 +26,7 @@ function world(pings: Ping[], bridge: number[]) {
     asked.push(after);
     return Response.json({ pings: pings.filter((p) => p.at > after) });
   }) as typeof fetch;
-  return { sent, asked, deps: { fetch: f, token: TOKEN, log: () => {} } };
+  return { sent, asked, deps: { fetch: f, token: TOKEN, log: () => {}, now: NOW } };
 }
 
 it('FP4: forFunhouse and funhouseNotice', () => {
@@ -57,9 +58,9 @@ it('FP6: the bridge answering 503 → after unchanged, sent again; 400 → handl
   expect(await pollOnce(start, w.deps)).toBe(start);
   expect(await pollOnce(start, w.deps)).toBe(A.at);
   expect(w.sent).toEqual([funhouseNotice(A), funhouseNotice(A)]);
-  const down = { fetch: (async () => new Response('', { status: 502 })) as typeof fetch, token: TOKEN, log: () => {} };
+  const down = { fetch: (async () => new Response('', { status: 502 })) as typeof fetch, token: TOKEN, log: () => {}, now: NOW };
   expect(await pollOnce(start, down)).toBe(start);
-  const offline = { fetch: (async () => { throw new Error('ECONNREFUSED'); }) as typeof fetch, token: TOKEN, log: () => {} };
+  const offline = { fetch: (async () => { throw new Error('ECONNREFUSED'); }) as typeof fetch, token: TOKEN, log: () => {}, now: NOW };
   expect(await pollOnce(start, offline)).toBe(start);
 });
 
@@ -76,10 +77,21 @@ it('FH6: a FunHouse alert is always forwarded, with source Ensō', async () => {
 
 it('FP7: startAfter keeps a saved after within 10 min, so a restart re-sends nothing; else 10 min back', () => {
   const now = Date.parse('2026-10-11T18:13:00.000Z');
-  const back = new Date(now - FUNHOUSE_START_BACK_MS).toISOString();
+  const back = new Date(now - FUNHOUSE_STALE_MS).toISOString();
   expect(startAfter('2026-10-11T18:12:28.204Z\n', now)).toBe('2026-10-11T18:12:28.204Z');
   expect(startAfter(null, now)).toBe(back);
   expect(startAfter('nonsense', now)).toBe(back);
   expect(startAfter('2026-10-11T17:00:00.000Z', now)).toBe(back); // too old
   expect(startAfter('2026-10-11T19:00:00.000Z', now)).toBe(back); // in the future
+});
+
+it('FP8: a ping older than 10 min is skipped (handled, no POST), so an outage backlog is never replayed', async () => {
+  const old = ping('dlv_s', '🧵 Thread needs you', '2026-10-11T00:54:00.000Z');
+  const fresh = ping('dlv_n', '🧵 Thread needs you', '2026-10-11T01:04:00.000Z');
+  const w = world([old, fresh], []);
+  expect(await pollOnce('2026-10-11T00:00:00.000Z', w.deps)).toBe(fresh.at);
+  expect(w.sent).toEqual([funhouseNotice(fresh)]);
+  const w2 = world([old], []);
+  expect(await pollOnce('2026-10-11T00:00:00.000Z', w2.deps)).toBe(old.at);
+  expect(w2.sent).toEqual([]);
 });

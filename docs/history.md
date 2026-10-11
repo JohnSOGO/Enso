@@ -470,7 +470,7 @@ captions (5 ingredients, 6 steps — it had been "watch it").
 to snap a photo of completed work so adult can approve remotely"): Done on a one-off opens a sheet with an optional
 photo; a chore run's photo is added from Waiting for OK; admins see it there full size and OK or send back. Deleted on
 OK or drop. **Still owed:** BS2 with the camera on a real phone.
-**Losing taps tested; a failed bounty Done is a 500** (v1.60.5, §7B.8, §7D.8; steward pass 17 items 1–2, MojoSOGO "BOTH"):
+**Losing taps tested; a failed bounty Done is a 500** (v1.60.6, §7B.8, §7D.8; steward pass 17 items 1–2, MojoSOGO "BOTH"):
 POST /bounties/:id/done re-throws any save error that is not the `uq_earning_bounty` constraint, as machines and cooking
 do, so a real failure is no longer told "That bounty is waiting for OK". BT23–BT24 and CK10 race two taps; machines'
 race was already L10. PickGrid's comment and map row stop listing callers.
@@ -502,6 +502,8 @@ is tapped, or Esc (Alt+P toggles on a keyboard); every tap while on is swallowed
 CSS selector), `Screen:`, build stamp. A mouse gets an outline and a crosshair. Checked in headless Chromium, mouse and
 touch: two picks in a row each landed on the clipboard with the tab unchanged, the bar and Esc stop it, taps work after.
 **Still owed:** PA3–PA4 on the iPhone.
+**No stale FunHouse notices** (v1.60.5, §9.4a, Q262; MojoSOGO 2026-10-11: "getting stale alerts on funhouse"): the
+poller skips any notice older than 10 minutes, so a backlog left while the board was off USB is dropped, not replayed.
 **Shorter FunHouse thread pings** (v1.57.1, §9.4a; MojoSOGO 2026-10-11: "the prefix has too many words"): a 🧵
 thread ping reaches the FunHouse as its text alone, which threads now write as `Enso:<thread title> "<ACTION what>"`.
 **Bounties and Score** (v1.57.0, §7B.8, §8.15b, migration 0044, Q249–Q256; asked by MojoSOGO 2026-10-11 after the AREC

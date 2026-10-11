@@ -9,8 +9,9 @@ export const ENSO_API = 'https://enso.sogodojo.com/api/v1';
 export const BRIDGE_URL = 'http://127.0.0.1:8765/notify';
 /** ⚑ How often Ensō is asked. */
 export const FUNHOUSE_POLL_MS = 15_000;
-/** ⚑ How far back the first poll reaches when no saved `after` is newer (the bridge does not drop a repeated id). */
-export const FUNHOUSE_START_BACK_MS = 10 * 60_000;
+/** ⚑ Older than this is stale: never shown. Also how far back the first poll reaches when no saved `after` is newer
+ *  (the bridge does not drop a repeated id). */
+export const FUNHOUSE_STALE_MS = 10 * 60_000;
 
 /** Mirrors OpsPing in src/worker/deliveries.ts (the HTTP contract). */
 export interface Ping { id: string; channel: 'push' | 'funhouse'; title: string; text: string; at: string }
@@ -26,10 +27,11 @@ export function funhouseNotice(p: Ping) {
   return { source: p.channel === 'funhouse' ? 'Ensō' : 'Claude', level: 'attention', text: text.slice(0, 500), sig: '⭕🔁🏠', beep: 'look', id: p.id };
 }
 
-export interface PollDeps { fetch: typeof fetch; token: string; log: (line: string) => void }
+export interface PollDeps { fetch: typeof fetch; token: string; log: (line: string) => void; now: () => number }
 
 /** One poll: the `after` to use next. At most one bridge POST; 200 / 4xx → handled, 503 / a network error /
- *  anything wrong from Ensō → unchanged (tried again next poll). */
+ *  anything wrong from Ensō → unchanged (tried again next poll). A ping older than FUNHOUSE_STALE_MS is skipped, so
+ *  a backlog left by a bridge outage is dropped, not replayed. */
 export async function pollOnce(after: string, deps: PollDeps): Promise<string> {
   let pings: Ping[];
   try {
@@ -44,6 +46,7 @@ export async function pollOnce(after: string, deps: PollDeps): Promise<string> {
   let next = after;
   for (const p of pings) {
     if (!forFunhouse(p)) { next = p.at; continue; }
+    if (deps.now() - Date.parse(p.at) > FUNHOUSE_STALE_MS) { deps.log(`${p.id} → stale, skipped`); next = p.at; continue; }
     try {
       const r = await deps.fetch(BRIDGE_URL, {
         method: 'POST', headers: { 'content-type': 'application/json; charset=utf-8' },
@@ -59,9 +62,9 @@ export async function pollOnce(after: string, deps: PollDeps): Promise<string> {
   return next;
 }
 
-/** §9.4a — the first `after`: the saved one when it is a valid instant within FUNHOUSE_START_BACK_MS, else that far back. */
+/** §9.4a — the first `after`: the saved one when it is a valid instant within FUNHOUSE_STALE_MS, else that far back. */
 export function startAfter(saved: string | null, nowMs: number): string {
-  const back = nowMs - FUNHOUSE_START_BACK_MS;
+  const back = nowMs - FUNHOUSE_STALE_MS;
   const t = saved ? Date.parse(saved.trim()) : NaN;
   return Number.isFinite(t) && t > back && t <= nowMs ? new Date(t).toISOString() : new Date(back).toISOString();
 }
@@ -78,7 +81,7 @@ export function main(home: string | undefined): number {
   try { saved = readFileSync(afterFile, 'utf8'); } catch { /* none yet */ }
   let after = startAfter(saved, Date.now());
   let busy = false;
-  const deps: PollDeps = { fetch, token, log: (line) => console.log(stamp(line)) };
+  const deps: PollDeps = { fetch, token, log: (line) => console.log(stamp(line)), now: Date.now };
   const tick = () => {
     if (busy) return;
     busy = true;
