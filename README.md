@@ -293,8 +293,8 @@ PowerShell on the dev PC:
 ```powershell
 cd C:\Users\Public\git\Enso; git pull; npm run build:home
 $action  = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument '"C:\Users\Public\git\Enso\home\funhouse-poller-hidden.vbs"' -WorkingDirectory 'C:\Users\Public\git\Enso\home'  # no window
-$trigger = @(New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"),
-            (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5))  # back within 5 min if it stops
+$trigger = @((New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"),
+             (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)))  # back within 5 min if it stops
 $settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -MultipleInstances IgnoreNew
 Register-ScheduledTask -TaskName 'Enso FunHouse poller' -Action $action -Trigger $trigger -Settings $settings -Force
 Start-ScheduledTask -TaskName 'Enso FunHouse poller'; Start-Sleep 3
