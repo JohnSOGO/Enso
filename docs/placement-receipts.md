@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.60.1: Point at it on by default, ◎ more visible (placement-advisor)
+
+- **Ask:** SPEC 3.03 §8.16 ⚑ Q234. The ◎ now shows by default on every device, as on Ozymandias. The Settings → 🙂 Me switch now turns it off (`enso.pointAt === '0'` means off, anything else means on). The floating ◎ opacity goes from .45 to .6 because MojoSOGO couldn't see it.
+- **Verdict:** frontend/src/components/PointAtButton.tsx (`read`, `setPointAtOn`, and the server-snapshot default in `usePointAtOn`) + frontend/src/components/PointAt.module.css (`.float` opacity) [EXISTING]
+- **Flow stage:** render
+- **Why:** PointAtButton.tsx is the only module that reads or writes the device switch, so flipping the default there moves SettingsMe and PointAt together and creates no second copy. The server snapshot is also a statement of the default, so it flips with `read`. Rejected: the default in SettingsMe (a restatement) or state.tsx (device-local, not account state).
+- **Caps:** PointAtButton.tsx 30/300; PointAt.module.css ~35/300. Nothing in the band.
+- **Sources read:** PointAtButton.tsx, PointAt.module.css, SettingsMe.tsx (28–35), scripts/arch.ts, docs/module-ownership.md, docs/placement-receipts.md, SPEC.md §8.16.
 ## 2026-10-11 — v1.60.0: A bounty's picture (placement-advisor)
 
 - **Ask:** SPEC 3.02 §7B.8 "A bounty's picture":

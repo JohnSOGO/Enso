@@ -470,6 +470,9 @@ captions (5 ingredients, 6 steps — it had been "watch it").
 to snap a photo of completed work so adult can approve remotely"): Done on a one-off opens a sheet with an optional
 photo; a chore run's photo is added from Waiting for OK; admins see it there full size and OK or send back. Deleted on
 OK or drop. **Still owed:** BS2 with the camera on a real phone.
+**◎ shows by default** (v1.60.1, §8.16, Q234 revised; MojoSOGO 2026-10-11: "I don't see the faint circle bottom left"):
+the switch was off on his phone; like Ozymandias the ◎ now shows on every device unless Settings → 🙂 Me turns it off, and
+it is a little less faint (opacity .6).
 **A bounty's picture** (v1.60.0, §7B.8, §8.15b, migration 0046, Q260; asked by MojoSOGO 2026-10-11 "if I create a
 bounty, let me add a picture"): ＋ Bounty has 📷 Add photo (sent after Post; Post again retries only the picture);
 the card shows it to everyone; an admin's card has 📷 Add / Replace. Deleted once paid (OK, or an admin's own Done)
