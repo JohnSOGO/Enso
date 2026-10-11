@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Steward pass 12, whole tree (code-steward)
+
+- **Run:** after the v1.48.0 release (SPEC 2.77 §9.5 My alerts, migration 0041, PR #44); audited e8c9471 against c19bd94.
+- **Verdict:** SOUND. Typecheck green, 765/765 tests (99 files), arch:audit quiet (nearest at 87%: EventForm.tsx, Calendar.tsx, Settings.tsx 180/207, routes/recipes.ts; tick.ts 117/148).
+- **Placement audit:** 1 receipt reconciled against 1 code commit (d5de762); it landed as its verdict said (the navigate-not-postMessage change is recorded in "Built as"). 0 code commits without a receipt.
+- **Top finding (LOW):** alert-history.ts alertUrl has no production caller (only MA1); sw.js builds the same URL from its own ALERTS_PATH copy. On the next §9.5 touch, delete alertUrl or pin the `?alert=` shape in MA8.
+- **Handoffs:** 2 to worker, both LOW: the alertUrl note above, and the deliveries.ts map row ("the one predicate" for a ping → note that alertSource mirrors opsPingsSince; docs only). 0 to reorganizer, 0 to placement-advisor. Pass 11's two §7D notes, pass 10's house-row helper note and the snooze-keeps-away test are still open.
+- **Restraint:** the "has a fire" test repeated in push.ts and my-alerts.ts is accepted (one line, commented). No shared ping predicate across SQL and TS. useAlertLink kept in MyAlerts.tsx. The old migration tests gaining dismissed_at is the whole-row check working, not shotgun surgery. No hotspot pressure: tick.ts was untouched this release.
+
 ## 2026-10-11 — My alerts: push history in Settings, a push tap opens its card (placement-advisor)
 
 - **Ask:** SPEC §9.5 (v1.48.0, SPEC 2.77; migration 0041, §4.2zn). Settings gains an Alerts section with my newest 200 push deliveries I haven't hidden; a tap opens a card (title as the phone showed it, whole message, time, source, alert number, phone result); ❌ hides one, Clear all hides all of mine; tapping a phone notification opens Settings → Alerts on its card. Rows are kept, so Status and the ops hourly limit still count them.
