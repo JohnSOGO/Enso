@@ -1,5 +1,5 @@
 // SPEC §9.3 — POST /announce: a house announcement, now. A delivery with no fire: one `house` row the
-// Worker speaks right after answering (§9.2) on everyone's ticked speakers (§9.2a), and one `push` row per other member, sent at once. The
+// Worker speaks right after answering (§9.2) on everyone's ticked speakers (§9.2a), one `push` row per other member, sent at once, and a `funhouse` row (§9.4b). The
 // sender's name comes from the session.
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
@@ -7,7 +7,7 @@ import { announceError, announceMessage } from '../../shared/announce';
 import { audience } from '../../shared/optins';
 import type { Channel } from '../../shared/vocab';
 import { activeMemberIds, all, householdTz, nowIso } from '../db';
-import { houseDelivery, pushDelivery } from '../deliveries';
+import { funhouseDelivery, houseDelivery, pushDelivery } from '../deliveries';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
 import { sendPushDeliveries } from '../push';
@@ -34,7 +34,7 @@ announce.post('/announce', requireMember, async (c) => {
   const stmts: D1PreparedStatement[] = [];
   // §9.2b: while the house is quiet nothing is spoken; House alone would send nothing, so say so.
   const quiet = channels.includes('house') ? await houseQuiet(db, now) : null;
-  if (quiet && !channels.includes('push')) {
+  if (quiet && channels.length === 1) {
     return fail(c, 409, 'house_quiet', `The house is quiet until ${utcToLocal(quiet.until, await householdTz(db)).time}.`);
   }
   // §9.2a: for every active member, so on everyone's ticked speakers together; none ticked → not spoken.
@@ -52,6 +52,11 @@ announce.post('/announce', requireMember, async (c) => {
       pushIds.push(d.id);
       stmts.push(d.stmt);
     }
+  }
+  if (channels.includes('funhouse')) { // §9.4b: the FunHouse, quiet or not
+    const d = funhouseDelivery(db, { message }, now);
+    ids.push(d.id);
+    stmts.push(d.stmt);
   }
   // Nothing would be sent — say why rather than succeed with nothing sent.
   if (!stmts.length && channels.includes('house') && speakers?.length === 0) return fail(c, 409, 'no_speakers', 'Nobody has a house speaker ticked.');

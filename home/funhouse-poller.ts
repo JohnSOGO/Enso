@@ -1,7 +1,7 @@
 // SPEC §9.4a — the FunHouse poller. Runs on the dev PC (Node 24), never in the Worker: every FUNHOUSE_POLL_MS it
 // asks Ensō's GET /ops/pings (Bearer OPS_NOTIFY_TOKEN, read from %USERPROFILE%\.enso\ops-notify-token) for founder
-// pings after the last one handled, and hands Claude's (🤖 / 🧵) to the FunHouse bridge on 127.0.0.1:8765, at most
-// one a poll. The bridge is local only, so the PC pulls; nothing inbound. Node globals and node:fs only —
+// pings and FunHouse alerts (§9.4b) after the last one handled, and hands Claude's pings (🤖 / 🧵) and every FunHouse
+// alert to the FunHouse bridge on 127.0.0.1:8765, at most one a poll. The bridge is local only, so the PC pulls; nothing inbound. Node globals and node:fs only —
 // `npm run build:home` bundles it into home/dist/funhouse-poller.mjs. The token is never logged.
 import { readFileSync } from 'node:fs';
 
@@ -12,16 +12,17 @@ export const FUNHOUSE_POLL_MS = 15_000;
 /** ⚑ How far back the first poll reaches; the bridge drops a repeated id. */
 export const FUNHOUSE_START_BACK_MS = 10 * 60_000;
 
-export interface Ping { id: string; title: string; text: string; at: string }
+/** Mirrors OpsPing in src/worker/deliveries.ts (the HTTP contract). */
+export interface Ping { id: string; channel: 'push' | 'funhouse'; title: string; text: string; at: string }
 
-/** ⚑ Q228 — Claude's pings only; Ozymandias (🏛️) reaches the FunHouse itself. */
-export function forFunhouse(title: string): boolean {
-  return title.startsWith('🤖') || title.startsWith('🧵');
+/** §9.4b every FunHouse alert; ⚑ Q228 of the pings, Claude's only — Ozymandias (🏛️) reaches the FunHouse itself. */
+export function forFunhouse(p: Pick<Ping, 'channel' | 'title'>): boolean {
+  return p.channel === 'funhouse' || p.title.startsWith('🤖') || p.title.startsWith('🧵');
 }
 
-/** ⚑ Q229 — the bridge body for one ping. */
+/** ⚑ Q229 / Q233 — the bridge body for one ping or FunHouse alert. */
 export function funhouseNotice(p: Ping) {
-  return { source: 'Claude', level: 'attention', text: `${p.title}: ${p.text}`.slice(0, 500), sig: '⭕🔁🏠', beep: 'look', id: p.id };
+  return { source: p.channel === 'funhouse' ? 'Ensō' : 'Claude', level: 'attention', text: `${p.title}: ${p.text}`.slice(0, 500), sig: '⭕🔁🏠', beep: 'look', id: p.id };
 }
 
 export interface PollDeps { fetch: typeof fetch; token: string; log: (line: string) => void }
@@ -41,7 +42,7 @@ export async function pollOnce(after: string, deps: PollDeps): Promise<string> {
   }
   let next = after;
   for (const p of pings) {
-    if (!forFunhouse(p.title)) { next = p.at; continue; }
+    if (!forFunhouse(p)) { next = p.at; continue; }
     try {
       const r = await deps.fetch(BRIDGE_URL, {
         method: 'POST', headers: { 'content-type': 'application/json; charset=utf-8' },

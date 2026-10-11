@@ -1,7 +1,8 @@
-// SPEC §5.7, §9.1–9.4, §6.6, §7B.7 — writing deliveries rows: the one INSERT for a push row and the one for a
-// house row, each queued with created_at = updated_at = now, and the one predicate for what is a founder ping
-// (counted for §9.4's limit, listed for §9.4a's FunHouse poller).
+// SPEC §5.7, §9.1–9.4b, §6.6, §7B.7 — writing deliveries rows: the one INSERT for a push row, the one for a
+// house row and the one for a FunHouse row (§9.4b), each queued with created_at = updated_at = now, and the one
+// predicate for what is a founder ping (counted for §9.4's limit, listed with FunHouse rows for §9.4a's poller).
 // Never sends (push.ts, house.ts do), never updates a status.
+import { pushTitle } from '../shared/alert-history';
 import type { NoticeKind } from '../shared/vocab';
 import { all, first, newId } from './db';
 
@@ -35,6 +36,18 @@ export function houseDelivery(db: D1Database, r: HouseRow, now: string): Written
   return { id, stmt };
 }
 
+/** A FunHouse row (no member, §9.4b): a fire's alert or an announcement, titled as the phone shows it (`pushTitle`). */
+export interface FunhouseRow { message: string; fireId?: string | null; alertNumber?: number }
+
+export function funhouseDelivery(db: D1Database, r: FunhouseRow, now: string): Written {
+  const id = newId('dlv');
+  const stmt = db.prepare(
+    `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, title, status, created_at, updated_at)
+     VALUES (?, ?, ?, 'funhouse', NULL, ?, ?, 'queued', ?, ?)`)
+    .bind(id, r.fireId ?? null, r.alertNumber ?? 1, r.message, pushTitle({ hasFire: r.fireId != null, title: null }), now, now);
+  return { id, stmt };
+}
+
 /** What a founder ping is (§9.4): a fire-less push with a title that is neither a sign-in notice (§6.6) nor a mess ask
  *  (§7B.7). Kept beside the writers it must tell apart; the hourly count and the FunHouse list (§9.4a) both read it. */
 const FOUNDER_PING = `channel = 'push' AND fire_id IS NULL AND title IS NOT NULL AND notice IS NULL AND mess_id IS NULL`;
@@ -45,12 +58,13 @@ export async function opsPingsSince(db: D1Database, since: string): Promise<numb
     `SELECT COUNT(*) AS n FROM deliveries WHERE ${FOUNDER_PING} AND created_at >= ?`, since))!.n;
 }
 
-export interface OpsPing { id: string; title: string; text: string; at: string }
+export interface OpsPing { id: string; channel: 'push' | 'funhouse'; title: string; text: string; at: string }
 
-/** §9.4a — the founder pings written at or after `since` and after `after` (when given), oldest first, at most `limit`. */
+/** §9.4a–9.4b — the founder pings and FunHouse rows written at or after `since` and after `after` (when given), oldest
+ *  first, at most `limit`. Never filtered on status: the poller moves on by `after`, one a poll. */
 export async function opsPingsAfter(db: D1Database, after: string | null, since: string, limit: number): Promise<OpsPing[]> {
   return all<OpsPing>(db,
-    `SELECT id, title, message AS text, created_at AS at FROM deliveries
-      WHERE ${FOUNDER_PING} AND created_at >= ? AND (? IS NULL OR created_at > ?)
+    `SELECT id, channel, title, message AS text, created_at AS at FROM deliveries
+      WHERE (${FOUNDER_PING} OR channel = 'funhouse') AND created_at >= ? AND (? IS NULL OR created_at > ?)
       ORDER BY created_at, id LIMIT ?`, since, after, after, limit);
 }

@@ -17,11 +17,12 @@ export interface AudienceInput {
 
 /**
  * Who a fire's alert is for (§5.7, §7.5). `push`: active members, narrowed to the assigned ones
- * (none assigned = everyone), and for an optional event to those who have it on. `house`: the
- * House channel speaks — for an optional event only when that audience is not empty.
+ * (none assigned = everyone), and for an optional event to those who have it on. `house` / `funhouse`: the
+ * House channel speaks / the FunHouse gets it (§9.4b) — for an optional event only when that audience is not empty.
  */
-export function audience(a: AudienceInput): { push: string[]; house: boolean } {
+export function audience(a: AudienceInput): { push: string[]; house: boolean; funhouse: boolean } {
   const forWhom = a.assignedTo.length === 0 ? a.activeIds : a.assignedTo.filter((id) => a.activeIds.includes(id));
   const push = forWhom.filter((id) => isOnFor(a, id, a.onIds));
-  return { push, house: a.channels.includes('house') && (!a.optional || push.length > 0) };
+  const anyone = !a.optional || push.length > 0;
+  return { push, house: a.channels.includes('house') && anyone, funhouse: a.channels.includes('funhouse') && anyone };
 }

@@ -1,5 +1,5 @@
 // SPEC §9.4 — POST /ops/notify: a Claude Code session pushes a message to the founder's phone; §9.4a — GET
-// /ops/pings: the dev PC's FunHouse poller lists the recent ones. No session:
+// /ops/pings: the dev PC's FunHouse poller lists the recent ones and the FunHouse alerts (§9.4b), marking those sent. No session:
 // a Bearer OPS_NOTIFY_TOKEN, compared in constant time (unset → 503, never open). One fire-less `push`
 // delivery with its own title, sent at once. No house row, ever. The token and the header are never
 // logged, and never put in a message or a detail.
@@ -40,6 +40,12 @@ ops.get('/ops/pings', async (c) => {
   const raw = Date.parse(c.req.query('after') ?? '');
   const after = Number.isNaN(raw) ? null : new Date(raw).toISOString();
   const pings = await opsPingsAfter(c.env.DB, after, opsWindowStart(now), OPS_NOTIFY_PER_HOUR);
+  // §9.4b: a listed FunHouse row is handed to the PC.
+  const handed = pings.filter((p) => p.channel === 'funhouse').map((p) => p.id);
+  if (handed.length) {
+    await c.env.DB.prepare(`UPDATE deliveries SET status = 'sent', updated_at = ?
+      WHERE id IN (${handed.map(() => '?').join(',')}) AND channel = 'funhouse' AND status = 'queued'`).bind(now, ...handed).run();
+  }
   return c.json({ pings });
 });
 

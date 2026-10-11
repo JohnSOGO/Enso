@@ -5,7 +5,7 @@ import { TimersSection, type Timer } from './Timers';
 import { MachinesSection } from './Machines';
 import { Announce } from './Announce';
 import { HouseQuiet } from './HouseQuiet';
-import { ChannelChecks, DayChips, RenotifySelect, SHORT, daysText } from './AlertFields';
+import { ChannelChecks, DayChips, RenotifySelect, SHORT, channelsOf, daysText, flagsOf, pickOneWay } from './AlertFields';
 import { del, errorText, get, patch, post } from '../api';
 import { useApp } from '../state';
 import { WEEKDAY, type Channel, type Weekday } from '../../../src/shared/vocab';
@@ -79,7 +79,7 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
   const { me, members, refresh } = useApp();
   const init = useMemo(() => ({
     title: alarm?.title ?? '', time: alarm?.time ?? '08:00', days: alarm?.days ?? ([] as Weekday[]),
-    push: alarm ? alarm.channels.includes('push') : true, house: alarm ? alarm.channels.includes('house') : false,
+    ...flagsOf(alarm?.channels),
     renotify: alarm?.renotifyMin ? String(alarm.renotifyMin) : 'off', assignedTo: alarm?.assignedTo ?? [],
   }), [alarm]);
   const [f, setF] = useState(init);
@@ -93,9 +93,9 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
     try { await fn(); refresh(); onClose(); } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
   const save = () => run(async () => {
-    const channels = [...(f.push ? ['push'] : []), ...(f.house ? ['house'] : [])];
+    const channels = channelsOf(f);
     if (!f.days.length) throw new Error('Pick at least one day of the week.');
-    if (!channels.length) throw new Error('Pick at least one way to alert (Phone or House).');
+    if (!channels.length) throw new Error(pickOneWay('alert'));
     const body = { title: f.title, time: f.time, days: f.days, channels, renotifyMin: f.renotify === 'off' ? null : Number(f.renotify), assignedTo: f.assignedTo };
     if (alarm) await patch(`/alarms/${alarm.id}`, body); else await post('/alarms', body);
   });
@@ -115,7 +115,7 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
           <input type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} />
         </label>
         <DayChips days={f.days} onChange={(days) => setF({ ...f, days })} />
-        <ChannelChecks push={f.push} house={f.house} onChange={(c) => setF({ ...f, ...c })} />
+        <ChannelChecks value={f} onChange={(c) => setF({ ...f, ...c })} />
         <RenotifySelect label="Repeat the alert until handled" value={f.renotify} onChange={(renotify) => setF({ ...f, renotify })} />
         <div className="field" role="group" aria-label="Assigned to">
           <span className="muted" style={{ fontSize: '.8rem' }}>Assigned to (none = everyone)</span>

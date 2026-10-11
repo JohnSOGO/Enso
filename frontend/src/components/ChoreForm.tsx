@@ -2,7 +2,7 @@
 // order, steps, channels, repeat alert. The server validates (§7B.4); its 400 shows in the dialog.
 import { useMemo, useState } from 'react';
 import { Modal } from './Modal';
-import { ChannelChecks, DayChips, RenotifySelect } from './AlertFields';
+import { ChannelChecks, DayChips, RenotifySelect, channelsOf, flagsOf, pickOneWay } from './AlertFields';
 import type { Chore } from './Chores';
 import { del, errorText, patch, post } from '../api';
 import { useApp } from '../state';
@@ -27,7 +27,7 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
     steps: chore
       ? chore.steps.map((st): StepDraft => ({ title: st.title, wait: st.waitMin ? String(st.waitMin) : '', memberId: st.memberId }))
       : [{ title: '', wait: '', memberId: null } as StepDraft],
-    push: chore ? chore.channels.includes('push') : true, house: chore ? chore.channels.includes('house') : false,
+    ...flagsOf(chore?.channels),
     renotify: chore?.renotifyMin ? String(chore.renotifyMin) : 'off',
   }), [chore]);
   const [f, setF] = useState(init);
@@ -56,11 +56,11 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
   }
   const save = () => run(async () => {
     const nudge = f.timing === 'by' && f.nudge;
-    const channels = [...(f.push ? ['push'] : []), ...(f.house ? ['house'] : [])];
+    const channels = channelsOf(f);
     if (!f.days.length) throw new Error('Pick at least one day of the week.');
     if (!f.people.length) throw new Error('Pick at least one person.');
     if (f.steps.some((st) => !st.title.trim())) throw new Error('Give every step a title.');
-    if ((f.timing === 'at' || nudge) && !channels.length) throw new Error('Pick at least one way to alert (Phone or House).');
+    if ((f.timing === 'at' || nudge) && !channels.length) throw new Error(pickOneWay('alert'));
     const last = f.steps.length - 1;
     const body = {
       title: f.title, doneMeans: f.doneMeans.trim() || null, days: f.days, timing: f.timing, time: f.time, nudge,
@@ -160,7 +160,7 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
           <button type="button" style={{ marginTop: 6 }} disabled={f.steps.length >= STEPS_MAX} onClick={addStep}>＋ Add step</button>
         </div>
 
-        <ChannelChecks push={f.push} house={f.house} onChange={(c) => setF({ ...f, ...c })} />
+        <ChannelChecks value={f} onChange={(c) => setF({ ...f, ...c })} />
         <RenotifySelect label="Repeat the alert until done" value={f.renotify} onChange={(renotify) => setF({ ...f, renotify })} />
       </fieldset>
       {chore && canEdit && (

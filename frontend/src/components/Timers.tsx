@@ -1,7 +1,7 @@
 // SPEC §8.5 — Timers screen (single-line list) and timer form.
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
-import { ChannelChecks, RenotifySelect, SHORT } from './AlertFields';
+import { ChannelChecks, RenotifySelect, SHORT, channelsOf, flagsOf, pickOneWay } from './AlertFields';
 import { del, errorText, get, patch, post } from '../api';
 import { useApp } from '../state';
 import { WEEKDAY, type Channel } from '../../../src/shared/vocab';
@@ -108,7 +108,7 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
   const { me, members, refresh } = useApp();
   const init = useMemo(() => ({
     title: timer?.title ?? '', interval: String(timer?.intervalMin ?? 60),
-    push: timer ? timer.channels.includes('push') : true, house: timer ? timer.channels.includes('house') : false,
+    ...flagsOf(timer?.channels),
     renotify: timer ? (timer.renotifyMin ? String(timer.renotifyMin) : 'off') : '15',
     assignedTo: timer?.assignedTo ?? [],
     activeFrom: timer?.activeFrom ?? '', activeTo: timer?.activeTo ?? '', announceStart: timer?.announceStart ?? false,
@@ -125,8 +125,8 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
     try { await fn(); refresh(); onClose(); } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
   const save = () => run(async () => {
-    const channels = [...(f.push ? ['push'] : []), ...(f.house ? ['house'] : [])];
-    if (!channels.length) throw new Error('Pick at least one way to alert (Phone or House).');
+    const channels = channelsOf(f);
+    if (!channels.length) throw new Error(pickOneWay('alert'));
     const body = { title: f.title, intervalMin: Number(f.interval), channels, renotifyMin: f.renotify === 'off' ? null : Number(f.renotify), assignedTo: f.assignedTo,
       activeFrom: f.activeFrom || null, activeTo: f.activeTo || null, announceStart: hasWindow && f.announceStart };
     if (timer) await patch(`/timers/${timer.id}`, body); else await post('/timers', body);
@@ -162,7 +162,7 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
             📢 Announce the start of each day
           </label>
         )}
-        <ChannelChecks push={f.push} house={f.house} onChange={(c) => setF({ ...f, ...c })} />
+        <ChannelChecks value={f} onChange={(c) => setF({ ...f, ...c })} />
         <RenotifySelect label="While ringing, repeat the alert" value={f.renotify} onChange={(renotify) => setF({ ...f, renotify })} />
         <div className="field" role="group" aria-label="Assigned to">
           <span className="muted" style={{ fontSize: '.8rem' }}>Assigned to (none = everyone)</span>

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.82 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.83 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -331,6 +331,7 @@ This table says what each term means.
 |------|---------|
 | `push` | Web Push to the phone(s) of the recipients (§5.4) |
 | `house` | Spoken on **all four Echos and the Voice PE** — the Worker calls Home Assistant through Cloudflare Tunnel + Access (§9.2). One announcement per alert, not per person. |
+| `funhouse` | Shown on the **FunHouse** desk device on the dev PC, through its poller (§9.4b). One per alert, not per person. |
 | `scheduled` | Fire exists, due in the future (or snoozed) |
 | `ringing` | Due time passed, alert sent, waiting for a human |
 | `closed` | Finished; `close_reason` says why |
@@ -841,6 +842,20 @@ Asked by MojoSOGO 2026-10-11 (§9.5).
 Schema: [`migrations/0041_alert_dismiss.sql`](migrations/0041_alert_dismiss.sql). The migration is the schema; it is not copied here.
 
 **Migration check (MA-M):** delivery rows survive 0041 unchanged, each with `dismissed_at` NULL.
+
+### 4.2zo Schema change — `migrations/0042_funhouse_channel.sql`
+
+Asked by MojoSOGO 2026-10-11 (§9.4b).
+
+Schema: [`migrations/0042_funhouse_channel.sql`](migrations/0042_funhouse_channel.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §9.4b — a delivery may be on the `funhouse` channel. SQLite cannot change a CHECK, so `deliveries` is rebuilt
+  (as 0012 did) with every column, both CHECKs and its three indexes; only the channel list grows. Old code still
+  writes only `push` and `house`, so it runs before the deploy.
+
+**Migration check (FH-M):** every delivery row survives 0042 with every column unchanged; a `funhouse` row can be
+written; a `bogus` channel is still refused.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -4640,7 +4655,8 @@ founder pings and hands each one to the bridge. Ensō stores nothing new: a ping
 401 `unauthorized`). → **200 `{ pings: [{ id, title, text, at }] }`**: the founder pings (the rows §9.4 step 5
 counts) created after `after` and within the last hour (`opsWindowStart(now)`), oldest first, at most
 `OPS_NOTIFY_PER_HOUR`. `id` = the delivery id, `text` = its message, `at` = its `created_at`. `after` missing or not
-an ISO instant → the whole last hour. Reading changes nothing (the phone push is unaffected).
+an ISO instant → the whole last hour. Reading changes nothing (the phone push is unaffected). Since v1.51.0 the list
+also carries the FunHouse alerts, each ping with its `channel` (§9.4b).
 
 **The poller** (`home/funhouse-poller.ts`, Node 24 on the dev PC, `npm run build:home` →
 `home/dist/funhouse-poller.mjs`, started by `home/funhouse-poller.cmd`; Node globals, `node:fs` and its own file only):
@@ -4665,6 +4681,49 @@ an ISO instant → the whole last hour. Reading changes nothing (the phone push 
 | FP4 | `funhouseNotice` / `forFunhouse` | the body above; 🤖 and 🧵 titles → true, "🏛️ Ozymandias" → false |
 | FP5 | one poll with a fake Ensō and bridge: a 🏛️ ping then two 🧵 pings | one bridge POST (the first 🧵), `after` = its `at`; next poll sends the second |
 | FP6 | the bridge answers 503; then 400 | `after` unchanged, sent again next poll; then handled, not retried |
+
+### 9.4b FunHouse as a place alerts go — `channel = 'funhouse'` — asked by MojoSOGO 2026-10-11
+
+"Add funhouse as reachable location for alerts." Beside 📱 Phone and 🔊 House, an alert can tick **🎪 FunHouse**: the
+desk device on the dev PC. It rides §9.4a: the PC poller already asks Ensō every 15 s, so a FunHouse alert is a
+`deliveries` row on the `funhouse` channel (§4.2zo) that the same `GET /ops/pings` lists. Nothing new runs anywhere.
+
+**Where it is ticked:** everywhere Phone / House are (`ChannelChecks`, §8.5; an event's Remind via, §8.4): alarms and
+event reminders, rolling timers (and their start announcement, §5.5a), chores, things to do, and 📢 Announce. Every
+member sees it ⚑ Q230. Validation already takes any `CHANNEL`; at least one of the three is still required. Machines
+keep `MACHINE_CHANNELS` (Phone + House) ⚑ Q231.
+
+**The row:** `channel` `funhouse`, `member_id` NULL, the same `message` as the alert's push, `title` = what the phone
+would show (`pushTitle`, §9.5: "Ensō" for a fire, "📢 Announcement" otherwise), `queued`. One per alert, like House.
+
+**Which rules it follows — the phone's** ⚑ Q232 (the FunHouse sits on a desk, it is not a speaker in the house):
+- Away (§9.2c) → no FunHouse row, as no phone row.
+- Quiet the house (§9.2b) → still written. Announce with House alone while quiet is still 409 `house_quiet`;
+  House + FunHouse while quiet → the FunHouse row only.
+- Phone first (§9.2d) → not delayed: alert 1 already reaches it.
+- An optional event (§7.5) → only when its audience is not empty (as House).
+
+**`GET /ops/pings`** lists founder pings **and** `funhouse` rows (the same window, order and limit), each as
+`{ id, channel, title, text, at }` (`channel` `push` for a ping, `funhouse` for an alert). Listing marks the listed
+`funhouse` rows still `queued` as `sent` (handed to the PC); founder pings are unchanged.
+
+**The poller:** `forFunhouse(ping)` → true for a `funhouse` row, or a 🤖 / 🧵 ping (Q228). A FunHouse alert's notice is
+§9.4a's with `source: "Ensō"` ⚑ Q233. The PC rebuilds and restarts it once (README).
+
+**Settings → 📊 Status** shows a FunHouse delivery with 🎪.
+
+**Acceptance (FH — each row is a test):**
+
+| # | Check | Expected |
+|---|---|---|
+| FH1 | tick: a reminder with Phone + FunHouse, two members | two push rows and one `funhouse` row (`member_id` NULL, `title` "Ensō", the same message) |
+| FH2 | tick while quiet; on an away fire | quiet: the `funhouse` row written, no house row; away: no row at all |
+| FH3 | tick: a Phone + House + FunHouse reminder repeating every 5 min, alert 1 | push rows and the `funhouse` row, no house row |
+| FH4 | `POST /announce` FunHouse only; House + FunHouse while quiet | 201, one `funhouse` row titled "📢 Announcement"; 201, the `funhouse` row only |
+| FH5 | `GET /ops/pings` with a ping and a `funhouse` row | both, oldest first, `channel` `push` / `funhouse`; the `funhouse` row is now `sent` |
+| FH6 | `forFunhouse` / `funhouseNotice` on a `funhouse` row titled "Ensō" | true; `source` "Ensō" |
+| FH7 | a timer start announcement with FunHouse ticked | one `funhouse` row |
+| FH-M | migration 0042 | §4.2zo's check |
 
 ### 9.5 My alerts — `src/shared/alert-history.ts`, `/me/alerts` — asked by MojoSOGO 2026-10-11
 
@@ -4788,7 +4847,7 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | GET / PUT / DELETE | `/house/quiet` | member | GET → `{ until, byName }`; PUT `{ for: '1h' \| '2h' \| '4h' \| 'today' }` → the same; DELETE turns quiet off; 400 `invalid_input` (§9.2b) |
 | POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `no_recipients` (§9.3); 409 `no_speakers` (§9.2a); 409 `house_quiet` (§9.2b); spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
 | POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 409 `no_recipients` (no founder yet) / 429 `rate_limited`, in that order |
-| GET | `/ops/pings?after=` | bearer `OPS_NOTIFY_TOKEN` (no session) | → `{ pings: [{ id, title, text, at }] }`, the founder pings of the last hour after `after`, oldest first, for the FunHouse poller (§9.4a); 503 / 401 as `/ops/notify` |
+| GET | `/ops/pings?after=` | bearer `OPS_NOTIFY_TOKEN` (no session) | → `{ pings: [{ id, channel, title, text, at }] }`, the founder pings and FunHouse alerts of the last hour after `after`, oldest first, for the FunHouse poller (§9.4a, §9.4b; listed `funhouse` rows become `sent`); 503 / 401 as `/ops/notify` |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek, areaCount }` (`thisWeek`/`nextWeek` = member id or null; `areaCount` §7B.6) |
 | POST | `/chores` | member | `{ title, doneMeans?, days, timing, time, nudge?, people, steps, channels, renotifyMin? }` → chore (201) |
 | PATCH/DELETE | `/chores/{id}` | creator or owner | same fields, all optional; re-plans unstarted runs (§7B.3); DELETE also deletes its areas and their photos (§7B.6) |

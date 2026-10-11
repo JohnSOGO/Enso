@@ -1,17 +1,17 @@
 // SPEC §8.5, §9.3 — the 📢 Announce button at the top of the Alarms tab and its box: a message,
-// Phone / House chosen each time, Send → POST /announce. Spoken as "{my name} says: …", now.
+// Phone / House / FunHouse chosen each time, Send → POST /announce. Spoken as "{my name} says: …", now.
 import { useState } from 'react';
 import { Modal } from './Modal';
-import { ChannelChecks } from './AlertFields';
+import { ChannelChecks, channelsOf, flagsOf } from './AlertFields';
 import { errorText, post } from '../api';
 import { ANNOUNCE_MAX } from '../../../src/shared/announce';
 
 function AnnounceBox({ onClose }: { onClose: () => void }) {
   // ⚑ Q36: House ticked, Phone unticked, every time the box opens.
-  const [f, setF] = useState({ text: '', push: false, house: true });
+  const [f, setF] = useState({ text: '', ...flagsOf(['house']) });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const channels = [...(f.push ? ['push'] : []), ...(f.house ? ['house'] : [])];
+  const channels = channelsOf(f);
 
   async function send() {
     setBusy(true); setError(null);
@@ -30,7 +30,7 @@ function AnnounceBox({ onClose }: { onClose: () => void }) {
             onChange={(e) => setF({ ...f, text: e.target.value })}
             onKeyDown={(e) => { if (e.key === 'Enter' && f.text.trim() && channels.length) send(); }} />
         </label>
-        <ChannelChecks push={f.push} house={f.house} onChange={(c) => setF({ ...f, ...c })} />
+        <ChannelChecks value={f} onChange={(c) => setF({ ...f, ...c })} />
       </fieldset>
     </Modal>
   );

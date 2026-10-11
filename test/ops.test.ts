@@ -245,11 +245,32 @@ it('FP2–FP3: only founder pings of the last hour, oldest first; after narrows,
   const all = await new Client().req('GET', '/ops/pings', undefined, AUTH);
   expect(all.status).toBe(200);
   expect(all.json.pings).toEqual([
-    { id: 'dlv_p1', title: '🏛️ Ozymandias', text: 'msg dlv_p1', at: first },
-    { id: 'dlv_p2', title: '🧵 Thread needs you', text: 'msg dlv_p2', at: second },
+    { id: 'dlv_p1', channel: 'push', title: '🏛️ Ozymandias', text: 'msg dlv_p1', at: first },
+    { id: 'dlv_p2', channel: 'push', title: '🧵 Thread needs you', text: 'msg dlv_p2', at: second },
   ]);
   const after = await new Client().req('GET', `/ops/pings?after=${encodeURIComponent(first)}`, undefined, AUTH);
   expect(after.json.pings.map((p: { id: string }) => p.id)).toEqual(['dlv_p2']);
   const bad = await new Client().req('GET', '/ops/pings?after=nonsense', undefined, AUTH);
   expect(bad.json.pings.map((p: { id: string }) => p.id)).toEqual(['dlv_p1', 'dlv_p2']);
+});
+
+it('FH5: GET /ops/pings lists FunHouse rows with the pings, oldest first, and marks them sent', async () => {
+  const o = await owner();
+  const founder = await meId(o);
+  await env.DB.prepare('DELETE FROM deliveries WHERE fire_id IS NULL').run();
+  const first = new Date(Date.now() - 10 * 60_000).toISOString(), second = new Date(Date.now() - 5 * 60_000).toISOString();
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, title, status, created_at, updated_at)
+      VALUES ('dlv_ping', NULL, 1, 'push', ?, 'hi', '🧵 Thread needs you', 'sent', ?, ?)`).bind(founder, first, first),
+    env.DB.prepare(`INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, title, status, created_at, updated_at)
+      VALUES ('dlv_fh', NULL, 1, 'funhouse', NULL, 'Mom says: dinner', '📢 Announcement', 'queued', ?, ?)`).bind(second, second),
+  ]);
+  const r = await new Client().req('GET', '/ops/pings', undefined, AUTH);
+  expect(r.json.pings).toEqual([
+    { id: 'dlv_ping', channel: 'push', title: '🧵 Thread needs you', text: 'hi', at: first },
+    { id: 'dlv_fh', channel: 'funhouse', title: '📢 Announcement', text: 'Mom says: dinner', at: second },
+  ]);
+  expect((await env.DB.prepare(`SELECT status FROM deliveries WHERE id = 'dlv_fh'`).first<{ status: string }>())!.status).toBe('sent');
+  const again = await new Client().req('GET', `/ops/pings?after=${encodeURIComponent(first)}`, undefined, AUTH);
+  expect(again.json.pings.map((p: { id: string }) => p.id)).toEqual(['dlv_fh']); // still listed once sent
 });

@@ -3,6 +3,7 @@ import { env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Client, member, owner, tickAt } from './helpers';
 import { audience, isOnFor } from '../src/shared/optins';
+import type { Channel } from '../src/shared/vocab';
 
 let A: Client, aId: string, B: Client, bId: string;
 
@@ -118,7 +119,7 @@ describe('M4h optional events (O1–O9)', () => {
 });
 
 describe('the optional-event rule (§7.5) — isOnFor and audience', () => {
-  const base = { assignedTo: [] as string[], activeIds: ['a', 'b', 'c'], onIds: [] as string[], channels: ['push', 'house'] as ('push' | 'house')[] };
+  const base = { assignedTo: [] as string[], activeIds: ['a', 'b', 'c'], onIds: [] as string[], channels: ['push', 'house'] as Channel[] };
 
   it('isOnFor: a non-optional event exists for everyone; an optional one only for who has it on', () => {
     expect(isOnFor({ optional: false }, 'a', [])).toBe(true);
@@ -129,17 +130,20 @@ describe('the optional-event rule (§7.5) — isOnFor and audience', () => {
   });
 
   it('not optional: exactly the old recipients (active, or the active assigned ones, in assigned order)', () => {
-    expect(audience({ ...base, optional: false })).toEqual({ push: ['a', 'b', 'c'], house: true });
-    expect(audience({ ...base, optional: false, assignedTo: ['c', 'x', 'a'] })).toEqual({ push: ['c', 'a'], house: true });
-    expect(audience({ ...base, optional: false, assignedTo: ['x'] })).toEqual({ push: [], house: true }); // House still speaks, as before
-    expect(audience({ ...base, optional: false, channels: ['push'] })).toEqual({ push: ['a', 'b', 'c'], house: false });
+    expect(audience({ ...base, optional: false })).toEqual({ push: ['a', 'b', 'c'], house: true, funhouse: false });
+    expect(audience({ ...base, optional: false, assignedTo: ['c', 'x', 'a'] })).toEqual({ push: ['c', 'a'], house: true, funhouse: false });
+    expect(audience({ ...base, optional: false, assignedTo: ['x'] })).toEqual({ push: [], house: true, funhouse: false }); // House still speaks, as before
+    expect(audience({ ...base, optional: false, channels: ['push'] })).toEqual({ push: ['a', 'b', 'c'], house: false, funhouse: false });
   });
 
   it('optional: active ∩ assigned-or-everyone ∩ on; House only when that audience is not empty', () => {
-    expect(audience({ ...base, optional: true, onIds: ['b', 'c'] })).toEqual({ push: ['b', 'c'], house: true });
-    expect(audience({ ...base, optional: true, onIds: ['b', 'c'], assignedTo: ['c'] })).toEqual({ push: ['c'], house: true });
-    expect(audience({ ...base, optional: true, onIds: ['b'], assignedTo: ['c'] })).toEqual({ push: [], house: false });
-    expect(audience({ ...base, optional: true, onIds: ['x'] })).toEqual({ push: [], house: false }); // on, but disabled
-    expect(audience({ ...base, optional: true })).toEqual({ push: [], house: false });
+    expect(audience({ ...base, optional: true, onIds: ['b', 'c'] })).toEqual({ push: ['b', 'c'], house: true, funhouse: false });
+    expect(audience({ ...base, optional: true, onIds: ['b', 'c'], assignedTo: ['c'] })).toEqual({ push: ['c'], house: true, funhouse: false });
+    expect(audience({ ...base, optional: true, onIds: ['b'], assignedTo: ['c'] })).toEqual({ push: [], house: false, funhouse: false });
+    expect(audience({ ...base, optional: true, onIds: ['x'] })).toEqual({ push: [], house: false, funhouse: false }); // on, but disabled
+    expect(audience({ ...base, optional: true })).toEqual({ push: [], house: false, funhouse: false });
+    // §9.4b: the FunHouse follows the same rule as House
+    expect(audience({ ...base, optional: true, onIds: ['b'], channels: ['funhouse'] })).toEqual({ push: ['b'], house: false, funhouse: true });
+    expect(audience({ ...base, optional: true, channels: ['funhouse'] })).toEqual({ push: [], house: false, funhouse: false });
   });
 });
