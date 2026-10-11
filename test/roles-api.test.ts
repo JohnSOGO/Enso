@@ -69,7 +69,7 @@ describe('§6.3 whose entry it is', () => {
     for (const [what, status] of await writes(k, mine)) expect([200, 201, 204, 400, 409, 422, 429, 503], what).toContain(status);
     const theirs = await entries(k);
     for (const [what, status] of await writes(o, theirs)) expect(status, what).not.toBe(403);
-  });
+  }, 30_000); // ~44 sequential round trips: the 5 s default ran out under a full parallel run (steward pass 14)
 
   it('A10 anyone ticks anyone\'s list item and marks anyone\'s show watched', async () => {
     const e = await entries(o);
