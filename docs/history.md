@@ -470,6 +470,10 @@ captions (5 ingredients, 6 steps — it had been "watch it").
 to snap a photo of completed work so adult can approve remotely"): Done on a one-off opens a sheet with an optional
 photo; a chore run's photo is added from Waiting for OK; admins see it there full size and OK or send back. Deleted on
 OK or drop. **Still owed:** BS2 with the camera on a real phone.
+**📢 Announce goes everywhere by default** (v1.61.0, §8.5, Q36; MojoSOGO 2026-10-11 "ALL for announcement", after
+Toasty's announcement reached only the speakers): the Announce box opens with 📱 Phone, 🔊 House and 🎪 FunHouse all
+ticked, for every member (was House only, plus FunHouse for the founder). The server is unchanged; the sender still gets
+no push. **Still owed:** try it on a phone.
 **Losing taps tested; a failed bounty Done is a 500** (v1.60.7, §7B.8, §7D.8; steward pass 17 items 1–2, MojoSOGO "BOTH"):
 POST /bounties/:id/done re-throws any save error that is not the `uq_earning_bounty` constraint, as machines and cooking
 do, so a real failure is no longer told "That bounty is waiting for OK". BT23–BT24 and CK10 race two taps; machines'
