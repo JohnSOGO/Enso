@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { Modal } from './Modal';
 import { ChannelChecks, channelsOf, flagsOf } from './AlertFields';
 import { errorText, post } from '../api';
-import { useIsFounder } from '../state';
 import { ANNOUNCE_MAX } from '../../../src/shared/announce';
+import { CHANNEL } from '../../../src/shared/vocab';
 
 function AnnounceBox({ onClose }: { onClose: () => void }) {
-  // ⚑ Q36: House ticked, Phone unticked, every time the box opens; FunHouse ticked too for the founder (§9.4b Q230).
-  const [f, setF] = useState({ text: '', ...flagsOf(useIsFounder() ? ['house', 'funhouse'] : ['house']) });
+  // Q36 (MojoSOGO 2026-10-11 "ALL for announcement"): every channel ticked, for every member, every time the box opens.
+  const [f, setF] = useState({ text: '', ...flagsOf(CHANNEL) });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const channels = channelsOf(f);

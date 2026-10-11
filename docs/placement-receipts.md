@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.61.0: Announce box opens with every channel ticked (placement-advisor)
+
+- **Ask:** Q36 was changed by MojoSOGO on 2026-10-11 to "ALL for announcement". The 📢 Announce box now opens with Phone + House + FunHouse ticked for every member. Before, it opened with House only, plus FunHouse for the founder (SPEC §8.5 / §9.3 / §9.4b). The server is unchanged.
+- **Verdict:** `frontend/src/components/Announce.tsx` [EXISTING]
+- **Flow stage:** render
+- **Why:** The change is only the form's starting value, and the map gives Announce.tsx the box and its ChannelChecks. The default becomes `flagsOf(CHANNEL)` from vocab, not a literal list, so "all" stays true if a channel is added and no channel string is written outside vocab.ts. The `useIsFounder` import goes. Rejected: changing `flagsOf`'s defaults in AlertFields.tsx, which cover five other forms that Q36 does not. Result: 🎪 now shows to non-founders in this box (shown when ticked, Q230), which is the intent. No shared/worker change: the sender still gets no push.
+- **Caps:** Announce.tsx was 48/300 and stays about the same. No file enters the band.
+- **Sources read:** frontend/src/components/Announce.tsx; docs/module-ownership.md; src/shared/vocab.ts; scripts/arch.ts; AlertFields.tsx flagsOf; test/ grep for Announce/useIsFounder.
+
 ## 2026-10-11 — v1.60.7: Bounty Done catch re-throws; losing-tap tests; PickGrid stops listing callers (placement-advisor)
 
 - **Ask:** steward pass 17 items 1 and 2 (MojoSOGO "BOTH"). (1) POST /bounties/:id/done's bare catch re-throws unless /UNIQUE|constraint/, as machines.ts and cooking.ts save() do; tests for the losing-tap guards. (2) PickGrid's header comment and its module-ownership row stop listing callers (Chores was missing).

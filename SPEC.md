@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.09 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 3.10 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3653,10 +3653,10 @@ Actions:
 
 At the very top, under the "Alarms" heading: a **📢 Announce** button. It opens the
 **announce box** (modal, titled "📢 Announce"): a one-line **Message** input (16 px,
-`maxLength` = `ANNOUNCE_MAX`), the channel checkboxes (☐ 📱 Phone ☐ 🔊 House — the same
-`ChannelChecks` as the alarm form, chosen each time; the box opens with **House ticked,
-Phone unticked** ⚑ Q36) and **Send** / **Cancel**. Send is disabled while the message is
-blank or neither channel is ticked. A refusal from the server shows inside the box; on
+`maxLength` = `ANNOUNCE_MAX`), the channel checkboxes (☑ 📱 Phone ☑ 🔊 House ☑ 🎪 FunHouse — the same
+`ChannelChecks` as the alarm form, chosen each time; the box opens with **every channel ticked, for every
+member** — Q36, MojoSOGO 2026-10-11 "ALL for announcement") and **Send** / **Cancel**. Send is disabled while the message is
+blank or no channel is ticked. A refusal from the server shows inside the box; on
 success the box closes (there is no toast in the app). What happens is §9.3.
 
 Right under it, **🤫 Quiet the house** (§9.2b): 1 hour · 2 hours · 4 hours · Rest of today, or, while quiet,
@@ -5115,8 +5115,8 @@ desk device on the dev PC. It rides §9.4a: the PC poller already asks Ensō eve
 
 **Where it is ticked:** everywhere Phone / House are (`ChannelChecks`, §8.5; an event's Remind via, §8.4): alarms and
 event reminders, rolling timers (and their start announcement, §5.5a), chores, things to do, and 📢 Announce. It is
-MojoSOGO's desk, so only **the founder** (§6.3) sees the tick, and a new alert (or the Announce box) of his opens with it
-**ticked**; nobody else sees it unless the alert they open already has it ticked (Q230, decided by MojoSOGO 2026-10-11:
+MojoSOGO's desk, so only **the founder** (§6.3) sees the tick, and a new alert of his opens with it
+**ticked** (the Announce box opens with it ticked for everyone, so everyone sees it there, §8.5 Q36); nobody else sees it unless the alert they open already has it ticked (Q230, decided by MojoSOGO 2026-10-11:
 "funhouse is really just for MojoSOGO … default off for others"). The server takes it from anyone. Validation already takes any `CHANNEL`; at least one of the three is still required. Machines
 (washing and cooking) ring it too, always, with or without someone to alert (Q231, MojoSOGO 2026-10-11: "I am not
 getting funhouse alerts on completion"); there is no tick on a machine.
