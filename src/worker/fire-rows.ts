@@ -103,7 +103,7 @@ export async function sourceOf(
     const quietUntil = machineQuietUntil(machineHoursOf(st), st.timezone, now);
     return {
       title: doneMessage(m.id, owner, waiting ? await nameOf(waiting.owner_id) : undefined, isStillLoaded(m, fire.due_at)),
-      ...machineAlert(quietUntil),
+      ...machineAlert(quietUntil, (await nameOf(m.alert_id)) !== null ? m.alert_id : null), // §7D.7: nobody active → phones only
     };
   }
   if (fire.kind === 'thing') {

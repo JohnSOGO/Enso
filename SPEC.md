@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.75 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.76 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1411,6 +1411,20 @@ ALTER TABLE fires ADD COLUMN away_at TEXT;                        -- UTC ISO
 ```
 
 **Migration check (AW-M):** fires and deliveries survive 0039 unchanged with both columns NULL.
+
+### 4.2zm Schema change — `migrations/0040_machine_alert.sql`
+
+Asked by MojoSOGO 2026-10-11 (§7D.7).
+
+```sql
+-- §7D.7 — who is alerted when a machine's load is done; NULL = nobody (phones only, no speaker). Additive only.
+ALTER TABLE machines ADD COLUMN alert_id TEXT REFERENCES members(id);
+-- A load already in a machine keeps alerting its owner; an owner-unknown load goes phones only.
+UPDATE machines SET alert_id = owner_id WHERE done_at IS NOT NULL;
+```
+
+**Migration check (AL-M):** machine rows and open fires survive 0040; a loaded machine's `alert_id` is its owner,
+a free or owner-unknown one NULL.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -3120,10 +3134,10 @@ fold & out**. The weekly Laundry chore (§7B) is separate and unchanged. The **D
 
 | Transition | Valid when | Result |
 |---|---|---|
-| **Start** `{ ownerId, minutes }` | the machine is free | owner, minutes, `started_at = now`, `done_at = now + minutes`, `started_by` = me; a new `machine` fire due at `done_at` |
+| **Start** `{ ownerId, minutes, alertId? }` | the machine is free | owner, alert person (§7D.7), minutes, `started_at = now`, `done_at = now + minutes`, `started_by` = me; a new `machine` fire due at `done_at` |
 | **Move** `{ minutes }` (washer → dryer) | the washer is done **and** the dryer is free | washer free, its open fire closes `done` (`closed_by` = me); the dryer starts with the **washer's owner** and its own minutes; a new dryer fire |
 | **Finish** — *Fold & out* | the last machine (dryer) is done | dryer free; its open fire closes `done` — the load's loop ends |
-| **Done now** `{ ownerId? }` ⚑ Q160 | free or running | the app catches up with the real machine: a **free** one gets `ownerId`'s load, or a load with **owner unknown** (`owner_id` NULL) when none is named — never assumed (MojoSOGO 2026-10-10) (`minutes` null, `started_at = done_at = now`, `started_by` = me); a **running** one keeps its load, `done_at = now`. Any open fire closes `superseded`; a new `machine` fire is due **now**. `ownerId` is optional; a named one must be an active member |
+| **Done now** `{ ownerId?, alertId? }` ⚑ Q160 | free or running | the app catches up with the real machine: a **free** one gets `ownerId`'s load, or a load with **owner unknown** (`owner_id` NULL) when none is named — never assumed (MojoSOGO 2026-10-10) (`minutes` null, `started_at = done_at = now`, `started_by` = me); a **running** one keeps its load, `done_at = now`. Any open fire closes `superseded`; a new `machine` fire is due **now**. `ownerId` is optional; a named one must be an active member |
 | **Clear** | running or done | free; its open fire closes `removed`; nothing rings |
 | **Remind** — *Still loaded* ⚑ Q159 | done | the load stays; its open fire closes `superseded` (`closed_by` = me) and a new `machine` fire is due **now**, so the reminders run again from alert 1 (§7D.3) |
 
@@ -3154,7 +3168,7 @@ fold & out**. The weekly Laundry chore (§7B) is separate and unchanged. The **D
   `MACHINE_MAX_ALERTS` = **4**. After the 4th alert it stays ringing silently in the Ringing
   bar and the card stays **DONE — waiting**. Never `missed`.
 - Recipients (decided by MojoSOGO 2026-10-05: "always go to all devices"): **every active
-  member's phones**, and **one** House announcement on **every speaker** Home Assistant lists
+  member's phones**, and — only when the load has someone to alert (§7D.7, MojoSOGO 2026-10-11) — **one** House announcement on **every speaker** Home Assistant lists
   (the §9.2a list, fetched at most once a tick), whatever anyone ticked in 🔊 Speak my alerts on.
   The `Everywhere` group is left out so no Echo speaks twice ⚑ Q161 (`everySpeaker`). When House
   is off or the list can't be read, the row is written with NULL: the default speakers. The
@@ -3240,6 +3254,34 @@ remember who started the dish washer".
 - Message: `"The dish washer Sam started is done"`; Still loaded `"The dish washer Sam started
   is still full — empty it"`; with no active starter `"The dish washer is done"` / `"… is still
   full — empty it"`. No waiting suffix (no machine before it); `" (alert n)"` follows as usual.
+
+### 7D.7 Alert when done — asked by MojoSOGO 2026-10-11
+
+"When a machine timer is started, make it clear and optional that someone is alerted when the machine finished. If
+no one is selected, then send a phone alert but not a house alert because you do not know who to send a house alert
+to." (The dish washer had just finished and every speaker in the house spoke with nobody responsible for it.)
+- Every load carries an **alert person**, `machines.alert_id` (§4.2zm): an active member, or **nobody** (NULL).
+- **Nobody** (or a person no longer active ⚑ Q219): the fire's channels are **Phone only** — every active member's
+  phones as in §7D.3, no house row at all, on every alert and Still loaded alike.
+- **Someone:** exactly as before — Phone + House, every speaker (§7D.3), with Quiet the house, Away and phone first
+  (§9.2b–9.2d) on top ⚑ Q217. The message is unchanged (it names the owner, §7D.3).
+- **Start** `alertId`: absent → the owner (so an older app keeps today's behavior); `null` → nobody; a string must be
+  an active member, else 400 "Alert when done must be an active member or nobody.". **Done now** on a free machine:
+  absent → follows `ownerId` (so Owner unknown → nobody, MojoSOGO's v1.43.0 case); on a running machine it is ignored.
+  **Move** carries the washer's alert person to the dryer; **Still loaded** and a running Done now keep it; **Finish**
+  and **Clear** free it.
+- The dish washer's started-by does **not** decide on its own: the chooser preselects the starter (the owner chip) and
+  the person can be cleared to nobody ⚑ Q218.
+- `GET /machines` returns `alertId`; the card line adds **· alerts Sam** or **· phones only** (§8.5).
+
+| # | Setup / call | Expected |
+|---|---|---|
+| AL1 | `machineAlert(null, 'A')` / `machineAlert(q, null)` | Phone + House, every speaker / Phone only, not every speaker, `quietUntil` q |
+| AL2 | `parseStart` / `parseDoneNow` with alertId absent, null, A, a stranger; Done now on a running machine | the owner / null / A / a message; null-owner Done now absent → null; running ignores it |
+| AL3 | start the dish washer for A with `alertId: null`, tick at done-at and 15 min later | push to every active member, **no** house delivery on either alert |
+| AL4 | Done now on a free washer naming nobody, ticks | phones only, `Clothes washer finished; Owner unknown; Please cycle to dryer`, no house row |
+| AL5 | start the washer for A alerting B; move to the dryer; tick its done-at and the next | the dryer's `alert_id` is B; alert 1 phones (phone first), alert 2 adds the house row |
+| AL6 | start for A alerting B, then disable B; tick | phones only, no house row |
 
 ---
 
@@ -3985,11 +4027,11 @@ actions on a second line. At 320 px:
 
 ```
 Machines
-Wash, move to the dryer, fold. Run the dishes, then empty them. Everyone hears when it's done.
+Wash, move to the dryer, fold. Run the dishes, then empty them. Every phone hears when it's done; the speakers only when someone is picked.
 🔔 Alerts sound weekdays 5:30pm–8:30pm, weekends 9:00am–9:00pm; outside those hours they wait. [Edit hours]
 ┌──────────────────────────────────────┐
 │ 🫧 Clothes washer  DONE — waiting     │
-│ Kai·14:05                             │
+│ Kai·14:05 · alerts Kai                │
 │ [Move to clothes dryer] [Still loaded]│
 │ [Clear]                               │
 ├──────────────────────────────────────┤
@@ -3997,7 +4039,8 @@ Wash, move to the dryer, fold. Run the dishes, then empty them. Everyone hears w
 │ Sam·~14:50                   [Clear] │
 ├──────────────────────────────────────┤
 │ 🍽️ Dish washer     running            │
-│ started by Ana·~15:30 [Done now][Clear]│
+│ started by Ana·~15:30 · phones only   │
+│                       [Done now][Clear]│
 └──────────────────────────────────────┘
 ```
 
@@ -4012,14 +4055,15 @@ Wash, move to the dryer, fold. Run the dishes, then empty them. Everyone hears w
   both empty = any time. Save refuses from ≥ to inside the box.
 - **Done now** (⚑ Q160) is for a load the app missed. On a free machine it opens the chooser
   titled "The clothes washer is done": *Whose load?* with **Owner unknown** preselected (never assumed;
-  a member chip names one), then **[It's done]**. On a
+  a member chip names one), *🔔 Alert when done* (below), then **[It's done]**. On a
   running machine it is one tap. Either way the done alerts start at once.
 - **Still loaded** (⚑ Q159) restarts the reminders (§7D.2) with one tap, no confirm; the action
   line wraps at 320 px.
 
 - **The chooser** (a modal, exported from `Machines.tsx` and reused by the Ringing bar): for
   **Start**, titled "Start the washer" — *Whose load?* one member chip per active member, **me**
-  preselected; *How long?* the machine's minute chips (§7D.2), e.g. **30 · 60 · 90 · 120 min** for the clothes washer. Tapping a minute chip
+  preselected; *🔔 Alert when done (optional)* — **Nobody · phones only** then one chip per active member, preselected to
+  the *Whose load?* pick and following it until this row is tapped (§7D.7); *How long?* the machine's minute chips (§7D.2), e.g. **30 · 60 · 90 · 120 min** for the clothes washer. Tapping a minute chip
   starts the machine at once and closes the box: **two taps** from the card (Start → 60). For
   **Move to dryer**, titled "Move Sam's load to the dryer" — only the minute chips.
 - Chips are at least 44 px tall; text is 16 px; nothing scrolls sideways at 320 px.
@@ -5186,11 +5230,11 @@ Settings → Status' recent deliveries ⚑ (Q111).
 | PATCH/DELETE | `/alarms/{id}` | creator or owner | same fields as POST, all optional; closes future scheduled fires like an event edit |
 | GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Clothes washer") and `personId` = the load's owner; every fire carries `awayBy` (§9.2c) |
 | GET | `/machines` | member | → `Machine[]` in load order: `{ id, label, state: MachineState, ownerId, minutes, startedAt, doneAt, startedBy, next }` (`state` derived by the server, §7D.1; `next` = the next machine's id or null) |
-| POST | `/machines/{id}/start` | member | `{ ownerId, minutes }` → `Machine[]`; 409 `busy` when not free (§7D.2) |
+| POST | `/machines/{id}/start` | member | `{ ownerId, minutes, alertId? }` (§7D.7) → `Machine[]`; 409 `busy` when not free (§7D.2) |
 | POST | `/machines/{id}/move` | member | `{ minutes }` → `Machine[]`; 409 `busy` / `not_done` / `invalid_state` |
 | POST | `/machines/{id}/finish` | member | Fold & out → `Machine[]`; 409 `not_done` / `invalid_state` |
 | GET / PATCH | `/machines/hours` | GET member / PATCH owner | `MachineHours` `{ weekday, weekend }`, each `{ from, to }` or null → the saved hours; 400 `invalid_input` (§7D.5) |
-| POST | `/machines/{id}/done` | member | Done now `{ ownerId? }` (required when free) → `Machine[]`; 409 `busy` when already done, 400 `invalid_input` (§7D.2) |
+| POST | `/machines/{id}/done` | member | Done now `{ ownerId?, alertId? }` (required when free) → `Machine[]`; 409 `busy` when already done, 400 `invalid_input` (§7D.2) |
 | POST | `/machines/{id}/remind` | member | Still loaded → `Machine[]`; 409 `not_done` (§7D.2) |
 | POST | `/machines/{id}/clear` | member | → `Machine[]`; 409 `already_free`. Every `/machines` write: 404 for an unknown machine, 400 `invalid_input`, 409 `conflict` when another tap changed the machine first |
 | POST | `/fires/{id}/actions` | member | `{ action: Action }` → fire (+ next); 409 on `invalid_action` |
@@ -5829,6 +5873,10 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q214 | How long "I'm away" lasts (§9.2c) | ⚑ Until that alert is closed; whatever replaces it (next timer countdown, Still loaded, next step) speaks again. No "back home" undo |
 | Q215 | Which alerts go phone first (§9.2d) | ⚑ Every alert kind with both Phone and House ticked; House-only alerts speak from the first; Announce and timer start announcements unchanged |
 | Q216 | Phone first on an alert that doesn't repeat (§9.2d) | ⚑ It is spoken on its one alert, so a House alert is never silently dropped |
+| Q217 | What picking a person changes (§7D.7) | ⚑ Only whether the house speaks: with someone, every phone and every speaker as before; the person's own speaker picks and phone are not singled out |
+| Q218 | Does the dish washer's starter get the alert (§7D.7) | ⚑ Preselected (the chooser follows the owner chip) but can be cleared to Nobody |
+| Q219 | An alert person who is no longer active (§7D.7) | ⚑ Treated as nobody: phones only |
+| Q220 | Changing who is alerted on a load already running (§7D.7) | ⚑ Not offered; Clear and start again. Move carries it to the dryer |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -6037,6 +6085,11 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Alert when done** (v1.47.0, §7D.7, §4.2zm; asked by MojoSOGO 2026-10-11; AL1–AL6, AL-M): starting a machine (or
+Done now) asks *Alert when done* — Nobody · phones only, or a member (preselected to whose load). With nobody, every
+phone hears it and no speaker does; with someone, as before. Owner unknown on Done now means nobody. Loads already
+running keep alerting their owner. Migration 0040. Q217–Q220 are ⚑ defaults. **Still owed:** start the dish washer
+with Nobody and hear only phones.
 **Phone first, then the house** (v1.46.0, §9.2d; asked by MojoSOGO 2026-10-10; PF1–PF3): an alert with Phone and House
 that repeats rings phones only the first time and adds the speakers from the second alert. House-only and one-shot
 alerts speak at once. Q215–Q216 are ⚑ defaults. **Still owed:** hear it on a real repeating alert.

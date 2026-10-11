@@ -17,7 +17,7 @@ const loadRows = (db: D1Database) => all<MachineRow>(db, 'SELECT * FROM machines
 
 function machinesView(rows: MachineRow[], now: string) {
   return MACHINE.map((id) => rows.find((r) => r.id === id)).filter((r): r is MachineRow => !!r).map((r) => ({
-    id: r.id, label: MACHINE_LABEL[r.id], state: machineState(r, now), ownerId: r.owner_id, minutes: r.minutes,
+    id: r.id, label: MACHINE_LABEL[r.id], state: machineState(r, now), ownerId: r.owner_id, alertId: r.alert_id, minutes: r.minutes,
     startedAt: r.started_at, doneAt: r.done_at, startedBy: r.started_by, next: nextMachine(r.id),
   }));
 }
@@ -40,9 +40,9 @@ export function machineWrites(db: D1Database, before: readonly MachineRow[], r: 
     stmts.push(
       db.prepare(`INSERT INTO machines (id) SELECT ? WHERE NOT EXISTS (SELECT 1 FROM machines WHERE id = ? AND started_at IS ?)`)
         .bind(row.id, row.id, was),
-      db.prepare(`UPDATE machines SET owner_id = ?, minutes = ?, started_at = ?, done_at = ?, started_by = ?, updated_at = ?
+      db.prepare(`UPDATE machines SET owner_id = ?, alert_id = ?, minutes = ?, started_at = ?, done_at = ?, started_by = ?, updated_at = ?
                    WHERE id = ? AND started_at IS ?`)
-        .bind(row.owner_id, row.minutes, row.started_at, row.done_at, row.started_by, row.updated_at, row.id, was),
+        .bind(row.owner_id, row.alert_id, row.minutes, row.started_at, row.done_at, row.started_by, row.updated_at, row.id, was),
     );
   }
   if (r.closeFire) stmts.push(updateFire(db, r.closeFire));
@@ -96,7 +96,7 @@ machines.post('/machines/:id/start', requireMember, async (c) => {
   const input = parseStart(await body(c), m.row.id, await activeMemberIds(c.env.DB));
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   const now = nowIso();
-  return save(c, m.rows, startMachine(m.row, input.ownerId, input.minutes, c.get('member').id, now), now);
+  return save(c, m.rows, startMachine(m.row, input.ownerId, input.alertId, input.minutes, c.get('member').id, now), now);
 });
 
 machines.post('/machines/:id/move', requireMember, async (c) => {
@@ -138,5 +138,5 @@ machines.post('/machines/:id/done', requireMember, async (c) => {
   const now = nowIso();
   const input = parseDoneNow(await body(c), await activeMemberIds(c.env.DB), machineState(m.row, now) === 'free');
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
-  return save(c, m.rows, doneNowMachine(m.row, input.ownerId, m.openFire, c.get('member').id, now), now);
+  return save(c, m.rows, doneNowMachine(m.row, input.ownerId, input.alertId, m.openFire, c.get('member').id, now), now);
 });

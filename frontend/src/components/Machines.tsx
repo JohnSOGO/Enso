@@ -11,7 +11,7 @@ import s from './Lists.module.css';
 
 /** GET /machines (§10) — `state` is the server's, never re-derived here. */
 export interface Machine {
-  id: MachineId; label: string; state: MachineState; ownerId: string | null; minutes: number | null;
+  id: MachineId; label: string; state: MachineState; ownerId: string | null; alertId: string | null; minutes: number | null;
   startedAt: string | null; doneAt: string | null; startedBy: string | null; next: MachineId | null;
 }
 
@@ -22,8 +22,18 @@ const BADGE: Record<MachineState, { mood: string; text: string }> = {
 const lower = (id: MachineId) => MACHINE_LABEL[id].toLowerCase();
 const bigChip = { minHeight: 44, fontSize: '1rem', padding: '0 14px', cursor: 'pointer' } as const;
 
+/** One chip of a chooser row: ✓ and a heavier border when picked. */
+function Pick({ on, color, label, onClick }: { on: boolean; color?: string; label: string; onClick: () => void }) {
+  return (
+    <button className="chip" aria-pressed={on} onClick={onClick}
+      style={{ ...bigChip, ...(color ? { borderColor: color } : {}), borderWidth: on ? 2 : 1, fontWeight: on ? 600 : 400 }}>
+      {on ? '✓ ' : ''}{label}
+    </button>
+  );
+}
+
 /**
- * Start a machine (whose load, then a minute chip), move its done load on (a minute chip only), or
+ * Start a machine (whose load, who to alert when done, then a minute chip), move its done load on (a minute chip only), or
  * mark a free machine's unrecorded load done (whose load, then It's done). Tapping a minute chip
  * does it at once: two taps from the card. A refusal shows inside.
  */
@@ -32,9 +42,12 @@ export function MachineChooser({ from, mode, ownerId, onClose }: {
 }) {
   const { me, members, memberById, refresh } = useApp();
   const [owner, setOwner] = useState<string | null>(mode === 'done' ? null : me.id); // §7D.2: Done now never assumes an owner
+  const [alertPick, setAlertPick] = useState<string | null | undefined>(undefined); // §7D.7: follows the owner until tapped
+  const alertTo = alertPick === undefined ? owner : alertPick;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const to = mode === 'move' ? nextMachine(from) : null;
+  const active = members.filter((m) => !m.disabledAt);
   const who = isLaundry(from) ? 'Whose load?' : 'Who started it?'; // §7D.6
   const ownerName = ownerId ? memberById(ownerId)?.displayName ?? 'unknown member' : null;
   const title = mode === 'start' ? `Start the ${lower(from)}` : mode === 'done' ? `The ${lower(from)} is done`
@@ -43,7 +56,7 @@ export function MachineChooser({ from, mode, ownerId, onClose }: {
   async function go(minutes?: number) {
     setBusy(true); setError(null);
     try {
-      await post(`/machines/${from}/${mode}`, mode === 'move' ? { minutes } : { ownerId: owner, minutes });
+      await post(`/machines/${from}/${mode}`, mode === 'move' ? { minutes } : { ownerId: owner, alertId: alertTo, minutes });
       refresh(); onClose();
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
@@ -55,18 +68,17 @@ export function MachineChooser({ from, mode, ownerId, onClose }: {
           <div className="field" role="group" aria-label={who}>
             <span className="muted" style={{ fontSize: '.8rem' }}>{who}</span>
             <div className="row wrap" style={{ marginTop: 4 }}>
-              {mode === 'done' && (
-                <button className="chip" aria-pressed={owner === null} onClick={() => setOwner(null)}
-                  style={{ ...bigChip, borderWidth: owner === null ? 2 : 1, fontWeight: owner === null ? 600 : 400 }}>
-                  {owner === null ? '✓ ' : ''}Owner unknown
-                </button>
-              )}
-              {members.filter((m) => !m.disabledAt).map((m) => (
-                <button key={m.id} className="chip" aria-pressed={owner === m.id} onClick={() => setOwner(m.id)}
-                  style={{ ...bigChip, borderColor: m.color, borderWidth: owner === m.id ? 2 : 1, fontWeight: owner === m.id ? 600 : 400 }}>
-                  {owner === m.id ? '✓ ' : ''}{m.displayName}
-                </button>
-              ))}
+              {mode === 'done' && <Pick on={owner === null} label="Owner unknown" onClick={() => setOwner(null)} />}
+              {active.map((m) => <Pick key={m.id} on={owner === m.id} color={m.color} label={m.displayName} onClick={() => setOwner(m.id)} />)}
+            </div>
+          </div>
+        )}
+        {mode !== 'move' && (
+          <div className="field" role="group" aria-label="Alert when done">
+            <span className="muted" style={{ fontSize: '.8rem' }}>🔔 Alert when done (optional) — with nobody, phones only, no speakers</span>
+            <div className="row wrap" style={{ marginTop: 4 }}>
+              <Pick on={alertTo === null} label="Nobody · phones only" onClick={() => setAlertPick(null)} />
+              {active.map((m) => <Pick key={m.id} on={alertTo === m.id} color={m.color} label={m.displayName} onClick={() => setAlertPick(m.id)} />)}
             </div>
           </div>
         )}
@@ -101,14 +113,16 @@ export function MachinesSection() {
     try { await post(`/machines/${m.id}/${what}`); refresh(); } catch (e) { setError(errorText(e)); refresh(); }
   }
 
+  const name = (id: string) => memberById(id)?.displayName ?? 'unknown member';
   const load = (m: Machine) => m.state === 'free' ? ''
-    : `${isLaundry(m.id) ? '' : 'started by '}${m.ownerId ? memberById(m.ownerId)?.displayName ?? 'unknown member' : 'owner unknown'} · ${m.doneAt ? `done ${m.state === 'running' ? '~' : ''}${localTime(m.doneAt)}` : '—'}`;
+    : `${isLaundry(m.id) ? '' : 'started by '}${m.ownerId ? name(m.ownerId) : 'owner unknown'} · ${m.doneAt ? `done ${m.state === 'running' ? '~' : ''}${localTime(m.doneAt)}` : '—'}`
+      + ` · ${m.alertId ? `alerts ${name(m.alertId)}` : 'phones only'}`; // §7D.7
 
   return (
     <section className={s.section} aria-label="Machines">
       <h2 style={{ marginBottom: 6 }}>Machines</h2>
       <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>
-        Wash, move to the dryer, fold. Run the dishes, then empty them. Everyone hears when it's done.
+        Wash, move to the dryer, fold. Run the dishes, then empty them. Every phone hears when it's done; the speakers only when someone is picked.
       </p>
       <MachineHoursLine />
       {error && <div role="alert" className="alert-error">{error}</div>}
