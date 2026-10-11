@@ -1,4 +1,4 @@
-// AL1–AL6 (SPEC §7D.7) — Alert when done: a machine load with nobody to alert rings phones only, never
+// AL1–AL7 (SPEC §7D.7) — Alert when done: a machine load with nobody to alert rings phones only, never
 // the house; with someone it rings as before. Routes use the real clock, as in machines.test.ts.
 import { env } from 'cloudflare:test';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -9,10 +9,10 @@ import { addMinutes } from '../src/shared/time';
 const Q = '2026-10-11T17:30:00.000Z';
 
 describe('AL1–AL2 the pure rules', () => {
-  it('AL1 machineAlert: someone → Phone + House on every speaker; nobody → Phone only', () => {
+  it('AL1 machineAlert: someone → Phone + House on every speaker; nobody → Phone + FunHouse', () => {
     expect(machineAlert(null, 'mem_a')).toMatchObject({ allSpeakers: true, cfg: { channels: [...MACHINE_CHANNELS] } });
     const none = machineAlert(Q, null);
-    expect(none).toMatchObject({ allSpeakers: false, cfg: { channels: ['push'], quietUntil: Q } });
+    expect(none).toMatchObject({ allSpeakers: false, cfg: { channels: ['push', 'funhouse'], quietUntil: Q } });
   });
 
   it('AL2 parseStart / parseDoneNow: absent → the owner, null → nobody, a member, a stranger refused', () => {
@@ -121,5 +121,19 @@ describe('AL3–AL6 /machines and tick', () => {
     const d = await sent(fire.id);
     expect(phones(d, 2)).toEqual([A, B].sort());
     expect(houses(d)).toEqual([]);
+  });
+
+  it('AL7 a machine done rings the FunHouse too, with or without someone to alert; away stops it', async () => {
+    await o.post('/machines/dishwasher/start', { ownerId: A, minutes: 60, alertId: null });
+    const fire = await openFire('dishwasher');
+    await tickAt(o, await doneNow('dishwasher'));
+    const fh = (await env.DB.prepare(`SELECT member_id, title, message FROM deliveries WHERE fire_id = ? AND channel = 'funhouse'`).bind(fire.id).all<any>()).results;
+    expect(fh).toEqual([{ member_id: null, title: 'Ensō', message: (await sent(fire.id))[0].message }]);
+    await o.post('/machines/dishwasher/clear');
+    await o.post('/machines/washer/start', { ownerId: A, minutes: 60, alertId: A });
+    const w = await openFire('washer');
+    await env.DB.prepare('UPDATE fires SET away_by = ? WHERE id = ?').bind(A, w.id).run();
+    await tickAt(o, await doneNow('washer'));
+    expect((await sent(w.id)).filter((x) => x.channel === 'funhouse')).toEqual([]);
   });
 });

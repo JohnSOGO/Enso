@@ -7,9 +7,9 @@ carry its result.
 
 ---
 
-## 2026-10-11 — v1.54.1: Cooking box custom minutes box in the chip row (placement-advisor)
+## 2026-10-11 — v1.54.2: Cooking box custom minutes box in the chip row (placement-advisor)
 
-- **Ask:** SPEC 2.89 §8.5: the cooking box's minutes field moves into the "How long?" chip row as a small "custom" box after the 60 chip, with a light gray "custom" placeholder. A chip picks its value and empties the box; typing in the box unpicks the chips. UI only.
+- **Ask:** SPEC 2.90 §8.5: the cooking box's minutes field moves into the "How long?" chip row as a small "custom" box after the 60 chip, with a light gray "custom" placeholder. A chip picks its value and empties the box; typing in the box unpicks the chips. UI only.
 - **Verdict:** frontend/src/components/CookBox.tsx [EXISTING] (plus its own CookBox.module.css for the placeholder color).
 - **Flow stage:** render
 - **Why:** The CookBox map row already owns "How long?". This is a layout and draft-state change inside that one concern. Rejected: Machines.tsx (Pick and bigChip need no change; MachineChooser's chips are not covered) and any shared or state.tsx home (chip-vs-custom is a local draft; validation still uses COOK_MINUTES_MAX).
@@ -25,6 +25,15 @@ carry its result.
 - **Handoffs:** 3, waiting on MojoSOGO's pick: the conflict-guard test; pass 15's PickGrid header and row wording (still open); a §8.2 line for the cooking ringing row `🍳 label · [Off]` (whether the glyph varies by kind is MojoSOGO's call). Still open, all LOW: pass 11's two §7D notes, pass 10's house-row helper note, the snooze-keeps-away test, the machines.ts alert-hours seam.
 - **MS9 transient:** no logic or order bug found. MS9 is the heaviest test in messes-api (PBKDF2 signup, 3 R2 reports, about 15 requests) under the default 5 s timeout, so load is the likely cause. It doesn't check the status of its claim and settle calls; if it recurs, capture the failure text before changing anything.
 - **Restraint:** openCookFire repeats routes/machines.ts's open-fire query (one line, two copies); the `/UNIQUE|constraint/` regex in two routes; the separate guard writers; Pick, bigChip and AlertWhenDone exported from Machines.tsx to CookBox (two callers); COOK_GLYPH in the PWA; cookDayTick's one query per timer.
+## 2026-10-11 — v1.54.1: Machine fires also ring the 🎪 FunHouse (placement-advisor)
+
+- **Ask:** SPEC 2.89 §7D.3 / §7D.7 / §7D.8 + §9.4b, Q231 decided. MojoSOGO: "I am not getting funhouse alerts on completion". Machine fires (washer, dryer, dish washer, cooking timers) also go to the FunHouse channel, both when there is someone to alert and when there is nobody.
+- **Verdict:** [EXISTING] src/shared/machines.ts: MACHINE_CHANNELS becomes ['push','house','funhouse']; machineAlert's nobody case becomes ['push','funhouse']; the doc comment is updated to match. Tests: test/machine-alert.test.ts AL1 updated and AL7 added there; test/cooking.test.ts assertions updated (cookAlert inherits from machineAlert); machines.test.ts delivery counts updated. No reorganizer, no CEILINGS change.
+- **Flow stage:** rules (machines.ts). Deliver is unchanged: tick.ts already writes the funhouse row on `aud.funhouse && !fire.away_by`, and optins.ts audience() reads it from cfg.channels.
+- **Why:** The channel set is a decision machines.ts already owns, so changing two literals there is the smallest change. A funhouse special case in tick.ts or fire-rows.ts was rejected: it would put a rule in the Worker and split the machine alert across two homes. 'funhouse' is already in vocab.ts CHANNEL. The phone-first rule is unaffected.
+- **Caps:** machines.ts 228/300 before, about the same after; nothing newly in the warning band.
+
+---
 
 ## 2026-10-11 — v1.54.0: Cooking timers, a second group under Machines (placement-advisor)
 

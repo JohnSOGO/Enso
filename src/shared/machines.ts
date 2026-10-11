@@ -6,18 +6,18 @@ import { addMinutes, ms } from './time';
 
 export const MACHINE_RENOTIFY_MIN = 15;
 export const MACHINE_MAX_ALERTS = 4;
-export const MACHINE_CHANNELS: readonly Channel[] = ['push', 'house'];
+export const MACHINE_CHANNELS: readonly Channel[] = ['push', 'house', 'funhouse'];
 
 /** §7D.3 — every machine fire rings alike. */
 export const machineAlertConfig = (): AlertConfig =>
   ({ channels: [...MACHINE_CHANNELS], renotifyMin: MACHINE_RENOTIFY_MIN, maxAlerts: MACHINE_MAX_ALERTS });
 
 /**
- * §7D.3, §7D.5, §7D.7 — a machine fire's audience and alert, waiting for the alert hours: every phone, and every speaker
- * only when the load has someone to alert (`alertId`, an active member); with nobody, phones only.
+ * §7D.3, §7D.5, §7D.7 — a machine fire's audience and alert, waiting for the alert hours: every phone and the FunHouse
+ * (§9.4b), and every speaker only when the load has someone to alert (`alertId`, an active member); with nobody, no house.
  */
 export const machineAlert = (quietUntil: string | null, alertId: string | null): { assignedTo: string[]; allSpeakers: boolean; cfg: AlertConfig } => {
-  const cfg: AlertConfig = { ...machineAlertConfig(), ...(alertId ? {} : { channels: ['push'] }), ...(quietUntil ? { quietUntil } : {}) };
+  const cfg: AlertConfig = { ...machineAlertConfig(), ...(alertId ? {} : { channels: ['push', 'funhouse'] }), ...(quietUntil ? { quietUntil } : {}) };
   return { assignedTo: [], allSpeakers: alertId !== null, cfg };
 };
 

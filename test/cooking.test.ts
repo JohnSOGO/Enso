@@ -24,9 +24,9 @@ describe('CK1–CK2, CK5–CK6, CK8 the pure rules (cooking.ts)', () => {
     expect(cookMessage({ cook_kind: 'oven', name: 'Oven 2' }, null)).toBe('Oven 2 is done');
   });
 
-  it('cookAlert: every 5 min, no alert hours; nobody → phones only', () => {
-    expect(cookAlert('A')).toMatchObject({ allSpeakers: true, cfg: { channels: ['push', 'house'], renotifyMin: COOK_RENOTIFY_MIN, maxAlerts: 4 } });
-    expect(cookAlert(null)).toMatchObject({ allSpeakers: false, cfg: { channels: ['push'], renotifyMin: 5 } });
+  it('cookAlert: every 5 min, no alert hours; nobody → phones + FunHouse', () => {
+    expect(cookAlert('A')).toMatchObject({ allSpeakers: true, cfg: { channels: ['push', 'house', 'funhouse'], renotifyMin: COOK_RENOTIFY_MIN, maxAlerts: 4 } });
+    expect(cookAlert(null)).toMatchObject({ allSpeakers: false, cfg: { channels: ['push', 'funhouse'], renotifyMin: 5 } });
     expect(cookAlert('A').cfg.quietUntil).toBeUndefined();
   });
 
@@ -129,14 +129,15 @@ describe('/cooking (CK3–CK7, CK9)', () => {
     expect(ringing).toMatchObject({ kind: 'machine', machineId: t.id, title: 'Air fryer', personId: A });
   });
 
-  it('CK4 nobody to alert: phones only on every alert', async () => {
+  it('CK4 nobody to alert: phones and the FunHouse on every alert, no house', async () => {
     const t = await create({ kind: 'oven', name: 'Oven 2', minutes: 30, alertId: null });
     const fire = await openFire(t.id);
     const doneAt = await finishedAgo(t.id, 0);
     await tickAt(o, doneAt);
     await tickAt(o, addMinutes(doneAt, 5));
     const d = await deliveriesOf(fire.id);
-    expect(d.every((x) => x.channel === 'push')).toBe(true);
+    expect(d.every((x) => x.channel === 'push' || x.channel === 'funhouse')).toBe(true);
+    expect(d.filter((x) => x.channel === 'funhouse')).toHaveLength(2);
     expect(Math.max(...d.map((x) => x.alert_number))).toBe(2);
     expect(d[0].message).toBe('Oven 2 is done');
   });
