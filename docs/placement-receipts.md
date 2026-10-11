@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.60.3: FunHouse poller skips stale pings (placement-advisor)
+
+- **Ask:** SPEC 3.05 §9.4a, MojoSOGO 2026-10-11: "getting stale alerts on funhouse". While the board was off USB the bridge answered 503, pollOnce kept `after` unchanged, and after the reconnect it drained the backlog one ping per 15 s poll. Fix: pollOnce skips any ping whose `at` is older than 10 min before now (handled, no POST, one log line). The clock comes in as PollDeps `now`; main passes Date.now. Test FP8.
+- **Verdict:** home/funhouse-poller.ts, pollOnce() + PollDeps [EXISTING]
+- **Flow stage:** deliver (the home-PC FunHouse leg)
+- **Why:** pollOnce already decides send or skip; a stale skip sits next to the !forFunhouse skip, so a backlog clears in one poll. One 10-min constant: FUNHOUSE_START_BACK_MS renamed FUNHOUSE_STALE_MS, serving startAfter and pollOnce. Rejected: filtering in GET /ops/pings (the Worker doesn't know when the PC can deliver); a new home/ module.
+- **Caps:** home/funhouse-poller.ts 100 → 104 of 300 (no CEILINGS pin). Nothing newly in the warning band.
+- **Reorganizer:** none needed.
+
+---
+
 ## 2026-10-11 — Steward pass 18, whole tree (code-steward)
 
 - **Run:** after the v1.60.0 release (SPEC 3.02 §7B.8, a bounty's picture, migration 0046). Also covers v1.59.0 (done photo, migration 0045) and v1.59.1 (Point at it label). Audited 265334e..50328a3 (the v1.60.0 head; v1.60.1–v1.60.2 landed after).

@@ -261,4 +261,5 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q257 | A bounty's done photo (§7B.8) | ⚑ Optional, one per pending earning (a second replaces it), added by the one who did it, for a one-off or a chore run; everyone can see it |
 | Q258 | How long a done photo is kept (§7B.8) | ⚑ Until the earning is OK'd or dropped (Not yet, Undo, bounty deleted); then deleted from R2 |
 | Q259 | A replaced done photo and the browser cache (§8.15b) | ⚑ The app adds its own `?v=` to the photo's address after an upload; nothing on the wire changes |
+| Q261 | A stale FunHouse notice (§9.4a) | ⚑ Older than 10 min at poll time → skipped, never shown (same window as the start-up look-back) |
 | Q260 | A bounty's picture (§7B.8) | ⚑ Optional, one per one-off, set by an admin when posting or later from the card; everyone sees it; deleted when the bounty is paid or deleted |
