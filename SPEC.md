@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.06 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 3.07 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5074,6 +5074,10 @@ also carries the FunHouse alerts, each ping with its `channel` (§9.4b).
   within the last 10 minutes, else 10 minutes ago ⚑ Q244. So a restart re-sends nothing already handled (the bridge
   does **not** drop a repeated `id`; MojoSOGO heard repeats after each restart, 2026-10-11, "DUP"); after more than
   10 minutes down, older notices are skipped.
+- **Stale pings are dropped:** a ping whose `at` is more than 10 minutes before the poll (`FUNHOUSE_STALE_MS`, the
+  same window) is skipped and counted as handled, with one log line and no POST ⚑ Q262. So a backlog left while the
+  bridge answered 503 (the board off USB) is not replayed one a poll when it comes back (MojoSOGO 2026-10-11:
+  "getting stale alerts on funhouse").
 - **Which pings:** a title starting with 🤖 or 🧵 (Claude's) ⚑ Q228. Others (🏛️ Ozymandias, which already
   reaches the FunHouse itself) are skipped and counted as handled.
 - **At most one notice a poll** (the bridge allows one per 10 s). It POSTs raw UTF-8 JSON
@@ -5094,6 +5098,7 @@ also carries the FunHouse alerts, each ping with its `channel` (§9.4b).
 | FP4 | `funhouseNotice` / `forFunhouse` | the body above (a 🤖 ping → "title: text", a 🧵 ping → its text alone); 🤖 and 🧵 titles → true, "🏛️ Ozymandias" → false |
 | FP5 | one poll with a fake Ensō and bridge: a 🏛️ ping then two 🧵 pings | one bridge POST (the first 🧵), `after` = its `at`; next poll sends the second |
 | FP6 | the bridge answers 503; then 400 | `after` unchanged, sent again next poll; then handled, not retried |
+| FP8 | `pollOnce` at 01:05 with a 🧵 ping at 00:54 then one at 01:04; then the 00:54 one alone | no POST for the first, the second POSTed, `after` = 01:04; alone → no POST, `after` = 00:54 |
 | FP7 | `startAfter(saved, now)`: saved 30 s ago (with a newline); none; nonsense; an hour old; in the future | the saved instant; 10 min back for the other four |
 
 ### 9.4b FunHouse as a place alerts go — `channel = 'funhouse'` — asked by MojoSOGO 2026-10-11

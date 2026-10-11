@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.60.5: FunHouse poller skips stale pings (placement-advisor)
+
+- **Ask:** SPEC 3.07 §9.4a, MojoSOGO 2026-10-11: "getting stale alerts on funhouse". While the board was off USB the bridge answered 503, pollOnce kept `after` unchanged, and after the reconnect it drained the backlog one ping per 15 s poll. Fix: pollOnce skips any ping whose `at` is older than 10 min before now (handled, no POST, one log line). The clock comes in as PollDeps `now`; main passes Date.now. Test FP8.
+- **Verdict:** home/funhouse-poller.ts, pollOnce() + PollDeps [EXISTING]
+- **Flow stage:** deliver (the home-PC FunHouse leg)
+- **Why:** pollOnce already decides send or skip; a stale skip sits next to the !forFunhouse skip, so a backlog clears in one poll. One 10-min constant: FUNHOUSE_START_BACK_MS renamed FUNHOUSE_STALE_MS, serving startAfter and pollOnce. Rejected: filtering in GET /ops/pings (the Worker doesn't know when the PC can deliver); a new home/ module.
+- **Caps:** home/funhouse-poller.ts 100 → 104 of 300 (no CEILINGS pin). Nothing newly in the warning band.
+- **Reorganizer:** none needed.
 ## 2026-10-11 — v1.60.4: standalone document height 100lvh so the tab bar isn't clipped (placement-advisor)
 
 - **Ask:** SPEC 3.06 §8.1 "Flush at the bottom", follow-up to v1.60.2. On the iOS 26 installed app (viewport-fit=cover, black-translucent) the tab bar was cut off about 59pt above the screen bottom: `html` 100%/dvh is short by the top safe-area inset, `body { overflow: hidden }` clips there, only 100lvh is the full screen. Add `@media (display-mode: standalone) { html { height: 100lvh; } }` in theme.css; `.app`'s standalone `height: 100vh` becomes `100lvh`.
