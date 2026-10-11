@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-11 — My alerts: push history in Settings, a push tap opens its card (placement-advisor)
+
+- **Ask:** SPEC §9.5 (v1.48.0, SPEC 2.77; migration 0041, §4.2zn). Settings gains an Alerts section with my newest 200 push deliveries I haven't hidden; a tap opens a card (title as the phone showed it, whole message, time, source, alert number, phone result); ❌ hides one, Clear all hides all of mine; tapping a phone notification opens Settings → Alerts on its card. Rows are kept, so Status and the ops hourly limit still count them.
+- **Verdict:**
+  - [NEW row] src/shared/alert-history.ts: ALERT_HISTORY_MAX, PUSH_TITLE moved from push.ts, pushTitle, alertSource, ALERTS_PATH / alertUrl / alertIdFrom. Pure; imports vocab and announce.
+  - [NEW row] src/worker/routes/my-alerts.ts: GET /me/alerts, DELETE /me/alerts/{id}, DELETE /me/alerts; the only reader and writer of dismissed_at. Mounted in index.ts.
+  - [EXISTING] src/worker/push.ts: payload gains alertId; title via pushTitle.
+  - [EXISTING] frontend/public/sw.js: an alertId tap opens `/settings/alerts?alert={id}`; a sign-in url still wins.
+  - [NEW row] frontend/src/components/MyAlerts.tsx: list, ❌, Clear all, card in Modal; exports useAlertLink.
+  - [EXISTING] Settings.tsx and App.tsx: wiring only.
+  - Migration 0041 (deliveries.dismissed_at + idx_deliveries_member) with test/migration-0041.test.ts.
+- **Flow stage:** rules (alert-history.ts) / route + persist (routes/my-alerts.ts, 0041) / deliver (push.ts payload, sw.js tap) / render (MyAlerts.tsx; Settings and App wiring).
+- **Why:** describing a past push to its recipient is a new concern; one pure leaf holds the title rule so the card shows exactly what the phone showed (§0.5). routes/household.ts was rejected on concern count; this follows the house-quiet / announce / ops one-feature route grain. dismissed_at is read only by my-alerts.ts, so Status, the ops limit and mess asks are unchanged.
+- **Built as:** the advisor suggested the service worker postMessage an open window first; the build navigates the window instead (the sign-in request's existing openAt), because AppRefresh reloads a resumed app and would drop a message-opened card. The spec gaps it flagged are settled in §9.5 / §13 as Q221–Q225 ⚑. MA8 reads sw.js through a SW_JS test binding (the pool has no fs).
+- **Caps:** Settings.tsx 177 → 180/207 (band 186.3, not entered); App.tsx 163 → 166/300; push.ts ~108/300; index.ts 95/300; new alert-history.ts, routes/my-alerts.ts and MyAlerts.tsx all well under 300. No reorganizer.
+
 ## 2026-10-11 — Steward pass 11, whole tree (code-steward)
 
 - **Run:** after the v1.47.0 release (SPEC 2.76 §7D.7, Alert when done, migration 0040, PR #42) and the reorganizer extract of src/shared/machine-hours.ts. Audited e9fdb33 against f241cc3.

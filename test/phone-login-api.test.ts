@@ -348,7 +348,7 @@ it('PL12: the login push — notice login, url to the approve page, its own titl
   const [req, ...others] = pushed.filter((x) => x.url === p.sub!.endpoint);
   expect(others).toEqual([]);
   const payload = JSON.parse(await decryptPush(p.sub!, req.body));
-  expect(payload).toEqual({ fireId: null, kind: null, tag: d.id, title: NOTICE_TITLE, body: message, actions: [], url: approveLoginUrl(r.id) });
+  expect(payload).toEqual({ fireId: null, kind: null, tag: d.id, title: NOTICE_TITLE, body: message, actions: [], url: approveLoginUrl(r.id), alertId: d.id });
   expect(payload.body).not.toContain(match);
   expect(payload.title).not.toContain(match);
 });
@@ -365,7 +365,7 @@ it('PL13: a password sign-in by a member with a phone → one "New sign-in on �
   expect(rows[0]).toMatchObject({ fire_id: null, channel: 'push', message: 'New sign-in on Firefox on Mac', title: NOTICE_TITLE, url: null, status: 'sent' });
   const [req] = pushed.filter((x) => x.url === p.sub!.endpoint);
   expect(JSON.parse(await decryptPush(p.sub!, req.body))).toEqual({
-    fireId: null, kind: null, tag: rows[0].id, title: NOTICE_TITLE, body: 'New sign-in on Firefox on Mac', actions: [], url: null,
+    fireId: null, kind: null, tag: rows[0].id, title: NOTICE_TITLE, body: 'New sign-in on Firefox on Mac', actions: [], url: null, alertId: rows[0].id,
   });
 
   expect((await new Client().post('/auth/login', { email: bare.email, password: PASSWORD })).status).toBe(200);

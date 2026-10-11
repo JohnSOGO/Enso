@@ -2,6 +2,7 @@
 // never caches or serves the app (§8.10 always-fresh). Plain static JS, served Cache-Control: no-cache.
 
 const LABEL = { done: 'Done', snooze: 'Snooze 10m', ack: 'Ack' }; // the Ringing bar's words (§8.2)
+const ALERTS_PATH = '/settings/alerts'; // §9.5 — the copy of src/shared/alert-history.ts ALERTS_PATH (MA8 pins it)
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
@@ -15,7 +16,8 @@ self.addEventListener('push', (event) => {
     body: p.body || 'Something needs you — open Ensō.',
     tag: p.tag || p.fireId || 'enso-test', // §9.1: fire → fireId, announcement → delivery id, test → enso-test
     icon: '/icon-192.png',
-    data: { fireId: p.fireId || null, url: typeof p.url === 'string' ? p.url : null }, // url: a sign-in request's approve page (§6.6)
+    // url: a sign-in request's approve page (§6.6); alertId: the delivery, whose card a tap opens (§9.5)
+    data: { fireId: p.fireId || null, url: typeof p.url === 'string' ? p.url : null, alertId: typeof p.alertId === 'string' ? p.alertId : null },
     actions,
     requireInteraction: true,
   }));
@@ -24,7 +26,10 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
-  event.waitUntil(event.action && data.fireId ? act(data.fireId, event.action) : data.url ? openAt(data.url) : openApp());
+  event.waitUntil(event.action && data.fireId ? act(data.fireId, event.action)
+    : data.url ? openAt(data.url)
+    : data.alertId ? openAt(`${ALERTS_PATH}?alert=${encodeURIComponent(data.alertId)}`)
+    : openApp());
 });
 
 async function act(fireId, action) {
@@ -49,7 +54,7 @@ async function act(fireId, action) {
   }
 }
 
-// §6.6 — a sign-in request opens its approve page: an open app window goes there, else a new one opens.
+// §6.6, §9.5 — a sign-in request's approve page, or an alert's card: an open app window goes there, else a new one opens.
 async function openAt(url) {
   const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
   if (open.length) {

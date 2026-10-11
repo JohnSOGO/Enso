@@ -48,7 +48,7 @@ it('D12 every fire kind and delivery is intact after 0008', async () => {
   // Every later migration is applied too: 0022 (§4.2u) adds deliveries.title, 0024 (§4.2w) speakers, 0025 (§4.2x) notice and url, and 0032 (§4.2ze) mess_id,
   // NULL on every older row.
   expect((await db.prepare('SELECT * FROM deliveries ORDER BY id').all()).results)
-    .toEqual(deliveriesBefore.map((d) => ({ ...d, title: null, speakers: null, notice: null, url: null, mess_id: null })));
+    .toEqual(deliveriesBefore.map((d) => ({ ...d, title: null, speakers: null, notice: null, url: null, mess_id: null, dismissed_at: null })));
   expect((await db.prepare('PRAGMA foreign_key_check').all()).results).toEqual([]);
 
   // The new kind: a thing fire is accepted, and a second open one for the same thing + date is refused.

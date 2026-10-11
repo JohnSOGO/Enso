@@ -13,6 +13,7 @@ import { ChoreAreas } from './components/ChoreAreas';
 import { HouseholdLists } from './components/HouseholdLists';
 import { Recipes } from './components/Recipes';
 import { Settings } from './components/Settings';
+import { useAlertLink } from './components/MyAlerts';
 import { RingingBar } from './components/RingingBar';
 import { MessBanner } from './components/MessBanner';
 import { SignIn } from './components/SignIn';
@@ -45,9 +46,10 @@ type Overlay =
   | { kind: 'explain'; title: string; text: string }
   | null;
 
-function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boolean }) {
+function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: () => void; justJoined: boolean; openAlert: string | null; onAlertOpened: () => void }) {
   const { me, status, today } = useApp();
   const [tab, setTab] = useState<Tab>(() => {
+    if (openAlert) return 'settings'; // §9.5 — a tapped notification opens its card in Settings → Alerts
     try { const t = localStorage.getItem('enso.tab') as Tab; return TABS.includes(t) ? t : 'calendar'; } catch { return 'calendar'; }
   });
   const [overlay, setOverlay] = useState<Overlay>(null);
@@ -83,7 +85,7 @@ function Shell({ onLogout, justJoined }: { onLogout: () => void; justJoined: boo
         {tab === 'chores' && <ChoresTab onEdit={(chore) => setOverlay({ kind: 'chore', chore })} onOpenAreas={(chore) => setOverlay({ kind: 'areas', chore })} />}
         {tab === 'lists' && <HouseholdLists pickRequest={listsTap} />}
         {tab === 'recipes' && <Recipes />}
-        {tab === 'settings' && <Settings onLogout={onLogout} />}
+        {tab === 'settings' && <Settings onLogout={onLogout} openAlert={openAlert} onAlertOpened={onAlertOpened} />}
       </main>
       {tab === 'calendar' && (
         <button className={s.fab} aria-label="Add event" title="Add event" onClick={() => setOverlay({ kind: 'event', date: today() })}>＋</button>
@@ -134,6 +136,8 @@ export function App() {
   const signedIn = (m: Me, how?: { joined: boolean }) => { setJustJoined(!!how?.joined); setMe(m); };
   // §6.6, §8.13 — a sign-in request's push opens /approve-login#{id}; signed out, the sign-in form shows first (⚑ Q134).
   const [approveId, setApproveId] = useState(keepApproveRequest);
+  // §9.5 — a tapped notification's /settings/alerts?alert={id}; kept across a sign-in first (⚑ Q225).
+  const [openAlert, onAlertOpened] = useAlertLink();
 
   // SPEC §8.10: the opening screen (index.html) covers loading; it leaves once we know who this is,
   // after at least 0.8 s from page start so it never flickers.
@@ -157,7 +161,7 @@ export function App() {
   if (approveId) return <ApproveLogin id={approveId} onDone={() => { forgetApproveRequest(); setApproveId(null); }} />;
   return (
     <AppProvider me={me} onMe={onMe}>
-      <Shell onLogout={() => { setJustJoined(false); setMe(null); }} justJoined={justJoined} />
+      <Shell onLogout={() => { setJustJoined(false); setMe(null); }} justJoined={justJoined} openAlert={openAlert} onAlertOpened={onAlertOpened} />
     </AppProvider>
   );
 }

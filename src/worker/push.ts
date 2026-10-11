@@ -3,13 +3,12 @@
 import type { Env } from './env';
 import { all } from './db';
 import { pushActions } from '../shared/engine';
-import { ANNOUNCE_TITLE } from '../shared/announce';
+import { PUSH_TITLE, pushTitle } from '../shared/alert-history';
 import type { Action, AlertKind } from '../shared/vocab';
 import { sendWebPush, type VapidKeys } from './web-push';
 
 export const NO_SUBSCRIPTION = 'no_subscription';
 export const PUSH_NOT_CONFIGURED = 'push_not_configured';
-export const PUSH_TITLE = 'Ensō';
 export const TEST_BODY = 'Ensō test — phone alerts work';
 export const TEST_TAG = 'enso-test';
 const DETAIL_MAX = 500;
@@ -18,9 +17,12 @@ const DETAIL_MAX = 500;
  * The notification the service worker shows (sw.js). A test push, an announcement (§9.3) and a ping (§9.4) have no
  * fire, no kind, no actions. `tag` is what the phone collapses by (never sent as a Topic — Apple refuses it): a fire's push →
  * its fireId; a delivery with no fire → its delivery id; the test push → TEST_TAG. `url` is where a tap goes: the
- * delivery's `deliveries.url` (only a sign-in request has one, §6.6), else null.
+ * delivery's `deliveries.url` (only a sign-in request has one, §6.6), else null. `alertId` is the delivery id, so a tap
+ * opens its card in Settings → Alerts (§9.5); null on the test push, which has no row.
  */
-export interface PushPayload { fireId: string | null; kind: AlertKind | null; tag: string; title: string; body: string; actions: Action[]; url: string | null }
+export interface PushPayload {
+  fireId: string | null; kind: AlertKind | null; tag: string; title: string; body: string; actions: Action[]; url: string | null; alertId: string | null;
+}
 
 interface Sub { id: string; endpoint: string; p256dh: string; auth: string }
 
@@ -79,9 +81,10 @@ export async function sendPushDeliveries(env: Env, deliveryIds: string[], now: s
       const subs = await subsOf(db, d.member_id);
       if (subs.length === 0) detail = NO_SUBSCRIPTION;
       else {
+        const title = pushTitle({ hasFire: d.fire_id !== null && d.kind !== null, title: d.title });
         const payload: PushPayload = d.fire_id === null || d.kind === null
-          ? { fireId: null, kind: null, tag: d.id, title: d.title ?? ANNOUNCE_TITLE, body: d.message, actions: [], url: d.url }
-          : { fireId: d.fire_id, kind: d.kind, tag: d.fire_id, title: PUSH_TITLE, body: d.message, actions: pushActions(d.kind), url: null };
+          ? { fireId: null, kind: null, tag: d.id, title, body: d.message, actions: [], url: d.url, alertId: d.id }
+          : { fireId: d.fire_id, kind: d.kind, tag: d.fire_id, title, body: d.message, actions: pushActions(d.kind), url: null, alertId: d.id };
         const r = await sendToAll(db, vapid, subs, payload, now);
         if (r.sent > 0) status = 'sent';
         detail = r.failures.length ? r.failures.join('; ').slice(0, DETAIL_MAX) : null;
@@ -99,6 +102,6 @@ export async function sendTestPush(env: Env, memberId: string, now: string):
   if (subs.length === 0) return { error: NO_SUBSCRIPTION, message: 'No phone is subscribed for you yet — turn phone alerts on first.' };
   const vapid = vapidOf(env);
   if (!vapid) return { error: PUSH_NOT_CONFIGURED, message: 'Phone alerts are not set up on this server (no push keys).' };
-  const r = await sendToAll(env.DB, vapid, subs, { fireId: null, kind: null, tag: TEST_TAG, title: PUSH_TITLE, body: TEST_BODY, actions: [], url: null }, now);
+  const r = await sendToAll(env.DB, vapid, subs, { fireId: null, kind: null, tag: TEST_TAG, title: PUSH_TITLE, body: TEST_BODY, actions: [], url: null, alertId: null }, now);
   return r.sent > 0 ? { sent: r.sent } : { error: 'push_failed', message: `The test push did not go through: ${r.failures.join('; ')}` };
 }
