@@ -16,15 +16,17 @@ import { MyAlerts } from './MyAlerts';
 import { SettingsHousehold } from './SettingsHousehold';
 import { SettingsMembers } from './SettingsMembers';
 import { SettingsStatus } from './SettingsStatus';
+import { SettingsAbout } from './SettingsAbout';
 
-type Area = 'me' | 'calendar' | 'phone' | 'speakers' | 'alerts' | 'household' | 'members' | 'status';
+type Area = 'me' | 'calendar' | 'phone' | 'speakers' | 'alerts' | 'household' | 'members' | 'status' | 'about';
 
-/** ⚑ Q226 — the buttons in order; `admin` ones show only to admins. */
+/** ⚑ Q226, Q246 — the buttons in order; `admin` ones show only to admins. */
 const AREAS: readonly { value: Area; emoji: string; label: string; admin?: true }[] = [
   { value: 'me', emoji: '🙂', label: 'Me' }, { value: 'calendar', emoji: '📅', label: 'Calendar items' },
   { value: 'phone', emoji: '📱', label: 'Phone alerts' }, { value: 'speakers', emoji: '🔊', label: 'Speakers' },
   { value: 'alerts', emoji: '🔔', label: 'Alerts' }, { value: 'household', emoji: '🏠', label: 'Household', admin: true },
   { value: 'members', emoji: '👥', label: 'Members', admin: true }, { value: 'status', emoji: '📊', label: 'Status' },
+  { value: 'about', emoji: 'ℹ️', label: 'About' },
 ];
 
 /** `openAlert`: a tapped notification's alert, whose card opens in Alerts (§9.5). */
@@ -45,6 +47,7 @@ export function Settings({ onLogout, openAlert, onAlertOpened }: { onLogout: () 
     household: () => <SettingsHousehold />,
     members: () => <SettingsMembers />,
     status: () => <SettingsStatus />,
+    about: () => <SettingsAbout />,
   };
 
   return (

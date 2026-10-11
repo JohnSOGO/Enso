@@ -1,0 +1,9 @@
+/* SPEC §8.6 About — the opening screen's look (§8.10, index.html #splash), as a panel inside the modal. */
+.about { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 24px 16px; border-radius: 12px;
+  background: #0F172A; color: #F8FAFC; text-align: center; }
+.about p { margin: 0; font-size: .9rem; color: #94A3B8; letter-spacing: .02em; }
+.logo { width: min(40vw, 160px); height: auto; margin-bottom: 8px; }
+.name { margin: 0; font-size: 2.4rem; font-weight: 300; letter-spacing: .04em; }
+.about .tagline { font-size: .95rem; color: #CBD5E1; font-weight: 300; margin-bottom: 6px; }
+.tagline span { display: inline-block; }
+.about .build { font-size: .75rem; color: #64748B; font-variant-numeric: tabular-nums; }
