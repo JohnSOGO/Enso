@@ -166,8 +166,11 @@ it('HS11 (§7D.3): a machine alert is spoken on every speaker HA lists but Every
   ]) });
   const ring = async () => {
     expect((await call(A, 'POST', '/machines/washer/done', { ownerId: aId })).status).toBe(200);
-    const now = new Date(Date.now() + 1000).toISOString();
-    expect((await call(A, 'POST', `/dev/tick?now=${encodeURIComponent(now)}`)).status).toBe(200);
+    // §9.2d: the machine's first alert is phone only; the house hears the second, 15 min on.
+    for (const ms of [1000, 16 * 60_000]) {
+      const now = new Date(Date.now() + ms).toISOString();
+      expect((await call(A, 'POST', `/dev/tick?now=${encodeURIComponent(now)}`)).status).toBe(200);
+    }
     const rows = await houseRows();
     expect(rows).toHaveLength(1);
     expect((await call(A, 'POST', '/machines/washer/clear')).status).toBe(200);

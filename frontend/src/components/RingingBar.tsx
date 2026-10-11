@@ -1,4 +1,4 @@
-// SPEC §8.2 — everything currently ringing, on every screen, with its one-tap actions.
+// SPEC §8.2 — everything currently ringing, on every screen, with its one-tap actions, and Away (§9.2c).
 import { useState } from 'react';
 import { errorText, post } from '../api';
 import { useApp, type Fire } from '../state';
@@ -56,8 +56,9 @@ export function RingingBar() {
           <span className={s.what}>
             {ICON[f.kind]} <b>{f.title}</b>
             {f.kind === 'chore' && f.stepTitle && <> — {f.stepTitle}</>}
-            <span className={s.sub}>{sub(f)}</span>
+            <span className={s.sub}>{sub(f)}{f.awayBy && ` · away (${person(f.awayBy)})`}</span>
           </span>
+          {!f.awayBy && <button disabled={busy === f.id} onClick={() => send(f, `/fires/${f.id}/away`, {})}>Away</button>}
           {(f.kind === 'reminder' || f.kind === 'thing') && <button disabled={busy === f.id} onClick={() => act(f, 'snooze')}>Snooze 10m</button>}
           {f.kind === 'machine' ? machineButton(f)
             : f.kind === 'timer'

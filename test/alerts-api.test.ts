@@ -69,7 +69,7 @@ describe('timer replayed through the database (T1–T10)', () => {
     // Deliveries: one push per member (visibly failed — no subscription in this test) + one house per alert
     // (visibly failed too — vitest.config.ts pins the House secrets empty, so House is not configured, §9.2).
     const d = await env.DB.prepare(`SELECT channel, status, detail FROM deliveries WHERE fire_id = ?`).bind(fire.id).all<any>();
-    expect(d.results.filter((x) => x.channel === 'house')).toHaveLength(4);
+    expect(d.results.filter((x) => x.channel === 'house')).toHaveLength(3); // §9.2d: alert 1 is phone only
     expect(d.results.filter((x) => x.channel === 'house').every((x) => x.status === 'failed' && x.detail === HOUSE_NOT_CONFIGURED)).toBe(true);
     expect(d.results.filter((x) => x.channel === 'push').every((x) => x.status === 'failed' && x.detail === 'no_subscription')).toBe(true);
 
