@@ -466,6 +466,10 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Done photo on a bounty** (v1.59.0, §7B.8, §8.15b, migration 0045, Q257–Q259; asked by MojoSOGO 2026-10-11 "allow child
+to snap a photo of completed work so adult can approve remotely"): Done on a one-off opens a sheet with an optional
+photo; a chore run's photo is added from Waiting for OK; admins see it there full size and OK or send back. Deleted on
+OK or drop. **Still owed:** BS2 with the camera on a real phone.
 **🎯 Pick mode like Ozymandias** (v1.58.0, §8.16, Q236–Q237 revised; MojoSOGO 2026-10-11: "look at ozymandias and do
 it like that"): modeled on the Ozymandias dashboard's `pick_mode.js`. The 🎯 became Ozy's small faint ◎ circle bottom left, amber
 while on ("I like the way ozymandias has the bottom left circle activator"). ◎ now turns pick mode on until a ◎ or the bar

@@ -1,10 +1,14 @@
 // SPEC §8.15b — Chores → 🪙 Bounties: Waiting for OK (admins: OK / Not yet / who), the one-offs with I'll do it /
-// Done / Let it go and an admin's ✕ Delete, ＋ Bounty (BountyForm), and Chore bounties (admins: None, 1–10, saved at
+// Done (BountyDone, with an optional photo) / Let it go and an admin's ✕ Delete, the done photo's thumbnail and 📷 on my
+// own pending row, ＋ Bounty (BountyForm), and Chore bounties (admins: None, 1–10, saved at
 // once). Which buttons show follows takeError / doneError, the server's own rules. useBounties is shared with Score.
 import { useEffect, useState } from 'react';
 import { BountyForm, POINT_CHOICES } from './BountyForm';
+import { BountyDone } from './BountyDone';
+import { Thumb } from './PhotoField';
+import { shrinkPicked, usePhotoPick } from './usePhotoPick';
 import type { Chore } from './Chores';
-import { del, errorText, get, post, put } from '../api';
+import { apiUrl, del, errorText, get, post, put, upload } from '../api';
 import { useApp } from '../state';
 import { isAdmin } from '../../../src/shared/roles';
 import { utcToLocal } from '../../../src/shared/time';
@@ -30,6 +34,14 @@ export function BountiesSection({ chores }: { chores: Chore[] | null }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [finishing, setFinishing] = useState<Bounty | null>(null);
+  const [photoFor, setPhotoFor] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0); // ⚑ Q259: a fresh ?v= after an upload
+  const photoPick = usePhotoPick(async ([f]) => {
+    const id = photoFor;
+    if (id) await act(id, async () => upload('PUT', `/earnings/${id}/photo`, await shrinkPicked(f)));
+    setNonce(Date.now());
+  });
   const [who, setWho] = useState<Record<string, string>>({});
   const admin = isAdmin(me);
   const name = (id: string | null) => (id === me.id ? 'You' : (id && memberById(id)?.displayName) || 'Someone');
@@ -55,7 +67,7 @@ export function BountiesSection({ chores }: { chores: Chore[] | null }) {
           {b.status === 'pending' && <span className="muted">Done by {name(b.doneBy)}, waiting for OK</span>}
         </div>
         {canTake && <button disabled={busy === b.id} onClick={() => act(b.id, () => post(`/bounties/${b.id}/take`))}>I'll do it</button>}
-        {canDone && <button className="primary" disabled={busy === b.id} onClick={() => act(b.id, () => post(`/bounties/${b.id}/done`))}>Done</button>}
+        {canDone && <button className="primary" disabled={busy === b.id} onClick={() => setFinishing(b)}>Done</button>}
         {b.status === 'taken' && b.takenBy === me.id && (
           <button disabled={busy === b.id} onClick={() => act(b.id, () => post(`/bounties/${b.id}/let-go`))}>Let it go</button>
         )}
@@ -71,9 +83,13 @@ export function BountiesSection({ chores }: { chores: Chore[] | null }) {
     const pick = who[e.id] ?? e.memberId;
     return (
       <li key={e.id} className={s.row}>
-        <div className={`${s.item} ${s.main}`}>
+        <div className={`${s.item} ${s.main}`} style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
           <span className={s.title}>{e.title}{e.kind === 'chore' && <span className="muted"> (chore)</span>} · {e.points} · {name(e.memberId)} · {when(e.doneAt)}</span>
+          {e.hasPhoto && <Thumb src={`${apiUrl(`/earnings/${e.id}/photo`)}?v=${nonce}`} alt={`The finished job: ${e.title}`} />}
         </div>
+        {e.memberId === me.id && (
+          <button disabled={busy === e.id} onClick={() => { setPhotoFor(e.id); photoPick.open(); }}>📷 {e.hasPhoto ? 'Replace photo' : 'Add photo'}</button>
+        )}
         {admin && <>
           <select aria-label={`Who did ${e.title}`} value={pick} onChange={(x) => setWho({ ...who, [e.id]: x.target.value })}>
             {[...active].sort((x, y) => Number(y.id === e.memberId) - Number(x.id === e.memberId))
@@ -124,7 +140,9 @@ export function BountiesSection({ chores }: { chores: Chore[] | null }) {
           </ul>
         </section>
       )}
+      {photoPick.input}
       {adding && <BountyForm onClose={() => setAdding(false)} />}
+      {finishing && <BountyDone bounty={finishing} onClose={() => setFinishing(null)} />}
     </>
   );
 }

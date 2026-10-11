@@ -21,17 +21,17 @@ export interface BountyRow {
 /** An `earnings` row (§4.2zq). */
 export interface EarningRow {
   id: string; bounty_id: string | null; chore_run_id: string | null; member_id: string; points: number;
-  done_at: string; ok_by: string | null; ok_at: string | null; dropped_at: string | null;
+  done_at: string; ok_by: string | null; ok_at: string | null; dropped_at: string | null; photo_key: string | null;
 }
 
 /** A one-off as the API sends it. */
 export interface Bounty {
   id: string; title: string; note: string | null; points: number; createdBy: string; createdAt: string;
-  status: BountyStatus; takenBy: string | null; doneBy: string | null;
+  status: BountyStatus; takenBy: string | null; doneBy: string | null; earningId: string | null;
 }
 
 /** A pending earning, for the Waiting for OK list. */
-export interface Earning { id: string; kind: 'chore' | 'bounty'; title: string; points: number; memberId: string; doneAt: string }
+export interface Earning { id: string; kind: 'chore' | 'bounty'; title: string; points: number; memberId: string; doneAt: string; hasPhoto: boolean }
 
 /** Points OK'd this week and this month. */
 export interface Score { memberId: string; week: number; month: number }

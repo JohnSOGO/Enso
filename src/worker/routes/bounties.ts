@@ -1,5 +1,5 @@
 // SPEC §7B.8 — bounties: one-offs (post, I'll do it, Let it go, Done, delete), a chore's bounty, an admin's OK / Not
-// yet on an earning, and everyone's score. The rules and words are src/shared/bounties.ts; an earning and its waiting
+// yet on an earning, its done photo (R2 `earnings/{id}/…`, private, deleted on OK / Not yet / delete), and everyone's score. The rules and words are src/shared/bounties.ts; an earning and its waiting
 // push are written through earnings.ts. Never decides a state itself.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
@@ -9,7 +9,8 @@ import {
 } from '../../shared/bounties';
 import { addMinutes, utcToLocal } from '../../shared/time';
 import { activeMemberIds, all, first, householdTz, newId, nowIso } from '../db';
-import { body, fail } from '../http';
+import { body, fail, photoBody } from '../http';
+import { replacePhoto, servePhoto } from '../photo-store';
 import { requireMember, requireOwner } from '../session';
 import { pushDelivery } from '../deliveries';
 import { sendPushDeliveries } from '../push';
@@ -26,7 +27,7 @@ function view({ b, earning }: Loaded, now: string): Bounty {
   const status = bountyStatus(b, earning, now);
   return {
     id: b.id, title: b.title, note: b.note, points: b.points, createdBy: b.created_by, createdAt: b.created_at, status,
-    takenBy: status === 'taken' ? b.taken_by : null, doneBy: earning?.member_id ?? null,
+    takenBy: status === 'taken' ? b.taken_by : null, doneBy: earning?.member_id ?? null, earningId: earning?.id ?? null,
   };
 }
 
@@ -58,14 +59,14 @@ bounties.get('/bounties', requireMember, async (c) => {
   const shown = rows.map((b) => view({ b, earning: byBounty.get(b.id) ?? null }, now)).filter((b) => b.status !== 'paid');
   const waiting = await all<Earning>(db,
     `SELECT e.id, CASE WHEN e.bounty_id IS NULL THEN 'chore' ELSE 'bounty' END AS kind, COALESCE(b.title, ch.title) AS title,
-            e.points, e.member_id AS memberId, e.done_at AS doneAt
+            e.points, e.member_id AS memberId, e.done_at AS doneAt, e.photo_key IS NOT NULL AS hasPhoto
        FROM earnings e LEFT JOIN bounties b ON b.id = e.bounty_id
        LEFT JOIN chore_runs r ON r.id = e.chore_run_id LEFT JOIN chores ch ON ch.id = r.chore_id
       WHERE e.ok_at IS NULL AND e.dropped_at IS NULL AND b.deleted_at IS NULL
       ORDER BY e.done_at, e.id`);
   const earned = await all<EarningRow>(db,
     'SELECT * FROM earnings WHERE ok_at IS NOT NULL AND dropped_at IS NULL AND done_at >= ?', scoreSince(today, tz));
-  return c.json({ bounties: shown, waiting, scores: scoresOf(earned, await activeMemberIds(db), today, tz) });
+  return c.json({ bounties: shown, waiting: waiting.map((e) => ({ ...e, hasPhoto: !!e.hasPhoto })), scores: scoresOf(earned, await activeMemberIds(db), today, tz) });
 });
 
 bounties.post('/bounties', requireMember, requireOwner, async (c) => {
@@ -132,8 +133,9 @@ bounties.delete('/bounties/:id', requireMember, requireOwner, async (c) => {
   const db = c.env.DB, now = nowIso();
   await db.batch([
     db.prepare('UPDATE bounties SET deleted_at = ? WHERE id = ?').bind(now, l.b.id),
-    db.prepare('UPDATE earnings SET dropped_at = ? WHERE bounty_id = ? AND dropped_at IS NULL').bind(now, l.b.id),
+    db.prepare('UPDATE earnings SET dropped_at = ?, photo_key = NULL WHERE bounty_id = ? AND dropped_at IS NULL').bind(now, l.b.id),
   ]);
+  await dropPhoto(c, l.earning);
   return c.body(null, 204);
 });
 
@@ -147,6 +149,9 @@ bounties.put('/chores/:id/bounty', requireMember, requireOwner, async (c) => {
   return c.json({ choreId: id, bounty: points });
 });
 
+/** Removes a decided earning's done photo from R2; the caller's UPDATE sets photo_key NULL (§7B.8). */
+const dropPhoto = async (c: Context<AppEnv>, e: EarningRow | null) => { if (e?.photo_key) await c.env.PHOTOS.delete(e.photo_key); };
+
 /** A live, pending earning, or the refusal to send. */
 async function pending(c: Context<AppEnv>): Promise<EarningRow | Response> {
   const e = await first<EarningRow>(c.env.DB, 'SELECT * FROM earnings WHERE id = ? AND dropped_at IS NULL', c.req.param('id'));
@@ -159,7 +164,9 @@ bounties.post('/earnings/:id/ok', requireMember, requireOwner, async (c) => {
   if (e instanceof Response) return e;
   const who = (await body(c)).memberId ?? e.member_id;
   if (typeof who !== 'string' || !(await activeMemberIds(c.env.DB)).includes(who)) return fail(c, 400, 'invalid_input', 'memberId must be an active member.');
-  await c.env.DB.prepare('UPDATE earnings SET member_id = ?, ok_by = ?, ok_at = ? WHERE id = ?').bind(who, c.get('member').id, nowIso(), e.id).run();
+  await c.env.DB.prepare('UPDATE earnings SET member_id = ?, ok_by = ?, ok_at = ?, photo_key = NULL WHERE id = ?')
+    .bind(who, c.get('member').id, nowIso(), e.id).run();
+  await dropPhoto(c, e);
   return c.body(null, 204);
 });
 
@@ -167,9 +174,26 @@ bounties.post('/earnings/:id/not-yet', requireMember, requireOwner, async (c) =>
   const e = await pending(c);
   if (e instanceof Response) return e;
   const db = c.env.DB, now = nowIso();
-  const stmts = [db.prepare('UPDATE earnings SET dropped_at = ? WHERE id = ?').bind(now, e.id)];
+  const stmts = [db.prepare('UPDATE earnings SET dropped_at = ?, photo_key = NULL WHERE id = ?').bind(now, e.id)];
   // ⚑ Q251: a one-off goes back to the one who said Done, as a fresh dib.
   if (e.bounty_id) stmts.push(db.prepare('UPDATE bounties SET taken_by = ?, taken_at = ? WHERE id = ?').bind(e.member_id, now, e.bounty_id));
   await db.batch(stmts);
+  await dropPhoto(c, e);
   return c.body(null, 204);
+});
+
+bounties.put('/earnings/:id/photo', requireMember, async (c) => {
+  const e = await pending(c);
+  if (e instanceof Response) return e;
+  if (e.member_id !== c.get('member').id) return fail(c, 403, 'forbidden', 'Only the one who did it can add the photo.');
+  const photo = await photoBody(c);
+  if (photo instanceof Response) return photo;
+  await replacePhoto(c.env.PHOTOS, 'earnings', e.id, photo.bytes, photo.type, e.photo_key,
+    (key) => c.env.DB.prepare('UPDATE earnings SET photo_key = ? WHERE id = ?').bind(key, e.id).run());
+  return c.body(null, 204);
+});
+
+bounties.get('/earnings/:id/photo', requireMember, async (c) => {
+  const e = await first<EarningRow>(c.env.DB, 'SELECT * FROM earnings WHERE id = ? AND dropped_at IS NULL', c.req.param('id'));
+  return servePhoto(c, c.env.PHOTOS, e?.photo_key, 'That photo no longer exists.');
 });

@@ -258,3 +258,6 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q254 | Bounty pushes (§7B.8) | ⚑ A new one-off pushes everyone but the poster once; a pending earning pushes every admin once; never spoken in the house; no repeats |
 | Q255 | Where bounties sit (§8.15) | ⚑ 🪙 Bounties and 🏅 Score join the Chores menu: Today · Bounties · Messes · All chores · Score |
 | Q256 | Who sets, approves and sees bounties (§7B.8) | **Decided by MojoSOGO 2026-10-11:** only admins set them (ADM); points count after an admin's OK (CNF, "child claims bounty and it goes pending; then gets adults approval via app"); everyone sees everyone's score, no ranks (PUB) |
+| Q257 | A bounty's done photo (§7B.8) | ⚑ Optional, one per pending earning (a second replaces it), added by the one who did it, for a one-off or a chore run; everyone can see it |
+| Q258 | How long a done photo is kept (§7B.8) | ⚑ Until the earning is OK'd or dropped (Not yet, Undo, bounty deleted); then deleted from R2 |
+| Q259 | A replaced done photo and the browser cache (§8.15b) | ⚑ The app adds its own `?v=` to the photo's address after an upload; nothing on the wire changes |
