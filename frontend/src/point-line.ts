@@ -1,5 +1,6 @@
 // SPEC §8.16 ⚑ Q237 — naming what was tapped: describeTap walks the DOM from the tapped element to the pieces,
-// pointLine joins them into the one line MojoSOGO pastes into a thread. No React, no state, no server.
+// selectorFor gives it a CSS selector, pickText joins them into the lines MojoSOGO pastes into a thread (shaped like
+// Ozymandias's "PDASH pick"). No React, no state, no server.
 
 export interface PointPieces {
   /** The open tab as on the tab bar, e.g. "⚙ Settings". */
@@ -11,9 +12,8 @@ export interface PointPieces {
   /** The thing's own name; '' when it has none. */
   name: string;
   kind: 'button' | 'checkbox' | 'field' | 'select' | 'link' | 'picture' | 'text';
-  /** The build stamp (§8.1) and the screen size, e.g. "430×932". */
-  stamp: string;
-  size: string;
+  /** The thing's CSS selector (selectorFor). */
+  selector: string;
 }
 
 export const GROUP_CHARS = 30;
@@ -24,12 +24,46 @@ const cut = (text: string, max: number) => {
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
 };
 
-/** The pasteable line: tab › modals › groups › "name" kind · stamp · size, empty pieces left out. */
-export function pointLine(p: PointPieces): string {
+/** Under this window width the Screen line says "(phone)". */
+export const PHONE_WIDTH = 700;
+
+/** The pasteable text, a line per piece; Where is left out when empty, as is an empty stamp. */
+export function pickText(p: PointPieces, stamp: string, width: number, height: number): string {
   const name = cut(p.name, NAME_CHARS);
-  const path = [cut(p.tab, NAME_CHARS), ...p.modals.map((m) => cut(m, NAME_CHARS)), ...p.groups.map((g) => cut(g, GROUP_CHARS)),
-    name ? `"${name}" ${p.kind}` : p.kind].filter(Boolean);
-  return [`📍 ${path.join(' › ')}`, p.stamp, p.size].filter(Boolean).join(' · ');
+  const where = [...p.modals.map((m) => cut(m, NAME_CHARS)), ...p.groups.map((g) => cut(g, GROUP_CHARS))].filter(Boolean);
+  return [
+    `Enso pick: ${cut(p.tab, NAME_CHARS)}`,
+    where.length ? `Where: ${where.join(' > ')}` : '',
+    `Element: ${name ? `${p.kind} "${name}"` : p.kind}`,
+    `Selector: ${p.selector}`,
+    `Screen: ${width}x${height}${width < PHONE_WIDTH ? ' (phone)' : ''}`,
+    stamp,
+  ].filter(Boolean).join('\n');
+}
+
+/** The part of an element selectorFor reads, so it can be tested without a browser. */
+export interface SelectorNode {
+  tagName: string;
+  id: string;
+  classList: Iterable<string>;
+  parentElement: SelectorNode | null;
+  children: ArrayLike<SelectorNode>;
+}
+
+const escapeCss = (v: string) => (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(v) : v.replace(/[^\w-]/g, (c) => `\\${c}`));
+
+/** Outward from the thing to the nearest id: tag, its first two classes (not the pick outline's), :nth-of-type(n) when a sibling shares the tag. */
+export function selectorFor(el: SelectorNode): string {
+  const parts: string[] = [];
+  for (let node: SelectorNode | null = el; node && node.tagName !== 'HTML'; node = node.parentElement) {
+    if (node.id && !/^\d/.test(node.id)) { parts.unshift(`#${escapeCss(node.id)}`); break; }
+    let part = node.tagName.toLowerCase() + [...node.classList].filter((c) => !c.startsWith('enso-pick')).slice(0, 2).map((c) => `.${escapeCss(c)}`).join('');
+    const same = node.parentElement ? Array.from(node.parentElement.children).filter((c) => c.tagName === node!.tagName) : [];
+    if (same.length > 1) part += `:nth-of-type(${same.indexOf(node) + 1})`;
+    parts.unshift(part);
+    if (node.tagName === 'BODY') break;
+  }
+  return parts.join(' > ');
 }
 
 const ACTIONABLE = 'button, a, input, select, textarea, label, img, [role=button], [role=checkbox], [role=switch], [aria-label]';
@@ -72,11 +106,15 @@ function nameOf(el: Element): string {
 const rowWords = (row: Element, thing: Element) =>
   [...row.childNodes].filter((n) => !n.contains(thing)).map((n) => (n instanceof Element ? ownText(n) : n.textContent ?? '')).join(' ');
 
-/** The tapped element → the pieces. `tab`, `stamp` and `size` come from the caller. */
-export function describeTap(target: Element, tab: string, stamp: string, size: string): PointPieces {
-  let thing = target.closest(ACTIONABLE) ?? target;
-  // A label stands for the control it holds.
-  if (thing.tagName === 'LABEL') thing = thing.querySelector('input, select, textarea') ?? thing;
+/** The thing a tap names: the nearest actionable element around it; a label stands for the control it holds. */
+export function pickedThing(target: Element): Element {
+  const thing = target.closest(ACTIONABLE) ?? target;
+  return thing.tagName === 'LABEL' ? thing.querySelector('input, select, textarea') ?? thing : thing;
+}
+
+/** The tapped element → the pieces. `tab` comes from the caller. */
+export function describeTap(target: Element, tab: string): PointPieces {
+  const thing = pickedThing(target);
   const holder = thing.closest('dialog');
   const open = [...thing.ownerDocument.querySelectorAll('dialog[open]')];
   const modals = holder ? open.slice(0, open.indexOf(holder) + 1).map((d) => d.getAttribute('aria-label') ?? '') : [];
@@ -86,5 +124,5 @@ export function describeTap(target: Element, tab: string, stamp: string, size: s
     const named = el.getAttribute('aria-label') ?? (legend ? ownText(legend) : el.tagName === 'LI' ? rowWords(el, thing) : '');
     if (named.trim()) groups.unshift(named);
   }
-  return { tab, modals, groups, name: nameOf(thing), kind: kindOf(thing), stamp, size };
+  return { tab, modals, groups, name: nameOf(thing), kind: kindOf(thing), selector: selectorFor(thing) };
 }
