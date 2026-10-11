@@ -16,7 +16,7 @@
 .fab {
   position: fixed;
   right: 16px;
-  bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom));
+  bottom: calc(var(--tabbar-h) + 16px + max(calc(env(safe-area-inset-bottom) - 12px), 14px));
   width: 56px; height: 56px; border-radius: 99px;
   background: var(--accent); border: 0; color: #fff; font-size: 1.6rem;
   box-shadow: 0 6px 18px rgba(0, 0, 0, .45);
@@ -28,13 +28,13 @@
   display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
   border-top: 1px solid var(--border);
   background: var(--surface);
-  /* §8.1, ⚑ Q208: at least 14 px so the build stamp shows where there is no bottom inset. */
-  padding-bottom: max(env(safe-area-inset-bottom), 14px);
+  /* §8.1, ⚑ Q208: 12 px into the home-indicator area; at least 14 px so the stamp shows where there is no inset. */
+  padding-bottom: max(calc(env(safe-area-inset-bottom) - 12px), 14px);
   position: relative;
 }
-/* The build stamp, in the bottom strip under the tabs; out of the grid so it is not a seventh column. */
+/* The build stamp, centered just under the tab buttons (above the home indicator); out of the grid so it is not a seventh column. */
 .build {
-  position: absolute; left: 8px; bottom: 1px; pointer-events: none;
+  position: absolute; left: 0; right: 0; top: var(--tabbar-h); text-align: center; pointer-events: none;
   font-size: .6rem; line-height: 12px; color: var(--text-dim); opacity: .7; font-variant-numeric: tabular-nums;
 }
 .tabs button {

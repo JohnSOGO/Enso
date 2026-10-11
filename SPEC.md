@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.06 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 3.07 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3544,9 +3544,12 @@ only the grey backdrop):
   installed app (`display-mode: standalone`) the page (`html`) and the frame are `100lvh` tall:
   there WebKit's `100%`, `dvh` and `bottom: 0` fall short by the top safe-area inset, and the
   page cut the bar off at that line (v1.60.2–v1.60.4, MojoSOGO 2026-10-11, iOS 26).
+  The tab buttons sit 12 px into the home-indicator area (strip = inset − 12 px, at least 14 px;
+  MojoSOGO 2026-10-11 "lower more", v1.60.5).
 - **Build stamp under the tabs** (asked by MojoSOGO 2026-10-10, v1.44.0): the same `v{version} ·
-  {commit}` as the opening screen (§8.10) shows all the time as tiny dim text at the left of the
-  bar's bottom strip (the home-indicator area), below the tab buttons and never over them; it is
+  {commit}` as the opening screen (§8.10) shows all the time as tiny dim text centered in the
+  bar's bottom strip, just under the tab buttons and above the home indicator, never over them (centered
+  since v1.60.5, MojoSOGO 2026-10-11 "center version"); it is
   not tappable. Where the screen has no bottom inset (desktop, Android, older iPhones) the strip is
   at least 14 px tall so the stamp still shows ⚑ Q208. It is the same build-time value as the
   opening screen's (one `buildStamp()` feeds both), so it always names the build that is running.
