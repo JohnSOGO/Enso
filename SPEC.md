@@ -2444,6 +2444,10 @@ it** less than `TAKE_HOURS` ago) · `open`. A deleted bounty is gone from every 
 - `scoresOf(earnings, activeIds, today, tz)` → `Score[]` (`{ memberId, week, month }`) for every active member, zeros
   included: the sum of the points of OK'd, live earnings whose `done_at` falls (household time) in this week
   (Sunday-start, as turns, §7B.1) and in this calendar month ⚑ Q250. Never negative, never ranked.
+- `runEarningChange(before, after)` → `'earn'` when a run's `done_at` goes from null to set, `'drop'` when it goes
+  from set to null, else null. `okAtOnce(finisher, now)` → `{ ok_by, ok_at }` when the finisher is an admin, else
+  null (Q249). `scoreSince(today, tz)` → the UTC start of the earlier of this week's Sunday and the 1st of the month,
+  so the route reads every earning a score can need and decides no window itself.
 - Push texts: `newBountyMessage(title, points)` → `"{title} · {points} points. Open Ensō → Chores → Bounties."`, title
   `NEW_BOUNTY_TITLE` "🪙 New bounty"; `waitingMessage(name, title, points)` → `"{name} says done: {title} · {points}
   points. OK it in Chores → Bounties."`, title `WAITING_TITLE` "🪙 Waiting for OK".
@@ -5070,7 +5074,8 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
   its kind (`reminder` → "Reminder", or "Alarm" when the event `is_alarm` ⚑ Q222; `timer` → "Rolling timer";
   `chore` → "Chore"; `thing` → "Thing to do"; `machine` → "Machine"); a `notice` → "Sign-in"; a `mess_id` →
   "Whose mess?"; a `title` → that title (a ping: "🏛️ Ozymandias", "🤖 Claude"); else "Announcement" (a timer
-  start announcement too ⚑ Q223). The ping branch matches `opsPingsSince` (§9.4).
+  start announcement too ⚑ Q223). The ping branch matches `opsPingsSince` (§9.4), except that a bounty push (§7B.8)
+  also takes the title branch ("🪙 New bounty", "🪙 Waiting for OK") but is not a founder ping.
 - `ALERTS_PATH = "/settings/alerts"`; a tap opens `/settings/alerts?alert={id}`, built in sw.js. `alertIdFrom(pathname,
   search)` → the id when the path is `ALERTS_PATH` and `alert` is set, else null. sw.js carries its own copy of
   the path (a test pins it).
