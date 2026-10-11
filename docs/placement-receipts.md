@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Steward pass, whole tree (code-steward)
+
+- **Run:** after the v1.45.0 (SPEC 2.74 §9.2b, Quiet the house, migration 0038, PR #39) and v1.46.0 (SPEC 2.75 §9.2c–9.2d, I'm away on one alert and phone first, migration 0039, PR #40) releases; audited 57b4dba against dd9f2d5.
+- **Verdict:** SOUND. Typecheck green, 750/750 tests (95 files), arch:audit quiet (nearest: EventForm.tsx, Calendar.tsx, routes/recipes.ts at 87%; tick.ts 117/148).
+- **Placement audit:** 3 receipts reconciled against 2 code commits (3de38f8, 57b4dba). Each landed as its verdict said; 0 code commits without a receipt.
+- **Top finding:** the house-row check is now written out by hand in three writers (tick step 2, timer-starts.ts, POST /announce), and tick.ts:91 carries four conditions on the highest-churn file. Standing extract-first note: the next change to whether a house row is written first adds one helper beside deliverySpeakers that all three writers call.
+- **Handoffs:** 1 standing note to placement-advisor (the house-row helper, reorganizer if extract-first); 3 to worker (speaker-choices.ts map row "two writers" → three and the where-things-stand date — done with this receipt; a snooze-keeps-away test; migration tests comparing only `before` keys, with the next fires/deliveries migration). 0 to reorganizer now.
+- **Restraint:** phone-first.ts (9 lines, one caller) and worker/house-quiet.ts (15 lines, four callers) kept as their own rows, not classitis; no merge with machineQuietUntil (delay vs skip); fireViews' SQL fragment and the one-tick Away race accepted; no early tick.ts split; earlier standing notes (machine-hours, DayCell, WhenFields, alertMessage options) carried, not re-raised.
+
 ## 2026-10-11 — Phone first, then the house (placement-advisor)
 
 - **Ask:** SPEC §9.2d (PF1–PF3; ⚑ Q215–Q216). Every fire kind with both Phone and House ticked that will alert again sends alert 1 to phones only; the speakers join from alert 2. House-only alerts and fires that won't alert again are spoken from the first. Fire-less house rows (§5.5a, §9.3) are unchanged.
