@@ -11,9 +11,9 @@ import { BOUNTY_NOTE_MAX, BOUNTY_TITLE_MAX, POINTS_MAX, POINTS_MIN, type Bounty 
 
 export const POINT_CHOICES = Array.from({ length: POINTS_MAX - POINTS_MIN + 1 }, (_, i) => POINTS_MIN + i);
 
-export function BountyForm({ onClose }: { onClose: () => void }) {
+export function BountyForm({ onClose, initialTitle = '' }: { onClose: () => void; initialTitle?: string }) {
   const { refresh } = useApp();
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initialTitle); // §7D.9: a done load's card prefills it
   const [points, setPoints] = useState(POINTS_MIN);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -48,7 +48,7 @@ export function BountyForm({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="＋ Bounty" onClose={onClose} dirty={!!title || !!note || !!photo} error={error}
+    <Modal title="＋ Bounty" onClose={onClose} dirty={title !== initialTitle || !!note || !!photo} error={error}
       footer={<>
         <button className="primary" disabled={!title.trim() || busy} onClick={send}>{busy ? 'Posting…' : 'Post'}</button>
         <button onClick={onClose}>Cancel</button>

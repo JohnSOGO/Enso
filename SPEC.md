@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.10 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 3.11 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2962,6 +2962,21 @@ each time something goes in, as many as they like at once, and it stays on the l
 | CK10 | two Stop taps at the same moment on a running timer | one 200, one 409 with a message; its fire closed `removed` once |
 | CK-M | migration check (§4.2zp) | the three machines and their open fires unchanged; a cooking row and its fire can be written |
 
+### 7D.9 A bounty from a done load — asked by MojoSOGO 2026-10-11
+
+"When a washing machine timer is done, have option to create bounty … basically someone else can advance the loop."
+A done load can be handed to anyone through a one-off bounty (§7B.8). Nothing new is stored: it is an ordinary
+one-off, posted by an admin (ADM) through `POST /bounties`, not tied to the machine ⚑ Q263. Moving or finishing the
+load does not pay it; whoever did the job says **Done** in Chores → Bounties, as for any one-off.
+
+- `loadBountyTitle(id, ownerName)` (pure, `machines.ts`) → the sheet's starting title, cut to `BOUNTY_TITLE_MAX`:
+  clothes washer "Move Sam's load to the clothes dryer", clothes dryer "Take Sam's load out of the clothes dryer and
+  fold it", dish washer "Empty the dish washer"; with no owner, "the load" in place of "Sam's load".
+
+| # | Given | Expect |
+|---|---|---|
+| LB1 | `loadBountyTitle` for washer / dryer with Sam, washer with null, dish washer, a 60-letter name | the texts above; "Move the load to the clothes dryer"; "Empty the dish washer"; at most 60 characters |
+
 ---
 
 ## 7E. Recipes — `src/shared/recipes.ts` (pure)
@@ -3753,7 +3768,7 @@ Start a machine. When it's done, every phone hears; the speakers too when someon
 |---|---|---|---|
 | free | **[Start]** [Done now] | **[Start]** [Done now] | **[Start]** [Done now] |
 | running | [Done now] [Clear] | [Done now] [Clear] | [Done now] [Clear] |
-| done | **[Move to clothes dryer]** [Still loaded] [Clear] | **[Fold & out]** [Still loaded] [Clear] | **[Emptied]** [Still loaded] [Clear] |
+| done | **[Move to clothes dryer]** [Still loaded] [🪙 Bounty] [Clear] | **[Fold & out]** [Still loaded] [🪙 Bounty] [Clear] | **[Emptied]** [Still loaded] [🪙 Bounty] [Clear] |
 
 - **Alert hours** (§7D.5): one line under the intro. The Edit hours box says "Machine alerts outside these hours
   wait until they open." **Edit hours** (admins only) opens
@@ -3765,6 +3780,9 @@ Start a machine. When it's done, every phone hears; the speakers too when someon
   running machine it is one tap. Either way the done alerts start at once.
 - **Still loaded** (⚑ Q159) restarts the reminders (§7D.2) with one tap, no confirm; the action
   line wraps at 320 px.
+- **🪙 Bounty** (§7D.9, admins only ⚑ Q263) on a done card opens the ＋ Bounty sheet (§8.15b) with the title
+  prefilled by `loadBountyTitle`; everything else is the sheet as usual (points 1, note, picture, Post / Cancel).
+  Cancel asks to discard only when something was changed from the prefilled sheet.
 
 - **The chooser** (a modal, exported from `Machines.tsx` and reused by the Ringing bar): for
   **Start**, titled "Start the washer" — *Whose load?* one member chip per active member, **me**

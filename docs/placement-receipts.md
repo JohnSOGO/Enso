@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.62.0: 🪙 Bounty from a done load (placement-advisor)
+
+- **Ask:** SPEC 3.11 §7D.9 and §8.5 🪙 Bounty (⚑ Q263). On a done machine card, admins get [🪙 Bounty], which opens the ＋ Bounty sheet with the title from a pure `loadBountyTitle(id, ownerName)` in machines.ts, cut to BOUNTY_TITLE_MAX. Test LB1. It posts an ordinary one-off bounty: no server change, no migration.
+- **Verdict:** `src/shared/machines.ts` (loadBountyTitle) + `frontend/src/components/BountyForm.tsx` (optional `initialTitle`) + `frontend/src/components/Machines.tsx` (MachinesSection button) [EXISTING]
+- **Flow stage:** rules (the title); render (the sheet's starting value and the card's button)
+- **Why:** The wording is a machine rule beside doneMessage, so the PWA asks shared code for it. The sheet and the card each gain one small input. machines.ts imports BOUNTY_TITLE_MAX from bounties.ts (shared-to-shared, no cycle) instead of a second copy of 60. Rejected: bounties.ts (would need machine labels), a new load-bounty.ts (one function), building the title in Machines.tsx (a rule in render), any route or column. Open item it raised (prefilled sheet dirty on open) settled in SPEC §8.5: dirty only when changed from the prefill.
+- **Caps:** machines.ts 228 → ~238/300; Machines.tsx 173 → ~182/300; BountyForm.tsx 73 → ~74/300. No file newly in the band.
+- **Sources read:** scripts/arch.ts; docs/module-ownership.md; docs/placement-receipts.md; SPEC §7D.9, §8.5; src/shared/machines.ts; src/shared/bounties.ts; Machines.tsx; BountyForm.tsx; test/machines.test.ts.
+
 ## 2026-10-11 — v1.61.0: Announce box opens with every channel ticked (placement-advisor)
 
 - **Ask:** Q36 was changed by MojoSOGO on 2026-10-11 to "ALL for announcement". The 📢 Announce box now opens with Phone + House + FunHouse ticked for every member. Before, it opened with House only, plus FunHouse for the founder (SPEC §8.5 / §9.3 / §9.4b). The server is unchanged.

@@ -1,8 +1,9 @@
 // SPEC §7D — the laundry loop and the dish washer: a machine's state, its transitions, the done message, input rules.
-// Pure: `now` is always a parameter. Imports engine + vocab + time; the engine never imports this. Alert hours: machine-hours.ts.
+// Pure: `now` is always a parameter. Imports engine + vocab + time + bounties (BOUNTY_TITLE_MAX); the engine never imports this. Alert hours: machine-hours.ts.
 import { closeFire, newMachineFire, type AlertConfig, type FireRow, type NewFire } from './engine';
 import { MACHINE, isOneOf, type Channel, type MachineId, type MachineState } from './vocab';
 import { addMinutes, ms } from './time';
+import { BOUNTY_TITLE_MAX } from './bounties';
 
 export const MACHINE_RENOTIFY_MIN = 15;
 export const MACHINE_MAX_ALERTS = 4;
@@ -180,6 +181,15 @@ export function doneMessage(id: MachineId, ownerName: string | null | undefined,
     : `${ownerName ? `${ownerName}, your laundry is` : 'The laundry is'} still in the ${lower(id)} — ${next ? `move it to the ${lower(next)}` : 'take it out'}`;
   if (waiting === undefined) return base;
   return `${base} — ${waiting ? `${waiting}'s load` : 'another load'} is waiting`;
+}
+
+/** §7D.9 — the ＋ Bounty sheet's starting title for a done load; `ownerName` null → "the load". Cut to the bounty title cap. */
+export function loadBountyTitle(id: MachineId, ownerName: string | null): string {
+  const load = ownerName ? `${ownerName}'s load` : 'the load';
+  const next = nextMachine(id);
+  const text = !isLaundry(id) ? `Empty the ${lower(id)}`
+    : next ? `Move ${load} to the ${lower(next)}` : `Take ${load} out of the ${lower(id)} and fold it`;
+  return text.slice(0, BOUNTY_TITLE_MAX);
 }
 
 /** The done load waiting in the machine before this one, if any (derived at alert time). */

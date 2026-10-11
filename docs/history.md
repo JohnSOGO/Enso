@@ -470,6 +470,12 @@ captions (5 ingredients, 6 steps — it had been "watch it").
 to snap a photo of completed work so adult can approve remotely"): Done on a one-off opens a sheet with an optional
 photo; a chore run's photo is added from Waiting for OK; admins see it there full size and OK or send back. Deleted on
 OK or drop. **Still owed:** BS2 with the camera on a real phone.
+**🪙 Bounty from a done load** (v1.62.0, §7D.9, §8.5, Q263; MojoSOGO 2026-10-11 "When a washing machine timer is
+done, have option to create bounty … basically someone else can advance the loop", then "Clothes Washer/ dryer and
+dishwasher"): a done card (all three machines) shows 🪙 Bounty to admins, opening the ＋ Bounty sheet with
+`loadBountyTitle` prefilled. A plain one-off, not tied to the machine; no server change, no migration. LB1 green.
+Built as: the prefilled sheet asks to discard on Cancel only when something changed.
+
 **📢 Announce goes everywhere by default** (v1.61.0, §8.5, Q36; MojoSOGO 2026-10-11 "ALL for announcement", after
 Toasty's announcement reached only the speakers): the Announce box opens with 📱 Phone, 🔊 House and 🎪 FunHouse all
 ticked, for every member (was House only, plus FunHouse for the founder). The server is unchanged; the sender still gets

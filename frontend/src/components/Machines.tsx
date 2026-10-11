@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { MachineHoursLine } from './MachineHours';
+import { BountyForm } from './BountyForm';
 import { errorText, get, post } from '../api';
 import { useApp } from '../state';
-import { MACHINE_LABEL, finishLabel, isLaundry, machineMinutes, nextMachine } from '../../../src/shared/machines';
+import { MACHINE_LABEL, finishLabel, isLaundry, loadBountyTitle, machineMinutes, nextMachine } from '../../../src/shared/machines';
+import { isAdmin } from '../../../src/shared/roles';
 import type { MachineId, MachineState } from '../../../src/shared/vocab';
 import s from './Lists.module.css';
 
@@ -104,10 +106,11 @@ export function MachineChooser({ from, mode, ownerId, onClose }: {
 
 /** The 🧺 Washing machines section of the Alarms tab (SPEC §8.5): one card per machine, in `MACHINE` order. */
 export function MachinesSection() {
-  const { version, localTime, memberById, refresh } = useApp();
+  const { me, version, localTime, memberById, refresh } = useApp();
   const [machines, setMachines] = useState<Machine[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [chooser, setChooser] = useState<{ from: MachineId; mode: 'start' | 'move' | 'done'; ownerId: string | null } | null>(null);
+  const [bountyTitle, setBountyTitle] = useState<string | null>(null); // §7D.9: the ＋ Bounty sheet, open from a done card
 
   useEffect(() => {
     get<Machine[]>('/machines').then((m) => { setMachines(m); setError(null); }).catch((e) => setError(errorText(e)));
@@ -161,6 +164,10 @@ export function MachinesSection() {
                 {m.state === 'done' && (
                   <button onClick={() => act(m, 'remind')} aria-label={`Still loaded: remind about the ${lower(m.id)} again`}>Still loaded</button>
                 )}
+                {m.state === 'done' && isAdmin(me) && (
+                  <button onClick={() => setBountyTitle(loadBountyTitle(m.id, m.ownerId ? memberById(m.ownerId)?.displayName ?? null : null))}
+                    aria-label={`Bounty: someone else deals with the ${lower(m.id)}`}>🪙 Bounty</button>
+                )}
                 {m.state !== 'free' && <button onClick={() => act(m, 'clear')} aria-label={`Clear the ${lower(m.id)}`}>Clear</button>}
               </div>
             </li>
@@ -168,6 +175,7 @@ export function MachinesSection() {
         </ul>
       )}
       {chooser && <MachineChooser {...chooser} onClose={() => setChooser(null)} />}
+      {bountyTitle !== null && <BountyForm initialTitle={bountyTitle} onClose={() => setBountyTitle(null)} />}
     </section>
   );
 }
