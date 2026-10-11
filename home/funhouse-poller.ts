@@ -20,9 +20,10 @@ export function forFunhouse(p: Pick<Ping, 'channel' | 'title'>): boolean {
   return p.channel === 'funhouse' || p.title.startsWith('🤖') || p.title.startsWith('🧵');
 }
 
-/** ⚑ Q229 / Q233 — the bridge body for one ping or FunHouse alert. */
+/** ⚑ Q229 / Q233 — the bridge body for one ping or FunHouse alert; a 🧵 thread ping's text already names project and thread. */
 export function funhouseNotice(p: Ping) {
-  return { source: p.channel === 'funhouse' ? 'Ensō' : 'Claude', level: 'attention', text: `${p.title}: ${p.text}`.slice(0, 500), sig: '⭕🔁🏠', beep: 'look', id: p.id };
+  const text = p.channel === 'push' && p.title.startsWith('🧵') ? p.text : `${p.title}: ${p.text}`;
+  return { source: p.channel === 'funhouse' ? 'Ensō' : 'Claude', level: 'attention', text: text.slice(0, 500), sig: '⭕🔁🏠', beep: 'look', id: p.id };
 }
 
 export interface PollDeps { fetch: typeof fetch; token: string; log: (line: string) => void }

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.97 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.98 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5003,6 +5003,9 @@ also carries the FunHouse alerts, each ping with its `channel` (§9.4b).
   reaches the FunHouse itself) are skipped and counted as handled.
 - **At most one notice a poll** (the bridge allows one per 10 s). It POSTs raw UTF-8 JSON
   `{ source: "Claude", level: "attention", text: "<title>: <text>", sig: "⭕🔁🏠", beep: "look", id: <ping id> }` ⚑ Q229.
+  A 🧵 thread ping sends its text alone (`text: "<text>"`): the FunHouse display is small, and a thread writes its
+  text as `Enso:<thread title> "<ACTION what>"` (MojoSOGO 2026-10-11: "the prefix has too many words"). The phone
+  shows the same text under its title.
   200 or any 4xx (refused; never retried) → handled; 503, a network error or a non-200 from Ensō → not handled, tried
   again next poll. One log line per notice: the id and the bridge's answer.
 
@@ -5013,7 +5016,7 @@ also carries the FunHouse alerts, each ping with its `channel` (§9.4b).
 | FP1 | `GET /ops/pings` with no token set; a wrong token | 503 `ops_notify_off`; 401 `unauthorized` |
 | FP2 | two pings, an announcement, a sign-in notice, a ping older than an hour | only the two pings, oldest first, `{ id, title, text, at }` (mess asks and a fire's pushes are left out by the same predicate §9.4's count uses) |
 | FP3 | `after` = the first ping's `at`; `after=nonsense` | only the second; both |
-| FP4 | `funhouseNotice` / `forFunhouse` | the body above; 🤖 and 🧵 titles → true, "🏛️ Ozymandias" → false |
+| FP4 | `funhouseNotice` / `forFunhouse` | the body above (a 🤖 ping → "title: text", a 🧵 ping → its text alone); 🤖 and 🧵 titles → true, "🏛️ Ozymandias" → false |
 | FP5 | one poll with a fake Ensō and bridge: a 🏛️ ping then two 🧵 pings | one bridge POST (the first 🧵), `after` = its `at`; next poll sends the second |
 | FP6 | the bridge answers 503; then 400 | `after` unchanged, sent again next poll; then handled, not retried |
 | FP7 | `startAfter(saved, now)`: saved 30 s ago (with a newline); none; nonsense; an hour old; in the future | the saved instant; 10 min back for the other four |
