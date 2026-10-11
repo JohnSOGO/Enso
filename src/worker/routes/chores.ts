@@ -1,8 +1,9 @@
-// SPEC §7B, §10 — chores: CRUD, today's runs, step done/undo, and edit re-plan persistence.
+// SPEC §7B, §10 — chores: CRUD, today's runs, step done/undo, and edit re-plan persistence; `bounty` on each chore and
+// run, and a run change's earning written or dropped in the same batch through earnings.ts (§7B.8).
 // Every rule (turns, planning, advance/undo, re-plan, validation) is src/shared/chores.ts;
 // this route loads rows, calls it, and writes each result in ONE db.batch.
 import { Hono, type Context } from 'hono';
-import type { AppEnv } from '../env';
+import type { AppEnv, Env } from '../env';
 import {
   advanceRun, assigneeFor, choreFromRow, parseChoreInput, replanRun, showsOnToday, stepPerson, undoRun,
   type Chore, type ChoreInput, type ChoreRow, type ChoreRun, type RunChange,
@@ -15,6 +16,10 @@ import { requireMember } from '../session';
 import { canChange } from '../../shared/roles';
 import { choreRunInserts, insertFire, loadChoreRun, updateChoreRun, updateFire } from '../fire-rows';
 import { areaCounts, choreAreaDeletes } from './chore-areas';
+import { runEarningWrites, type Finisher } from '../earnings';
+import { sendPushDeliveries } from '../push';
+import { isAdmin } from '../../shared/roles';
+import type { Role } from '../../shared/vocab';
 
 const householdTz = async (db: D1Database) => (await first<{ timezone: string }>(db, 'SELECT timezone FROM settings WHERE id = 1'))!.timezone;
 const openFireOf = (db: D1Database, runId: string) =>
@@ -26,15 +31,16 @@ function choreView(row: ChoreRow, today: string, active: string[], areaCount: nu
     id: c.id, title: c.title, doneMeans: c.done_means, days: c.days, timing: c.timing, time: c.time, nudge: c.nudge,
     people: c.people, steps: c.steps, channels: c.channels, renotifyMin: c.renotify_min, createdBy: row.created_by,
     thisWeek: assigneeFor(c, today, active), nextWeek: assigneeFor(c, addDays(today, 7), active), areaCount,
+    bounty: row.bounty,
   };
 }
 
-function runView(chore: Chore, run: ChoreRun, open: Pick<FireRow, 'due_at' | 'state'> | null, areaCount: number) {
+function runView(chore: Chore, run: ChoreRun, open: Pick<FireRow, 'due_at' | 'state'> | null, areaCount: number, bounty: number | null) {
   return {
     id: run.id, choreId: chore.id, title: chore.title, doneMeans: chore.done_means, timing: chore.timing, time: chore.time,
     step: run.step, steps: chore.steps, assigneeId: run.assignee_id, personId: stepPerson(chore, run),
     doneAt: run.done_at, doneBy: run.done_by,
-    nextDueAt: open?.state === 'scheduled' ? open.due_at : null, ringing: open?.state === 'ringing', areaCount,
+    nextDueAt: open?.state === 'scheduled' ? open.due_at : null, ringing: open?.state === 'ringing', areaCount, bounty,
   };
 }
 
@@ -46,20 +52,27 @@ function changeStatements(db: D1Database, ch: RunChange, now: string): D1Prepare
   return stmts;
 }
 
-type StepResult = { run: ChoreRun; chore: Chore; change: RunChange } | { error: 'not_found' | 'already_done' | 'nothing_to_undo' };
+type StepResult = { run: ChoreRun; chore: Chore; change: RunChange; bounty: number | null } | { error: 'not_found' | 'already_done' | 'nothing_to_undo' };
 
-async function stepRun(db: D1Database, runId: string, now: string, act: (chore: Chore, run: ChoreRun, open: FireRow | null, tz: string) => RunChange | { error: 'already_done' | 'nothing_to_undo' }): Promise<StepResult> {
+/** One step done or undone, with its earning written or dropped in the same batch (§7B.8); the waiting push after. */
+async function stepRun(env: Env, runId: string, member: Finisher, now: string, act: (chore: Chore, run: ChoreRun, open: FireRow | null, tz: string) => RunChange | { error: 'already_done' | 'nothing_to_undo' }): Promise<StepResult> {
+  const db = env.DB;
   const cr = await loadChoreRun(db, runId);
   if (!cr) return { error: 'not_found' };
   const r = act(cr.chore, cr.run, await openFireOf(db, runId), await householdTz(db));
   if ('error' in r) return r;
-  await db.batch(changeStatements(db, r, now));
-  return { run: r.run, chore: cr.chore, change: r };
+  const earn = await runEarningWrites(db, cr.chore.id, cr.run, r.run, member, now);
+  await db.batch([...changeStatements(db, r, now), ...earn.stmts]);
+  if (earn.pushIds.length) await sendPushDeliveries(env, earn.pushIds, now);
+  return { run: r.run, chore: cr.chore, change: r, bounty: earn.bounty };
 }
 
+/** The acting member, as stepRun takes it. */
+export const finisherOf = (m: { id: string; role: Role }): Finisher => ({ id: m.id, admin: isAdmin(m) });
+
 /** Done the run's current step (§7B.3) — shared by /chore-runs/{id}/done and a chore fire's Done. */
-export const completeStep = (db: D1Database, runId: string, memberId: string, now: string) =>
-  stepRun(db, runId, now, (chore, run, open, tz) => advanceRun(chore, run, open, memberId, now, tz));
+export const completeStep = (env: Env, runId: string, member: Finisher, now: string) =>
+  stepRun(env, runId, member, now, (chore, run, open, tz) => advanceRun(chore, run, open, member.id, now, tz));
 
 async function loadChore(c: Context<AppEnv>, forWrite: boolean): Promise<ChoreRow | Response> {
   const row = await first<ChoreRow>(c.env.DB, 'SELECT * FROM chores WHERE id = ? AND deleted_at IS NULL', c.req.param('id'));
@@ -156,10 +169,11 @@ chores.get('/chores/today', requireMember, async (c) => {
   const choreRows = await all<ChoreRow>(db,
     'SELECT * FROM chores WHERE id IN (SELECT chore_id FROM chore_runs WHERE date = ?)', today);
   const byId = new Map(choreRows.map((r) => [r.id, choreFromRow(r)]));
+  const bounties = new Map(choreRows.map((r) => [r.id, r.bounty]));
   const counts = await areaCounts(db);
   const runs = rows
     .filter((r) => showsOnToday(byId.get(r.chore_id)!, r))
-    .map((r) => runView(byId.get(r.chore_id)!, r, r.open_state ? { due_at: r.open_due_at!, state: r.open_state } : null, counts.get(r.chore_id) ?? 0));
+    .map((r) => runView(byId.get(r.chore_id)!, r, r.open_state ? { due_at: r.open_due_at!, state: r.open_state } : null, counts.get(r.chore_id) ?? 0, bounties.get(r.chore_id) ?? null));
   return c.json({ date: today, runs });
 });
 
@@ -169,13 +183,13 @@ async function stepResponse(c: Context<AppEnv>, r: StepResult) {
     if (r.error === 'already_done') return fail(c, 409, 'already_done', 'Every step of this chore is already done.');
     return fail(c, 409, 'nothing_to_undo', 'No step of this chore has been done yet.');
   }
-  return c.json(runView(r.chore, r.run, await openFireOf(c.env.DB, r.run.id), (await areaCounts(c.env.DB)).get(r.chore.id) ?? 0));
+  return c.json(runView(r.chore, r.run, await openFireOf(c.env.DB, r.run.id), (await areaCounts(c.env.DB)).get(r.chore.id) ?? 0, r.bounty));
 }
 
 chores.post('/chore-runs/:id/done', requireMember, async (c) =>
-  stepResponse(c, await completeStep(c.env.DB, c.req.param('id'), c.get('member').id, nowIso())));
+  stepResponse(c, await completeStep(c.env, c.req.param('id'), finisherOf(c.get('member')), nowIso())));
 
 chores.post('/chore-runs/:id/undo', requireMember, async (c) => {
   const now = nowIso();
-  return stepResponse(c, await stepRun(c.env.DB, c.req.param('id'), now, (chore, run, open, tz) => undoRun(chore, run, open, now, tz)));
+  return stepResponse(c, await stepRun(c.env, c.req.param('id'), finisherOf(c.get('member')), now, (chore, run, open, tz) => undoRun(chore, run, open, now, tz)));
 });

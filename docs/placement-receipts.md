@@ -7,6 +7,19 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.57.0: Bounties and the score (placement-advisor)
+
+- **Ask:** SPEC 2.97 §7B.8 Bounties and the score, §8.15b (🪙 Bounties / ＋ Bounty / 🏅 Score screens, 🪙 n on Today and All chores), §4.2zq migration 0044, §10 rows for /bounties, /chores/{id}/bounty, /earnings, and the §9.4 founder-ping predicate leaving out bounty pushes.
+- **Verdict:** NEW rows `src/shared/bounties.ts`, `src/worker/routes/bounties.ts`, `src/worker/earnings.ts`, `frontend/src/components/Bounties.tsx`, `BountyForm.tsx`, `Score.tsx`. EXISTING: vocab.ts (BOUNTY_STATUS), shared/chores.ts (ChoreRow.bounty only), routes/chores.ts (views + the earning hook in stepRun), routes/alerts.ts (completeStep call), deliveries.ts (bountyId / earningId, FOUNDER_PING), index.ts (mount), Chores.tsx, ChoresToday.tsx, alert-history.ts (comment only).
+- **Flow stage:** rules (bounties.ts) → route (routes/bounties.ts) → persist + deliver (earnings.ts, deliveries.ts, stepRun's batch) → render (the three PWA files).
+- **Why:** earnings have two writers (a one-off's Done, a chore run's last step), so one persist owner modelled on mess-asks.ts keeps auto-OK (Q252) and the admin push identical. The chore hook sits in `stepRun`, shared by /chore-runs/{id}/done, the fire's Done (alerts.ts) and undo, in the same D1 batch as the run change, so finish/earn and undo/drop are atomic and cannot drift between callers; `completeStep` takes env and the member. Only ChoreRow gains `bounty` (on Chore it would spread into parseChoreInput, PATCH and tick). Earn-or-drop, okAtOnce and the score window start are pure helpers so the Worker decides nothing. PUT /chores/{id}/bounty lives in routes/bounties.ts, keeping routes/chores.ts one concern. The PWA is three files (one would be ~300 lines and three concerns). alertSource unchanged: §9.5's title branch already labels bounty pushes; only its comment is corrected.
+- **Rejected:** each caller hooking after completeStep (the push-action path would drift); an earning write in fire-rows.ts loadChoreRun (wrong concern, high fan-in); a separate "Bounty" alert source (not in the spec).
+- **Caps:** new files all under 200 lines; routes/chores.ts 181 → ~200/300; shared/chores.ts ~242/300; deliveries.ts ~74; no file newly in the warning band; CEILINGS unchanged; no reorganizer.
+- **Restraint (for the steward):** earnings.ts's inline active-admins query repeats mess-asks.ts's (two copies). Fold them into db.ts only if a third appears.
+- **Sources read:** SPEC.md §4.2zq, §7B.8, §8.15, §8.15b, §9.4, §9.5, §10; docs/module-ownership.md; docs/modularity.md; docs/placement-receipts.md; scripts/arch.ts; routes/chores.ts; deliveries.ts; mess-asks.ts; index.ts; fire-rows.ts; routes/alerts.ts; shared/chores.ts; vocab.ts; alert-history.ts; Chores.tsx; ChoresToday.tsx.
+
+---
+
 ## 2026-10-11 — v1.56.0: Settings → ℹ️ About (placement-advisor)
 
 - **Ask:** SPEC 2.96 §8.6 (new area, MojoSOGO 2026-10-11 "add 'about' button in settings; modal shows splash screen, logo, revision, developed by"): a 9th Settings PickGrid button ℹ️ About for everyone, whose modal shows the §8.10 opening-screen look (/icon.svg, "Ensō", the tagline, `__ENSO_BUILD__`) and "Developed by MojoSOGO · with Claude". No server, API or migration change.

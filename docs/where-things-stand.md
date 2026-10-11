@@ -48,6 +48,8 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- Bounties and Score (v1.57.0, §7B.8, §8.15b, migration 0044): an admin posts a bounty and a kid's phone gets the push; the kid
+  taps I'll do it then Done; the admin's phone gets "🪙 Waiting for OK" and OKs it; 🏅 Score shows it (BS1–BS3). Q249–Q255 are ⚑ defaults.
 - Cooking timers (v1.54.0, §7D.8): on the iPhone at 320 px, Alarms → 🍳 Cooking machines → ＋ Cooking timer, start an air fryer
   for 1 minute, Edit it, hear it done, tap Off, then the red ✕. Q239–Q243 are ⚑ defaults.
 - Alarms tab as a menu (v1.53.0, §8.5): on the iPhone at 320 px, open each of ⏰ Alarms, ⏱ Rolling timers, 🫧 Machines;

@@ -250,3 +250,11 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q245 | How the Chores tab shows its sections (§8.15) | ⚑ A menu of ✅ Today · 🧽 Messes · 📋 All chores, each in its own modal, as Settings and Alarms (was all three stacked on the tab) |
 | Q247 | Where Settings → ℹ️ About sits (§8.6) | ⚑ Last button in the grid, after 📊 Status, for every member |
 | Q248 | The About credit line (§8.6) | ⚑ "Developed by MojoSOGO · with Claude" (no other author is named in SPEC or README) |
+| Q249 | Bounty points (§7B.8) | ⚑ Whole points 1–10 per job |
+| Q250 | Who a multi-step chore bounty pays (§7B.8) | ⚑ Whoever finishes the last step (the run's `done_by`); Undo of a finished run drops it |
+| Q251 | A one-off's dib (§7B.8) | ⚑ I'll do it holds it 3 h, then it lapses by itself; one live dib per person; Not yet gives the doer a fresh dib |
+| Q252 | An admin's own Done (§7B.8) | ⚑ OK'd at once by them; no waiting push |
+| Q253 | Score windows (§7B.8) | ⚑ This week (Sunday-start, as turns) and this calendar month, by the day the work was done, OK'd points only |
+| Q254 | Bounty pushes (§7B.8) | ⚑ A new one-off pushes everyone but the poster once; a pending earning pushes every admin once; never spoken in the house; no repeats |
+| Q255 | Where bounties sit (§8.15) | ⚑ 🪙 Bounties and 🏅 Score join the Chores menu: Today · Bounties · Messes · All chores · Score |
+| Q256 | Who sets, approves and sees bounties (§7B.8) | **Decided by MojoSOGO 2026-10-11:** only admins set them (ADM); points count after an admin's OK (CNF, "child claims bounty and it goes pending; then gets adults approval via app"); everyone sees everyone's score, no ranks (PUB) |

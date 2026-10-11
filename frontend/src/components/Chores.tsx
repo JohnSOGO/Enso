@@ -1,5 +1,5 @@
-// SPEC §8.15 — the 🧹 Chores tab: a menu of ✅ Today (ChoresToday), 🧽 Messes (§8.15a) and 📋 All chores (one line per
-// chore, sorted by time, §8.5), the tapped one in a Modal. A row opens the chore's What done looks like sheet. Whose
+// SPEC §8.15 — the 🧹 Chores tab: a menu of ✅ Today (ChoresToday), 🪙 Bounties and 🏅 Score (§8.15b), 🧽 Messes (§8.15a)
+// and 📋 All chores (one line per chore, sorted by time, §8.5, 🪙 n when it has a bounty), the tapped one in a Modal. A row opens the chore's What done looks like sheet. Whose
 // turn it is comes from the server (thisWeek / nextWeek); nothing is computed here. Holds which section is open.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Modal } from './Modal';
@@ -7,6 +7,8 @@ import { PickGrid } from './PickGrid';
 import { daysText } from './AlertFields';
 import { ChoresToday } from './ChoresToday';
 import { MessesSection } from './Messes';
+import { BountiesSection } from './Bounties';
+import { ScoreSection } from './Score';
 import { errorText, get } from '../api';
 import { useApp } from '../state';
 import type { Channel, ChoreTiming, Weekday } from '../../../src/shared/vocab';
@@ -17,15 +19,16 @@ import s from './Lists.module.css';
 export interface Chore {
   id: string; title: string; doneMeans: string | null; days: Weekday[]; timing: ChoreTiming; time: string;
   nudge: boolean; people: string[]; steps: ChoreStep[]; channels: Channel[]; renotifyMin: number | null;
-  createdBy: string; thisWeek: string | null; nextWeek: string | null; areaCount: number;
+  createdBy: string; thisWeek: string | null; nextWeek: string | null; areaCount: number; bounty: number | null;
 }
 
-type Section = 'today' | 'messes' | 'all';
+type Section = 'today' | 'bounties' | 'messes' | 'all' | 'score';
 
-/** ⚑ Q245 — the menu, as on Settings (§8.6) and Alarms (§8.5); Today first. */
+/** ⚑ Q245, Q255 — the menu, as on Settings (§8.6) and Alarms (§8.5); Today first. */
 const SECTIONS: readonly { value: Section; emoji: string; label: string }[] = [
-  { value: 'today', emoji: '✅', label: 'Today' }, { value: 'messes', emoji: '🧽', label: 'Messes' },
-  { value: 'all', emoji: '📋', label: 'All chores' },
+  { value: 'today', emoji: '✅', label: 'Today' }, { value: 'bounties', emoji: '🪙', label: 'Bounties' },
+  { value: 'messes', emoji: '🧽', label: 'Messes' }, { value: 'all', emoji: '📋', label: 'All chores' },
+  { value: 'score', emoji: '🏅', label: 'Score' },
 ];
 
 export function ChoresTab({ onEdit, onOpenAreas }: { onEdit: (c: Chore | null) => void; onOpenAreas: (c: Chore) => void }) {
@@ -44,7 +47,9 @@ export function ChoresTab({ onEdit, onOpenAreas }: { onEdit: (c: Chore | null) =
 
   const body: Record<Section, () => ReactNode> = {
     today: () => <ChoresToday onOpenAreas={openAreas} />,
+    bounties: () => <BountiesSection chores={sorted} />,
     messes: () => <MessesSection />,
+    score: () => <ScoreSection />,
     all: () => <AllChoresSection sorted={sorted} error={error} turn={turn} onEdit={onEdit} onOpenAreas={onOpenAreas} />,
   };
   const shown = SECTIONS.find((x) => x.value === open);
@@ -91,6 +96,7 @@ function AllChoresSection({ sorted, error, turn, onEdit, onOpenAreas }: {
                     {c.title}
                     {c.steps.length > 1 && <><sup aria-hidden> {c.steps.length}</sup><span className="visually-hidden">, {c.steps.length} steps</span></>}
                     {c.areaCount > 0 && <><span aria-hidden> 📋</span><span className="visually-hidden">, {c.areaCount} areas</span></>}
+                    {c.bounty && <> · 🪙 {c.bounty}</>}
                   </button>
                 </th>
                 <td className={s.rigid}>{daysText(c.days)}</td>

@@ -41,6 +41,7 @@ export interface ChoreRow {
   id: string; title: string; done_means: string | null; days: string; timing: ChoreTiming; time: string;
   nudge: number; people: string; steps: string; channels: string; renotify_min: number | null; max_alerts: number;
   start_date: string; created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
+  bounty: number | null; // §7B.8 — never part of Chore: it plays no part in planning
 }
 
 /** One `chore_runs` row. `step` = steps.length once finished. */
