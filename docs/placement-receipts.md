@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.55.0: 🎯 pick mode stays on, Ozy-style text with a CSS selector, toast instead of modal (placement-advisor)
+
+- **Ask:** SPEC 2.92 §8.16 (modeled on the Ozymandias dashboard's pick mode). 🎯 turns pick mode on until 🎯 again, the bar, Esc, or Alt+P. While on: a top bar, a hover outline for a mouse (a class on the element under the pointer), a crosshair cursor. Every tap is captured, swallowed and copied, then shown in a toast (4 s, or 15 s with "Copy blocked"), with no 📍 Pointed at modal. The text becomes multi-line: `Enso pick: <tab>` / `Where:` modals and groups joined " > " / `Element: <kind> "<name>"` / `Selector:` (stops at the nearest id, else tag.class (first 2) with :nth-of-type where siblings share the tag, joined " > ") / `Screen: WxH` (phone below 700 wide) / build stamp.
+- **Verdict:** frontend/src/point-line.ts, frontend/src/components/PointAtButton.tsx, frontend/src/components/PointAt.tsx (+ PointAt.module.css) [EXISTING]. Build waited on the §8.16 text.
+- **Flow stage:** render and capture intent (PWA only); point-line.ts is the PWA's own naming rule.
+- **Why:** point-line.ts (91/300, one importer) already owns naming the tapped element. selectorFor is another way of naming it, and pickText replaces pointLine outright, so its concern stays one. A separate selector module was rejected as classitis at this size. PointAtButton.tsx (26/300) keeps the switch and the signal, which turns from arm into toggle; it holds no pick state. PointAt.tsx (74/300) already owns the capture-phase layer and the result display; swapping the modal for a toast and adding hover, crosshair and keys keeps it one concern (the pick layer). A generic Toast component was rejected (no second user). Threats avoided: module-level `let` for pick state; the phone/desktop size rule leaking into the layer (it lives in pickText); a stale hover class left on app elements after off or unmount; the copy moving out of the gesture handlers (v1.52.1).
+- **Caps:** point-line.ts ~130/300; PointAt.tsx ~120/300; PointAtButton.tsx ~26/300; PointAt.module.css ~35/300. Nothing in the band; no re-pins.
+- **Sources read:** docs/module-ownership.md (PointAt rows, state.tsx row), docs/placement-receipts.md (v1.52.0, v1.52.1), scripts/arch.ts, SPEC.md §8.16, frontend/src/point-line.ts, frontend/src/components/PointAt.tsx, frontend/src/components/PointAtButton.tsx, frontend/src/components/PointAt.module.css.
+
 ## 2026-10-11 — v1.54.2: Cooking box custom minutes box in the chip row (placement-advisor)
 
 - **Ask:** SPEC 2.90 §8.5: the cooking box's minutes field moves into the "How long?" chip row as a small "custom" box after the 60 chip, with a light gray "custom" placeholder. A chip picks its value and empties the box; typing in the box unpicks the chips. UI only.

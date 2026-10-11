@@ -8,11 +8,24 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, .4);
   z-index: 5;
 }
-/* The pick bar: fixed across the top; inside an open dialog when there is one, so the top layer never hides it. */
+/* The pick-mode bar: fixed across the top; inside an open dialog when there is one, so the top layer never hides it. */
 .bar {
   position: fixed; top: env(safe-area-inset-top); left: 0; right: 0;
   padding: 12px 14px; text-align: center; font-weight: 600;
   background: var(--accent); color: #fff;
   z-index: 50;
 }
-.line { user-select: text; -webkit-user-select: text; overflow-wrap: anywhere; font-family: ui-monospace, monospace; font-size: .9rem; }
+/* Each pick's text, near the bottom; selectable by hand when the copy was blocked. */
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--tabbar-h) + 64px + env(safe-area-inset-bottom));
+  width: min(520px, calc(100vw - 24px)); padding: 8px 10px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--accent); color: var(--text);
+  font: .8rem/1.4 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere;
+  user-select: text; -webkit-user-select: text; box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+  z-index: 50;
+}
+.toast strong { display: block; font-family: inherit; margin-bottom: 4px; }
+/* Pick mode with a mouse: crosshair everywhere, an outline on the thing under the pointer (global names, see PointAt.tsx). */
+:global(html.enso-pick-on), :global(html.enso-pick-on *) { cursor: crosshair !important; }
+:global(.enso-pick-hover) { outline: 2px solid var(--accent) !important; outline-offset: 1px; }

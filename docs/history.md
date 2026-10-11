@@ -466,6 +466,13 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**🎯 Pick mode like Ozymandias** (v1.55.0, §8.16, Q236–Q237 revised; MojoSOGO 2026-10-11: "look at ozymandias and do
+it like that"): modeled on the Ozymandias dashboard's `pick_mode.js`. 🎯 now turns pick mode on until a 🎯 or the bar
+is tapped, or Esc (Alt+P toggles on a keyboard); every tap while on is swallowed and copied, and a toast shows the text
+(the 📍 Pointed at modal is gone). The text is Ozy's lines: `Enso pick:` tab, `Where:`, `Element:`, `Selector:` (a real
+CSS selector), `Screen:`, build stamp. A mouse gets an outline and a crosshair. Checked in headless Chromium, mouse and
+touch: two picks in a row each landed on the clipboard with the tab unchanged, the bar and Esc stop it, taps work after.
+**Still owed:** PA3–PA4 on the iPhone.
 **Custom minutes box** (v1.54.2, §8.5; asked by MojoSOGO 2026-10-11): in the cooking box the minutes field sits in the
 chip row right after 60, a small box with a light gray "custom" hint; a chip and the box clear each other.
 **FunHouse poller never repeats after a restart** (v1.54.3, §9.4a, Q244; MojoSOGO "DUP" 2026-10-11): the poller saves
