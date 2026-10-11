@@ -229,3 +229,5 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q226 | Settings as a menu (§8.6) | ⚑ Eight buttons in this order: Me, Calendar items, Phone alerts, Speakers, Alerts, Household, Members, Status; each opens in a modal, closing returns to the menu |
 | Q227 | Where Log out sits (§8.6) | ⚑ Under the Settings grid, not inside Me |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
+| Q228 | Which founder pings the FunHouse poller shows (§9.4a) | ⚑ Titles starting 🤖 or 🧵 (Claude's); others, such as 🏛️ Ozymandias which reaches the FunHouse itself, are skipped |
+| Q229 | How a ping looks on the FunHouse (§9.4a) | ⚑ source "Claude", level `attention`, beep `look`, sig ⭕🔁🏠, text "title: text" |

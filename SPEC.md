@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.79 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.80 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4626,6 +4626,43 @@ Settings → 📊 Status' recent deliveries ⚑ (Q111).
 | ON9 | the titles of other pushes | an announcement's push is still "📢 Announcement"; a fire's push keeps "Ensō" and `tag` = its `fireId` |
 | ON-M | migration 0022 | §4.2u's check |
 
+### 9.4a The same pings on the FunHouse — `GET /ops/pings`, `home/funhouse-poller.ts` — asked by MojoSOGO 2026-10-11
+
+"Me not receiving Enso alerts when threads need me … also not msg funhouse; that best." Project threads run in the
+cloud and can reach Ensō over HTTPS only. The FunHouse desk device (a separate project) is reachable only through its
+bridge on the dev PC at `http://127.0.0.1:8765/notify`, with no inbound door. So the dev PC **polls** Ensō for new
+founder pings and hands each one to the bridge. Ensō stores nothing new: a ping is already its `deliveries` row (§9.4).
+
+**`GET /ops/pings?after=<ISO instant>`**, the same bearer as `/ops/notify` (steps 1–2 of §9.4: 503 `ops_notify_off`,
+401 `unauthorized`). → **200 `{ pings: [{ id, title, text, at }] }`**: the founder pings (the rows §9.4 step 5
+counts) created after `after` and within the last hour (`opsWindowStart(now)`), oldest first, at most
+`OPS_NOTIFY_PER_HOUR`. `id` = the delivery id, `text` = its message, `at` = its `created_at`. `after` missing or not
+an ISO instant → the whole last hour. Reading changes nothing (the phone push is unaffected).
+
+**The poller** (`home/funhouse-poller.ts`, Node 24 on the dev PC, `npm run build:home` →
+`home/dist/funhouse-poller.mjs`, started by `home/funhouse-poller.cmd`; Node globals, `node:fs` and its own file only):
+- The token is read from `%USERPROFILE%\.enso\ops-notify-token` at start (the same file §9.4 uses; no new copy).
+  Missing or empty → it logs that and exits 1. The token is never logged.
+- Every `FUNHOUSE_POLL_MS = 15000` ⚑ it asks `/ops/pings?after=<the last handled at>`; at start `after` is
+  10 minutes ago ⚑ (a restart re-sends at most those; the bridge drops a repeated `id`).
+- **Which pings:** a title starting with 🤖 or 🧵 (Claude's) ⚑ Q228. Others (🏛️ Ozymandias, which already
+  reaches the FunHouse itself) are skipped and counted as handled.
+- **At most one notice a poll** (the bridge allows one per 10 s). It POSTs raw UTF-8 JSON
+  `{ source: "Claude", level: "attention", text: "<title>: <text>", sig: "⭕🔁🏠", beep: "look", id: <ping id> }` ⚑ Q229.
+  200 or any 4xx (refused; never retried) → handled; 503, a network error or a non-200 from Ensō → not handled, tried
+  again next poll. One log line per notice: the id and the bridge's answer.
+
+**Acceptance (each row is a test):**
+
+| # | Check | Expected |
+|---|---|---|
+| FP1 | `GET /ops/pings` with no token set; a wrong token | 503 `ops_notify_off`; 401 `unauthorized` |
+| FP2 | two pings, an announcement, a sign-in notice, a mess ask, a fire's push, a ping older than an hour | only the two pings, oldest first, `{ id, title, text, at }` |
+| FP3 | `after` = the first ping's `at`; `after=nonsense` | only the second; both |
+| FP4 | `funhouseNotice` / `forFunhouse` | the body above; 🤖 and 🧵 titles → true, "🏛️ Ozymandias" → false |
+| FP5 | one poll with a fake Ensō and bridge: a 🏛️ ping then two 🧵 pings | one bridge POST (the first 🧵), `after` = its `at`; next poll sends the second |
+| FP6 | the bridge answers 503; then 400 | `after` unchanged, sent again next poll; then handled, not retried |
+
 ### 9.5 My alerts — `src/shared/alert-history.ts`, `/me/alerts` — asked by MojoSOGO 2026-10-11
 
 "If Ensō sends an alert from Ozy, I tap it but it goes away with no detail." Every push is already a `deliveries`
@@ -4748,6 +4785,7 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | GET / PUT / DELETE | `/house/quiet` | member | GET → `{ until, byName }`; PUT `{ for: '1h' \| '2h' \| '4h' \| 'today' }` → the same; DELETE turns quiet off; 400 `invalid_input` (§9.2b) |
 | POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `no_recipients` (§9.3); 409 `no_speakers` (§9.2a); 409 `house_quiet` (§9.2b); spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
 | POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 409 `no_recipients` (no founder yet) / 429 `rate_limited`, in that order |
+| GET | `/ops/pings?after=` | bearer `OPS_NOTIFY_TOKEN` (no session) | → `{ pings: [{ id, title, text, at }] }`, the founder pings of the last hour after `after`, oldest first, for the FunHouse poller (§9.4a); 503 / 401 as `/ops/notify` |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek, areaCount }` (`thisWeek`/`nextWeek` = member id or null; `areaCount` §7B.6) |
 | POST | `/chores` | member | `{ title, doneMeans?, days, timing, time, nudge?, people, steps, channels, renotifyMin? }` → chore (201) |
 | PATCH/DELETE | `/chores/{id}` | creator or owner | same fields, all optional; re-plans unstarted runs (§7B.3); DELETE also deletes its areas and their photos (§7B.6) |
