@@ -480,7 +480,7 @@ admin's Done is OK'd at once, so the Done sheet no longer offers them 📷 (it u
 bounty, let me add a picture"): ＋ Bounty has 📷 Add photo (sent after Post; Post again retries only the picture);
 the card shows it to everyone; an admin's card has 📷 Add / Replace. Deleted once paid (OK, or an admin's own Done)
 or deleted. **Still owed:** try it on a real phone.
-**Tab bar lower, build stamp centered** (v1.60.5, §8.1, Q208; MojoSOGO 2026-10-11 iPhone screenshot "Better… lower more
+**Tab bar lower, build stamp centered** (v1.60.6, §8.1, Q208; MojoSOGO 2026-10-11 iPhone screenshot "Better… lower more
 and center version"): the bar's bottom strip is the inset less 12 px (at least 14 px), so the buttons sit lower; the stamp
 is centered just under the buttons, above the home indicator. The Calendar ＋ keeps its 16 px gap.
 **Tab bar not cut off on the installed iPhone app** (v1.60.4, §8.1; MojoSOGO 2026-10-11 screenshot "now cutoff and not
@@ -501,6 +501,8 @@ is tapped, or Esc (Alt+P toggles on a keyboard); every tap while on is swallowed
 CSS selector), `Screen:`, build stamp. A mouse gets an outline and a crosshair. Checked in headless Chromium, mouse and
 touch: two picks in a row each landed on the clipboard with the tab unchanged, the bar and Esc stop it, taps work after.
 **Still owed:** PA3–PA4 on the iPhone.
+**No stale FunHouse notices** (v1.60.5, §9.4a, Q262; MojoSOGO 2026-10-11: "getting stale alerts on funhouse"): the
+poller skips any notice older than 10 minutes, so a backlog left while the board was off USB is dropped, not replayed.
 **Shorter FunHouse thread pings** (v1.57.1, §9.4a; MojoSOGO 2026-10-11: "the prefix has too many words"): a 🧵
 thread ping reaches the FunHouse as its text alone, which threads now write as `Enso:<thread title> "<ACTION what>"`.
 **Bounties and Score** (v1.57.0, §7B.8, §8.15b, migration 0044, Q249–Q256; asked by MojoSOGO 2026-10-11 after the AREC

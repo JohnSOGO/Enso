@@ -208,7 +208,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q205 | Ending a dish washer load (§7D.6) | ⚑ **Emptied** (the dryer's Fold & out, renamed for dishes); Still loaded restarts its reminders like the laundry |
 | Q206 | When the dish washer's alerts sound (§7D.6) | ⚑ Like the laundry's: every phone and speaker, only in the machine alert hours (they wait outside them) |
 | Q207 | The dish washer's minutes (§7D.6) | ⚑ 60 / 90 / 120 / 150 min chips (dish cycles run longer than the laundry's) |
-| Q208 | The build stamp where a screen has no bottom inset (§8.1) | ⚑ The bar's bottom strip is at least 14 px tall so the stamp always shows; since v1.60.5 the strip is the inset less 12 px and the stamp is centered under the buttons |
+| Q208 | The build stamp where a screen has no bottom inset (§8.1) | ⚑ The bar's bottom strip is at least 14 px tall so the stamp always shows; since v1.60.6 the strip is the inset less 12 px and the stamp is centered under the buttons |
 | Q209 | How long the house can be quiet (§9.2b) | ⚑ 1 hour, 2 hours, 4 hours or Rest of today |
 | Q210 | When "Rest of today" ends (§9.2b) | ⚑ At household-local midnight |
 | Q211 | Who can quiet the house, and for whom (§9.2b) | ⚑ Any member; the whole household's speakers at once; the line says who set it |
@@ -261,5 +261,6 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q257 | A bounty's done photo (§7B.8) | ⚑ Optional, one per pending earning (a second replaces it), added by the one who did it, for a one-off or a chore run; everyone can see it |
 | Q258 | How long a done photo is kept (§7B.8) | ⚑ Until the earning is OK'd or dropped (Not yet, Undo, bounty deleted); then deleted from R2 |
 | Q259 | A replaced done photo and the browser cache (§8.15b) | ⚑ The app adds its own `?v=` to the photo's address after an upload; nothing on the wire changes |
+| Q262 | A stale FunHouse notice (§9.4a) | ⚑ Older than 10 min at poll time → skipped, never shown (same window as the start-up look-back) |
 | Q260 | A bounty's picture (§7B.8) | ⚑ Optional, one per one-off, set by an admin when posting or later from the card; everyone sees it; deleted when the bounty is paid or deleted |
 | Q261 | An admin's own Done sheet (§8.15b) | ⚑ No 📷 Add photo: an admin's Done is OK'd at once (Q252), so a photo would be refused and deleted; the sheet says "Your points count at once." |
