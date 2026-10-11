@@ -4,6 +4,7 @@ import { errorText, post } from '../api';
 import { useApp, type Fire } from '../state';
 import { MachineChooser } from './Machines';
 import { MACHINE_LABEL, finishLabel, isMachineId, nextMachine } from '../../../src/shared/machines';
+import { isCookId } from '../../../src/shared/cooking';
 import type { AlertKind, MachineId } from '../../../src/shared/vocab';
 import s from './RingingBar.module.css';
 
@@ -26,8 +27,9 @@ export function RingingBar() {
   }
   const act = (f: Fire, action: 'done' | 'snooze' | 'ack') => send(f, `/fires/${f.id}/actions`, { action });
 
-  /** §8.2: a machine fire is closed only by /machines — Move to the next machine, or Fold & out on the last. */
+  /** §8.2: a machine fire is closed only by /machines (or /cooking) — Move to the next machine, Fold & out on the last, Off on a cooking timer. */
   const machineButton = (f: Fire) => {
+    if (isCookId(f.machineId)) return <button className="primary" disabled={busy === f.id} onClick={() => send(f, `/cooking/${f.machineId}/off`, {})}>Off</button>; // §7D.8
     if (!isMachineId(f.machineId)) return null;
     const from = f.machineId, next = nextMachine(from);
     return next
@@ -54,7 +56,7 @@ export function RingingBar() {
       {shown.map((f) => (
         <div key={f.id} className={s.row}>
           <span className={s.what}>
-            {ICON[f.kind]} <b>{f.title}</b>
+            {isCookId(f.machineId) ? '🍳' : ICON[f.kind]} <b>{f.title}</b>
             {f.kind === 'chore' && f.stepTitle && <> — {f.stepTitle}</>}
             <span className={s.sub}>{sub(f)}{f.awayBy && ` · away (${person(f.awayBy)})`}</span>
           </span>

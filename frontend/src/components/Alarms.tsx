@@ -5,6 +5,7 @@ import { Modal } from './Modal';
 import { PickGrid } from './PickGrid';
 import { TimersSection, type Timer } from './Timers';
 import { MachinesSection } from './Machines';
+import { CookingSection } from './Cooking';
 import { Announce } from './Announce';
 import { HouseQuiet } from './HouseQuiet';
 import { ChannelChecks, DayChips, RenotifySelect, SHORT, channelsOf, daysText, flagsOf, pickOneWay } from './AlertFields';
@@ -156,7 +157,7 @@ export function Alarms({ onEditAlarm, onEditTimer }: { onEditAlarm: (a: Alarm | 
   const body: Record<Section, () => ReactNode> = {
     alarms: () => <ScheduledSection onEdit={onEditAlarm} />,
     timers: () => <TimersSection onEdit={onEditTimer} />,
-    machines: () => <MachinesSection />,
+    machines: () => <><MachinesSection /><CookingSection /></>, // §8.5 two groups
   };
   return (
     <div style={{ padding: 12, overflowY: 'auto', height: '100%' }}>

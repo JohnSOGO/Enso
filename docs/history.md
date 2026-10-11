@@ -466,6 +466,12 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Cooking timers** (v1.54.0, §7D.8, migration 0043; asked by MojoSOGO 2026-10-11): the Machines modal is split into
+🧺 Washing machines (unchanged) and 🍳 Cooking. ＋ Cooking timer makes a new timer each time (air fryer, stove, oven,
+microwave, other, with an optional name), as many at once as needed; each stays until its red ✕ or until the first
+midnight it is not still going. They ring at any hour, every 5 minutes. CK1–CK9 and CK-M are tests. Built as: a cooking
+timer is a `machines` row (id `cook_…`), so its fire is an ordinary machine fire. Q239–Q243 are ⚑ defaults.
+**Still owed:** on the iPhone at 320 px, start an air fryer timer, edit its minutes, hear it done, Off, then ✕.
 **Alarms tab as a menu; Machines wording** (v1.53.0, §8.5; asked by MojoSOGO 2026-10-11): Announce and Quiet the house
 stay on the tab; Alarms, Rolling timers and Machines are buttons that open in a modal, as Settings does. The Machines
 intro no longer reads as laundry only, and Edit hours says "Machine alerts". No behavior change. Q238 is a ⚑ default.

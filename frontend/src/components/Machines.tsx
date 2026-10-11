@@ -1,5 +1,5 @@
-// SPEC §8.5, §7D — the Machines section of the Alarms tab (clothes washer and dryer, dish washer) and its chooser,
-// which the Ringing bar reuses for Move to dryer (§8.2).
+// SPEC §8.5, §7D — the 🧺 Washing machines group of the Machines section (clothes washer and dryer, dish washer) and its
+// chooser, which the Ringing bar reuses for Move to dryer (§8.2). Its chips and Alert when done are shared with Cooking.tsx.
 import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { MachineHoursLine } from './MachineHours';
@@ -20,15 +20,29 @@ const BADGE: Record<MachineState, { mood: string; text: string }> = {
   free: { mood: 'neutral', text: 'free' }, running: { mood: 'good', text: 'running' }, done: { mood: 'warn', text: 'DONE — waiting' },
 };
 const lower = (id: MachineId) => MACHINE_LABEL[id].toLowerCase();
-const bigChip = { minHeight: 44, fontSize: '1rem', padding: '0 14px', cursor: 'pointer' } as const;
+export const bigChip = { minHeight: 44, fontSize: '1rem', padding: '0 14px', cursor: 'pointer' } as const;
 
 /** One chip of a chooser row: ✓ and a heavier border when picked. */
-function Pick({ on, color, label, onClick }: { on: boolean; color?: string; label: string; onClick: () => void }) {
+export function Pick({ on, color, label, onClick }: { on: boolean; color?: string; label: string; onClick: () => void }) {
   return (
     <button className="chip" aria-pressed={on} onClick={onClick}
       style={{ ...bigChip, ...(color ? { borderColor: color } : {}), borderWidth: on ? 2 : 1, fontWeight: on ? 600 : 400 }}>
       {on ? '✓ ' : ''}{label}
     </button>
+  );
+}
+
+/** §7D.7 — 🔔 Alert when done: nobody (phones only) or one active member. Shared with the cooking box (§7D.8). */
+export function AlertWhenDone({ alertTo, onPick }: { alertTo: string | null; onPick: (id: string | null) => void }) {
+  const active = useApp().members.filter((m) => !m.disabledAt);
+  return (
+    <div className="field" role="group" aria-label="Alert when done">
+      <span className="muted" style={{ fontSize: '.8rem' }}>🔔 Alert when done (optional) — with nobody, phones only, no speakers</span>
+      <div className="row wrap" style={{ marginTop: 4 }}>
+        <Pick on={alertTo === null} label="Nobody · phones only" onClick={() => onPick(null)} />
+        {active.map((m) => <Pick key={m.id} on={alertTo === m.id} color={m.color} label={m.displayName} onClick={() => onPick(m.id)} />)}
+      </div>
+    </div>
   );
 }
 
@@ -73,15 +87,7 @@ export function MachineChooser({ from, mode, ownerId, onClose }: {
             </div>
           </div>
         )}
-        {mode !== 'move' && (
-          <div className="field" role="group" aria-label="Alert when done">
-            <span className="muted" style={{ fontSize: '.8rem' }}>🔔 Alert when done (optional) — with nobody, phones only, no speakers</span>
-            <div className="row wrap" style={{ marginTop: 4 }}>
-              <Pick on={alertTo === null} label="Nobody · phones only" onClick={() => setAlertPick(null)} />
-              {active.map((m) => <Pick key={m.id} on={alertTo === m.id} color={m.color} label={m.displayName} onClick={() => setAlertPick(m.id)} />)}
-            </div>
-          </div>
-        )}
+        {mode !== 'move' && <AlertWhenDone alertTo={alertTo} onPick={setAlertPick} />}
         {mode === 'done' && <button className="primary" style={bigChip} onClick={() => go()}>It's done</button>}
         {mode !== 'done' && <div className="field" role="group" aria-label="How long?">
           <span className="muted" style={{ fontSize: '.8rem' }}>How long{mode === 'move' && to ? ` in the ${lower(to)}` : ''}?</span>
@@ -96,7 +102,7 @@ export function MachineChooser({ from, mode, ownerId, onClose }: {
   );
 }
 
-/** The "Machines" section of the Alarms tab (SPEC §8.5): one card per machine, in `MACHINE` order. */
+/** The 🧺 Washing machines group of the Machines section (SPEC §8.5): one card per machine, in `MACHINE` order. */
 export function MachinesSection() {
   const { version, localTime, memberById, refresh } = useApp();
   const [machines, setMachines] = useState<Machine[] | null>(null);
@@ -119,7 +125,8 @@ export function MachinesSection() {
       + ` · ${m.alertId ? `alerts ${name(m.alertId)}` : 'phones only'}`; // §7D.7
 
   return (
-    <section className={s.section} aria-label="Machines">
+    <section className={s.section} aria-label="Washing machines">
+      <h3 style={{ fontSize: '1rem', marginBottom: 6 }}>🧺 Washing machines</h3>
       <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>
         Start a machine. When it's done, every phone hears; the speakers too when someone is picked.
       </p>

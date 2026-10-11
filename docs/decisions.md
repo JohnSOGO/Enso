@@ -240,3 +240,8 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q236 | How long pick mode lasts (§8.16) | ⚑ One tap; tapping the bar or a 🎯 cancels; Pick again in the result arms the next |
 | Q237 | What the line says (§8.16) | ⚑ tab › modal titles › named groups › "name" kind · build stamp · screen size |
 | Q238 | Alarms tab as a menu (§8.5) | ⚑ Announce and Quiet the house stay on the tab; below them three buttons (⏰ Alarms, ⏱ Rolling timers, 🫧 Machines), each opens in a modal |
+| Q239 | Cooking timer kinds (§7D.8) | ⚑ Air fryer 🍟, Stove 🍳, Oven 🔥, Microwave ⚡, Other ⏲️, plus an optional name ("Oven 2") |
+| Q240 | Cooking timer minutes (§7D.8) | ⚑ Any whole number 1–600, with quick chips 1–60 |
+| Q241 | How a cooking timer rings (§7D.8) | ⚑ At any hour (not the machine alert hours), every 5 minutes, 4 alerts; phones always, speakers when someone is picked |
+| Q242 | Cooking timers' end of day (§7D.8) | ⚑ At local midnight every timer not running and not still alerting is closed; one still going stays until it rings out |
+| Q243 | Where cooking timers sit (§8.5) | ⚑ In the 🫧 Machines modal, under 🧺 Washing machines, as 🍳 Cooking with ＋ Cooking timer |
