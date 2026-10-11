@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.49.2: Away silences phones too; tick skips push rows for an away fire (placement-advisor)
+
+- **Ask:** SPEC §9.2c (SPEC 2.81), MojoSOGO picked ALL: while fires.away_by is set, tick step 2 writes no push row as well as no house row. The alert still steps.
+- **Verdict:** `src/worker/tick.ts` [EXISTING]. Comment-only edits in `src/worker/routes/alerts.ts` and `frontend/src/state.tsx`. Tests in `test/fire-away-api.test.ts` (AW2/AW4).
+- **Flow stage:** persist (which delivery rows a fire's alert writes).
+- **Why:** tick.ts step 2 is the only place that plans a fire's alert deliveries (other pushDelivery callers are announce, ops, phone-login, mess-asks, timer-starts, none per-fire). The away gate already sits there for speakers, so one condition on the push block keeps both gates together. A src/shared/ rule was rejected: a gate on a stored column, not a decision the PWA shares.
+- **Caps:** tick.ts 118/148, not in the band. routes/alerts.ts 211/300, state.tsx 101/300 (comments only). No reorganizer.
+
 ## 2026-10-11 — v1.49.1: drop alertUrl, pin sw.js `?alert=` in MA8; deliveries row notes the alertSource mirror (placement-advisor)
 
 - **Ask:** patch, no behavior change; steward pass 12's two LOW handoffs (SPEC §9.5), picked by MojoSOGO ("NOW"). (1) Delete the unused `alertUrl` from src/shared/alert-history.ts, its MA1 lines, map row mention and §9.5 line; extend MA8 to pin `${ALERTS_PATH}?alert=` in sw.js. (2) The deliveries.ts map row notes that alertSource mirrors the opsPingsSince ping rule.

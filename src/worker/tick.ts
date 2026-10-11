@@ -80,7 +80,8 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
         optional: src.optional ?? false, assignedTo: src.assignedTo, activeIds: await activeMemberIds(db),
         onIds: src.onIds ?? [], channels: src.cfg.channels,
       });
-      if (src.cfg.channels.includes('push')) {
+      // §9.2c: someone away from this alert → no phone rings either.
+      if (src.cfg.channels.includes('push') && !fire.away_by) {
         for (const memberId of aud.push) {
           const d = pushDelivery(db, { ...base, memberId, message }, now);
           newDeliveryIds.push(d.id);

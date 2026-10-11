@@ -1,4 +1,4 @@
-// SPEC §9.2c AW1–AW4 — "I'm away" on one alert: its speakers stop, it stays open, phones keep reminding.
+// SPEC §9.2c AW1–AW4 — "I'm away" on one alert: its speakers stop, it stays open, it stays open, silent.
 import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test';
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import worker from '../src/worker/index';
@@ -30,7 +30,7 @@ const tick = async (iso: string) => expect((await call(A, 'POST', `/dev/tick?now
 const rowsOf = async (fireId: string, alertNumber: number) => (await env.DB.prepare(
   'SELECT channel FROM deliveries WHERE fire_id = ? AND alert_number = ?').bind(fireId, alertNumber).all<any>()).results.map((r: any) => r.channel);
 
-it('AW1 + AW2: Away on a ringing reminder keeps it open; its next alert reaches phones only', async () => {
+it('AW1 + AW2: Away on a ringing reminder keeps it open; its next alert writes no delivery', async () => {
   const date = '2026-11-20';
   const ev = await A.post('/events', { title: 'Vet', startDate: date, endDate: date, startTime: '12:00',
     reminder: { offsetMin: 0, channels: ['push', 'house'], renotifyMin: 5 } });
@@ -49,9 +49,9 @@ it('AW1 + AW2: Away on a ringing reminder keeps it open; its next alert reaches 
 
   ha.heard.length = 0;
   await tick(`${date}T20:06:00.000Z`);
-  expect(await rowsOf(fire.id, 2)).toEqual(expect.arrayContaining(['push']));
-  expect(await rowsOf(fire.id, 2)).not.toContain('house');
+  expect(await rowsOf(fire.id, 2)).toEqual([]);
   expect(ha.heard).toHaveLength(0);
+  expect((await env.DB.prepare('SELECT alert_count FROM fires WHERE id = ?').bind(fire.id).first<any>())!.alert_count).toBe(2);
 
   expect((await call(A, 'POST', `/fires/${fire.id}/actions`, { action: 'done' })).status).toBe(200);
   const closed = await call(A, 'POST', `/fires/${fire.id}/away`);
@@ -72,7 +72,7 @@ it('AW3: a timer that is away, then Ack → the next countdown is not away', asy
   await A.post(`/timers/${t.json.id}/commands`, { cmd: 'stop' });
 });
 
-it('AW4: Away on a ringing machine fire → its next reminder has push rows only', async () => {
+it('AW4: Away on a ringing machine fire → its next reminder writes no delivery', async () => {
   await A.patch('/machines/hours', { weekday: null, weekend: null }); // the real clock: ring at any hour (§7D.5)
   expect((await call(A, 'POST', '/machines/washer/done', { ownerId: aId })).status).toBe(200);
   const at = (min: number) => new Date(Date.now() + min * 60_000).toISOString();
@@ -81,9 +81,7 @@ it('AW4: Away on a ringing machine fire → its next reminder has push rows only
   expect((await call(A, 'POST', `/fires/${fire.id}/away`)).status).toBe(200);
   ha.heard.length = 0;
   await tick(at(16));
-  const second = await rowsOf(fire.id, 2);
-  expect(second).toContain('push');
-  expect(second).not.toContain('house');
+  expect(await rowsOf(fire.id, 2)).toEqual([]);
   expect(ha.heard).toHaveLength(0);
   expect((await call(A, 'POST', '/machines/washer/clear')).status).toBe(200);
 });
