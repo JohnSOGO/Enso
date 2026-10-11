@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.60.3: no photo on an admin's own Done (placement-advisor)
+
+- **Ask:** Do not offer 📷 Add photo on the one-off Done sheet to an admin, whose Done is OK'd at once (⚑ Q252). The sheet shows Done / Cancel and a line saying the points count at once. No server change. SPEC 3.05 §8.15b, ⚑ Q261, from steward pass 18 finding 1.
+- **Verdict:** `frontend/src/components/BountyDone.tsx` [EXISTING]
+- **Flow stage:** render
+- **Why:** The sheet already owns the one-off Done flow, and this only changes what it shows to one kind of finisher. The admin test reuses `isAdmin` from `src/shared/roles.ts`, which Messes.tsx already imports, so the PWA does not re-derive a role rule. okAtOnce and the routes already decide the payout, so there is nothing to add server-side. A new component or a flag on the caller was rejected because the decision belongs to the sheet that renders the photo control. Blast radius: one 53-line leaf file. The photo-upload path is left in place for non-admins.
+- **Caps:** BountyDone.tsx goes from 53 lines to about 55-60 against a cap of 300. No file is newly in the warning band.
+- **Sources read:** frontend/src/components/BountyDone.tsx, scripts/arch.ts (caps), docs/module-ownership.md (rows for BountyDone.tsx and roles.ts), src/shared/roles.ts (isAdmin), src/shared/bounties.ts (okAtOnce), SPEC.md (§8.15b at 4430-4462, BT13, version line), docs/decisions.md (Q252), frontend/src/components (shared/roles imports).
+
+---
+
 ## 2026-10-11 — Steward pass 18, whole tree (code-steward)
 
 - **Run:** after the v1.60.0 release (SPEC 3.02 §7B.8, a bounty's picture, migration 0046). Also covers v1.59.0 (done photo, migration 0045) and v1.59.1 (Point at it label). Audited 265334e..50328a3 (the v1.60.0 head; v1.60.1–v1.60.2 landed after).
