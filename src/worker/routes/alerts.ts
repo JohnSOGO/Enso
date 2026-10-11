@@ -11,7 +11,7 @@ import { canChange } from '../../shared/roles';
 import { ALERT_TITLE_MAX, TIMER_INTERVAL_MAX, TIMER_INTERVAL_MIN } from '../../shared/alert-limits';
 import { choreFireContext } from '../../shared/chores';
 import { insertFire, loadChoreRun, sourceOf, updateFire } from '../fire-rows';
-import { completeStep } from './chores';
+import { completeStep, finisherOf } from './chores';
 import { isOnFor } from '../../shared/optins';
 import { MACHINE_LABEL, isMachineId } from '../../shared/machines';
 import { cookLabel } from '../../shared/cooking';
@@ -203,7 +203,7 @@ alerts.post('/fires/:id/actions', requireMember, async (c) => {
   if ('error' in r) return fail(c, 409, 'invalid_action', `Cannot ${b.action} this ${fire.kind} right now (it is ${fire.state}).`);
   if (fire.kind === 'chore') {
     // Done on a chore fire advances its run one step (§7B.3); that closes this fire and may plan the next.
-    const s = await completeStep(c.env.DB, fire.chore_run_id!, c.get('member').id, now);
+    const s = await completeStep(c.env, fire.chore_run_id!, finisherOf(c.get('member')), now);
     if ('error' in s) return fail(c, 409, 'invalid_action', `Cannot ${b.action} this chore right now (${s.error}).`);
     return c.json({ fire: s.change.closeFire ?? r.fire, next: s.change.newFire ?? null });
   }

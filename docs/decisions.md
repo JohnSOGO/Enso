@@ -236,9 +236,9 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q232 | Which rules the FunHouse follows (§9.4b) | ⚑ The phone's: Away stops it, Quiet the house does not, phone first does not delay it |
 | Q233 | How an Ensō alert looks on the FunHouse (§9.4b) | ⚑ As a ping (Q229) with source "Ensō" |
 | Q234 | Where 🎯 Point at it is turned on (§8.16) | ⚑ A switch in Settings → 🙂 Me, off by default, for this device only (kept in the browser); any member may turn it on |
-| Q235 | Where the 🎯 sits while on (§8.16) | ⚑ Since v1.57.0 a small faint round ◎ (like Ozymandias), bottom left just above the tab bar on every tab, and one in every modal header beside ✕; amber while pick mode is on |
-| Q236 | How long pick mode lasts (§8.16) | ⚑ Since v1.57.0 (like Ozymandias): stays on until a ◎ or the bar is tapped, or Esc; Alt+P toggles while the switch is on (was one tap) |
-| Q237 | What the pick text says (§8.16) | ⚑ Since v1.57.0, Ozymandias's PDASH pick lines: `Enso pick:` tab / `Where:` modals > groups / `Element:` kind "name" / `Selector:` CSS / `Screen:` WxH / build stamp (was one 📍 line) |
+| Q235 | Where the 🎯 sits while on (§8.16) | ⚑ Since v1.58.0 a small faint round ◎ (like Ozymandias), bottom left just above the tab bar on every tab, and one in every modal header beside ✕; amber while pick mode is on |
+| Q236 | How long pick mode lasts (§8.16) | ⚑ Since v1.58.0 (like Ozymandias): stays on until a ◎ or the bar is tapped, or Esc; Alt+P toggles while the switch is on (was one tap) |
+| Q237 | What the pick text says (§8.16) | ⚑ Since v1.58.0, Ozymandias's PDASH pick lines: `Enso pick:` tab / `Where:` modals > groups / `Element:` kind "name" / `Selector:` CSS / `Screen:` WxH / build stamp (was one 📍 line) |
 | Q238 | Alarms tab as a menu (§8.5) | ⚑ Announce and Quiet the house stay on the tab; below them three buttons (⏰ Alarms, ⏱ Rolling timers, 🫧 Machines), each opens in a modal |
 | Q239 | Cooking timer kinds (§7D.8) | ⚑ Air fryer 🍟, Stove 🍳, Oven 🔥, Microwave ⚡, Other ⏲️, plus an optional name ("Oven 2") |
 | Q240 | Cooking timer minutes (§7D.8) | ⚑ Any whole number 1–600, with quick chips 1–60 |
@@ -250,3 +250,11 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q245 | How the Chores tab shows its sections (§8.15) | ⚑ A menu of ✅ Today · 🧽 Messes · 📋 All chores, each in its own modal, as Settings and Alarms (was all three stacked on the tab) |
 | Q247 | Where Settings → ℹ️ About sits (§8.6) | ⚑ Last button in the grid, after 📊 Status, for every member |
 | Q248 | The About credit line (§8.6) | ⚑ "Developed by MojoSOGO · with Claude" (no other author is named in SPEC or README) |
+| Q249 | Bounty points (§7B.8) | ⚑ Whole points 1–10 per job |
+| Q250 | Who a multi-step chore bounty pays (§7B.8) | ⚑ Whoever finishes the last step (the run's `done_by`); Undo of a finished run drops it |
+| Q251 | A one-off's dib (§7B.8) | ⚑ I'll do it holds it 3 h, then it lapses by itself; one live dib per person; Not yet gives the doer a fresh dib |
+| Q252 | An admin's own Done (§7B.8) | ⚑ OK'd at once by them; no waiting push |
+| Q253 | Score windows (§7B.8) | ⚑ This week (Sunday-start, as turns) and this calendar month, by the day the work was done, OK'd points only |
+| Q254 | Bounty pushes (§7B.8) | ⚑ A new one-off pushes everyone but the poster once; a pending earning pushes every admin once; never spoken in the house; no repeats |
+| Q255 | Where bounties sit (§8.15) | ⚑ 🪙 Bounties and 🏅 Score join the Chores menu: Today · Bounties · Messes · All chores · Score |
+| Q256 | Who sets, approves and sees bounties (§7B.8) | **Decided by MojoSOGO 2026-10-11:** only admins set them (ADM); points count after an admin's OK (CNF, "child claims bounty and it goes pending; then gets adults approval via app"); everyone sees everyone's score, no ranks (PUB) |

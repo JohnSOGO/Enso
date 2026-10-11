@@ -12,7 +12,7 @@ import s from './ChoresToday.module.css';
 export interface Run {
   id: string; choreId: string; title: string; doneMeans: string | null; timing: ChoreTiming; time: string;
   step: number; steps: ChoreStep[]; assigneeId: string | null; personId: string | null;
-  doneAt: string | null; doneBy: string | null; nextDueAt: string | null; ringing: boolean; areaCount: number;
+  doneAt: string | null; doneBy: string | null; nextDueAt: string | null; ringing: boolean; areaCount: number; bounty: number | null;
 }
 
 const SCOPES = [['mine', 'Mine'], ['everyone', 'Everyone']] as const;
@@ -67,6 +67,7 @@ export function ChoresToday({ onOpenAreas }: { onOpenAreas: (choreId: string) =>
         <span className={s.what}>
           <span className={ls.title}>
             {r.title}
+            {r.bounty && <> · 🪙 {r.bounty}</>}
             {multi && !finished && <span className="muted"> — {r.step + 1}/{r.steps.length} {r.steps[r.step]?.title}</span>}
           </span>
           {r.doneMeans && <span className={`muted ${s.doneMeans}`}>{r.doneMeans}</span>}
