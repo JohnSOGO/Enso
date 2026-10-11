@@ -7,6 +7,32 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.60.0: A bounty's picture (placement-advisor)
+
+- **Ask:** SPEC 3.02 §7B.8 "A bounty's picture":
+  - PUT/GET /bounties/{id}/photo (admins set it; anyone reads it).
+  - `Bounty.hasPhoto` and migration 0046 (`bounties.photo_key`).
+  - The picture is deleted when the bounty is paid or deleted.
+  - §8.15b: the ＋ Bounty sheet gets 📷 Add photo (sent after Post); the card shows a thumbnail; an admin's card gets 📷 Add/Replace.
+- **Verdict:** EXISTING, no new row, plus a new migration 0046 and its test. By file:
+  - routes/bounties.ts: both routes, plus the deletes on OK, on an admin's instant Done, and on DELETE.
+  - photo-store.ts: the `'bounties'` prefix.
+  - shared/bounties.ts: BountyRow.photo_key and Bounty.hasPhoto.
+  - BountyForm.tsx: the photo pick, PUT after Post.
+  - Bounties.tsx: the thumbnail and the admin 📷.
+- **Flow stage:** route → persist (D1 + R2 via photo-store.ts) → render. No new rule.
+- **Why:** bounties.ts already owns the bounty, `loadBounty`/`view`, and every point where a bounty becomes paid or deleted, so the deletes must live there. This mirrors v1.59.0.
+- **Rejected:**
+  - A routes/bounty-photos.ts now: it needs exported loaders, and the deletes stay behind anyway.
+  - A shared `canSetPhoto` rule: it is one status check.
+  - A vocab entry.
+  - Deleting on Not yet: the bounty is still live.
+- **Caps:** routes/bounties.ts 199 → 228/300 (band at 270), with a second photo route pair in one file. Bounties.tsx 148 → 153/300. BountyForm.tsx 45 → 73/300. shared/bounties.ts ~128/300. photo-store.ts 35/300. Nothing newly in the band; no re-pins.
+- **Seam named for next time:** both photo route pairs + dropPhoto → `src/worker/routes/bounty-photos.ts`, with bounties.ts exporting loadBounty/pending (the lists.ts/item-photos.ts pattern). Extract when bounties.ts would pass ~250.
+- **Sources read:** docs/module-ownership.md (photo and bounty rows), docs/placement-receipts.md (v1.59.0, steward pass 17), scripts/arch.ts (caps), SPEC.md §7B.8 "A bounty's picture", src/worker/routes/bounties.ts (199 lines). Line counts and wire types for photo-store.ts, shared/bounties.ts, BountyForm.tsx, Bounties.tsx, BountyDone.tsx and earnings.ts.
+
+---
+
 ## 2026-10-11 — Steward pass 17, whole tree (code-steward)
 
 - **Run:** after the v1.58.0 release (SPEC 2.99 §8.16, pick mode like Ozymandias, with the ◎ button). Also covers v1.54.1–v1.57.1 (FunHouse for machines, custom minutes, poller cursor, two machines buttons, Chores menu, tagline, Settings About, bounties and score with migration 0044, shorter thread pings). Audited e21ab6c..265334e.
