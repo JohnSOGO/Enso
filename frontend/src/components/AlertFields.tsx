@@ -1,6 +1,7 @@
 // SPEC §8.5 — fields shared by the alarm, timer and chore forms: day chips + days text,
 // channel checkboxes and the flags ⇄ channels mapping (§9.4b), repeat-alert options. Each form keeps its own state and labels.
 import { CHANNEL, WEEKDAY, type Channel, type Weekday } from '../../../src/shared/vocab';
+import { useIsFounder } from '../state';
 
 export const SHORT: Record<Weekday, string> = { SU: 'Sun', MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat' };
 export const WEEKDAYS: Weekday[] = ['MO', 'TU', 'WE', 'TH', 'FR'];
@@ -42,9 +43,9 @@ export const CHANNEL_NAME: Record<Channel, string> = { push: 'Phone', house: 'Ho
 /** A form's one tick per channel. */
 export type ChannelFlags = Record<Channel, boolean>;
 
-/** The ticks a stored channel list shows as; none stored (a new alert) → Phone only. */
-export function flagsOf(channels?: readonly Channel[]): ChannelFlags {
-  const on = channels ?? ['push'];
+/** The ticks a stored channel list shows as; none stored (a new alert) → Phone, plus FunHouse for the founder (§9.4b Q230). */
+export function flagsOf(channels?: readonly Channel[], funhouseByDefault = false): ChannelFlags {
+  const on: readonly Channel[] = channels ?? (funhouseByDefault ? ['push', 'funhouse'] : ['push']);
   return Object.fromEntries(CHANNEL.map((c) => [c, on.includes(c)])) as ChannelFlags;
 }
 
@@ -57,14 +58,15 @@ export function pickOneWay(verb: string): string {
   return `Pick at least one way to ${verb} (${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}).`;
 }
 
-/** The 📱 Phone / 🔊 House / 🎪 FunHouse "Alert via" checkboxes. */
+/** The 📱 Phone / 🔊 House / 🎪 FunHouse "Alert via" checkboxes; 🎪 only for the founder or when already ticked (§9.4b Q230). */
 export function ChannelChecks({ value, onChange, label = 'Alert via' }: {
   value: ChannelFlags; onChange: (c: ChannelFlags) => void; label?: string;
 }) {
   const flags = flagsOf(channelsOf(value)); // only the channel keys, whatever else the form's state holds
+  const founder = useIsFounder();
   return (
     <div className="row wrap" style={{ marginBottom: 12 }} role="group" aria-label={label}>
-      {CHANNEL.map((c) => (
+      {CHANNEL.filter((c) => c !== 'funhouse' || founder || flags.funhouse).map((c) => (
         <label key={c} className="chip" style={{ padding: '4px 8px' }}>
           <input type="checkbox" checked={flags[c]} onChange={(e) => onChange({ ...flags, [c]: e.target.checked })} /> {CHANNEL_ICON[c]} {CHANNEL_NAME[c]}
         </label>

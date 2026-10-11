@@ -7,7 +7,7 @@ import { Announce } from './Announce';
 import { HouseQuiet } from './HouseQuiet';
 import { ChannelChecks, DayChips, RenotifySelect, SHORT, channelsOf, daysText, flagsOf, pickOneWay } from './AlertFields';
 import { del, errorText, get, patch, post } from '../api';
-import { useApp } from '../state';
+import { useApp, useIsFounder } from '../state';
 import { WEEKDAY, type Channel, type Weekday } from '../../../src/shared/vocab';
 import { utcToLocal, weekdayOf } from '../../../src/shared/time';
 import { canChange } from '../../../src/shared/roles';
@@ -77,11 +77,12 @@ function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
 
 export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: () => void }) {
   const { me, members, refresh } = useApp();
+  const founder = useIsFounder();
   const init = useMemo(() => ({
     title: alarm?.title ?? '', time: alarm?.time ?? '08:00', days: alarm?.days ?? ([] as Weekday[]),
-    ...flagsOf(alarm?.channels),
+    ...flagsOf(alarm?.channels, founder),
     renotify: alarm?.renotifyMin ? String(alarm.renotifyMin) : 'off', assignedTo: alarm?.assignedTo ?? [],
-  }), [alarm]);
+  }), [alarm, founder]);
   const [f, setF] = useState(init);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

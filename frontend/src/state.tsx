@@ -55,6 +55,12 @@ export function useApp(): Ctx {
   return c;
 }
 
+/** §6.3: whether I am the founder (from the members list; false until it loads). */
+export function useIsFounder(): boolean {
+  const { me, members } = useApp();
+  return members.some((m) => m.id === me.id && m.isFounder);
+}
+
 export function AppProvider({ me, onMe, children }: { me: Me; onMe: (m: Me | null) => void; children: ReactNode }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [settings, setSettings] = useState({ householdName: 'Home', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });

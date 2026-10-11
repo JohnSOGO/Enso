@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
 import { del, errorText, get, patch, post, put } from '../api';
-import { useApp } from '../state';
+import { useApp, useIsFounder } from '../state';
 import { WEEKDAY } from '../../../src/shared/vocab';
 import { weekdayOf } from '../../../src/shared/time';
 import { canChange } from '../../../src/shared/roles';
@@ -21,11 +21,11 @@ interface Form extends RepeatValue, ReminderValue {
   assignedTo: string[]; optional: boolean; emoji: string;
 }
 
-function blank(date: string): Form {
+function blank(date: string, founder: boolean): Form {
   return {
     title: '', address: '', bring: [], notes: '', date, allDay: false, startTime: '09:00', endTime: '', endDate: date,
     repeat: 'none', byDay: [WEEKDAY[weekdayOf(date)]], weeks: ownWeek(date), until: '', assignedTo: [], optional: false, emoji: '',
-    ...reminderOf(null),
+    ...reminderOf(null, founder),
   };
 }
 
@@ -59,7 +59,8 @@ interface Props {
 
 export function EventForm({ eventId, date, onClose }: Props) {
   const { me, members, refresh } = useApp();
-  const [form, setForm] = useState<Form | null>(eventId ? null : blank(date));
+  const founder = useIsFounder();
+  const [form, setForm] = useState<Form | null>(eventId ? null : blank(date, founder));
   const [initial, setInitial] = useState<string>(JSON.stringify(form));
   const [meta, setMeta] = useState<{ createdBy: string; recurring: boolean; thingId: string | null; optional: boolean; on: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +122,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
       {meta?.thingId && <FromThing thingId={meta.thingId} />}
       {form && (
         <fieldset disabled={!canEdit || busy} style={{ border: 0, padding: 0 }}>
-          {canEdit && <EventFillBar form={form} opened={eventId ? null : blank(date)} onFill={setForm} />}
+          {canEdit && <EventFillBar form={form} opened={eventId ? null : blank(date, founder)} onFill={setForm} />}
           {!canEdit && <p className="muted" style={{ marginBottom: 10 }}>Only the creator or an admin can change this event.</p>}
           <label className="field"><span>Title</span>
             <input value={form.title} maxLength={ALERT_TITLE_MAX} onChange={(e) => set('title', e.target.value)} autoFocus={!eventId} />
