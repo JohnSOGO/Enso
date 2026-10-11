@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Steward pass 14, whole tree (code-steward)
+
+- **Run:** after the v1.50.0 release (SPEC 2.82 §9.4a, GET /ops/pings + home/funhouse-poller.ts, PR #50), with v1.49.2 (PR #49); audited 3b9b2cb against 2542f2c.
+- **Verdict:** SOUND. Typecheck green, 770/770 tests (100 files), arch:audit quiet (engine.ts 86%, tick.ts 118/148).
+- **Placement audit:** 2 receipts checked against 2 code commits (973c28b, df9b2ef); each landed as its verdict said (opsGate file-local in ops.ts, FOUNDER_PING shared in deliveries.ts, new home/funhouse-poller.ts row, home/ LAYERS gains node:fs). 0 code commits without a receipt.
+- **Top finding:** test/roles-api.test.ts A9 does about 44 sequential Worker round trips under the default 5 s timeout and timed out twice under full parallel load during the v1.50.0 deploy (passes alone and with --maxWorkers=4). Give it an explicit 30_000 timeout or split it in two; no global testTimeout.
+- **Handoffs:** 2 to worker, waiting on MojoSOGO's pick (A9 timeout; the tick.ts map row still says only the house row is skipped for an away fire, but since v1.49.2 push rows are too). Still open, all LOW: pass 11's two §7D notes, pass 10's house-row helper note, the snooze-keeps-away test.
+- **Restraint:** the poller's `Ping` type repeats deliveries.ts `OpsPing` across the home/ boundary (an HTTP contract, guarded by tests); the FOUNDER_PING TS mirror in alertSource is documented; opsGate stays file-local; the same-millisecond `created_at > after` case is negligible at a few pings an hour; the hard-coded poller URLs follow the spec.
+
+---
+
 ## 2026-10-11 — The same pings on the FunHouse: GET /ops/pings + home poller (placement-advisor)
 
 - **Ask:** SPEC §9.4a (v1.50.0, SPEC 2.82) and the API row `GET /ops/pings?after=`, asked by MojoSOGO ("also not msg funhouse; that best"). The read route lists the founder pings of the last hour after `after`, with the same bearer as `/ops/notify`; the home-side `home/funhouse-poller.ts` (+ `.cmd`, built by `npm run build:home`) polls it and POSTs Claude's pings (🤖 / 🧵) to the FunHouse bridge at 127.0.0.1:8765, at most one per poll.
