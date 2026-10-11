@@ -121,7 +121,8 @@ bounties.post('/bounties/:id/done', requireMember, async (c) => {
   const w = await earningInsert(db, { bountyId: l.b.id }, finisherOf(me), l.b.points, l.b.title, now);
   try {
     await db.batch(w.stmts);
-  } catch {
+  } catch (e) {
+    if (!/UNIQUE|constraint/i.test(String(e))) throw e; // a real failure is a 500, never "someone said Done first"
     return refuse(c, 'That bounty is waiting for OK.'); // uq_earning_bounty: someone said Done first
   }
   if (w.pushIds.length) await sendPushDeliveries(c.env, w.pushIds, now);

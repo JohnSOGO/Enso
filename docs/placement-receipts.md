@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.60.5: Bounty Done catch re-throws; losing-tap tests; PickGrid stops listing callers (placement-advisor)
+
+- **Ask:** steward pass 17 items 1 and 2 (MojoSOGO "BOTH"). (1) POST /bounties/:id/done's bare catch re-throws unless /UNIQUE|constraint/, as machines.ts and cooking.ts save() do; tests for the losing-tap guards. (2) PickGrid's header comment and its module-ownership row stop listing callers (Chores was missing).
+- **Verdict:** src/worker/routes/bounties.ts with test/bounties-api.test.ts and test/cooking.test.ts [EXISTING]; frontend/src/components/PickGrid.tsx and the PickGrid map row [EXISTING].
+- **Flow stage:** persist (route save) for item 1; render (comment only) for item 2.
+- **Why:** the route stage owns "save in one batch, 409 when another tap won"; copying the siblings' guard keeps the three routes the same with no new shape. No shared regex helper for three one-liners. The bounty refusal keeps `bounty_state`. Tests race two real taps (no test hooks in routes); machines' race was already L10. Listing callers restated what imports show and had drifted.
+- **Caps:** bounties.ts ~229/300; PickGrid.tsx unchanged. Nothing in the band.
+- **Sources read:** scripts/arch.ts; docs/module-ownership.md; routes/bounties.ts, machines.ts, cooking.ts catch blocks; PickGrid.tsx; the three test files.
+
 ## 2026-10-11 — v1.60.4: standalone document height 100lvh so the tab bar isn't clipped (placement-advisor)
 
 - **Ask:** SPEC 3.06 §8.1 "Flush at the bottom", follow-up to v1.60.2. On the iOS 26 installed app (viewport-fit=cover, black-translucent) the tab bar was cut off about 59pt above the screen bottom: `html` 100%/dvh is short by the top safe-area inset, `body { overflow: hidden }` clips there, only 100lvh is the full screen. Add `@media (display-mode: standalone) { html { height: 100lvh; } }` in theme.css; `.app`'s standalone `height: 100vh` becomes `100lvh`.

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.06 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 3.07 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2552,6 +2552,8 @@ earning OK'd) or deleted ⚑ Q260.
 | BT20 | C (not the earner) PUTs a photo; B PUTs one after OK; a bad type | 403; 409; 400 |
 | BT21 | B PUTs a second photo; an admin OKs; another earning with a photo gets Not yet; a chore run with a photo is undone | one object (the old one gone); the object gone and GET → 404 after OK; gone after Not yet; gone after Undo |
 | BT22 | an admin posts a bounty and PUTs a picture; a member PUTs one; the bounty is OK'd; another is deleted | 204 and `hasPhoto: true`, anyone GETs it; 403; the object gone after OK; gone after delete |
+| BT23 | B taps Done twice at the same moment | one 200 pending, one 409 `bounty_state`; one live earning. Any other save error is a 500, never "waiting for OK" |
+| BT24 | C and B tap I'll do it at the same moment | one 200, one 409 `bounty_state`; the bounty is held by the 200's member |
 | BT-M3 | migration check (§4.2zs) | bounties written before 0046 survive with `photo_key` NULL; `foreign_key_check` empty |
 | BT-M2 | migration check (§4.2zr) | earnings written before 0045 survive with `photo_key` NULL; `foreign_key_check` empty |
 | BT-M | migration check (§4.2zq) | rows written before 0044 survive; `chores.bounty` and the new `deliveries` columns NULL on them; `foreign_key_check` empty |
@@ -2957,6 +2959,7 @@ each time something goes in, as many as they like at once, and it stays on the l
 | CK7 | ✕ on a running timer; then GET and any action on it | fire closed `removed`; not listed; 404 |
 | CK8 | `cookExpired`: off since yesterday 18:00; running across midnight; done 23:58 with 2 alerts sent; done yesterday with 4 sent; off since today 00:05 (Los Angeles) | true / false / false / true / false |
 | CK9 | tick after local midnight with an off timer from yesterday and a running one | the off one closed (`closed_by` NULL), the running one stays |
+| CK10 | two Stop taps at the same moment on a running timer | one 200, one 409 with a message; its fire closed `removed` once |
 | CK-M | migration check (§4.2zp) | the three machines and their open fires unchanged; a cooking row and its fire can be written |
 
 ---
