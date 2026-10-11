@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.55.0: Chores tab becomes a section menu (placement-advisor)
+
+- **Ask:** Make the 🧹 Chores tab a menu like Alarms/Settings: heading Chores, a PickGrid of ✅ Today · 🧽 Messes · 📋 All chores, and a tap opens that section in a Modal titled emoji + name, with nothing inside the sections changing (SPEC 2.93 §8.15, ⚑ Q245).
+- **Verdict:** frontend/src/components/Chores.tsx [EXISTING]. The All chores list moves into a local AllChoresSection in the same file. The map row is reworded to describe the menu.
+- **Flow stage:** render
+- **Why:** This only regroups the sections Chores.tsx already lays out, using the pattern from Alarms.tsx (§8.5, v1.53.0) and Settings.tsx (§8.6) with PickGrid and Modal, which hold no state. No rule, route or vocabulary involved. The fetch stays in ChoresTab because ChoresToday's 📋 needs the chores list while All chores is closed. Rejected: a new ChoresAll.tsx (needless at about 120 lines). Rejected: a shared section-menu helper for Alarms/Settings/Chores (speculative). Rejected: dropping Messes' own h2 (widens scope into Messes.tsx against "nothing inside changes").
+- **Caps:** Chores.tsx 84/300 → about 120/300. No file enters the band; CEILINGS unchanged.
+- **Reorganizer:** none needed.
+
+---
+
 ## 2026-10-11 — v1.54.4: Alarms tab splits Machines into Washing machines and Cooking machines (placement-advisor)
 
 - **Ask:** SPEC 2.92 §8.5: the Alarms tab PickGrid goes from three buttons to four (⏰ Alarms, ⏱ Rolling timers, 🧺 Washing machines, 🍳 Cooking machines). Each machines button opens its own modal: MachinesSection alone, CookingSection alone. The groups' own h3 headings go, since the modal title names them.
