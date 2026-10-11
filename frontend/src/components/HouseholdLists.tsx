@@ -8,6 +8,7 @@ import { Shows } from './Shows';
 import { ItemForm, type Item } from './HouseholdListItemForm';
 import { ListOptions, NewListForm, type ListSummary } from './HouseholdListOptions';
 import { ListPicker, pickerEntries } from './ListPicker';
+import { PickFace } from './PickGrid';
 import { ItemPhoto, type Snap } from './ItemPhoto';
 import { errorText, get, patch, post, upload } from '../api';
 import { useApp } from '../state';
@@ -78,9 +79,7 @@ export function HouseholdLists({ pickRequest }: { pickRequest: number }) {
     <div className={s.screen}>
       <div className={s.picker}>
         <button className={s.chosen} aria-haspopup="dialog" onClick={() => setPicking(true)}>
-          <span aria-hidden className={s.pickEmoji}>{shown?.emoji ?? '🛒'}</span>
-          <span className={s.pickName}>{shown?.label ?? (lists === null ? 'Loading…' : 'No lists')}</span>
-          {shown?.count != null && <span className={`muted ${s.pickCount}`}>{shown.count}</span>}
+          <PickFace emoji={shown?.emoji ?? '🛒'} label={shown?.label ?? (lists === null ? 'Loading…' : 'No lists')} count={shown?.count} />
           <span aria-hidden className="muted">▾</span>
         </button>
         {current && canChange(current.createdBy, me) && (

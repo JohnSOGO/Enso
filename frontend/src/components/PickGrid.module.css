@@ -1,0 +1,10 @@
+/* The popup grid of emoji buttons (§8.6 Settings, §8.8 Lists): emoji, name, optional count. */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 359px) { .grid { grid-template-columns: 1fr; } }
+.pick { min-height: 52px; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 6px 8px; text-align: left; }
+.pick[aria-pressed='true'] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.pickEmoji { flex: none; font-size: 1.3rem; line-height: 1; }
+.pickName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pickCount { flex: none; font-size: .85rem; font-variant-numeric: tabular-nums; }
+/* In the grid a long name wraps to two lines rather than cutting off. */
+.grid .pickName { white-space: normal; overflow-wrap: break-word; hyphens: auto; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }

@@ -7,6 +7,19 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Split Settings into its areas, shared PickGrid (reorganizer, ahead of v1.49.0)
+
+- **Trigger:** placement-advisor verdict REORGANIZER FIRST for v1.49.0: Settings.tsx (180/207, Me + Household + Members + Status in one file) is the owner the next Settings change lands near, and the Lists popup grid is about to gain a second user in Settings.
+- **Seam moved:**
+  - Me's display name + color controls from `frontend/src/components/Settings.tsx` to `SettingsMe.tsx` [NEW row].
+  - Household's name / time zone form + DaysOff to `SettingsHousehold.tsx` [NEW row].
+  - The members table (setAdmin and its asks, Disable / Enable) + Invites to `SettingsMembers.tsx` [NEW row].
+  - StatusSection, HouseLine, STATUS_BADGE to `SettingsStatus.tsx` [NEW row].
+  - (Done by the coordinating session, reviewed here) the pick grid styles from `HouseholdLists.module.css` to `PickGrid.tsx` + `PickGrid.module.css` [NEW row]; ListPicker renders PickGrid, the Lists button renders PickFace.
+- **Room opened:** Settings.tsx: 180 → 41 lines; cap 207 → 81 (41 + WORKING_BUFFER). New files 31–53 lines, all under 300.
+- **Behavior:** preserved; typecheck, npm test and arch:audit green. Settings.tsx keeps the Section wrapper and composes the same sections, headings (h3 Days off, Members) and controls in the same order. It shows Status only once status has loaded, as before. The requests are unchanged (PATCH /me, PATCH /settings, PATCH /members/{id}, POST /auth/logout, GET /settings). PickGrid has byte-identical CSS rules, aria-pressed still boolean on list entries and absent on ＋ New list…, and the Lists button still truncates (the two-line wrap applies only inside the grid). One deliberate difference: each area has its own useAction, so a failed name / color save now shows its error above the Display name field (it used to show at the top of Me), and a failed members action shows under the Members heading (it used to show at the top of Household). Nothing changes on screen when no action fails.
+- **Restraint:** one file per area the advisor named, no new abstraction. MyAlerts, OptionalItems, PhoneAlerts and HouseSpeakers are untouched, and so are the h3 headings and Section. No pick grid in Settings yet; that is the feature's work.
+
 ## 2026-10-11 — My alerts: push history in Settings, a push tap opens its card (placement-advisor)
 
 - **Ask:** SPEC §9.5 (v1.48.0, SPEC 2.77; migration 0041, §4.2zn). Settings gains an Alerts section with my newest 200 push deliveries I haven't hidden; a tap opens a card (title as the phone showed it, whole message, time, source, alert number, phone result); ❌ hides one, Clear all hides all of mine; tapping a phone notification opens Settings → Alerts on its card. Rows are kept, so Status and the ops hourly limit still count them.
