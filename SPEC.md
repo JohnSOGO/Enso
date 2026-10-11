@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.92 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.94 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3478,24 +3478,26 @@ success the box closes (there is no toast in the app). What happens is §9.3.
 Right under it, **🤫 Quiet the house** (§9.2b): 1 hour · 2 hours · 4 hours · Rest of today, or, while quiet,
 how long is left, who set it, and **Turn off now**.
 
-Then a **menu of three buttons**, the same grid as Settings (§8.6, `PickGrid`) ⚑ (Q238): **⏰ Alarms**,
-**⏱ Rolling timers**, **🫧 Machines**. Asked by MojoSOGO 2026-10-11 ("alarms needs its own modal"). A tap opens
+Then a **menu of four buttons**, the same grid as Settings (§8.6, `PickGrid`) ⚑ (Q238): **⏰ Alarms**,
+**⏱ Rolling timers**, **🧺 Washing machines**, **🍳 Cooking machines**. Asked by MojoSOGO 2026-10-11 ("alarms needs its own modal";
+then "have two machines buttons; washing machines; cooking machines and move cooking to that new button"). A tap opens
 that section in a modal titled with its emoji and name; ✕, Escape or a tap outside closes it back to the tab. An
 alarm or timer form opens on top of its section and closing it returns there. Nothing in a section changed what it
 does; only where it sits. Alarms and Rolling timers are single-line lists (per the table rules), each with a
-**＋ Add** button at its top; Machines is one fixed card per machine and has no ＋ Add. Chores moved to their own
+**＋ Add** button at its top; Washing machines is one fixed card per machine and has no ＋ Add; Cooking machines has
+**＋ Cooking timer**. Chores moved to their own
 tab in v1.28.0 (§8.15).
 
 ```
 Alarms
 [ 📢 Announce ]
 🤫 Quiet the house  [1 hour] [2 hours] [4 hours] [Rest of today]
-[ ⏰ Alarms        ] [ ⏱ Rolling timers ]
-[ 🫧 Machines      ]
+[ ⏰ Alarms           ] [ ⏱ Rolling timers  ]
+[ 🧺 Washing machines ] [ 🍳 Cooking machines ]
 ```
 
 **Acceptance (AM1–AM3, manual on the iPhone at 320 px):** AM1 the tab shows Announce, Quiet the house and the
-three buttons; AM2 each button opens its section titled with its name, and closing returns to the tab; AM3 ＋ Add
+four buttons; AM2 each button opens its section titled with its name, and closing returns to the tab; AM3 ＋ Add
 or a row opens its form over the section, and Save or Cancel returns to the section with the list up to date.
 
 **⏰ Alarms** (scheduled) — one row per alarm, sorted by time of day, then title:
@@ -3538,14 +3540,14 @@ each day**, channels, repeat alert every, assigned to, Delete).
   Filling only one, `from = to`, or an interval not shorter than the range is refused by the
   server; the message shows inside the form.
 
-**🫧 Machines** — every machine in the house (§7D): clothes washer, clothes dryer, dish washer. One card
+**🧺 Washing machines** — the fixed machines (§7D): clothes washer, clothes dryer, dish washer. One card
 per machine, in `MACHINE` order. Each card: the machine (🫧 Clothes washer, 🌀 Clothes dryer,
 🍽️ Dish washer ⚑), a state badge (**free** neutral ·
 **running** green · **DONE — waiting** amber), whose load and the done-at time, and its
 actions on a second line. At 320 px:
 
 ```
-🫧 Machines                                   (modal title)
+🧺 Washing machines                           (modal title)
 Start a machine. When it's done, every phone hears; the speakers too when someone is picked.
 🔔 Alerts sound weekdays 5:30pm–8:30pm, weekends 9:00am–9:00pm; outside those hours they wait. [Edit hours]
 ┌──────────────────────────────────────┐
@@ -3591,8 +3593,8 @@ Start a machine. When it's done, every phone hears; the speakers too when someon
   with `role="alert"`. Clear asks once ("Clear the washer? Nothing will ring.").
 - Done-at is household local time; the cards re-read `/machines` on every app refresh.
 
-**Two groups** (§7D.8, MojoSOGO 2026-10-11): the Machines modal has **🧺 Washing machines** (the cards above, with
-the intro and alert-hours lines, unchanged) and below it **🍳 Cooking** ⚑ Q243:
+**🍳 Cooking machines** (§7D.8, MojoSOGO 2026-10-11): its own button and modal, apart from 🧺 Washing machines
+(which keeps the cards above, the intro and the alert-hours lines) ⚑ Q243:
 - a **＋ Cooking timer** button opens the create box: *What?* one chip per `COOK_KIND` (Air fryer preselected), an
   optional *Name* field ("Oven 2", 16 px), *🔔 Alert when done (optional)* as in the chooser (me preselected),
   *How long?* chips **1 · 3 · 5 · 10 · 15 · 20 · 30 · 45 · 60** and, right after 60 on the same row, a small
@@ -4121,8 +4123,19 @@ Hoosiers  1986            🍅 —    💵 Rent
 ### 8.15 Chores (the 🧹 tab) — asked by MojoSOGO 2026-10-05
 
 "Chores needs its own section." The **🧹 Chores** tab holds everything about chores that used to be split between
-Alarms → Chores and Lists → Today ⚑ Q166: **Today** at the top (ticking off is the daily use), then **All chores**
-(the chore list of §8.5, with ＋ Add), and from either, a chore's **What done looks like** sheet.
+Alarms → Chores and Lists → Today ⚑ Q166: **Today** (ticking off is the daily use), **Messes** (§8.15a) and **All
+chores** (the chore list of §8.5, with ＋ Add), and from Today or All chores, a chore's **What done looks like** sheet.
+
+**A menu** (v1.55.0, asked by MojoSOGO 2026-10-11: "Chores needs a modal after pressed, which chore sub category are
+we pushing into") ⚑ Q245: under the heading "Chores", the same grid as Settings and Alarms (§8.6, `PickGrid`) of
+**✅ Today**, **🧽 Messes**, **📋 All chores**, Today first. A tap opens that section in a modal titled with its emoji
+and name; ✕, Escape or a tap outside closes it back to the tab. A chore form, What done looks like sheet or Report a
+mess sheet opens on top of its section and closing it returns there. Nothing inside a section changed; only where it
+sits. The mess banner (§8.15a) stays on every screen.
+
+Acceptance (CM1–CM3): CM1 the tab shows the three buttons and no list; CM2 each button opens its section in a modal
+and ✕ returns to the grid; CM3 ticking a Today step, tapping a chore row, and 📸 Report a mess all work from inside
+their modal.
 
 **Today** — a switch **Mine | Everyone** (default Mine; remembered):
 
@@ -4196,7 +4209,7 @@ Today row's 📋:
 - The photo is a small thumbnail (tap for full size). The two buttons are ≥ 44 px. Answering removes the row.
 - It is not red and makes no sound; it stays until I answer, even while the mess is on To talk about.
 
-**Messes** — a section of the 🧹 Chores tab between Today and All chores:
+**Messes** — a section of the 🧹 Chores tab, the 🧽 Messes button of its menu (§8.15):
 
 ```
 Messes                                    [📸 Report a mess]
@@ -4230,7 +4243,7 @@ Balances
 ### 8.16 🎯 Point at it — name what I tapped
 
 Asked by MojoSOGO 2026-10-11: "click the screen and the control … its location/path in the display can be captured
-so I don't have to over explain", without clashing with what a tap already does. Since v1.55.0 it works like the
+so I don't have to over explain", without clashing with what a tap already does. Since v1.56.0 it works like the
 Ozymandias dashboard's pick mode (MojoSOGO 2026-10-11: "look at ozymandias and do it like that"): a **pick mode** that
 stays on, where every tap is captured, swallowed, and copied as a few lines he pastes into a Claude thread.
 
@@ -4269,7 +4282,7 @@ stays on, where every tap is captured, swallowed, and copied as a few lines he p
   Element: checkbox "FunHouse"
   Selector: dialog > div._body_x1 > label:nth-of-type(2) > input
   Screen: 430x932 (phone)
-  v1.55.0 · 1a2b3c4
+  v1.56.0 · 1a2b3c4
   ```
 - It names what is already on screen; it reads no data from the server and is stored nowhere.
 

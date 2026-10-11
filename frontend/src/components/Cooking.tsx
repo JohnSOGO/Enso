@@ -1,4 +1,4 @@
-// SPEC §8.5, §7D.8 — the 🍳 Cooking group of the Machines section: ＋ Cooking timer, then one card per open timer with
+// SPEC §8.5, §7D.8 — the 🍳 Cooking machines section of the Alarms tab: ＋ Cooking timer, then one card per open timer with
 // its red ✕. The box is CookBox.tsx.
 import { useEffect, useState } from 'react';
 import { CookBox, COOK_GLYPH } from './CookBox';
@@ -37,9 +37,9 @@ export function CookingSection() {
     + ` · ${t.alertId ? `alerts ${memberById(t.alertId)?.displayName ?? 'unknown member'}` : 'phones only'}`;
 
   return (
-    <section className={s.section} aria-label="Cooking" style={{ marginTop: 16 }}>
+    <section className={s.section} aria-label="Cooking machines">
       <div className="row">
-        <h3 style={{ fontSize: '1rem', flex: 1 }}>🍳 Cooking</h3>
+        <span style={{ flex: 1 }} />
         <button className="primary" onClick={() => setBox({ editing: null })}>＋ Cooking timer</button>
       </div>
       {error && <div role="alert" className="alert-error">{error}</div>}

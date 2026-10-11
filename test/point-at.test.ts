@@ -17,13 +17,13 @@ const pieces = (more: Partial<PointPieces> = {}): PointPieces => ({
 
 describe('pickText — §8.16 PA1', () => {
   it('a line per piece: tab, Where, Element, Selector, Screen, stamp', () => {
-    expect(pickText(pieces(), 'v1.55.0 · 1a2b3c4', 430, 932)).toBe([
+    expect(pickText(pieces(), 'v1.56.0 · 1a2b3c4', 430, 932)).toBe([
       'Enso pick: ⚙ Settings',
       'Where: 🔔 Alerts > Morning pills',
       'Element: checkbox "FunHouse"',
       'Selector: dialog > label:nth-of-type(2) > input',
       'Screen: 430x932 (phone)',
-      'v1.55.0 · 1a2b3c4',
+      'v1.56.0 · 1a2b3c4',
     ].join('\n'));
   });
 

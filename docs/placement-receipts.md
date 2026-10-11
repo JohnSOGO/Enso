@@ -7,14 +7,33 @@ carry its result.
 
 ---
 
-## 2026-10-11 — v1.55.0: 🎯 pick mode stays on, Ozy-style text with a CSS selector, toast instead of modal (placement-advisor)
+## 2026-10-11 — v1.56.0: 🎯 pick mode stays on, Ozy-style text with a CSS selector, toast instead of modal (placement-advisor)
 
-- **Ask:** SPEC 2.92 §8.16 (modeled on the Ozymandias dashboard's pick mode). 🎯 turns pick mode on until 🎯 again, the bar, Esc, or Alt+P. While on: a top bar, a hover outline for a mouse (a class on the element under the pointer), a crosshair cursor. Every tap is captured, swallowed and copied, then shown in a toast (4 s, or 15 s with "Copy blocked"), with no 📍 Pointed at modal. The text becomes multi-line: `Enso pick: <tab>` / `Where:` modals and groups joined " > " / `Element: <kind> "<name>"` / `Selector:` (stops at the nearest id, else tag.class (first 2) with :nth-of-type where siblings share the tag, joined " > ") / `Screen: WxH` (phone below 700 wide) / build stamp.
+- **Ask:** SPEC 2.94 §8.16 (modeled on the Ozymandias dashboard's pick mode). 🎯 turns pick mode on until 🎯 again, the bar, Esc, or Alt+P. While on: a top bar, a hover outline for a mouse (a class on the element under the pointer), a crosshair cursor. Every tap is captured, swallowed and copied, then shown in a toast (4 s, or 15 s with "Copy blocked"), with no 📍 Pointed at modal. The text becomes multi-line: `Enso pick: <tab>` / `Where:` modals and groups joined " > " / `Element: <kind> "<name>"` / `Selector:` (stops at the nearest id, else tag.class (first 2) with :nth-of-type where siblings share the tag, joined " > ") / `Screen: WxH` (phone below 700 wide) / build stamp.
 - **Verdict:** frontend/src/point-line.ts, frontend/src/components/PointAtButton.tsx, frontend/src/components/PointAt.tsx (+ PointAt.module.css) [EXISTING]. Build waited on the §8.16 text.
 - **Flow stage:** render and capture intent (PWA only); point-line.ts is the PWA's own naming rule.
 - **Why:** point-line.ts (91/300, one importer) already owns naming the tapped element. selectorFor is another way of naming it, and pickText replaces pointLine outright, so its concern stays one. A separate selector module was rejected as classitis at this size. PointAtButton.tsx (26/300) keeps the switch and the signal, which turns from arm into toggle; it holds no pick state. PointAt.tsx (74/300) already owns the capture-phase layer and the result display; swapping the modal for a toast and adding hover, crosshair and keys keeps it one concern (the pick layer). A generic Toast component was rejected (no second user). Threats avoided: module-level `let` for pick state; the phone/desktop size rule leaking into the layer (it lives in pickText); a stale hover class left on app elements after off or unmount; the copy moving out of the gesture handlers (v1.52.1).
 - **Caps:** point-line.ts ~130/300; PointAt.tsx ~120/300; PointAtButton.tsx ~26/300; PointAt.module.css ~35/300. Nothing in the band; no re-pins.
 - **Sources read:** docs/module-ownership.md (PointAt rows, state.tsx row), docs/placement-receipts.md (v1.52.0, v1.52.1), scripts/arch.ts, SPEC.md §8.16, frontend/src/point-line.ts, frontend/src/components/PointAt.tsx, frontend/src/components/PointAtButton.tsx, frontend/src/components/PointAt.module.css.
+## 2026-10-11 — v1.55.0: Chores tab becomes a section menu (placement-advisor)
+
+- **Ask:** Make the 🧹 Chores tab a menu like Alarms/Settings: heading Chores, a PickGrid of ✅ Today · 🧽 Messes · 📋 All chores, and a tap opens that section in a Modal titled emoji + name, with nothing inside the sections changing (SPEC 2.93 §8.15, ⚑ Q245).
+- **Verdict:** frontend/src/components/Chores.tsx [EXISTING]. The All chores list moves into a local AllChoresSection in the same file. The map row is reworded to describe the menu.
+- **Flow stage:** render
+- **Why:** This only regroups the sections Chores.tsx already lays out, using the pattern from Alarms.tsx (§8.5, v1.53.0) and Settings.tsx (§8.6) with PickGrid and Modal, which hold no state. No rule, route or vocabulary involved. The fetch stays in ChoresTab because ChoresToday's 📋 needs the chores list while All chores is closed. Rejected: a new ChoresAll.tsx (needless at about 120 lines). Rejected: a shared section-menu helper for Alarms/Settings/Chores (speculative). Rejected: dropping Messes' own h2 (widens scope into Messes.tsx against "nothing inside changes").
+- **Caps:** Chores.tsx 84/300 → about 120/300. No file enters the band; CEILINGS unchanged.
+- **Reorganizer:** none needed.
+
+---
+
+## 2026-10-11 — v1.54.4: Alarms tab splits Machines into Washing machines and Cooking machines (placement-advisor)
+
+- **Ask:** SPEC 2.92 §8.5: the Alarms tab PickGrid goes from three buttons to four (⏰ Alarms, ⏱ Rolling timers, 🧺 Washing machines, 🍳 Cooking machines). Each machines button opens its own modal: MachinesSection alone, CookingSection alone. The groups' own h3 headings go, since the modal title names them.
+- **Verdict:** frontend/src/components/Alarms.tsx (SECTIONS and body map); Machines.tsx and Cooking.tsx (heading removal only) [EXISTING]
+- **Flow stage:** render
+- **Why:** Alarms.tsx already owns which section is open, so a fourth PickGrid entry is a data change in its SECTIONS list. Each group file keeps its single concern and only loses the heading the Modal title now provides; Cooking keeps its ＋ Cooking timer row with a flex spacer. Rejected: a new "MachinesMenu" wrapper (a hop for no concern). Ownership rows for Alarms, Machines, Cooking and MachineHours corrected in the same commit.
+- **Caps:** Alarms.tsx about 172/300, Machines.tsx about 173/300, Cooking.tsx about 71/300. None in the warning band.
+- **Sources read:** Alarms.tsx, Machines.tsx, Cooking.tsx, docs/module-ownership.md, scripts/arch.ts, SPEC.md §8.5.
 
 ## 2026-10-11 — v1.54.2: Cooking box custom minutes box in the chip row (placement-advisor)
 
