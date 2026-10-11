@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.88 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.89 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3594,7 +3594,9 @@ Start a machine. When it's done, every phone hears; the speakers too when someon
 the intro and alert-hours lines, unchanged) and below it **🍳 Cooking** ⚑ Q243:
 - a **＋ Cooking timer** button opens the create box: *What?* one chip per `COOK_KIND` (Air fryer preselected), an
   optional *Name* field ("Oven 2", 16 px), *🔔 Alert when done (optional)* as in the chooser (me preselected),
-  *How long?* a minutes field with chips **1 · 3 · 5 · 10 · 15 · 20 · 30 · 45 · 60** that fill it, and **[Start]**.
+  *How long?* chips **1 · 3 · 5 · 10 · 15 · 20 · 30 · 45 · 60** and, right after 60 on the same row, a small
+  **custom** box (light gray "custom" placeholder, MojoSOGO 2026-10-11) for any whole number of minutes; a chip picks
+  its value and empties the box, typing in the box unpicks the chips; then **[Start]**.
 - one card per open timer, oldest first: emoji + label, a **red ✕** at its top right, the badge (running green /
   **DONE** amber / off neutral), `~14:05` (or `done 14:05`, or `12 min` when off) and `· alerts Sam` / `· phones only`.
   Actions: running **[Edit] [Stop]**; done **[Off]** **[Edit]**; off **[Start again]** **[Edit]**. Edit opens the

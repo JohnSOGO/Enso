@@ -1,12 +1,13 @@
 // SPEC §8.5, §7D.8 — the cooking-timer box: create one (Start) or edit one (Save). Holds only its draft.
 import { useState } from 'react';
 import { Modal } from './Modal';
-import { AlertWhenDone, Pick, bigChip } from './Machines';
+import { AlertWhenDone, Pick } from './Machines';
 import { errorText, patch, post } from '../api';
 import { useApp } from '../state';
 import { COOK_LABEL, COOK_MINUTES_MAX, COOK_NAME_MAX } from '../../../src/shared/cooking';
 import { COOK_KIND, type CookKind } from '../../../src/shared/vocab';
 import type { Cooking } from './Cooking';
+import s from './CookBox.module.css';
 
 export const COOK_GLYPH: Record<CookKind, string> = { air_fryer: '🍟', stove: '🍳', oven: '🔥', microwave: '⚡', other: '⏲️' }; // ⚑ Q239
 const CHIPS = [1, 3, 5, 10, 15, 20, 30, 45, 60] as const;
@@ -17,10 +18,12 @@ export function CookBox({ editing, onClose }: { editing: Cooking | null; onClose
   const [kind, setKind] = useState<CookKind>(editing?.kind ?? 'air_fryer');
   const [name, setName] = useState(editing?.name ?? '');
   const [alertTo, setAlertTo] = useState<string | null>(editing ? editing.alertId : me.id);
-  const [minutes, setMinutes] = useState(editing ? String(editing.minutes) : '');
+  // §8.5: a chip or the custom box, never both — a value that matches a chip opens on that chip.
+  const [chip, setChip] = useState<number | null>(editing && (CHIPS as readonly number[]).includes(editing.minutes) ? editing.minutes : null);
+  const [custom, setCustom] = useState(editing && chip === null ? String(editing.minutes) : '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const n = Number(minutes);
+  const n = chip ?? Number(custom);
   const ok = Number.isInteger(n) && n >= 1 && n <= COOK_MINUTES_MAX;
 
   async function go() {
@@ -52,10 +55,10 @@ export function CookBox({ editing, onClose }: { editing: Cooking | null; onClose
         <AlertWhenDone alertTo={alertTo} onPick={setAlertTo} />
         <div className="field" role="group" aria-label="How long?">
           <span className="muted" style={{ fontSize: '.8rem' }}>How long? (minutes)</span>
-          <input type="number" inputMode="numeric" min={1} max={COOK_MINUTES_MAX} value={minutes} style={{ fontSize: 16, marginTop: 4 }}
-            aria-label="Minutes" onChange={(e) => setMinutes(e.target.value)} />
           <div className="row wrap" style={{ marginTop: 4 }}>
-            {CHIPS.map((c) => <button key={c} className="chip" style={bigChip} aria-pressed={n === c} onClick={() => setMinutes(String(c))}>{c}</button>)}
+            {CHIPS.map((c) => <Pick key={c} on={chip === c} label={String(c)} onClick={() => { setChip(c); setCustom(''); }} />)}
+            <input type="number" inputMode="numeric" min={1} max={COOK_MINUTES_MAX} value={custom} placeholder="custom" aria-label="Custom minutes"
+              className={s.custom} onChange={(e) => { setCustom(e.target.value); setChip(null); }} />
           </div>
         </div>
       </fieldset>

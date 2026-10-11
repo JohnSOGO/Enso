@@ -7,6 +7,25 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.54.1: Cooking box custom minutes box in the chip row (placement-advisor)
+
+- **Ask:** SPEC 2.89 §8.5: the cooking box's minutes field moves into the "How long?" chip row as a small "custom" box after the 60 chip, with a light gray "custom" placeholder. A chip picks its value and empties the box; typing in the box unpicks the chips. UI only.
+- **Verdict:** frontend/src/components/CookBox.tsx [EXISTING] (plus its own CookBox.module.css for the placeholder color).
+- **Flow stage:** render
+- **Why:** The CookBox map row already owns "How long?". This is a layout and draft-state change inside that one concern. Rejected: Machines.tsx (Pick and bigChip need no change; MachineChooser's chips are not covered) and any shared or state.tsx home (chip-vs-custom is a local draft; validation still uses COOK_MINUTES_MAX).
+- **Caps:** CookBox.tsx about 70/300, no CEILINGS pin. Nothing newly in the warning band.
+- **Sources read:** CookBox.tsx, SPEC.md §8.5, docs/module-ownership.md (CookBox and Machines rows), scripts/arch.ts, docs/placement-receipts.md.
+
+## 2026-10-11 — Steward pass 16, whole tree (code-steward)
+
+- **Run:** after the v1.54.0 release (SPEC 2.88 §7D.8: cooking timers as `machines` rows with a `cook_` id, migration 0043, tick step 3e, the 🍳 Cooking group under 🧺 Washing machines). Audited 99bae1f..e21ab6c.
+- **Verdict:** SOUND. Typecheck green, 796/796 tests (106 files), arch:audit quiet (engine.ts 86%, tick.ts 123/148, machines.ts 228/300 unchanged).
+- **Placement audit:** 1 receipt checked against 1 code commit (e21ab6c). It landed where its verdict said. The map rows match the files. 0 code commits without a receipt.
+- **Top finding:** the losing-tap 409 `conflict` guard (the row-id INSERT collision that rolls back the batch) has no test in either routes/machines.ts or cook-rows.ts / routes/cooking.ts. One cookWrites test with a stale `before` (LOW-MED, S).
+- **Handoffs:** 3, waiting on MojoSOGO's pick: the conflict-guard test; pass 15's PickGrid header and row wording (still open); a §8.2 line for the cooking ringing row `🍳 label · [Off]` (whether the glyph varies by kind is MojoSOGO's call). Still open, all LOW: pass 11's two §7D notes, pass 10's house-row helper note, the snooze-keeps-away test, the machines.ts alert-hours seam.
+- **MS9 transient:** no logic or order bug found. MS9 is the heaviest test in messes-api (PBKDF2 signup, 3 R2 reports, about 15 requests) under the default 5 s timeout, so load is the likely cause. It doesn't check the status of its claim and settle calls; if it recurs, capture the failure text before changing anything.
+- **Restraint:** openCookFire repeats routes/machines.ts's open-fire query (one line, two copies); the `/UNIQUE|constraint/` regex in two routes; the separate guard writers; Pick, bigChip and AlertWhenDone exported from Machines.tsx to CookBox (two callers); COOK_GLYPH in the PWA; cookDayTick's one query per timer.
+
 ## 2026-10-11 — v1.54.0: Cooking timers, a second group under Machines (placement-advisor)
 
 - **Ask:** SPEC 2.88 §7D.8 (cooking timers, asked by MojoSOGO), §4.2zp (migration 0043: machines gains cook_kind, name, created_at, closed_at), §5.6 step 3e (end-of-day close), §8.5 "Two groups" (🧺 Washing machines / 🍳 Cooking), §10 /cooking rows. Anyone creates as many as they like (Air fryer, Stove, Oven, Microwave, Other); Off / Stop / Start again / Edit / ✕ close; rings every 5 min ×4 at any hour; cleared after midnight when not active. CK1–CK9, CK-M.

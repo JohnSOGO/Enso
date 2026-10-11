@@ -466,6 +466,8 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Custom minutes box** (v1.54.1, §8.5; asked by MojoSOGO 2026-10-11): in the cooking box the minutes field sits in the
+chip row right after 60, a small box with a light gray "custom" hint; a chip and the box clear each other.
 **Cooking timers** (v1.54.0, §7D.8, migration 0043; asked by MojoSOGO 2026-10-11): the Machines modal is split into
 🧺 Washing machines (unchanged) and 🍳 Cooking. ＋ Cooking timer makes a new timer each time (air fryer, stove, oven,
 microwave, other, with an optional name), as many at once as needed; each stays until its red ✕ or until the first
