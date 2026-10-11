@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.60.7: Bounty Done catch re-throws; losing-tap tests; PickGrid stops listing callers (placement-advisor)
+
+- **Ask:** steward pass 17 items 1 and 2 (MojoSOGO "BOTH"). (1) POST /bounties/:id/done's bare catch re-throws unless /UNIQUE|constraint/, as machines.ts and cooking.ts save() do; tests for the losing-tap guards. (2) PickGrid's header comment and its module-ownership row stop listing callers (Chores was missing).
+- **Verdict:** src/worker/routes/bounties.ts with test/bounties-api.test.ts and test/cooking.test.ts [EXISTING]; frontend/src/components/PickGrid.tsx and the PickGrid map row [EXISTING].
+- **Flow stage:** persist (route save) for item 1; render (comment only) for item 2.
+- **Why:** the route stage owns "save in one batch, 409 when another tap won"; copying the siblings' guard keeps the three routes the same with no new shape. No shared regex helper for three one-liners. The bounty refusal keeps `bounty_state`. Tests race two real taps (no test hooks in routes); machines' race was already L10. Listing callers restated what imports show and had drifted.
+- **Caps:** bounties.ts ~229/300; PickGrid.tsx unchanged. Nothing in the band.
+- **Sources read:** scripts/arch.ts; docs/module-ownership.md; routes/bounties.ts, machines.ts, cooking.ts catch blocks; PickGrid.tsx; the three test files.
 ## 2026-10-11 — v1.60.6: tab bar lower, build stamp centered under the buttons (placement-advisor)
 
 - **Ask:** SPEC 3.08 §8.1 (Flush at the bottom / Build stamp, ⚑ Q208). MojoSOGO: "lower more and center version". `.tabs` padding-bottom `max(calc(env(safe-area-inset-bottom) - 12px), 14px)`; `.build` centered (left: 0; right: 0; text-align: center) at `top: var(--tabbar-h)`.

@@ -190,4 +190,12 @@ describe('/cooking (CK3–CK7, CK9)', () => {
     expect(ids).not.toContain(off.id);
     expect(await env.DB.prepare('SELECT closed_at FROM machines WHERE id = ?').bind(off.id).first<any>()).toMatchObject({ closed_at: expect.any(String) });
   });
+
+  it('CK10 two Stop taps at once: one stops it, the other is a 409, its fire closed once', async () => {
+    const t = await create({ kind: 'microwave', minutes: 5 });
+    const rs = await Promise.all([o.post(`/cooking/${t.id}/stop`), bClient.post(`/cooking/${t.id}/stop`)]);
+    expect(rs.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect(rs.find((r) => r.status === 409)!.json.message).toBeTruthy();
+    expect((await firesOf(t.id)).map((f) => f.close_reason)).toEqual(['removed']);
+  });
 });

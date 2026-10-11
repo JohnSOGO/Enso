@@ -97,6 +97,25 @@ describe('M4ab bounties', () => {
     expect((await a.del(`/bounties/${x.id}`)).status).toBe(409); // BT15 paid
   });
 
+  it('BT23 two Done taps at once: one is pending, the other is refused, one earning', async () => {
+    const x = await post('Fold the towels', 2);
+    await b.post(`/bounties/${x.id}/take`);
+    const rs = await Promise.all([b.post(`/bounties/${x.id}/done`), b.post(`/bounties/${x.id}/done`)]);
+    expect(rs.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect(rs.find((r) => r.status === 409)!.json).toMatchObject({ error: 'bounty_state', message: expect.any(String) });
+    const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM earnings WHERE bounty_id = ? AND dropped_at IS NULL').bind(x.id).first<{ n: number }>();
+    expect(n!.n).toBe(1);
+  });
+
+  it('BT24 two members take at once: one holds it, the other is refused', async () => {
+    const x = await post('Water the plants', 1);
+    const rs = await Promise.all([cc.post(`/bounties/${x.id}/take`), b.post(`/bounties/${x.id}/take`)]);
+    expect(rs.map((r) => r.status).sort()).toEqual([200, 409]);
+    const held = await env.DB.prepare('SELECT taken_by FROM bounties WHERE id = ?').bind(x.id).first<{ taken_by: string }>();
+    expect(held!.taken_by).toBe(rs[0].status === 200 ? C : B);
+    await (rs[0].status === 200 ? cc : b).post(`/bounties/${x.id}/let-go`);
+  });
+
   it('BT9 Not yet hands it back to the doer as a fresh dib', async () => {
     const x = await post('Kitchen trash', 1);
     await cc.post(`/bounties/${x.id}/done`);

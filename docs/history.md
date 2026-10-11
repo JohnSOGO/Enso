@@ -470,6 +470,10 @@ captions (5 ingredients, 6 steps — it had been "watch it").
 to snap a photo of completed work so adult can approve remotely"): Done on a one-off opens a sheet with an optional
 photo; a chore run's photo is added from Waiting for OK; admins see it there full size and OK or send back. Deleted on
 OK or drop. **Still owed:** BS2 with the camera on a real phone.
+**Losing taps tested; a failed bounty Done is a 500** (v1.60.7, §7B.8, §7D.8; steward pass 17 items 1–2, MojoSOGO "BOTH"):
+POST /bounties/:id/done re-throws any save error that is not the `uq_earning_bounty` constraint, as machines and cooking
+do, so a real failure is no longer told "That bounty is waiting for OK". BT23–BT24 and CK10 race two taps; machines'
+race was already L10. PickGrid's comment and map row stop listing callers.
 **◎ shows by default** (v1.60.1, §8.16, Q234 revised; MojoSOGO 2026-10-11: "I don't see the faint circle bottom left"):
 the switch was off on his phone; like Ozymandias the ◎ now shows on every device unless Settings → 🙂 Me turns it off, and
 it is a little less faint (opacity .6).
