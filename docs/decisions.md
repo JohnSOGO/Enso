@@ -239,3 +239,4 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q235 | Where the 🎯 sits while on (§8.16) | ⚑ A small round button bottom left above the tab bar on every tab, and one in every modal header beside ✕ |
 | Q236 | How long pick mode lasts (§8.16) | ⚑ One tap; tapping the bar or a 🎯 cancels; Pick again in the result arms the next |
 | Q237 | What the line says (§8.16) | ⚑ tab › modal titles › named groups › "name" kind · build stamp · screen size |
+| Q238 | Alarms tab as a menu (§8.5) | ⚑ Announce and Quiet the house stay on the tab; below them three buttons (⏰ Alarms, ⏱ Rolling timers, 🫧 Machines), each opens in a modal |

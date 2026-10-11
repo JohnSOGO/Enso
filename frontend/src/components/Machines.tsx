@@ -1,4 +1,4 @@
-// SPEC §8.5, §7D — the Machines section of the Alarms tab (the laundry loop, the dish washer) and its chooser,
+// SPEC §8.5, §7D — the Machines section of the Alarms tab (clothes washer and dryer, dish washer) and its chooser,
 // which the Ringing bar reuses for Move to dryer (§8.2).
 import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
@@ -120,9 +120,8 @@ export function MachinesSection() {
 
   return (
     <section className={s.section} aria-label="Machines">
-      <h2 style={{ marginBottom: 6 }}>Machines</h2>
       <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>
-        Wash, move to the dryer, fold. Run the dishes, then empty them. Every phone hears when it's done; the speakers only when someone is picked.
+        Start a machine. When it's done, every phone hears; the speakers too when someone is picked.
       </p>
       <MachineHoursLine />
       {error && <div role="alert" className="alert-error">{error}</div>}

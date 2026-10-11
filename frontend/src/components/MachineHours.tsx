@@ -42,7 +42,7 @@ function HoursForm({ hours, onClose, onSaved }: { hours: MachineHours; onClose: 
   return (
     <Modal title="Machine alert hours" onClose={onClose} error={error}
       footer={<><button onClick={onClose} disabled={busy}>Cancel</button><button className="primary" onClick={save} disabled={busy}>Save</button></>}>
-      <p className="muted" style={{ fontSize: '.85rem' }}>Washer and dryer alerts outside these hours wait until they open. Leave both empty for any time.</p>
+      <p className="muted" style={{ fontSize: '.85rem' }}>Machine alerts outside these hours wait until they open. Leave both empty for any time.</p>
       {DAYS.map(([k, label]) => (
         <div key={k} className="field" role="group" aria-label={label}>
           <span className="muted" style={{ fontSize: '.8rem' }}>{label}</span>

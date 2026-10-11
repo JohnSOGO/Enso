@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.86 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.87 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3406,11 +3406,27 @@ success the box closes (there is no toast in the app). What happens is §9.3.
 Right under it, **🤫 Quiet the house** (§9.2b): 1 hour · 2 hours · 4 hours · Rest of today, or, while quiet,
 how long is left, who set it, and **Turn off now**.
 
-Then three sections — Scheduled, Rolling timers, **Machines**. Scheduled and Rolling timers are
-single-line lists (per the table rules), each with a **＋ Add** button in its header; Machines is two
-fixed cards and has no ＋ Add. Chores moved to their own tab in v1.28.0 (§8.15).
+Then a **menu of three buttons**, the same grid as Settings (§8.6, `PickGrid`) ⚑ (Q238): **⏰ Alarms**,
+**⏱ Rolling timers**, **🫧 Machines**. Asked by MojoSOGO 2026-10-11 ("alarms needs its own modal"). A tap opens
+that section in a modal titled with its emoji and name; ✕, Escape or a tap outside closes it back to the tab. An
+alarm or timer form opens on top of its section and closing it returns there. Nothing in a section changed what it
+does; only where it sits. Alarms and Rolling timers are single-line lists (per the table rules), each with a
+**＋ Add** button at its top; Machines is one fixed card per machine and has no ＋ Add. Chores moved to their own
+tab in v1.28.0 (§8.15).
 
-**Scheduled** — one row per alarm, sorted by time of day, then title:
+```
+Alarms
+[ 📢 Announce ]
+🤫 Quiet the house  [1 hour] [2 hours] [4 hours] [Rest of today]
+[ ⏰ Alarms        ] [ ⏱ Rolling timers ]
+[ 🫧 Machines      ]
+```
+
+**Acceptance (AM1–AM3, manual on the iPhone at 320 px):** AM1 the tab shows Announce, Quiet the house and the
+three buttons; AM2 each button opens its section titled with its name, and closing returns to the tab; AM3 ＋ Add
+or a row opens its form over the section, and Save or Cancel returns to the section with the list up to date.
+
+**⏰ Alarms** (scheduled) — one row per alarm, sorted by time of day, then title:
 
 ```
 Time   Alarm                    Days            Next
@@ -3450,15 +3466,15 @@ each day**, channels, repeat alert every, assigned to, Delete).
   Filling only one, `from = to`, or an interval not shorter than the range is refused by the
   server; the message shows inside the form.
 
-**Machines** — the laundry loop and the dish washer (§7D), right after Rolling timers. One card
+**🫧 Machines** — every machine in the house (§7D): clothes washer, clothes dryer, dish washer. One card
 per machine, in `MACHINE` order. Each card: the machine (🫧 Clothes washer, 🌀 Clothes dryer,
 🍽️ Dish washer ⚑), a state badge (**free** neutral ·
 **running** green · **DONE — waiting** amber), whose load and the done-at time, and its
 actions on a second line. At 320 px:
 
 ```
-Machines
-Wash, move to the dryer, fold. Run the dishes, then empty them. Every phone hears when it's done; the speakers only when someone is picked.
+🫧 Machines                                   (modal title)
+Start a machine. When it's done, every phone hears; the speakers too when someone is picked.
 🔔 Alerts sound weekdays 5:30pm–8:30pm, weekends 9:00am–9:00pm; outside those hours they wait. [Edit hours]
 ┌──────────────────────────────────────┐
 │ 🫧 Clothes washer  DONE — waiting     │
@@ -3481,7 +3497,8 @@ Wash, move to the dryer, fold. Run the dishes, then empty them. Every phone hear
 | running | [Done now] [Clear] | [Done now] [Clear] | [Done now] [Clear] |
 | done | **[Move to clothes dryer]** [Still loaded] [Clear] | **[Fold & out]** [Still loaded] [Clear] | **[Emptied]** [Still loaded] [Clear] |
 
-- **Alert hours** (§7D.5): one line under the heading. **Edit hours** (admins only) opens
+- **Alert hours** (§7D.5): one line under the intro. The Edit hours box says "Machine alerts outside these hours
+  wait until they open." **Edit hours** (admins only) opens
   "Machine alert hours": Weekdays and Weekends, each two `<input type="time">` fields (16 px);
   both empty = any time. Save refuses from ≥ to inside the box.
 - **Done now** (⚑ Q160) is for a load the app missed. On a free machine it opens the chooser
