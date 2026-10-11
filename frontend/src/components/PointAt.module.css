@@ -5,7 +5,7 @@
   bottom: calc(var(--tabbar-h) + 8px + env(safe-area-inset-bottom));
   width: 32px; height: 32px; min-height: 0; padding: 0; border-radius: 99px;
   background: var(--surface); border: 1px solid var(--border); color: var(--text-dim);
-  font: 18px/1 Arial, sans-serif; opacity: .45;
+  font: 18px/1 Arial, sans-serif; opacity: .6;
   z-index: 5;
 }
 .float:hover { opacity: 1; }

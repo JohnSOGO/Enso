@@ -470,11 +470,14 @@ captions (5 ingredients, 6 steps — it had been "watch it").
 to snap a photo of completed work so adult can approve remotely"): Done on a one-off opens a sheet with an optional
 photo; a chore run's photo is added from Waiting for OK; admins see it there full size and OK or send back. Deleted on
 OK or drop. **Still owed:** BS2 with the camera on a real phone.
+**◎ shows by default** (v1.60.1, §8.16, Q234 revised; MojoSOGO 2026-10-11: "I don't see the faint circle bottom left"):
+the switch was off on his phone; like Ozymandias the ◎ now shows on every device unless Settings → 🙂 Me turns it off, and
+it is a little less faint (opacity .6).
 **A bounty's picture** (v1.60.0, §7B.8, §8.15b, migration 0046, Q260; asked by MojoSOGO 2026-10-11 "if I create a
 bounty, let me add a picture"): ＋ Bounty has 📷 Add photo (sent after Post; Post again retries only the picture);
 the card shows it to everyone; an admin's card has 📷 Add / Replace. Deleted once paid (OK, or an admin's own Done)
 or deleted. **Still owed:** try it on a real phone.
-**Tab bar flush on the installed iPhone app** (v1.60.1, §8.1; MojoSOGO 2026-10-11 "on phone app, the bottom icon bar is
+**Tab bar flush on the installed iPhone app** (v1.60.2, §8.1; MojoSOGO 2026-10-11 "on phone app, the bottom icon bar is
 not at the bottom of the screen"): v1.44.0's `position: fixed; inset: 0` still stopped above the home-indicator area in
 standalone WebKit. In `display-mode: standalone` the frame is now `height: 100vh` (the whole screen there). Browser tabs
 unchanged. **Still owed:** a look on the real iPhone (no WebKit standalone in the test rig).

@@ -6,13 +6,14 @@ const KEY = 'enso.pointAt';
 const listeners = new Set<() => void>();
 const toggle = new EventTarget();
 
-const read = () => { try { return localStorage.getItem(KEY) === '1'; } catch { return false; } };
+/** On unless this device turned it off ('0'), like Ozymandias's always-there ◎ (⚑ Q234). */
+const read = () => { try { return localStorage.getItem(KEY) !== '0'; } catch { return true; } };
 const subscribe = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };
 
-export const usePointAtOn = () => useSyncExternalStore(subscribe, read, () => false);
+export const usePointAtOn = () => useSyncExternalStore(subscribe, read, () => true);
 
 export function setPointAtOn(on: boolean) {
-  try { if (on) localStorage.setItem(KEY, '1'); else localStorage.removeItem(KEY); } catch { /* storage may be blocked */ }
+  try { if (on) localStorage.removeItem(KEY); else localStorage.setItem(KEY, '0'); } catch { /* storage may be blocked */ }
   listeners.forEach((f) => f());
 }
 

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.03 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 3.04 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3542,7 +3542,7 @@ only the grey backdrop):
   (`position: fixed; inset: 0`), never `height: 100%`, which on an installed iPhone left a strip of
   page below the bar. The bar's own colour runs down through the home-indicator area. In the
   installed app (`display-mode: standalone`) the frame is `100vh` tall instead of `bottom: 0`:
-  there the fixed box still stopped above the home-indicator area (v1.60.1, MojoSOGO 2026-10-11).
+  there the fixed box still stopped above the home-indicator area (v1.60.2, MojoSOGO 2026-10-11).
 - **Build stamp under the tabs** (asked by MojoSOGO 2026-10-10, v1.44.0): the same `v{version} ·
   {commit}` as the opening screen (§8.10) shows all the time as tiny dim text at the left of the
   bar's bottom strip (the home-indicator area), below the tab buttons and never over them; it is
@@ -4480,8 +4480,8 @@ so I don't have to over explain", without clashing with what a tap already does.
 Ozymandias dashboard's pick mode (MojoSOGO 2026-10-11: "look at ozymandias and do it like that"): a **pick mode** that
 stays on, where every tap is captured, swallowed, and copied as a few lines he pastes into a Claude thread.
 
-- **Off by default.** Settings → 🙂 Me has a switch **🎯 Point at it** (its label says how: tap ◎ bottom left, tap anything, tap ◎ again to stop) that turns it on **for this device only**
-  (kept in the browser, not the account) ⚑ (Q234). Any member can turn it on.
+- **On by default** since v1.60.1, like Ozymandias's always-there ◎ (MojoSOGO 2026-10-11: "I don't see the faint circle"). Settings → 🙂 Me has a switch **🎯 Point at it** (its label says how: tap ◎ bottom left, tap anything, tap ◎ again to stop) that turns it off or on **for this device only**
+  (kept in the browser, not the account) ⚑ (Q234). Any member can turn it off.
 - **While the switch is on**, a small faint round **◎** button sits in the bottom left corner just above the tab bar on
   every tab, and a **◎** sits in every modal's header beside ✕ ⚑ (Q235). Like Ozymandias's (MojoSOGO 2026-10-11: "I like
   the way ozymandias has the bottom left circle activator"), every ◎ turns amber while pick mode is on. Nothing else
