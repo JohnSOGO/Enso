@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth**: §14 holds status and deviatio
 MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-11, v1.48.0, main = production.*
+*Last updated 2026-10-11, v1.49.0, main = production.*
 
 ## Running where
 
@@ -54,7 +54,8 @@ the working agreement in `CLAUDE.md`.
 - Event address and paste (v1.37.0–v1.38.0, §7.9, §7.9a): on the iPhone, Paste a copied text and a screenshot into a
   new event, and a "moved to…" text into an existing one; Open in Maps.
 - Dish washer (v1.42.0, §7D.6): start one on the iPhone, hear it done, tap Emptied. Q204–Q207 are ⚑ defaults.
-- My alerts (v1.48.0, §9.5): tap a real Ozymandias ping on the iPhone and land on its card in Settings → Alerts; ❌ a line,
+- Settings menu (v1.49.0, §8.6): check the button grid and each area on the iPhone at 320 px.
+- My alerts (v1.48.0, §9.5): tap a real Ozymandias ping on the iPhone and land on its card in Settings → 🔔 Alerts; ❌ a line,
   Clear all. Q221–Q225 are ⚑ defaults.
 - Alert when done (v1.47.0, §7D.7): start the dish washer with Nobody picked and hear only phones; start one for a person
   and hear the speakers from its second alert. Q217–Q220 are ⚑ defaults.

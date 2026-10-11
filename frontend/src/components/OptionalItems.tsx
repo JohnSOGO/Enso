@@ -1,4 +1,4 @@
-// SPEC §8.6, §7.5 — Settings → Me → Optional calendar items: the built-in Public holidays and 📈 rows,
+// SPEC §8.6, §7.5 — Settings → 📅 Calendar items: the built-in Public holidays and 📈 rows,
 // then each optional event, how it repeats, and this member's own On switch.
 import { useEffect, useState, type ReactNode } from 'react';
 import { del, errorText, get, patch, put } from '../api';

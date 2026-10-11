@@ -16,7 +16,7 @@ export const WARN_AT = 0.9;
 
 /** Individually pinned caps: size when pinned + WORKING_BUFFER. Move one only with a receipt. */
 export const CEILINGS: Record<string, number> = {
-  'frontend/src/components/Settings.tsx': 41 + WORKING_BUFFER,
+  'frontend/src/components/Settings.tsx': 59 + WORKING_BUFFER,
   'frontend/src/components/Calendar.tsx': 262 + WORKING_BUFFER,
   'frontend/src/components/EventForm.tsx': 183 + WORKING_BUFFER,
   'src/worker/routes/events.ts': 107 + WORKING_BUFFER,

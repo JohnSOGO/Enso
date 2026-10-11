@@ -1,4 +1,4 @@
-// SPEC §9.2a, §8.6 — Settings → Me → 🔊 Speak my alerts on: Home Assistant's speakers, each with a box this
+// SPEC §9.2a, §8.6 — Settings → 🔊 Speakers → Speak my alerts on: Home Assistant's speakers, each with a box this
 // member ticks. Shows `mine` and `defaults` exactly as the server sends them; never decides the defaults.
 import { useEffect, useState } from 'react';
 import { ApiError, errorText, get, patch } from '../api';

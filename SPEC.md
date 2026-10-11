@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.77 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.78 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1981,7 +1981,7 @@ approval (they just approved it), not after signup or setup. Push only, never ho
 - **Number matching:** the phone shows three numbers; only the one on the PC's screen approves. A tap-through
   on a push someone else triggered picks right one time in three at best, and a wrong pick denies.
 - **The number is never in the push** — not in its body, title or the delivery's `message` (deliveries show in
-  Settings → Status).
+  Settings → 📊 Status).
 
 **Acceptance (M4w — each row is a test):**
 
@@ -2106,7 +2106,7 @@ it is on for the member (§7.5).
 - `publicHolidays(year, keys?)` returns the holidays (actual + observed dates) whose
   key is in `keys` (all when omitted).
 - **Household days off** = `settings.days_off` (JSON array of keys, §4.2b); `NULL` means `DEFAULT_DAYS_OFF` from `holidays.ts` (the ✓
-  column). The owner edits it in Settings → Household → **Days off** (a checklist of
+  column). The owner edits it in Settings → 🏠 Household → **Days off** (a checklist of
   every key in `HOLIDAYS`). `/calendar` returns only days-off holidays.
 
 **Observed rule:** applies to the fixed-date holidays Jan 1, Jun 19, Jul 4, Nov 11 and
@@ -2126,7 +2126,7 @@ is always marked too. New Year's Day on a Saturday is observed on Dec 31 of the
 
 ### 7.4 Monthly options expiration 📈 (`src/shared/markets.ts`)
 
-A per-member marker, off by default, switched on in Settings → Me ("📈 Show monthly
+A per-member marker, off by default, switched on in Settings → 📅 Calendar items ("📈 Show monthly
 options expiration"; `member_prefs.show_options_expiration`, §4.2c).
 
 - The date is the **3rd Friday** of each month; if that day is an exchange holiday
@@ -2143,7 +2143,7 @@ options expiration"; `member_prefs.show_options_expiration`, §4.2c).
 
 ### 7.5 Optional events — each person turns them on
 
-**Optional calendar items** (Settings → Me) is the one list of everything a member can
+**Optional calendar items** (Settings → 📅 Calendar items) is the one list of everything a member can
 switch on for their own calendar (decided by MojoSOGO 2026-10-03):
 1. **Public holidays** — built in, on by default (`member_prefs.show_public_holidays`);
 2. **📈 Monthly options expiration** — built in, off by default
@@ -3893,7 +3893,7 @@ only the grey backdrop):
     - `failing` → **"🔇 House failing"**; tapping it: "The last house announcement did not
       get through to Home Assistant (over the Cloudflare tunnel at ha.sogodojo.com), so
       alerts set to “House” may not be spoken. Check that Home Assistant and its Cloudflared
-      add-on are running; the error is in Settings → Status. Alerts still show in the Ringing
+      add-on are running; the error is in Settings → 📊 Status. Alerts still show in the Ringing
       bar."
     - `not_configured` → **"🔇 House not set up"**; tapping it: "This server has no Home
       Assistant connection set up (the tunnel address, the HA token or the Cloudflare Access
@@ -4112,22 +4112,43 @@ Time      Chore            Days        This week
 
 ### 8.6 Settings
 
-- **Me:** **Optional calendar items** — Public holidays, 📈 options expiration, then one line
-  per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); name,
-  color, enable phone alerts (subscribe), **🔊 Speak my alerts on** (§9.2a),
-  log out.
-- **Alerts** (§9.5): every push this phone's member got, newest first — tap a line for its card, a red ❌ on each
-  line hides it, **Clear all** at the top. A tapped phone notification opens here, on its card.
-- **Household (admins):** name, timezone, days off (§7.3), **invites (§8.9)**, members list:
-  one line per member — name · **Owner** / **Admin** chip (nothing for a regular member) ·
-  **Make admin** / **Remove admin** (asks first; never on the founder) · **Disable** /
+Asked by MojoSOGO 2026-10-11 ("clean up settings similar to lists"): the **⚙ Settings** tab is a **menu of
+buttons**, the same grid as the Lists popup (§8.8, `PickGrid`), instead of one long page. A tap opens that
+area in a titled modal; ✕, Escape or a tap outside closes it back to the menu ⚑ (Q226). No setting changed
+what it does; only where it sits.
+
+```
+Settings
+[ 🙂 Me            ] [ 📅 Calendar items ]
+[ 📱 Phone alerts  ] [ 🔊 Speakers       ]
+[ 🔔 Alerts        ] [ 🏠 Household      ]   ← Household and Members: admins only
+[ 👥 Members       ] [ 📊 Status         ]
+[ Log out ]
+```
+
+- **🙂 Me:** name, color.
+- **📅 Calendar items:** **Optional calendar items** — Public holidays, 📈 options expiration, then one line
+  per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5).
+- **📱 Phone alerts:** this phone's state and Turn on / Turn off / Send a test (§9.1).
+- **🔊 Speakers:** **Speak my alerts on** (§9.2a).
+- **🔔 Alerts** (§9.5): every push this phone's member got, newest first — tap a line for its card, a red ❌ on each
+  line hides it, **Clear all** at the top. A tapped phone notification opens Settings with this area open, on its
+  card.
+- **🏠 Household (admins):** name, timezone, days off (§7.3).
+- **👥 Members (admins):** members list: one line per member — name · **Owner** / **Admin** chip (nothing for a
+  regular member) · **Make admin** / **Remove admin** (asks first; never on the founder) · **Disable** /
   **Enable** (never on the founder). An admin removing their own admin role is warned
-  that they will lose these settings at once.
-- **Status:** a **House announcements** line from `house` (§9.2) ⚑ (Q38): `ok` → "working"
+  that they will lose these settings at once. Then **invites (§8.9)**.
+- **📊 Status:** a **House announcements** line from `house` (§9.2) ⚑ (Q38): `ok` → "working"
   (good) with the last success time; `failing` → "failing since {lastFailedAt}" (bad) with
   `lastError` beneath; `not_configured` → "not set up" (bad); `untried` → "not tried yet"
-  (neutral). Then the current member's push subscriptions with last
-  success/error, and the last 20 deliveries with their status badge.
+  (neutral). Then the last 20 deliveries with their status badge.
+- **Log out** sits under the grid, not inside an area ⚑ (Q227). No menu button is marked chosen.
+
+**Acceptance (SM1–SM4):** SM1 the tab shows the grid, with Household and Members only for an admin; SM2 each
+button opens its area titled with its name, and closing returns to the grid; SM3 a tapped alert notification opens
+Settings → 🔔 Alerts on its card, and closing the card leaves the Alerts list open; SM4 every setting listed above is
+reachable and behaves as before (manual, on the iPhone at 320 px: the grid is two columns, one under 360 px).
 
 ### 8.8 Lists screen
 
@@ -4407,7 +4428,7 @@ Pumpkin patch        📅 Sat Oct 12
 
 ### 8.9 Invites (owner) and the join page
 
-**In Settings → Household → Invites:**
+**In Settings → 👥 Members → Invites:**
 
 ```
 Invite someone   [ Their name…        ][ Invite ]
@@ -4707,11 +4728,11 @@ Dark by default. Colors are defined as tokens on `:root`:
 
 ### 9.1 Web Push — phone notifications
 
-Each person turns phone alerts on **once per phone**, in Settings → Me (decided by MojoSOGO
+Each person turns phone alerts on **once per phone**, in Settings → 📱 Phone alerts (decided by MojoSOGO
 2026-10-03: Web Push through the installed app, not SMS).
 
 **Turning it on** (`frontend/src/…` — placement decides):
-- A **Phone alerts** row in Settings → Me shows this phone's state, honestly:
+- A **Phone alerts** area in Settings → 📱 Phone alerts shows this phone's state, honestly:
   - **On for this phone** (with **Send a test** and **Turn off**);
   - **Off** — **Turn on**;
   - **Blocked** — the phone's settings deny notifications for Ensō (say where to change it);
@@ -4893,7 +4914,7 @@ right away (§9.3).
 
 ### 9.2a Each person's speakers — `🔊 Speak my alerts on`
 
-Decided by MojoSOGO 2026-10-04: in Settings → Me each person ticks the house speakers they want to be
+Decided by MojoSOGO 2026-10-04: in Settings → 🔊 Speakers each person ticks the house speakers they want to be
 alerted on, from the list Home Assistant has. A private bedroom speaker then never announces something
 for someone who is never in that room.
 
@@ -4953,7 +4974,7 @@ steps and push still goes out. For an announcement with House alone ticked, that
 `invalid_input`). It is not checked against Home Assistant: the house may be unreachable, and an id HA
 no longer lists is shown as such and fails visibly when spoken. `GET /me` carries `houseSpeakers`.
 
-**The screen** (`🔊 Speak my alerts on`, Settings → Me, below Phone alerts):
+**The screen** (`🔊 Speak my alerts on`, Settings → 🔊 Speakers):
 - One line per speaker from `GET /house/speakers`: a checkbox, the name, and a dim `Alexa` / `Voice PE`
   (an `echo` speaker may be a Fire TV or an Echo Show, so the screen says Alexa).
   Ticking or unticking saves at once (`PATCH /me` with the whole new list).
@@ -5124,7 +5145,7 @@ acked, nothing is scheduled — **now only**.
   or visibly `failed` (`no_subscription`, `push_not_configured`, a push-service error) — a
   member without a phone gets the honest failed row, as alerts do.
 - → **201** `{ deliveries: { id, channel, memberId, status }[] }`, read after sending push and
-  **before** the house row is spoken (push rows final, the house row `queued`). Every row also shows in Settings → Status.
+  **before** the house row is spoken (push rows final, the house row `queued`). Every row also shows in Settings → 📊 Status.
 - 400 `invalid_input` with `announceError`'s message. **409 `no_recipients`** when only Phone
   is ticked and there is no other active member — nothing would be sent, so it says so.
 
@@ -5183,7 +5204,7 @@ announcement, §9.3) that carries its own title (§4.2u). No session, no house r
 
 **The push:** `{ fireId: null, kind: null, tag: <delivery id>, title: <the title>, body: <the text>,
 actions: [] }` — like an announcement's, with its own title. Like any delivery it shows in
-Settings → Status' recent deliveries ⚑ (Q111).
+Settings → 📊 Status' recent deliveries ⚑ (Q111).
 
 **Acceptance (M4t — each row is a test):**
 
@@ -5232,7 +5253,7 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 - Only this file reads or writes `dismissed_at`: Status (§8.6), the ping limit (§9.4) and mess asks still count
   hidden rows.
 
-**Screen** (Settings → **Alerts**, between Me and Household; `frontend/src/components/MyAlerts.tsx`):
+**Screen** (Settings → **🔔 Alerts**, the fifth button; `frontend/src/components/MyAlerts.tsx`):
 - **Clear all** at the top (asks "Clear all your alerts?"; disabled when empty) ⚑ Q224; "No alerts yet." when empty.
 - One line per alert: the title, the message (one line, cut with …), the time; a red **❌** at the end hides it at
   once, no asking ⚑ Q224.
@@ -5957,6 +5978,8 @@ with reminders and timers (a third fire kind), not a second reminder system.
 | Q223 | A timer start announcement in My alerts (§9.5) | ⚑ "Announcement" (the row carries nothing that tells it apart) |
 | Q224 | Deleting alerts (§9.5) | ⚑ Each person's own list only; ❌ hides one with no asking; Clear all asks first |
 | Q225 | A notification tapped while signed out (§9.5) | ⚑ Sign in first, then the card opens |
+| Q226 | Settings as a menu (§8.6) | ⚑ Eight buttons in this order: Me, Calendar items, Phone alerts, Speakers, Alerts, Household, Members, Status; each opens in a modal, closing returns to the menu |
+| Q227 | Where Log out sits (§8.6) | ⚑ Under the Settings grid, not inside Me |
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 
 ---
@@ -6165,6 +6188,12 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Settings menu** (v1.49.0, §8.6; asked by MojoSOGO 2026-10-11; SM1–SM4): the Settings tab is a grid of eight
+buttons like the Lists popup (shared `PickGrid`): Me, Calendar items, Phone alerts, Speakers, Alerts, Household,
+Members, Status (the admin two hidden from others). Each opens its area in a modal; closing returns to the grid. Log
+out is under the grid. A tapped alert notification opens Alerts on its card. No setting changed; §8.6 no longer lists
+push subscriptions under Status, which was never built there (Phone alerts shows this phone's state). Q226–Q227 are
+⚑ defaults. **Still owed:** check the grid and each area on the iPhone at 320 px.
 **My alerts** (v1.48.0, §9.5, §4.2zn; asked by MojoSOGO 2026-10-11; MA1–MA8, MA-M): Settings → Alerts lists every
 push I got (newest 200), each line with a red ❌, Clear all at the top, a tap opens its card with the whole message,
 time, source and result. Tapping a phone notification opens the app on that card. Migration 0041. Q221–Q225 are ⚑

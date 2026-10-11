@@ -19,7 +19,6 @@ export function SettingsMembers() {
 
   return (
     <>
-      <h3 style={{ fontSize: '.9rem', margin: '16px 0 6px' }}>Members</h3>
       {errorEl}
       <table className={s.table}>
         <thead><tr><th scope="col">Name</th><th scope="col">Role</th><th scope="col"><span className="visually-hidden">Access</span></th></tr></thead>

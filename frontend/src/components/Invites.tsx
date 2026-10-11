@@ -1,4 +1,4 @@
-// SPEC §8.9 — Settings → Household → Invites: create (opens the invite card), list with states, revoke.
+// SPEC §8.9 — Settings → 👥 Members → Invites: create (opens the invite card), list with states, revoke.
 import { useEffect, useState } from 'react';
 import { del, get, post } from '../api';
 import { useAction } from './useAction';
