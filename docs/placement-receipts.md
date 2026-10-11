@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.60.6: tab bar lower, build stamp centered under the buttons (placement-advisor)
+
+- **Ask:** SPEC 3.08 §8.1 (Flush at the bottom / Build stamp, ⚑ Q208). MojoSOGO: "lower more and center version". `.tabs` padding-bottom `max(calc(env(safe-area-inset-bottom) - 12px), 14px)`; `.build` centered (left: 0; right: 0; text-align: center) at `top: var(--tabbar-h)`.
+- **Verdict:** `frontend/src/App.module.css` [EXISTING]
+- **Flow stage:** render
+- **Why:** both rules already live in the frame's stylesheet; edits two declarations, adds no concern. theme.css (`--tabbar-h` moves every consumer) and App.tsx markup rejected. Sibling `.fab` mirrors the new strip so the ＋ keeps its 16 px gap.
+- **Caps:** App.module.css about 50/300. No file newly in the warning band.
+
 ## 2026-10-11 — v1.60.5: FunHouse poller skips stale pings (placement-advisor)
 
 - **Ask:** SPEC 3.07 §9.4a, MojoSOGO 2026-10-11: "getting stale alerts on funhouse". While the board was off USB the bridge answered 503, pollOnce kept `after` unchanged, and after the reconnect it drained the backlog one ping per 15 s poll. Fix: pollOnce skips any ping whose `at` is older than 10 min before now (handled, no POST, one log line). The clock comes in as PollDeps `now`; main passes Date.now. Test FP8.
