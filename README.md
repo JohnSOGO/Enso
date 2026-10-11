@@ -5,12 +5,12 @@ The household's loops, kept turning without strain (å††ç›¸, the Zen cir
 Household calendar PWA with reminders, **rolling timers** (restart on Ack) and shared
 shopping / wish lists; alerts by
 phone push and spoken in the house through Home Assistant. **The spec is `SPEC.md`** â€”
-it is the source of truth; Â§14 records the prototype's status and deviations.
+it is the source of truth; `docs/history.md` records the prototype's status and deviations.
 Changes go into the spec first, then get built â€” see `CLAUDE.md`.
 
 **Status:** live at https://enso.sogodojo.com. Calendar, alarms, timers, lists, chores, phone
 push and house announcements are built; House alerts are spoken by the Worker itself through a
-Cloudflare Tunnel to Home Assistant (v1.7.0 â€” no relay at home). Details in SPEC Â§14.
+Cloudflare Tunnel to Home Assistant (v1.7.0 â€” no relay at home). Details in `docs/history.md` §14.
 
 The previous local-model build is archived in `archive/v1-local-model/` (reference only).
 
@@ -43,7 +43,7 @@ three House secrets there (below), local House alerts are visibly `failed`, `hou
 Reading photos locally (Things to do, SPEC Â§7C.4) also needs `ANTHROPIC_API_KEY` there; without it
 read-photo answers 503 "Reading photos isn't set up yet." (tests pin it empty, so they never call the API).
 
-Things to do, once per account (SPEC Â§11 M4g): `npx wrangler r2 bucket create enso-photos`, then
+Things to do, once per account (`docs/history.md` §11 M4g): `npx wrangler r2 bucket create enso-photos`, then
 `npx wrangler secret put ANTHROPIC_API_KEY`.
 
 Recipes from YouTube videos (SPEC Â§7E) also need `YOUTUBE_API_KEY` (a Google Cloud API key with the

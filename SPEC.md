@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.78 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.79 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -16,10 +16,11 @@ here *before* it is built, and the code is then built to match. See `CLAUDE.md`.
 Read this section first. It exists because the previous build attempt failed on
 exactly these points.
 
-1. **Build milestones in order (§11).** Each ends with acceptance checks. Do not
-   start the next milestone until the current one's checks pass.
-2. **§3 is the only place a vocabulary is defined.** Every state, channel, action
-   and status string lives in `src/shared/vocab.ts` and is imported everywhere —
+1. **Every change carries its acceptance checks** in its own section. The original
+   milestones (§11) are done and kept in `docs/history.md`.
+2. **`src/shared/vocab.ts` is the only place a vocabulary is defined** (§3 says what
+   each term means). Every state, channel, action
+   and status string lives there and is imported everywhere —
    server, frontend, tests. Never type one of those strings as a literal
    anywhere else.
 3. **The engine (§5) is pure.** No database, no `fetch`, no `Date.now()` inside it.
@@ -322,41 +323,9 @@ failure. Its verdicts (extract vs bless-and-raise) are in `docs/modularity.md`.
 
 ## 3. Vocabularies — `src/shared/vocab.ts`
 
-These are the **only** definitions. Export each as a `const` tuple and derive the
-type from it:
-
-```ts
-export const ALERT_KIND   = ['reminder', 'timer', 'chore', 'thing', 'machine'] as const;
-export const CHANNEL      = ['push', 'house'] as const;
-export const FIRE_STATE   = ['scheduled', 'ringing', 'closed'] as const;
-export const CLOSE_REASON = ['done', 'acked', 'missed', 'superseded', 'stopped', 'removed'] as const;
-export const ACTION       = ['done', 'snooze', 'ack'] as const;      // actions on a fire
-export const TIMER_CMD    = ['start', 'stop'] as const;             // commands on a timer
-export const DELIVERY_STATUS = ['queued', 'claimed', 'sent', 'partial', 'failed'] as const;
-export const ROLE         = ['owner', 'member'] as const;
-export const FREQ         = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'] as const;
-export const WEEKDAY      = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;  // §4.3 byDay, alarm days
-export const CHORE_TIMING = ['at', 'by'] as const;                               // §7B
-export const THING_STATUS = ['idea', 'planned', 'done', 'dropped'] as const;     // §7C
-export const HOUSE_STATE  = ['ok', 'failing', 'not_configured', 'untried'] as const; // /status `house.state` (§9.2)
-export const MACHINE      = ['washer', 'dryer', 'dishwasher'] as const;          // §7D, card order: the laundry in load order, then the dish washer
-export const MACHINE_STATE = ['free', 'running', 'done'] as const;               // §7D, derived, never stored
-export const SUN_EVENT    = ['sunset'] as const;                                 // §7.7 events.start_sun
-export const RECIPE_SOURCE = ['description', 'captions', 'transcript', 'comments', 'page', 'typed'] as const; // §7E what a recipe was read from ('transcript': pasted, §7E.2b; 'page': any other link, §7E.6)
-export const CAPTIONS_FAILURE = ['blocked', 'none', 'failed'] as const;         // §7E why captions couldn't be read
-export const SPEAKER_KIND = ['echo', 'satellite'] as const;                      // §9.2a a house speaker, from its HA entity id
-export const IDENTIFY_FAILURE = ['off', 'failed'] as const;                     // §7A.3 why SogoAI gave no reading
-export const ITEM_READ_VIA = ['sogoai', 'claude'] as const;                     // §7A.3 who named a snapped item
-export const LOGIN_REQUEST_STATUS = ['pending', 'approved', 'denied', 'used'] as const; // §6.6 login_requests.status
-export const LOGIN_VIEW   = ['pending', 'approved', 'denied', 'expired'] as const; // §6.6 what the waiting browser / the phone is told — derived, never stored
-export const NOTICE_KIND  = ['login', 'new_sign_in'] as const;                    // §6.6 deliveries.notice — a sign-in notice push, never an alert
-export const MESS_SETTLE  = ['paid', 'forgiven'] as const;                        // §7B.7 messes.settled_how
-export const MESS_STATUS  = ['open', 'discuss', 'owed', 'closed', 'settled'] as const; // §7B.7 a mess's state — derived, never stored
-export const LIST_ADD_RESULT = ['added', 'existing', 'reopened'] as const;       // §7A.1 POST /lists/{id}/items result
-export const HOUSE_QUIET_FOR = ['1h', '2h', '4h', 'today'] as const;       // §9.2b how long the house is quiet
-
-export type Channel = typeof CHANNEL[number];   // ...and so on for each
-```
+The tuples themselves are in `src/shared/vocab.ts`, each a `const` tuple with its type derived from it
+(`export type Channel = typeof CHANNEL[number]`). That file is the only definition; it is not copied here.
+This table says what each term means.
 
 | Term | Meaning |
 |------|---------|
@@ -424,153 +393,13 @@ used to validate input against any of these tuples.
 
 ### 4.2 Schema — `migrations/0001_init.sql`
 
-```sql
-CREATE TABLE settings (
-  id            INTEGER PRIMARY KEY CHECK (id = 1),
-  household_name TEXT NOT NULL DEFAULT 'Home',
-  timezone      TEXT NOT NULL DEFAULT 'America/Los_Angeles',
-  relay_last_seen TEXT                        -- was the relay's heartbeat; DROPPED by 0013 (§4.2l)
-);
-INSERT INTO settings (id) VALUES (1);
+Schema: [`migrations/0001_init.sql`](migrations/0001_init.sql). The migration is the schema; it is not copied here.
 
-CREATE TABLE members (
-  id            TEXT PRIMARY KEY,             -- 'mem_' + 16 random base32 chars
-  email         TEXT NOT NULL UNIQUE COLLATE NOCASE,
-  display_name  TEXT NOT NULL,
-  color         TEXT NOT NULL,                -- from §6.5 palette
-  role          TEXT NOT NULL CHECK (role IN ('owner','member')),
-  password_hash TEXT NOT NULL,                -- 'pbkdf2$100000$<salt b64>$<hash b64>'
-  created_at    TEXT NOT NULL,
-  disabled_at   TEXT                          -- non-null = cannot log in
-);
+Notes on it:
+- `relay_last_seen`: was the relay's heartbeat; DROPPED by 0013 (§4.2l)
+- `color`: from §6.5 palette
 
-CREATE TABLE sessions (
-  id            TEXT PRIMARY KEY,
-  member_id     TEXT NOT NULL REFERENCES members(id),
-  token_hash    TEXT NOT NULL UNIQUE,         -- SHA-256 hex of the cookie token
-  created_at    TEXT NOT NULL,
-  expires_at    TEXT NOT NULL                 -- sliding: now + 90 days on each use
-);
-
-CREATE TABLE invites (
-  id            TEXT PRIMARY KEY,
-  code_hash     TEXT NOT NULL UNIQUE,         -- SHA-256 hex of the normalized code
-  display_name  TEXT NOT NULL,
-  created_by    TEXT NOT NULL REFERENCES members(id),
-  created_at    TEXT NOT NULL,
-  expires_at    TEXT NOT NULL,                -- created_at + 7 days
-  used_by       TEXT REFERENCES members(id),
-  used_at       TEXT,
-  revoked_at    TEXT
-);
-
-CREATE TABLE events (
-  id            TEXT PRIMARY KEY,
-  title         TEXT NOT NULL,
-  notes         TEXT,
-  start_date    TEXT NOT NULL,                -- local YYYY-MM-DD
-  start_time    TEXT,                         -- local HH:MM; NULL = all-day
-  end_date      TEXT NOT NULL,                -- local; = start_date for single-day
-  end_time      TEXT,                         -- local HH:MM; NULL if all-day
-  recurrence    TEXT,                         -- JSON, §4.3; NULL = one-off
-  exdates       TEXT NOT NULL DEFAULT '[]',   -- JSON array of local YYYY-MM-DD skipped occurrences
-  assigned_to   TEXT NOT NULL DEFAULT '[]',   -- JSON array of member ids; [] = everyone
-  -- reminder (all NULL = no reminder)
-  remind_offset_min INTEGER,                  -- minutes BEFORE start; 0 = at start (all-day: start = 09:00 local ⚑ DEFAULT)
-  remind_channels   TEXT,                     -- JSON array of CHANNEL
-  renotify_min      INTEGER,                  -- NULL = alert once
-  max_alerts        INTEGER NOT NULL DEFAULT 4,
-  created_by    TEXT NOT NULL REFERENCES members(id),
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL,
-  deleted_at    TEXT
-);
-CREATE INDEX idx_events_dates ON events(start_date, end_date) WHERE deleted_at IS NULL;
-
-CREATE TABLE timers (
-  id            TEXT PRIMARY KEY,
-  title         TEXT NOT NULL,
-  interval_min  INTEGER NOT NULL CHECK (interval_min BETWEEN 1 AND 1440),
-  channels      TEXT NOT NULL,                -- JSON array of CHANNEL
-  renotify_min  INTEGER DEFAULT 15,           -- NULL = alert once
-  max_alerts    INTEGER NOT NULL DEFAULT 4,
-  assigned_to   TEXT NOT NULL DEFAULT '[]',
-  running       INTEGER NOT NULL DEFAULT 0,
-  created_by    TEXT NOT NULL REFERENCES members(id),
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL,
-  deleted_at    TEXT
-);
-
--- One row per time an alert is due. Reminders: one per event occurrence.
--- Timers: one per countdown.
-CREATE TABLE fires (
-  id              TEXT PRIMARY KEY,
-  kind            TEXT NOT NULL CHECK (kind IN ('reminder','timer')),
-  event_id        TEXT REFERENCES events(id),
-  occurrence_date TEXT,                       -- local YYYY-MM-DD of the event occurrence
-  timer_id        TEXT REFERENCES timers(id),
-  due_at          TEXT NOT NULL,              -- UTC ISO
-  state           TEXT NOT NULL CHECK (state IN ('scheduled','ringing','closed')),
-  alert_count     INTEGER NOT NULL DEFAULT 0,
-  last_alerted_at TEXT,
-  close_reason    TEXT CHECK (close_reason IN ('done','acked','missed','superseded','stopped','removed')),
-  closed_by       TEXT REFERENCES members(id),
-  closed_at       TEXT,
-  CHECK ((kind = 'reminder' AND event_id IS NOT NULL AND occurrence_date IS NOT NULL AND timer_id IS NULL)
-      OR (kind = 'timer'    AND timer_id IS NOT NULL AND event_id IS NULL))
-);
-CREATE UNIQUE INDEX uq_fire_occurrence ON fires(event_id, occurrence_date) WHERE kind = 'reminder' AND state != 'closed';
-CREATE UNIQUE INDEX uq_timer_open      ON fires(timer_id) WHERE kind = 'timer' AND state != 'closed';
-CREATE INDEX idx_fires_open ON fires(state, due_at) WHERE state != 'closed';
-
-CREATE TABLE deliveries (
-  id            TEXT PRIMARY KEY,
-  fire_id       TEXT NOT NULL REFERENCES fires(id),
-  alert_number  INTEGER NOT NULL,             -- which alert of the fire (1 = first)
-  channel       TEXT NOT NULL CHECK (channel IN ('push','house')),
-  member_id     TEXT REFERENCES members(id),  -- set for push, NULL for house
-  message       TEXT NOT NULL,
-  status        TEXT NOT NULL CHECK (status IN ('queued','claimed','sent','partial','failed')),
-  detail        TEXT,                         -- error text or per-surface result JSON
-  attempts      INTEGER NOT NULL DEFAULT 0,
-  claimed_at    TEXT,
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL
-);
-CREATE INDEX idx_deliveries_queue ON deliveries(channel, status);
-
-CREATE TABLE push_subscriptions (
-  id            TEXT PRIMARY KEY,
-  member_id     TEXT NOT NULL REFERENCES members(id),
-  endpoint      TEXT NOT NULL UNIQUE,
-  p256dh        TEXT NOT NULL,
-  auth          TEXT NOT NULL,
-  user_agent    TEXT,
-  created_at    TEXT NOT NULL,
-  last_ok_at    TEXT,
-  last_error    TEXT
-);
-
-CREATE TABLE school_holidays (
-  date          TEXT PRIMARY KEY,             -- local YYYY-MM-DD
-  label         TEXT NOT NULL
-);
-
-CREATE TABLE login_failures (             -- §6.4 rate limit; rows older than 15 min are ignored
-  email         TEXT NOT NULL COLLATE NOCASE,
-  at            TEXT NOT NULL
-);
-CREATE INDEX idx_login_failures ON login_failures(email, at);
-
-CREATE TABLE member_prefs (
-  member_id            TEXT PRIMARY KEY REFERENCES members(id),
-  show_public_holidays INTEGER NOT NULL DEFAULT 1,
-  show_school_holidays INTEGER NOT NULL DEFAULT 1
-);
-```
-
-The `CHECK` lists above necessarily repeat §3 as SQL text. Test **M1-VOCAB** reads the
+The `CHECK` lists in the migrations necessarily repeat the vocabularies as SQL text. Test **M1-VOCAB** reads the
 `CHECK`s **in force** from the migrated database's own schema (`sqlite_master`), not from
 migration text — so a table rebuilt or a column dropped by a later migration is judged by
 what actually exists. It asserts
@@ -579,11 +408,10 @@ test is what keeps the two in step.
 
 ### 4.2a Schema change — `migrations/0002_alarms.sql`
 
-```sql
--- A scheduled alarm (§1) is stored as an event with is_alarm = 1. It reuses the
--- event recurrence + reminder + fire machinery unchanged; only its presentation differs.
-ALTER TABLE events ADD COLUMN is_alarm INTEGER NOT NULL DEFAULT 0 CHECK (is_alarm IN (0, 1));
-```
+Schema: [`migrations/0002_alarms.sql`](migrations/0002_alarms.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- A scheduled alarm (§1) is stored as an event with is_alarm = 1. It reuses the event recurrence + reminder + fire machinery unchanged; only its presentation differs.
 
 An alarm row always has: `start_time` set (never all-day), `recurrence =
 {"freq":"WEEKLY","byDay":[...]}` with at least one day, `remind_offset_min = 0`,
@@ -591,116 +419,25 @@ An alarm row always has: `start_time` set (never all-day), `recurrence =
 
 ### 4.2b Schema change — `migrations/0003_days_off.sql`
 
-```sql
--- Household days off (§7.3): JSON array of HOLIDAYS keys; NULL = DEFAULT_DAYS_OFF.
-ALTER TABLE settings ADD COLUMN days_off TEXT;
-```
+Schema: [`migrations/0003_days_off.sql`](migrations/0003_days_off.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- Household days off (§7.3): JSON array of HOLIDAYS keys; NULL = DEFAULT_DAYS_OFF.
 
 ### 4.2c Schema change — `migrations/0004_options_expiration.sql`
 
-```sql
--- Per-member switch for the 📈 monthly options expiration marker (§7.4).
-ALTER TABLE member_prefs ADD COLUMN show_options_expiration INTEGER NOT NULL DEFAULT 0;
-```
+Schema: [`migrations/0004_options_expiration.sql`](migrations/0004_options_expiration.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- Per-member switch for the 📈 monthly options expiration marker (§7.4).
 
 ### 4.2d Schema change — `migrations/0005_lists.sql`
 
-```sql
--- §7A — items on the two household lists. One row per item; checking it off keeps the
--- row (for "Recently bought" / "Done") until it ages out of view.
-CREATE TABLE list_items (
-  id          TEXT PRIMARY KEY,               -- 'itm_' + 16 base32
-  list        TEXT NOT NULL CHECK (list IN ('shopping','wishlist')),
-  text        TEXT NOT NULL,                  -- as typed, trimmed; 1–120 chars
-  text_key    TEXT NOT NULL,                  -- itemKey(text), §7A.1
-  note        TEXT,                           -- wish list detail; ≤ 1000 chars
-  owner_id    TEXT REFERENCES members(id),    -- wish list: whose it is; NULL = household
-  created_by  TEXT NOT NULL REFERENCES members(id),
-  created_at  TEXT NOT NULL,
-  updated_at  TEXT NOT NULL,
-  checked_at  TEXT,                           -- NULL = open
-  checked_by  TEXT REFERENCES members(id),
-  deleted_at  TEXT
-);
-CREATE UNIQUE INDEX uq_list_item_key ON list_items(list, text_key) WHERE deleted_at IS NULL;
-CREATE INDEX idx_list_items ON list_items(list, checked_at) WHERE deleted_at IS NULL;
-```
+Schema: [`migrations/0005_lists.sql`](migrations/0005_lists.sql). The migration is the schema; it is not copied here.
 
 ### 4.2e Schema change — `migrations/0006_chores.sql`
 
-```sql
--- §7B — chores and their daily runs. fires gains kind 'chore' (+ chore_run_id); SQLite
--- cannot alter a CHECK, so fires is rebuilt and its rows copied. DROP TABLE fires counts
--- as deleting every fire, which leaves a deferred FK violation per delivery that the
--- rename never clears — so deliveries are stashed and restored around the swap.
-PRAGMA defer_foreign_keys = true;
-
-CREATE TABLE chores (
-  id           TEXT PRIMARY KEY,               -- 'chr_' + 16 base32
-  title        TEXT NOT NULL,                  -- 1–60 chars
-  done_means   TEXT,                           -- ≤ 200 chars: what "done" looks like
-  days         TEXT NOT NULL,                  -- JSON Weekday[], ≥ 1, week order
-  timing       TEXT NOT NULL CHECK (timing IN ('at','by')),
-  time         TEXT NOT NULL,                  -- local HH:MM
-  nudge        INTEGER NOT NULL DEFAULT 0 CHECK (nudge IN (0, 1)),   -- 'by' only
-  people       TEXT NOT NULL,                  -- JSON member ids in turn order, 1–8
-  steps        TEXT NOT NULL,                  -- JSON ChoreStep[], 1–6 (§7B.2)
-  channels     TEXT NOT NULL,                  -- JSON CHANNEL[] (for rings and nudges)
-  renotify_min INTEGER,                        -- NULL = ring once
-  max_alerts   INTEGER NOT NULL DEFAULT 4,
-  start_date   TEXT NOT NULL,                  -- local date created; rotation counts weeks from it
-  created_by   TEXT NOT NULL REFERENCES members(id),
-  created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL,
-  deleted_at   TEXT
-);
-
-CREATE TABLE chore_runs (                      -- one per chore per day it is due
-  id           TEXT PRIMARY KEY,               -- 'run_' + 16 base32
-  chore_id     TEXT NOT NULL REFERENCES chores(id),
-  date         TEXT NOT NULL,                  -- local YYYY-MM-DD
-  assignee_id  TEXT REFERENCES members(id),    -- whose turn; NULL = nobody active
-  step         INTEGER NOT NULL DEFAULT 0,     -- index of the current step; = steps.length when done
-  done_at      TEXT,
-  done_by      TEXT REFERENCES members(id),
-  created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL,
-  UNIQUE (chore_id, date)
-);
-
-CREATE TABLE fires_new (
-  id              TEXT PRIMARY KEY,
-  kind            TEXT NOT NULL CHECK (kind IN ('reminder','timer','chore')),
-  event_id        TEXT REFERENCES events(id),
-  occurrence_date TEXT,
-  timer_id        TEXT REFERENCES timers(id),
-  chore_run_id    TEXT REFERENCES chore_runs(id),
-  due_at          TEXT NOT NULL,
-  state           TEXT NOT NULL CHECK (state IN ('scheduled','ringing','closed')),
-  alert_count     INTEGER NOT NULL DEFAULT 0,
-  last_alerted_at TEXT,
-  close_reason    TEXT CHECK (close_reason IN ('done','acked','missed','superseded','stopped','removed')),
-  closed_by       TEXT REFERENCES members(id),
-  closed_at       TEXT,
-  CHECK ((kind = 'reminder' AND event_id IS NOT NULL AND occurrence_date IS NOT NULL AND timer_id IS NULL AND chore_run_id IS NULL)
-      OR (kind = 'timer'    AND timer_id IS NOT NULL AND event_id IS NULL AND chore_run_id IS NULL)
-      OR (kind = 'chore'    AND chore_run_id IS NOT NULL AND event_id IS NULL AND timer_id IS NULL))
-);
-INSERT INTO fires_new (id, kind, event_id, occurrence_date, timer_id, chore_run_id, due_at, state,
-                       alert_count, last_alerted_at, close_reason, closed_by, closed_at)
-  SELECT id, kind, event_id, occurrence_date, timer_id, NULL, due_at, state,
-         alert_count, last_alerted_at, close_reason, closed_by, closed_at FROM fires;
-CREATE TABLE deliveries_stash AS SELECT * FROM deliveries;
-DELETE FROM deliveries;
-DROP TABLE fires;
-ALTER TABLE fires_new RENAME TO fires;
-INSERT INTO deliveries SELECT * FROM deliveries_stash;
-DROP TABLE deliveries_stash;
-CREATE UNIQUE INDEX uq_fire_occurrence ON fires(event_id, occurrence_date) WHERE kind = 'reminder' AND state != 'closed';
-CREATE UNIQUE INDEX uq_timer_open      ON fires(timer_id) WHERE kind = 'timer' AND state != 'closed';
-CREATE UNIQUE INDEX uq_chore_run_open  ON fires(chore_run_id) WHERE kind = 'chore' AND state != 'closed';
-CREATE INDEX idx_fires_open ON fires(state, due_at) WHERE state != 'closed';
-```
+Schema: [`migrations/0006_chores.sql`](migrations/0006_chores.sql). The migration is the schema; it is not copied here.
 
 **Migration check (M4c):** a test applies 0001–0005, inserts a reminder fire, a timer
 fire and a delivery, applies 0006, and finds all three intact with the delivery still
@@ -708,169 +445,32 @@ pointing at its fire.
 
 ### 4.2f Schema change — `migrations/0007_custom_lists.sql`
 
-```sql
--- §7A — lists become household data: any number, named by members. list_items.list (a
--- fixed vocabulary) becomes list_id, and owner_id becomes assignee_id for every list.
--- list_items is rebuilt (SQLite cannot drop a CHECK); nothing references it.
-CREATE TABLE lists (
-  id         TEXT PRIMARY KEY,                 -- 'lst_' + 16 base32; the two seeded lists keep fixed ids
-  name       TEXT NOT NULL,                    -- 1–40 chars, as typed (trimmed)
-  name_key   TEXT NOT NULL,                    -- itemKey(name): one list per name
-  created_by TEXT REFERENCES members(id),      -- NULL for the two seeded lists
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  deleted_at TEXT
-);
-CREATE UNIQUE INDEX uq_list_name ON lists(name_key) WHERE deleted_at IS NULL;
-INSERT INTO lists (id, name, name_key, created_by, created_at, updated_at) VALUES
-  ('lst_shopping', 'Shopping',  'shopping',  NULL, '2026-10-03T00:00:00.000Z', '2026-10-03T00:00:00.000Z'),
-  ('lst_wishlist', 'Wish list', 'wish list', NULL, '2026-10-03T00:00:00.000Z', '2026-10-03T00:00:00.000Z');
-
-CREATE TABLE list_items_new (
-  id          TEXT PRIMARY KEY,
-  list_id     TEXT NOT NULL REFERENCES lists(id),
-  text        TEXT NOT NULL,
-  text_key    TEXT NOT NULL,
-  note        TEXT,
-  assignee_id TEXT REFERENCES members(id),     -- one person, or NULL = the household
-  created_by  TEXT NOT NULL REFERENCES members(id),
-  created_at  TEXT NOT NULL,
-  updated_at  TEXT NOT NULL,
-  checked_at  TEXT,
-  checked_by  TEXT REFERENCES members(id),
-  deleted_at  TEXT
-);
-INSERT INTO list_items_new (id, list_id, text, text_key, note, assignee_id, created_by, created_at,
-                            updated_at, checked_at, checked_by, deleted_at)
-  SELECT id, CASE list WHEN 'shopping' THEN 'lst_shopping' ELSE 'lst_wishlist' END, text, text_key, note,
-         owner_id, created_by, created_at, updated_at, checked_at, checked_by, deleted_at
-    FROM list_items;
-DROP TABLE list_items;
-ALTER TABLE list_items_new RENAME TO list_items;
-CREATE UNIQUE INDEX uq_list_item_key ON list_items(list_id, text_key) WHERE deleted_at IS NULL;
-CREATE INDEX idx_list_items ON list_items(list_id, checked_at) WHERE deleted_at IS NULL;
-```
+Schema: [`migrations/0007_custom_lists.sql`](migrations/0007_custom_lists.sql). The migration is the schema; it is not copied here.
 
 The seed timestamps are fixed literals (never `datetime('now')`, §4.1).
 
 ### 4.2g Schema change — `migrations/0008_things_to_do.sql`
 
-```sql
--- §7C — things to do: ideas with a time window, reminders, an optional photo.
--- fires gains kind 'thing' (+ thing_id); rebuilt exactly like 0006, deliveries stashed.
-PRAGMA defer_foreign_keys = true;
-
-CREATE TABLE things (
-  id           TEXT PRIMARY KEY,                -- 'thg_' + 16 base32
-  title        TEXT NOT NULL,                   -- 1–120
-  note         TEXT,                            -- ≤ 2000
-  place        TEXT,                            -- ≤ 200
-  url          TEXT,                            -- ≤ 500, http(s) only
-  window_start TEXT,                            -- local YYYY-MM-DD; NULL = any time
-  window_end   TEXT,                            -- local YYYY-MM-DD ≥ window_start; NULL = open-ended
-  remind_start INTEGER NOT NULL DEFAULT 0 CHECK (remind_start IN (0, 1)),
-  remind_on    TEXT,                            -- local YYYY-MM-DD, a reminder on a picked date
-  channels     TEXT NOT NULL DEFAULT '["push"]',-- JSON CHANNEL[] for its reminders
-  photo_key    TEXT,                            -- R2 object key; NULL = no photo
-  status       TEXT NOT NULL DEFAULT 'idea' CHECK (status IN ('idea','planned','done','dropped')),
-  planned_event_id TEXT REFERENCES events(id),  -- set by Plan it
-  created_by   TEXT NOT NULL REFERENCES members(id),
-  created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL,
-  deleted_at   TEXT
-);
-CREATE INDEX idx_things_open ON things(status, window_end) WHERE deleted_at IS NULL;
-
--- Plan it (§7C.2) links the calendar event back to its thing.
-ALTER TABLE events ADD COLUMN thing_id TEXT REFERENCES things(id);
-
--- Daily cap on photo reading (§7C.4).
-CREATE TABLE photo_reads (at TEXT NOT NULL, member_id TEXT NOT NULL REFERENCES members(id));
-
-CREATE TABLE fires_new (
-  id              TEXT PRIMARY KEY,
-  kind            TEXT NOT NULL CHECK (kind IN ('reminder','timer','chore','thing')),
-  event_id        TEXT REFERENCES events(id),
-  occurrence_date TEXT,                         -- reminder: the event occurrence; thing: the reminder's date
-  timer_id        TEXT REFERENCES timers(id),
-  chore_run_id    TEXT REFERENCES chore_runs(id),
-  thing_id        TEXT REFERENCES things(id),
-  due_at          TEXT NOT NULL,
-  state           TEXT NOT NULL CHECK (state IN ('scheduled','ringing','closed')),
-  alert_count     INTEGER NOT NULL DEFAULT 0,
-  last_alerted_at TEXT,
-  close_reason    TEXT CHECK (close_reason IN ('done','acked','missed','superseded','stopped','removed')),
-  closed_by       TEXT REFERENCES members(id),
-  closed_at       TEXT,
-  CHECK ((kind = 'reminder' AND event_id IS NOT NULL AND occurrence_date IS NOT NULL AND timer_id IS NULL AND chore_run_id IS NULL AND thing_id IS NULL)
-      OR (kind = 'timer'    AND timer_id IS NOT NULL AND event_id IS NULL AND chore_run_id IS NULL AND thing_id IS NULL)
-      OR (kind = 'chore'    AND chore_run_id IS NOT NULL AND event_id IS NULL AND timer_id IS NULL AND thing_id IS NULL)
-      OR (kind = 'thing'    AND thing_id IS NOT NULL AND occurrence_date IS NOT NULL AND event_id IS NULL AND timer_id IS NULL AND chore_run_id IS NULL))
-);
-INSERT INTO fires_new (id, kind, event_id, occurrence_date, timer_id, chore_run_id, thing_id, due_at, state,
-                       alert_count, last_alerted_at, close_reason, closed_by, closed_at)
-  SELECT id, kind, event_id, occurrence_date, timer_id, chore_run_id, NULL, due_at, state,
-         alert_count, last_alerted_at, close_reason, closed_by, closed_at FROM fires;
-CREATE TABLE deliveries_stash AS SELECT * FROM deliveries;
-DELETE FROM deliveries;
-DROP TABLE fires;
-ALTER TABLE fires_new RENAME TO fires;
-INSERT INTO deliveries SELECT * FROM deliveries_stash;
-DROP TABLE deliveries_stash;
-CREATE UNIQUE INDEX uq_fire_occurrence ON fires(event_id, occurrence_date) WHERE kind = 'reminder' AND state != 'closed';
-CREATE UNIQUE INDEX uq_timer_open      ON fires(timer_id) WHERE kind = 'timer' AND state != 'closed';
-CREATE UNIQUE INDEX uq_chore_run_open  ON fires(chore_run_id) WHERE kind = 'chore' AND state != 'closed';
-CREATE UNIQUE INDEX uq_thing_reminder  ON fires(thing_id, occurrence_date) WHERE kind = 'thing' AND state != 'closed';
-CREATE INDEX idx_fires_open ON fires(state, due_at) WHERE state != 'closed';
-```
+Schema: [`migrations/0008_things_to_do.sql`](migrations/0008_things_to_do.sql). The migration is the schema; it is not copied here.
 
 **Migration check (M4g):** like C13 — fires of every existing kind and their deliveries
 survive 0008; `PRAGMA foreign_key_check` is empty.
 
 ### 4.2h Schema change — `migrations/0009_optional_events.sql`
 
-```sql
--- §7.5 — optional events: shown to, and reminding, only the members who turned them on.
-ALTER TABLE events ADD COLUMN optional INTEGER NOT NULL DEFAULT 0 CHECK (optional IN (0, 1));
-CREATE TABLE event_optins (
-  event_id   TEXT NOT NULL REFERENCES events(id),
-  member_id  TEXT NOT NULL REFERENCES members(id),
-  created_at TEXT NOT NULL,
-  PRIMARY KEY (event_id, member_id)
-);
-```
+Schema: [`migrations/0009_optional_events.sql`](migrations/0009_optional_events.sql). The migration is the schema; it is not copied here.
 
 ### 4.2i Schema change — `migrations/0010_calendar_tidy.sql`
 
-```sql
--- §7.2 / §7.6 — school holidays removed (the table and the member switch); event emoji added.
-DROP TABLE school_holidays;
-ALTER TABLE member_prefs DROP COLUMN show_school_holidays;
-ALTER TABLE events ADD COLUMN emoji TEXT;
-```
+Schema: [`migrations/0010_calendar_tidy.sql`](migrations/0010_calendar_tidy.sql). The migration is the schema; it is not copied here.
 
 ### 4.2j Schema change — `migrations/0011_thing_details.sql`
 
-```sql
--- §7C.1 — things gain address, phone and cost (free text, as written).
-ALTER TABLE things ADD COLUMN address TEXT;
-ALTER TABLE things ADD COLUMN phone TEXT;
-ALTER TABLE things ADD COLUMN cost TEXT;
-```
+Schema: [`migrations/0011_thing_details.sql`](migrations/0011_thing_details.sql). The migration is the schema; it is not copied here.
 
 ### 4.2k Schema change — `migrations/0012_announcements.sql`
 
-```sql
--- §9.3 — an announcement is a delivery with no fire: deliveries.fire_id becomes nullable.
--- SQLite cannot drop a NOT NULL, so deliveries is rebuilt and its rows copied. No table
--- references deliveries, so nothing has to be stashed. Every other column and both CHECKs
--- are unchanged (M1-VOCAB reads them from sqlite_master).
-CREATE TABLE deliveries_new ( …the §4.2 columns, except: fire_id TEXT REFERENCES fires(id) … );
-INSERT INTO deliveries_new (…every column…) SELECT …every column… FROM deliveries;
-DROP TABLE deliveries;
-ALTER TABLE deliveries_new RENAME TO deliveries;
-CREATE INDEX idx_deliveries_queue ON deliveries(channel, status);
-```
+Schema: [`migrations/0012_announcements.sql`](migrations/0012_announcements.sql). The migration is the schema; it is not copied here.
 
 `alert_number` stays `NOT NULL`; an announcement's deliveries carry `1`.
 **Migration check (AN8):** like C13 — deliveries written under 0001–0011 survive 0012
@@ -879,48 +479,21 @@ unchanged, `PRAGMA foreign_key_check` is empty, and afterwards a delivery with
 
 ### 4.2l Schema change — `migrations/0013_retire_relay.sql`
 
-```sql
--- §9.2 — the relay is retired (v1.7.0); its heartbeat column goes with it. House health is
--- derived from the deliveries table instead (houseState), never stored.
-ALTER TABLE settings DROP COLUMN relay_last_seen;
-```
+Schema: [`migrations/0013_retire_relay.sql`](migrations/0013_retire_relay.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §9.2 — the relay is retired (v1.7.0); its heartbeat column goes with it. House health is derived from the deliveries table instead (houseState), never stored.
 
 **Migration check (H9):** the `settings` row survives 0013 with its name, time zone and days
 off unchanged, and `relay_last_seen` is no longer a column.
 
 ### 4.2m Schema change — `migrations/0014_machines.sql`
 
-```sql
--- §7D — the laundry loop: two machines, and fires gain kind 'machine' (+ machine_id).
--- fires is rebuilt exactly like 0006/0008, deliveries stashed and restored.
-PRAGMA defer_foreign_keys = true;
+Schema: [`migrations/0014_machines.sql`](migrations/0014_machines.sql). The migration is the schema; it is not copied here.
 
-CREATE TABLE machines (
-  id         TEXT PRIMARY KEY,                 -- MACHINE (vocab.ts); the route validates with isOneOf
-  owner_id   TEXT REFERENCES members(id),      -- whose load; NULL = free
-  minutes    INTEGER,                          -- the chip picked (MACHINE_MINUTES)
-  started_at TEXT,                             -- UTC ISO; NULL = free
-  done_at    TEXT,                             -- started_at + minutes
-  started_by TEXT REFERENCES members(id),
-  updated_at TEXT
-);
-INSERT INTO machines (id, updated_at) VALUES ('washer', '2026-10-03T00:00:00.000Z'), ('dryer', '2026-10-03T00:00:00.000Z');
-
-CREATE TABLE fires_new (
-  …every 0008 column…,
-  kind       TEXT NOT NULL CHECK (kind IN ('reminder','timer','chore','thing','machine')),
-  machine_id TEXT REFERENCES machines(id),
-  CHECK ((kind = 'reminder' AND … AND machine_id IS NULL)
-      OR (kind = 'timer'    AND … AND machine_id IS NULL)
-      OR (kind = 'chore'    AND … AND machine_id IS NULL)
-      OR (kind = 'thing'    AND … AND machine_id IS NULL)
-      OR (kind = 'machine'  AND machine_id IS NOT NULL AND event_id IS NULL AND timer_id IS NULL
-                            AND chore_run_id IS NULL AND thing_id IS NULL))
-);
--- copy fires (machine_id NULL), stash deliveries, drop, rename, restore, recreate every
--- 0008 index, and:
-CREATE UNIQUE INDEX uq_machine_open ON fires(machine_id) WHERE kind = 'machine' AND state != 'closed';
-```
+Notes on it:
+- fires is rebuilt exactly like 0006/0008, deliveries stashed and restored.
+- copy fires (machine_id NULL), stash deliveries, drop, rename, restore, recreate every 0008 index.
 
 There is no CHECK on `machines.id` (the vocabulary lives in `vocab.ts`). Seeds carry literal
 timestamps, never `datetime('now')`. **Done-waiting is never stored:** a machine is `done` when
@@ -932,12 +505,10 @@ without `machine_id` is refused by the CHECK.
 
 ### 4.2n Schema change — `migrations/0015_timer_window.sql`
 
-```sql
--- §5.3 rule 0 — a rolling timer's optional active time range, local wall time HH:MM in the
--- household timezone (§4.1). Both NULL = no window (rings at any hour, as before).
-ALTER TABLE timers ADD COLUMN active_from TEXT;
-ALTER TABLE timers ADD COLUMN active_to TEXT;
-```
+Schema: [`migrations/0015_timer_window.sql`](migrations/0015_timer_window.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §5.3 rule 0 — a rolling timer's optional active time range, local wall time HH:MM in the household timezone (§4.1). Both NULL = no window (rings at any hour, as before).
 
 There is no CHECK: the route validates (both null, or both `HH:MM` and `timerWindowError` is
 null). `from > to` is an overnight window (22:00–06:00).
@@ -946,13 +517,10 @@ null). `from > to` is an overnight window (22:00–06:00).
 
 ### 4.2o Schema change — `migrations/0016_sun_alerts.sql`
 
-```sql
--- §7.7 — sun-timed alerts: the household's place, and an event whose start is the sunset.
-ALTER TABLE settings ADD COLUMN latitude REAL;
-ALTER TABLE settings ADD COLUMN longitude REAL;
-UPDATE settings SET latitude = 33.20, longitude = -117.29 WHERE id = 1;  -- ZIP 92056, Oceanside
-ALTER TABLE events ADD COLUMN start_sun TEXT CHECK (start_sun IN ('sunset'));
-```
+Schema: [`migrations/0016_sun_alerts.sql`](migrations/0016_sun_alerts.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §7.7 — sun-timed alerts: the household's place, and an event whose start is the sunset.
 
 `settings.latitude` / `longitude` are degrees (north / east positive); both NULL = no place, and
 then no sun-timed reminder is planned (§7.7). There is no edit UI ⚑ Q57. `events.start_sun`
@@ -966,31 +534,13 @@ is refused by the CHECK.
 
 ### 4.2p Schema change — `migrations/0017_recipes.sql`
 
-```sql
--- §7E — recipes, household-shared: read from a YouTube video, or typed by hand. Additive only.
-CREATE TABLE recipes (
-  id             TEXT PRIMARY KEY,               -- 'rcp_' + 16 base32
-  title          TEXT NOT NULL,                  -- 1–RECIPE_TITLE_MAX; the dish, else the video's title
-  video_id       TEXT,                           -- the 11-character YouTube id; NULL = typed
-  video_title    TEXT,                           -- as YouTube gave it; NULL when typed
-  channel        TEXT,                           -- the channel's name; NULL when typed
-  ingredients    TEXT NOT NULL,                  -- JSON string[], each ≤ INGREDIENT_MAX
-  steps          TEXT NOT NULL,                  -- JSON string[]
-  servings       TEXT,                           -- free text as stated ("4", "serves 6–8")
-  time_text      TEXT,                           -- free text as stated ("45 min")
-  found          INTEGER NOT NULL CHECK (found IN (0, 1)),
-  source         TEXT NOT NULL,                  -- JSON RECIPE_SOURCE[]: what was read (§7E.1)
-  captions_error TEXT,                           -- why captions couldn't be read; NULL = read, or not tried
-  created_by     TEXT NOT NULL REFERENCES members(id),
-  created_at     TEXT NOT NULL,
-  updated_at     TEXT NOT NULL,
-  deleted_at     TEXT
-);
--- One live recipe per video (§7E.2): a second paste of the same link is 409 duplicate.
-CREATE UNIQUE INDEX uq_recipe_video ON recipes(video_id) WHERE deleted_at IS NULL AND video_id IS NOT NULL;
--- Daily cap on reading videos (§7E.2), counted apart from photo_reads.
-CREATE TABLE recipe_reads (at TEXT NOT NULL, member_id TEXT NOT NULL REFERENCES members(id));
-```
+Schema: [`migrations/0017_recipes.sql`](migrations/0017_recipes.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- `title`: 1–RECIPE_TITLE_MAX; the dish, else the video's title
+- `servings`: free text as stated ("4", "serves 6–8")
+- `time_text`: free text as stated ("45 min")
+- `source`: JSON RECIPE_SOURCE[]: what was read (§7E.1)
 
 There is **no url or thumbnail column**: both are derived from `video_id` (`watchUrl`,
 `thumbnailUrl`, §7E.1). `source` holds a JSON list, so it has no CHECK; the route writes only
@@ -1001,16 +551,7 @@ soft-deleted one does not block it and any number of typed recipes (NULL `video_
 
 ### 4.2q Schema change — `migrations/0018_recipe_emojis.sql`
 
-```sql
--- §7E.5 — each person's own emoji on a recipe: one per member per recipe. Additive only.
-CREATE TABLE recipe_emojis (
-  recipe_id  TEXT NOT NULL REFERENCES recipes(id),
-  member_id  TEXT NOT NULL REFERENCES members(id),
-  emoji      TEXT NOT NULL,                      -- one emoji (emojiError, §7.6)
-  updated_at TEXT NOT NULL,
-  PRIMARY KEY (recipe_id, member_id)
-);
-```
+Schema: [`migrations/0018_recipe_emojis.sql`](migrations/0018_recipe_emojis.sql). The migration is the schema; it is not copied here.
 
 Written only by `PUT /recipes/{id}/emoji` as an upsert (`INSERT … ON CONFLICT(recipe_id,
 member_id) DO UPDATE`) and removed by `DELETE /recipes/{id}/emoji`. A soft-deleted recipe keeps its
@@ -1021,10 +562,7 @@ survive 0018 unchanged; the primary key refuses a second row for the same member
 
 ### 4.2r Schema change — `migrations/0019_recipe_comments.sql`
 
-```sql
--- §7E.2 — why the video creator's comments couldn't be read. Additive only.
-ALTER TABLE recipes ADD COLUMN comments_error TEXT; -- NULL = read, none to read, or not tried
-```
+Schema: [`migrations/0019_recipe_comments.sql`](migrations/0019_recipe_comments.sql). The migration is the schema; it is not copied here.
 
 Set only by `POST /recipes/from-video` (§7E.2 step 8) when the comments lookup failed by quota or
 otherwise; comments turned off, or no comment by the creator among them, leave it NULL ⚑ Q78. PATCH
@@ -1036,14 +574,10 @@ NULL.
 
 ### 4.2s Schema change — `migrations/0020_recipe_captions_job.sql`
 
-```sql
--- §7E.2c — the captions-from-home job on a recipe row. Additive only.
-ALTER TABLE recipes ADD COLUMN captions_job TEXT CHECK (captions_job IN ('queued', 'claimed')); -- NULL = no job
-ALTER TABLE recipes ADD COLUMN captions_queued_at TEXT;   -- when from-video queued it
-ALTER TABLE recipes ADD COLUMN captions_claimed_at TEXT;  -- the latest claim
-ALTER TABLE recipes ADD COLUMN captions_attempts INTEGER NOT NULL DEFAULT 0; -- claims so far
-CREATE INDEX idx_recipes_captions_job ON recipes(captions_job) WHERE captions_job IS NOT NULL;
-```
+Schema: [`migrations/0020_recipe_captions_job.sql`](migrations/0020_recipe_captions_job.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §7E.2c — the captions-from-home job on a recipe row. Additive only.
 
 `CAPTIONS_JOB` (§3) is `queued` | `claimed`. Done and failed are **not stored**: ending a job puts the
 four columns back to NULL / 0 and the outcome lives in `source` / `captions_error`. Every write of these
@@ -1060,14 +594,10 @@ Dropped by 0021 (§4.2t).
 Decided by MojoSOGO 2026-10-04: no polling, no job queue — the Worker asks SogoAI in-line (§7E.2c). The
 job columns and their index (§4.2s) go.
 
-```sql
--- §7E.2c — the captions-from-home job is gone: the Worker asks SogoAI in-line.
-DROP INDEX idx_recipes_captions_job;
-ALTER TABLE recipes DROP COLUMN captions_job;
-ALTER TABLE recipes DROP COLUMN captions_queued_at;
-ALTER TABLE recipes DROP COLUMN captions_claimed_at;
-ALTER TABLE recipes DROP COLUMN captions_attempts;
-```
+Schema: [`migrations/0021_drop_captions_job.sql`](migrations/0021_drop_captions_job.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §7E.2c — the captions-from-home job is gone: the Worker asks SogoAI in-line.
 
 The index goes first (SQLite refuses to drop an indexed column). 0020's CHECK is column-level, so
 `DROP COLUMN` needs no table rebuild. A recipe whose job was pending when 0021 ran keeps its
@@ -1081,10 +611,10 @@ The index goes first (SQLite refuses to drop an indexed column). 0020's CHECK is
 Decided by MojoSOGO 2026-10-04: a Claude Code session can ping the founder's phone (§9.4). Its push
 carries the caller's title, so a fire-less delivery may now carry its own title.
 
-```sql
--- §9.4 — a fire-less push delivery may carry its own push title (ops/notify); NULL elsewhere.
-ALTER TABLE deliveries ADD COLUMN title TEXT;
-```
+Schema: [`migrations/0022_delivery_title.sql`](migrations/0022_delivery_title.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §9.4 — a fire-less push delivery may carry its own push title (ops/notify); NULL elsewhere.
 
 `title` is NULL on every existing row and on every fire, announcement and house delivery; only
 `POST /ops/notify` writes it. `sendPushDeliveries` shows a fire-less delivery as `title ?? ANNOUNCE_TITLE`
@@ -1095,10 +625,10 @@ written under 0001–0021 survive 0022 unchanged with `title` NULL; `PRAGMA fore
 
 Decided by MojoSOGO 2026-10-04: a snapped item keeps its photo (§7A.3).
 
-```sql
--- §7A.3 — a list item's photo: its R2 key (list-items/{itemId}/{random}.jpg), NULL when it has none.
-ALTER TABLE list_items ADD COLUMN photo_key TEXT;
-```
+Schema: [`migrations/0023_list_item_photo.sql`](migrations/0023_list_item_photo.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §7A.3 — a list item's photo: its R2 key (list-items/{itemId}/{random}.jpg), NULL when it has none.
 
 `photo_key` is NULL on every existing row. It is written only by `PUT /list-items/{id}/photo` and cleared by
 `DELETE /list-items/{id}/photo`, by deleting the item and by deleting its list (§7A.1). It is never sent on the
@@ -1109,12 +639,11 @@ unchanged with `photo_key` NULL; `PRAGMA foreign_key_check` is empty.
 
 Decided by MojoSOGO 2026-10-04: each person ticks the house speakers they want to be alerted on (§9.2a).
 
-```sql
--- §9.2a — the house speakers a member chose: a JSON list of HA entity ids; NULL = not chosen (the default speakers).
-ALTER TABLE member_prefs ADD COLUMN house_speakers TEXT;
--- §9.2a — the speakers a house delivery is spoken on, fixed when it is written; NULL = the default speakers.
-ALTER TABLE deliveries ADD COLUMN speakers TEXT;
-```
+Schema: [`migrations/0024_house_speakers.sql`](migrations/0024_house_speakers.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §9.2a — the house speakers a member chose: a JSON list of HA entity ids; NULL = not chosen (the default speakers).
+- §9.2a — the speakers a house delivery is spoken on, fixed when it is written; NULL = the default speakers.
 
 Both are NULL on every existing row, so every existing member has not chosen and every queued house row
 speaks on the default speakers, exactly as before. `house_speakers` is written only by `PATCH /me`;
@@ -1126,30 +655,14 @@ with both columns NULL; `PRAGMA foreign_key_check` is empty.
 
 Decided by MojoSOGO 2026-10-04: a browser can be signed in by approving it on the member's phone (§6.6).
 
-```sql
--- §6.6 — one row per "Sign in with my phone" request. Rows are never deleted: they are the rate-limit count.
-CREATE TABLE login_requests (
-  id                 TEXT PRIMARY KEY,                -- 'lgn_' + 16 base32
-  member_id          TEXT REFERENCES members(id),     -- NULL = a decoy: no usable member, or over the limit (§6.6)
-  email              TEXT NOT NULL COLLATE NOCASE,    -- as asked, trimmed; what the limit counts by
-  waiting_token_hash TEXT NOT NULL UNIQUE,            -- SHA-256 hex of the waiting browser's cookie
-  match_number       INTEGER NOT NULL,                -- the 2-digit number the browser shows
-  choices            TEXT NOT NULL,                   -- JSON [n, n, n]: the match and two decoys, shuffled
-  status             TEXT NOT NULL CHECK (status IN ('pending','approved','denied','used')),
-  user_agent         TEXT,                            -- the waiting browser's, ≤ 300 chars
-  place              TEXT,                            -- "City, CC" from Cloudflare's request.cf; NULL = unknown
-  created_at         TEXT NOT NULL,
-  expires_at         TEXT NOT NULL,                   -- created_at + 2 min
-  decided_at         TEXT,                            -- approved or denied
-  used_at            TEXT                             -- the session was minted
-);
-CREATE INDEX idx_login_requests_email ON login_requests(email, created_at);
-CREATE INDEX idx_login_requests_member ON login_requests(member_id, status);
+Schema: [`migrations/0025_phone_login.sql`](migrations/0025_phone_login.sql). The migration is the schema; it is not copied here.
 
--- §6.6 — a push that is a sign-in notice (no fire), and where tapping it goes.
-ALTER TABLE deliveries ADD COLUMN notice TEXT CHECK (notice IN ('login','new_sign_in'));
-ALTER TABLE deliveries ADD COLUMN url TEXT;
-```
+Notes on it:
+- §6.6 — one row per "Sign in with my phone" request. Rows are never deleted: they are the rate-limit count.
+- `member_id`: NULL = a decoy: no usable member, or over the limit (§6.6)
+- `user_agent`: the waiting browser's, ≤ 300 chars
+- `place`: "City, CC" from Cloudflare's request.cf; NULL = unknown
+- §6.6 — a push that is a sign-in notice (no fire), and where tapping it goes.
 
 Additive only. The column is `match_number`, not `match` (`MATCH` is an SQLite operator). `notice` and `url` are
 NULL on every existing row and on every fire, announcement, ping and house delivery; only §6.6 writes them. M1-VOCAB
@@ -1161,31 +674,7 @@ empty; `PRAGMA foreign_key_check` is empty.
 
 Asked by MojoSOGO 2026-10-05: the household's movies & shows list (§7F).
 
-```sql
--- §7F — the household's movies & shows. Soft-deleted; a watched show keeps who and when.
-CREATE TABLE shows (
-  id           TEXT PRIMARY KEY,                -- 'shw_' + 16 base32
-  title        TEXT NOT NULL,                   -- 1–120
-  title_key    TEXT NOT NULL,                   -- showKey(title, year): one per key among live rows (§7F.1)
-  kind         TEXT CHECK (kind IN ('movie','show')),  -- NULL = unknown
-  year         TEXT,                            -- ≤ 20, free text
-  rt_critics   INTEGER CHECK (rt_critics BETWEEN 0 AND 100),
-  rt_audience  INTEGER CHECK (rt_audience BETWEEN 0 AND 100),
-  watch        TEXT NOT NULL DEFAULT '[]',      -- JSON { how, where, note }[] (≤ 12)
-  checked_at   TEXT,                            -- when how-to-watch was last looked up; NULL = never
-  summary      TEXT,                            -- ≤ 500
-  note         TEXT,                            -- ≤ 2000
-  url          TEXT,                            -- ≤ 500, http(s) only
-  status       TEXT NOT NULL DEFAULT 'want' CHECK (status IN ('want','watched')),
-  watched_at   TEXT,
-  watched_by   TEXT REFERENCES members(id),
-  created_by   TEXT NOT NULL REFERENCES members(id),
-  created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL,
-  deleted_at   TEXT
-);
-CREATE UNIQUE INDEX uq_shows_key ON shows(title_key) WHERE deleted_at IS NULL;
-```
+Schema: [`migrations/0026_shows.sql`](migrations/0026_shows.sql). The migration is the schema; it is not copied here.
 
 Additive only. M1-VOCAB covers `shows.kind` (`SHOW_KIND`) and `shows.status` (`SHOW_STATUS`); `watch[].how`
 (`WATCH_HOW`) is JSON, checked by `parseShowInput`. **Migration check (W-M):** rows written under 0001–0025
@@ -1198,10 +687,7 @@ An applied migration is never edited.
 
 Asked by MojoSOGO 2026-10-05: each list shows an emoji in the Lists picker (§8.8).
 
-```sql
--- §7A.1 — a list's own emoji; NULL = the default picked from its name (defaultListEmoji).
-ALTER TABLE lists ADD COLUMN emoji TEXT;  -- one emoji (emojiError, §7.6) or NULL
-```
+Schema: [`migrations/0027_list_emoji.sql`](migrations/0027_list_emoji.sql). The migration is the schema; it is not copied here.
 
 Additive only. **Migration check (LE-M):** rows written under 0001–0026 survive unchanged with `emoji` NULL;
 `PRAGMA foreign_key_check` is empty.
@@ -1210,13 +696,7 @@ Additive only. **Migration check (LE-M):** rows written under 0001–0026 surviv
 
 Asked by MojoSOGO 2026-10-05: the machines' alerts sound only in their hours (§7D.5).
 
-```sql
--- §7D.5 — the machines' alert hours, household local HH:MM; both ends NULL = any time that day.
-ALTER TABLE settings ADD COLUMN machine_weekday_from TEXT DEFAULT '17:30';
-ALTER TABLE settings ADD COLUMN machine_weekday_to   TEXT DEFAULT '20:30';
-ALTER TABLE settings ADD COLUMN machine_weekend_from TEXT DEFAULT '09:00';
-ALTER TABLE settings ADD COLUMN machine_weekend_to   TEXT DEFAULT '21:00';
-```
+Schema: [`migrations/0028_machine_hours.sql`](migrations/0028_machine_hours.sql). The migration is the schema; it is not copied here.
 
 Additive only; the existing settings row takes the defaults. Checked by L21 (`GET /machines/hours` reads
 `DEFAULT_MACHINE_HOURS` after the migration).
@@ -1226,28 +706,7 @@ Additive only; the existing settings row takes the defaults. Checked by L21 (`GE
 Asked by MojoSOGO 2026-10-05: each chore gets "an area for what done looks like with specific areas, pictures
 and a list of expectations" (§7B.6).
 
-```sql
--- §7B.6 — what done looks like: a chore's named areas, each with a list of expectations and reference photos.
-CREATE TABLE chore_areas (
-  id           TEXT PRIMARY KEY,                       -- 'cha_' + 16 base32
-  chore_id     TEXT NOT NULL REFERENCES chores(id),
-  name         TEXT NOT NULL,                          -- 1–40 chars, e.g. "Sink"
-  expectations TEXT NOT NULL DEFAULT '[]',             -- JSON string[], 0–12, each 1–120 chars, in order
-  position     INTEGER NOT NULL,                       -- order within the chore: the order added
-  created_by   TEXT NOT NULL REFERENCES members(id),
-  created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL
-);
-CREATE INDEX idx_chore_areas_chore ON chore_areas(chore_id, position);
-
-CREATE TABLE chore_area_photos (
-  id         TEXT PRIMARY KEY,                         -- 'cap_' + 16 base32
-  area_id    TEXT NOT NULL REFERENCES chore_areas(id),
-  photo_key  TEXT NOT NULL,                            -- R2 chore-areas/{areaId}/{random}.jpg; never on the wire
-  created_at TEXT NOT NULL
-);
-CREATE INDEX idx_chore_area_photos_area ON chore_area_photos(area_id, created_at);
-```
+Schema: [`migrations/0029_chore_areas.sql`](migrations/0029_chore_areas.sql). The migration is the schema; it is not copied here.
 
 Additive only. Areas are deleted outright (they are reference, not history): `DELETE /chore-areas/{id}` and
 deleting their chore remove the rows and the R2 objects. **Migration check (CA-M):** rows written under 0001–0028
@@ -1257,12 +716,7 @@ survive 0029 unchanged; `PRAGMA foreign_key_check` is empty.
 
 Asked by MojoSOGO 2026-10-05: recipes from Facebook links and any web page, not only YouTube (§7E.6).
 
-```sql
--- §7E.6 — a recipe read from a link that is not a YouTube video. Additive only.
-ALTER TABLE recipes ADD COLUMN link TEXT;  -- recipeLinkOf's cleaned link; NULL for a video or a typed recipe
--- One live recipe per link (§7E.6): a second paste of the same link is 409 duplicate.
-CREATE UNIQUE INDEX uq_recipe_link ON recipes(link) WHERE deleted_at IS NULL AND link IS NOT NULL;
-```
+Schema: [`migrations/0030_recipe_links.sql`](migrations/0030_recipe_links.sql). The migration is the schema; it is not copied here.
 
 A link recipe keeps `video_id` and `video_title` NULL and its site's name ("Facebook", "allrecipes.com") in
 `channel`. **Migration check (RL-M):** rows written under 0001–0029 survive 0030 unchanged, existing recipes
@@ -1273,10 +727,7 @@ block it.
 
 Asked by MojoSOGO 2026-10-05 (§7E.2b ⚑ Q174).
 
-```sql
--- §7E.2b — a recipe's picture: the first screenshot of its latest read from screenshots, in R2. Additive only.
-ALTER TABLE recipes ADD COLUMN photo_key TEXT;  -- R2 recipes/{id}/{random}.jpg; never on the wire; NULL = none
-```
+Schema: [`migrations/0031_recipe_photo.sql`](migrations/0031_recipe_photo.sql). The migration is the schema; it is not copied here.
 
 **Migration check (RP-M):** rows written under 0001–0030 survive 0031 unchanged, `photo_key` NULL.
 
@@ -1284,39 +735,7 @@ ALTER TABLE recipes ADD COLUMN photo_key TEXT;  -- R2 recipes/{id}/{random}.jpg;
 
 Asked by MojoSOGO 2026-10-05 (§7B.7).
 
-```sql
--- §7B.7 — whose mess? A mess someone cleaned up, who owned up to it, and the point they owe. Additive only.
-CREATE TABLE messes (
-  id          TEXT PRIMARY KEY,                       -- 'mes_' + 16 base32
-  reported_by TEXT NOT NULL REFERENCES members(id),   -- who cleaned it up, and is owed
-  chore_id    TEXT REFERENCES chores(id),             -- the chore it belongs to; NULL = none named
-  note        TEXT,                                   -- 1–120 chars; NULL = none
-  photo_key   TEXT,                                   -- R2 messes/{id}/{random}.jpg; never on the wire; NULL once deleted
-  claimed_by  TEXT REFERENCES members(id),            -- who owes: claimed it, or recorded by an admin
-  claimed_at  TEXT,
-  assigned_by TEXT REFERENCES members(id),            -- the admin who recorded it; NULL = claimed by the person
-  discuss_at  TEXT,                                   -- moved to To talk about
-  closed_at   TEXT,                                   -- closed by an admin as nobody's
-  closed_by   TEXT REFERENCES members(id),
-  settled_at  TEXT,
-  settled_how TEXT CHECK (settled_how IN ('paid','forgiven')),
-  settled_by  TEXT REFERENCES members(id),
-  deleted_at  TEXT,
-  created_at  TEXT NOT NULL
-);
-CREATE INDEX idx_messes_created ON messes(created_at);
-
-CREATE TABLE mess_denials (                           -- "Not me"
-  mess_id    TEXT NOT NULL REFERENCES messes(id),
-  member_id  TEXT NOT NULL REFERENCES members(id),
-  created_at TEXT NOT NULL,
-  PRIMARY KEY (mess_id, member_id)
-);
-
--- A mess's asks and its To talk about notice: fire-less pushes that point at their mess (counted for the 4 asks).
-ALTER TABLE deliveries ADD COLUMN mess_id TEXT REFERENCES messes(id);
-CREATE INDEX idx_deliveries_mess ON deliveries(mess_id, member_id);
-```
+Schema: [`migrations/0032_messes.sql`](migrations/0032_messes.sql). The migration is the schema; it is not copied here.
 
 Additive only. `deliveries.mess_id` is NULL on every existing row and on every delivery but a mess's asks and its
 To talk about notice. Messes are soft-deleted (their asks point at them). **Migration check (MS-M):** rows written
@@ -1326,11 +745,10 @@ under 0001–0031 survive 0032 unchanged with `mess_id` NULL; `PRAGMA foreign_ke
 
 Asked by MojoSOGO 2026-10-08 (§5.5a).
 
-```sql
--- §5.5a — a rolling timer can announce the start of its day. Additive only.
-ALTER TABLE timers ADD COLUMN announce_start INTEGER NOT NULL DEFAULT 0 CHECK (announce_start IN (0, 1));
-ALTER TABLE timers ADD COLUMN announced_on TEXT;  -- local YYYY-MM-DD of the window opening last announced
-```
+Schema: [`migrations/0033_timer_announce.sql`](migrations/0033_timer_announce.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §5.5a — a rolling timer can announce the start of its day. Additive only.
 
 **Migration check (TS-M):** timers written under 0001–0032 survive 0033 unchanged with `announce_start` 0 and
 `announced_on` NULL — none of them announces anything.
@@ -1339,10 +757,10 @@ ALTER TABLE timers ADD COLUMN announced_on TEXT;  -- local YYYY-MM-DD of the win
 
 Asked by MojoSOGO 2026-10-09 (§7.9).
 
-```sql
--- §7.9 — an event's address (optional). Additive only.
-ALTER TABLE events ADD COLUMN address TEXT;  -- NULL = none; at most EVENT_ADDRESS_MAX (200) characters
-```
+Schema: [`migrations/0034_event_address.sql`](migrations/0034_event_address.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §7.9 — an event's address (optional). Additive only.
 
 **Migration check (EA-M):** events written under 0001–0033 survive 0034 unchanged with `address` NULL.
 
@@ -1350,10 +768,11 @@ ALTER TABLE events ADD COLUMN address TEXT;  -- NULL = none; at most EVENT_ADDRE
 
 Asked by MojoSOGO 2026-10-10 (§7.10).
 
-```sql
--- §7.10 — an event's things to bring (optional). Additive only.
-ALTER TABLE events ADD COLUMN bring TEXT;  -- NULL = none; else a JSON list of 1–EVENT_BRING_MAX lines
-```
+Schema: [`migrations/0035_event_bring.sql`](migrations/0035_event_bring.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §7.10 — an event's things to bring (optional). Additive only.
+- `ALTER`: NULL = none; else a JSON list of 1–EVENT_BRING_MAX lines
 
 **Migration check (EB-M):** events written under 0001–0034 survive 0035 unchanged with `bring` NULL.
 
@@ -1361,17 +780,10 @@ ALTER TABLE events ADD COLUMN bring TEXT;  -- NULL = none; else a JSON list of 1
 
 Asked by MojoSOGO 2026-10-10 (§7.11).
 
-```sql
--- §7.11 — the daily forecast shown on the calendar. Additive only.
-CREATE TABLE weather_days (
-  date       TEXT PRIMARY KEY,   -- household-local YYYY-MM-DD
-  code       INTEGER NOT NULL,   -- WMO weather code (§7.11 table)
-  high_f     INTEGER NOT NULL,   -- rounded °F
-  low_f      INTEGER NOT NULL,
-  fetched_at TEXT NOT NULL       -- UTC ISO of the refresh that wrote it
-);
-ALTER TABLE settings ADD COLUMN weather_tried_at TEXT;  -- UTC ISO of the last refresh attempt; NULL = never
-```
+Schema: [`migrations/0036_weather.sql`](migrations/0036_weather.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §7.11 — the daily forecast shown on the calendar. Additive only.
 
 **Migration check (WX-M):** settings written under 0001–0035 survive 0036 unchanged with `weather_tried_at` NULL;
 `weather_days` starts empty.
@@ -1380,10 +792,10 @@ ALTER TABLE settings ADD COLUMN weather_tried_at TEXT;  -- UTC ISO of the last r
 
 Asked by MojoSOGO 2026-10-10 (§7D.6).
 
-```sql
--- §7D.6 — the dish washer: a third machines row, seeded free. Additive only.
-INSERT INTO machines (id, updated_at) VALUES ('dishwasher', '2026-10-10T00:00:00.000Z');
-```
+Schema: [`migrations/0037_dishwasher.sql`](migrations/0037_dishwasher.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §7D.6 — the dish washer: a third machines row, seeded free. Additive only.
 
 **Migration check (DW-M):** the washer and dryer rows (a running load included) and their open fires survive 0037
 unchanged; the dish washer is seeded free.
@@ -1392,11 +804,10 @@ unchanged; the dish washer is seeded free.
 
 Asked by MojoSOGO 2026-10-10 (§9.2b).
 
-```sql
--- §9.2b — quiet the house: speakers say nothing until this instant. Additive only.
-ALTER TABLE settings ADD COLUMN house_quiet_until TEXT;                     -- UTC ISO; NULL or past = not quiet
-ALTER TABLE settings ADD COLUMN house_quiet_by TEXT REFERENCES members(id); -- who set it
-```
+Schema: [`migrations/0038_house_quiet.sql`](migrations/0038_house_quiet.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §9.2b — quiet the house: speakers say nothing until this instant. Additive only.
 
 **Migration check (HQ-M):** the settings row survives 0038 unchanged with both columns NULL (not quiet).
 
@@ -1404,11 +815,10 @@ ALTER TABLE settings ADD COLUMN house_quiet_by TEXT REFERENCES members(id); -- w
 
 Asked by MojoSOGO 2026-10-10 (§9.2c).
 
-```sql
--- §9.2c — "I'm away" on one alert: its speakers stop, it stays open. Additive only.
-ALTER TABLE fires ADD COLUMN away_by TEXT REFERENCES members(id); -- who said they're away; NULL = not
-ALTER TABLE fires ADD COLUMN away_at TEXT;                        -- UTC ISO
-```
+Schema: [`migrations/0039_fire_away.sql`](migrations/0039_fire_away.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §9.2c — "I'm away" on one alert: its speakers stop, it stays open. Additive only.
 
 **Migration check (AW-M):** fires and deliveries survive 0039 unchanged with both columns NULL.
 
@@ -1416,12 +826,10 @@ ALTER TABLE fires ADD COLUMN away_at TEXT;                        -- UTC ISO
 
 Asked by MojoSOGO 2026-10-11 (§7D.7).
 
-```sql
--- §7D.7 — who is alerted when a machine's load is done; NULL = nobody (phones only, no speaker). Additive only.
-ALTER TABLE machines ADD COLUMN alert_id TEXT REFERENCES members(id);
--- A load already in a machine keeps alerting its owner; an owner-unknown load goes phones only.
-UPDATE machines SET alert_id = owner_id WHERE done_at IS NOT NULL;
-```
+Schema: [`migrations/0040_machine_alert.sql`](migrations/0040_machine_alert.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- §7D.7 — who is alerted when a machine's load is done; NULL = nobody (phones only, no speaker). Additive only.
 
 **Migration check (AL-M):** machine rows and open fires survive 0040; a loaded machine's `alert_id` is its owner,
 a free or owner-unknown one NULL.
@@ -1430,11 +838,7 @@ a free or owner-unknown one NULL.
 
 Asked by MojoSOGO 2026-10-11 (§9.5).
 
-```sql
--- §9.5 — a push I hid from my Alerts list; the row is kept (Status and the ping limit still count it). Additive only.
-ALTER TABLE deliveries ADD COLUMN dismissed_at TEXT;
-CREATE INDEX idx_deliveries_member ON deliveries(member_id, created_at);
-```
+Schema: [`migrations/0041_alert_dismiss.sql`](migrations/0041_alert_dismiss.sql). The migration is the schema; it is not copied here.
 
 **Migration check (MA-M):** delivery rows survive 0041 unchanged, each with `dismissed_at` NULL.
 
@@ -5427,262 +4831,10 @@ arrives. That is plenty for one household.
 
 ---
 
-## 11. Milestones
+## 11. Milestones — in `docs/history.md`
 
-Every milestone ends with `npm run typecheck && npm test` green, plus its own
-checks.
-
-**M0 — Skeleton**
-- Scaffold per §2.2, wrangler.toml per §10.1, `0001_init.sql`, `/health`,
-  `/dev/tick` stub, PWA shell served by the Worker.
-- ✅ `npm run dev` → `GET localhost:8787/api/v1/health` returns `{ok:true, db:true}`,
-  and the page loads.
-- ✅ A Workers-pool test applies `migrations/` and queries `settings`.
-
-**M1 — Shared pure modules**
-- `vocab.ts`, `time.ts`, `recurrence.ts`, `holidays.ts`, `engine.ts`.
-- ✅ Every row of §5.8 (T1–T11, R1–R14, R9a) and §7.3 acceptance is a passing test.
-- ✅ **M1-VOCAB:** every SQL `CHECK (… IN (…))` list in the migrated schema matches its
-  `vocab.ts` tuple. The test parses the migration files, and is the only place
-  allowed to read SQL as text.
-
-**M2 — Accounts**
-- Setup, login/logout, sessions, invites, signup, roles, rate limit; Settings → Me /
-  Household (members, invites).
-- ✅ API tests:
-  - setup works once, then returns 410
-  - a used code returns `invalid_code`
-  - an expired code returns `invalid_code`
-  - a member cannot create an invite (403)
-  - the 6th bad login returns 429
-  - a disabled member cannot log in
-
-**M3 — Calendar**
-- `/calendar`, event CRUD + exdates, continuous view, day sheet, event form,
-  holidays, school-holiday editor.
-- ✅ API test: a weekly event returns the right occurrences across the DST change.
-- ✅ Manual, in Chrome at **320px, 480px and 1024px** wide (DevTools device mode is
-  fine):
-  - no horizontal scroll
-  - Sep 7 2026 (Labor Day) shows the yellow cell + 🛠️
-  - the tone changes at Oct 1
-  - Today scrolls back
-  - the form's Save is reachable on a short screen
-
-**M4 — In-app alerts**
-- `tick()`, scheduled handler, `/fires`, actions, timers API + screen, Ringing bar.
-- ✅ API test driving `/dev/tick` with explicit times replays T1–T10 end to end
-  through the database.
-- ✅ Manual: create a 1-min timer, tick, see it ring in the bar, Ack, and see
-  "next" update.
-
-**M4a — Scheduled alarms**
-- Migration 0002, `/alarms` API, Alarms tab (Scheduled + Rolling timers), alarm form;
-  `/calendar` excludes alarms.
-- ✅ API tests: an alarm Mon/Wed/Fri 08:00 is absent from `/calendar`, listed by
-  `/alarms` with its days, and rings via `/dev/tick` at 08:00 local on a Wednesday
-  but not on a Tuesday; an alarm with no days is rejected with a message.
-
-**M4b — Lists**
-- Migration 0005, `LIST` vocab, `/lists` API, the Lists tab (§7A, §8.8).
-- ✅ API tests L1–L12 (§7A.2). (Superseded in part by M4e: fixed lists → household lists.)
-- ✅ Manual at 320 px: four tabs fit on one line; add five shopping items in a row
-  without touching anything but the keyboard; tick one, find it under Recently bought,
-  put it back.
-
-**M4e — Lists of your own**
-- Migration 0007 (lists table, `list_items` rebuilt with `list_id` + `assignee_id`), the
-  list picker, new/rename/delete list, assignee on every item (§7A, §8.8). `LIST` leaves
-  `vocab.ts`; M1-VOCAB reads the migrated schema.
-- ✅ API tests L1–L20.
-- ✅ Manual at 320 px: create "Hardware store" from the picker, add two items, assign one,
-  tick it, rename the list, delete it.
-
-**M4g — Things to do**
-- Migration 0008, `THING_STATUS` + `thing` kind, `src/shared/things.ts`, tick planning of
-  thing reminders, `/things` API, R2 photos, photo reading, Lists → Things to do (§7C, §8.11).
-- Setup: `wrangler r2 bucket create enso-photos`; `wrangler secret put ANTHROPIC_API_KEY`.
-- ✅ Tests D1–D13.
-- ✅ Manual on the iPhone: photograph a real flyer → the fields fill → save → a reminder
-  rings on its day → Plan it puts it on the calendar.
-
-**M4h — Optional events + "certain weeks"** (street sweeping)
-- Migration 0009, `setPos` lists in `recurrence.ts`, opt-in visibility in `/calendar`,
-  `/fires` and tick recipients, `/optional-events` + `/events/{id}/optin`, the event form
-  (certain weeks, evening before, Optional / On for me), Settings → Me list (§7.5, §8.4, §8.6).
-- ✅ §4.3 acceptance incl. 1st & 3rd Thursday; tests O1–O9.
-- ✅ Production: "Street sweeping" exists — 1st & 3rd Thursday, all-day, optional,
-  reminder the evening before at 8 pm by phone; on for MojoSOGO; everyone else can turn it on.
-
-**M4i — Calendar tidy** (v1.2.0)
-- Migration 0010, school holidays removed everywhere, event emoji, day icons beside the
-  date at every width, public holidays + 📈 as rows of Optional calendar items (§7.2, §7.5,
-  §7.6, §8.4, §8.6).
-- ✅ Tests E1–E3; existing holiday/market tests unchanged; no `school` left in code.
-- ✅ Production: Street sweeping gets 🧹; a new optional **🗑️ Take out trash**, every Sunday
-  at **18:00**, ringing at 18:00 by phone, on for MojoSOGO (decided by MojoSOGO).
-
-**M4j — Thing details** (v1.3.0)
-- Migration 0011; address / phone / cost on things (input, wire shape, Plan-it notes);
-  photo reading returns them; the thing form's text fields auto-size (§7C.1, §7C.4, §8.11).
-- ✅ Tests: the three fields round-trip, their limits 400 with a message, `cleanPhotoReading`
-  trims them, Plan-it notes include them.
-
-**M4k — Announcements** (v1.6.0)
-- Migration 0012 (`deliveries.fire_id` nullable), `announce.ts`, `POST /announce`, the push
-  `tag`, the 📢 Announce box on the Alarms tab (§4.2k, §8.5, §9.1, §9.3).
-- ✅ Tests AN1–AN8.
-- ✅ Manual: an announcement with House ticked is spoken on the Echos and the Voice PE as
-  "{name} says: …"; with Phone ticked it arrives on another member's phone.
-
-**M4n — Sun-timed alerts: the goat alert** (v1.10.0)
-- Migration 0016 (`settings.latitude` / `longitude`, `events.start_sun`), `SUN_EVENT`,
-  `src/shared/sun.ts`, sunset planning in `planReminderFires`, the sunset text, sun events off
-  `/calendar` and the event routes, `startSun` on `/fires` and `· sunset` in the Ringing bar
-  (§4.2o, §5.1, §5.7, §7.7, §8.2, §10).
-- ✅ Tests S1–S3, G1–G7, SA-M; M1-VOCAB passes with `events.start_sun`.
-- ✅ Manual: after the production insert (§14), Shelly and John turn it on in Optional
-  calendar items; a real goat alert arrives on their phones and is spoken in the house.
-
-**M4o — Recipes** (v1.11.0)
-- Migration 0017 (`recipes`, `recipe_reads`), `RECIPE_SOURCE` / `CAPTIONS_FAILURE`,
-  `src/shared/recipes.ts`, `youtube.ts`, `youtube-captions.ts`, `recipe-reader.ts`, the `/recipes`
-  routes, the 🍳 Recipes tab with its view and form (§4.2p, §7E, §8.12, §10).
-- ✅ Tests R1–R12, RC-M.
-- ✅ Manual: the five tabs at 320 px; a real video read on the deployed URL (keys set), its
-  ingredients added to Shopping.
-
-**M4p — Each person's recipe emoji** (v1.12.0)
-- Migration 0018 (`recipe_emojis`), `PUT/DELETE /recipes/{id}/emoji`, `emojis` on every recipe,
-  `myEmoji` / `byMyEmoji` / `usedEmojis`, `RecipeEmoji.tsx`, the Newest | By emoji chips
-  (§4.2q, §7E.5, §8.12, §10).
-- ✅ Tests RE1–RE9, RE-M.
-- ✅ Manual: the chips, the picker and the rows at 320 px; Shelly's and John's emojis both show.
-
-**M4q — The creator's comments** (v1.13.0)
-- Migration 0019 (`recipes.comments_error`), `comments` in `RECIPE_SOURCE`, `lookUpComments`,
-  `creatorComments`, the comments step in from-video, the prompt's comments section, the source
-  note (§4.2r, §7E.2, §8.12, §10).
-- ✅ Tests R13–R15, CM-M.
-- ✅ Manual: a real video whose recipe is only in the creator's pinned comment, read on the
-  deployed URL.
-
-**M4r — The transcript, by hand** (v1.14.0)
-- `POST /recipes/{id}/transcript` (screenshots and/or text), `transcript` in `RECIPE_SOURCE`,
-  `cleanTranscript`, `PASTED_MAX`, `parseScreenshots`, `SCREENSHOTS_MAX`, the screenshots line in the
-  prompt, `RecipeTranscript.tsx` in the recipe view (§7E.2b, §8.12, §10, §12). No migration.
-- ✅ Tests R16–R20, R19b.
-- ✅ Manual: screenshots of a YouTube transcript taken on the iPhone, read on a "watch it" recipe on
-  the deployed URL; the picker and thumbnails at 320 px.
-
-**M4s — Captions from home** (v1.15.0; asked in-line since v1.16.0)
-- `home-captions.ts` (Worker → Access → the `sogoai` tunnel → SogoAI, in-line in from-video),
-  `HOME_CAPTIONS_URL`, the SogoAI helper as a `127.0.0.1:8790` server and `npm run build:home`; migration
-  0020 added the job columns and 0021 drops them (§2, §2.4, §2.5, §4.2s, §4.2t, §7E.2c).
-- ✅ Tests H-C1–H-C9, CJ-M, CJ-D.
-- ✅ Manual: the helper running on SogoAI as a startup task behind the tunnel; a video blocked from
-  Cloudflare read on the deployed URL, saved complete with `captions` in its source.
-
-**M4t — Ping the founder's phone** (v1.17.0)
-- Migration 0022 (`deliveries.title`), `src/shared/ops.ts`, `POST /ops/notify`, the title passthrough
-  in `push.ts`, `OPS_NOTIFY_TOKEN`, the README's one-liners (§2.4, §4.2u, §9.1, §9.4, §10).
-- ✅ Tests ON1–ON9, ON-M.
-- ✅ Manual: the secret and the token file set; a ping from a Claude session arrives on the founder's
-  iPhone with its title.
-
-**M4x — Movies & shows** (v1.22.0)
-- Migration 0026 (`shows`), `SHOW_KIND` / `SHOW_STATUS` / `WATCH_HOW`, `src/shared/shows.ts`,
-  `src/shared/show-reading.ts`, `src/worker/show-reader.ts`, the `/shows` routes (`routes/shows.ts`), optional content
-  blocks on `askClaudeResearch`, Lists → Movies & shows (`Shows.tsx`, `ShowForm.tsx`) (§3, §4.2y, §7F, §8.8, §8.14,
-  §10, §12, §13 Q144–Q155).
-- Tests W1–W14, W-M.
-- Manual: a real title, a real clip link and a real screenshot looked up on the deployed URL (the first runs against
-  the real API); the list and the form at 320 px.
-
-**M4v — Each person's speakers** (v1.19.0)
-- Migration 0024 (`member_prefs.house_speakers`, `deliveries.speakers`), `SPEAKER_KIND`, `src/shared/speakers.ts`,
-  `src/worker/speaker-choices.ts`, `GET /house/speakers`, `PATCH /me { houseSpeakers }`, the drain speaking on a
-  row's speakers, and 🔊 Speak my alerts on in Settings → Me (`HouseSpeakers.tsx`) (§3, §4.2w, §8.6, §9.2, §9.2a,
-  §9.3, §10, §13 Q125–Q129).
-- ✅ Tests HS1–HS10, HS-M; H1 follows the new classifyHouse.
-- Manual: Home Assistant's real list seen in Settings → Me on the iPhone at 320 px; each person ticks theirs; a
-  reminder for John alone heard only on his speakers.
-
-**M4u — Snap an item** (v1.18.0)
-- Migration 0023 (`list_items.photo_key`), `src/shared/item-reading.ts`, `IDENTIFY_FAILURE` / `ITEM_READ_VIA`,
-  `POST /list-items/read-photo` and `/list-items/{id}/photo` (`routes/item-photos.ts`), `identifyFromHome`,
-  `readItemPhoto`, the helper's `POST /identify` + `home/identify.ts` (LM Studio on SogoAI), the 📷 on every
-  list's add row (`ItemPhoto.tsx`), the 📷 row marker and the photo in the item form (§2, §2.4, §2.5, §3, §4.2v,
-  §7A.1, §7A.3, §8.8, §10, §12).
-- ✅ Tests SN1–SN15, SN-M.
-- ✅ Manual: the helper updated on SogoAI with `IDENTIFY_MODEL`; a real item snapped on the iPhone named by
-  SogoAI, added, and its photo seen in the ✎ form; the add row at 320 px.
-
-**M4l — The laundry loop** (v1.8.0)
-- Migration 0014 (`machines` + the `fires` rebuild), `MACHINE` / `MACHINE_STATE` + the
-  `machine` kind, `src/shared/machines.ts`, the `/machines` routes, machine rows in the
-  Ringing bar, the Machines cards + chooser on the Alarms tab (§4.2m, §7D, §8.2, §8.5).
-- ✅ Tests L1–L13 (§7D.4); M1-VOCAB passes with the rebuilt `fires`.
-- ✅ Manual: at 320 px the two cards and the chooser fit with no sideways scroll; on the
-  iPhone a start is two taps; a real done reminder is spoken in the house.
-
-**M4d — Invites**
-- `/auth/invite-preview`, the invites list states, the invite card (QR, Share, Copy),
-  the join page at `/join`, the welcome card (§6.2a, §8.9).
-- ✅ API tests I1–I6.
-- ✅ Manual: on the PC create an invite; scan the QR with a phone on the home network;
-  the join page greets the invitee by name; join; the welcome card shows once; the
-  invite shows **joined** in Settings.
-
-**M4c — Chores**
-- Migration 0006 (incl. the `fires` rebuild), `CHORE_TIMING` + `chore` vocab,
-  `src/shared/chores.ts`, tick planning, `/chores` + `/chore-runs` API, the Chores
-  section + chore form (§8.5), Lists → Today (§8.8), chore rows in the Ringing bar.
-- ✅ Tests C1–C14 (§7B.5); M1-VOCAB passes with the rebuilt `fires`.
-- ✅ Manual at 320 px: create the Laundry loop; on Today tick step 1, see "rings …";
-  undo it; the four tabs still fit.
-
-**M5 — Web Push** (v1.4.0)
-- Spike done 2026-10-03 (library chosen, encryption round-trips under workerd, §2.1).
-- VAPID keys generated and set (`VAPID_PUBLIC_KEY`/`VAPID_SUBJECT` as vars,
-  `VAPID_PRIVATE_KEY` as a secret — piped, never typed through `!`), `sw.js`, Phone alerts row
-  in Settings → Me, sending with results, `POST /push/test` (§9.1). P1–P9.
-- ✅ Manual, **on the deployed URL**:
-  - Android: the notification shows Done/Snooze; tapping Done closes the fire.
-  - iPhone home-screen app: the notification arrives, and tapping it opens the
-    Ringing bar.
-  - A revoked subscription produces a `failed` delivery, visible in Settings →
-    Status.
-
-**M6 — House delivery** (the LAN relay until v1.7.0; now direct, §9.2)
-- `src/worker/house.ts` (drain, speak via HA through Cloudflare Tunnel + Access,
-  `classifyHouse`, `houseState`), tick step 4, `POST /announce` speaking at once, `/status`
-  `house`, the "House failing" / "House not set up" badge, migration 0013, tunnel + secrets
-  setup steps in README.
-- ✅ H1–H9 (§9.2).
-- ✅ Manual: an announcement from the Alarms tab is spoken on the Echos **and** the Voice
-  PE through the tunnel.
-- ✅ Manual: a 1-min timer (or a scheduled reminder) with channel House is spoken.
-- ✅ Manual: with the tunnel down, the next house delivery is `failed` and the
-  "House failing" badge appears.
-
-**M7 — Production** — `https://enso.sogodojo.com`
-- `wrangler d1 create enso` → its id in `wrangler.toml`; `db:migrate:remote`.
-- `wrangler.toml`: `[[routes]] pattern = "enso.sogodojo.com", custom_domain = true` (the
-  `sogodojo.com` zone is on the same Cloudflare account, like AskRoxy).
-- Secrets (§2.4): `SETUP_TOKEN`, 32+ random characters, set with
-  `wrangler secret put`; House needs `HA_TOKEN`, `CF_ACCESS_CLIENT_ID` and
-  `CF_ACCESS_CLIENT_SECRET` (§9.2). **`DEV_ENDPOINTS` is never set in production** (no `/dev/*`).
-  VAPID keys arrive with M5 (§9.1).
-- **Production starts clean** (decided by MojoSOGO 2026-10-03): no events, alarms, chores,
-  timers, list items or accounts. It carries over from the local dev database only the
-  household's settings (name, time zone, days off) and its school holidays. Public
-  holidays need nothing — they are computed. Shopping and Wish list exist (migration
-  0007), empty.
-- The owner is created on the live site with the setup token (§6.1); everyone else joins
-  by invite (§6.2a). The local dev database and its test accounts are untouched.
-- ✅ The owner can set up, invite a second member, and both receive a shared
-  reminder on phone and house.
+The build order M0–M4x and each milestone's acceptance checks are history now; they live in
+[`docs/history.md`](docs/history.md) §11. New work carries its acceptance checks in its own section.
 
 ---
 
@@ -5754,655 +4906,19 @@ with reminders and timers (a third fire kind), not a second reminder system.
 
 ---
 
-## 13. Open questions for MojoSOGO
+## 13. Decisions and open questions — in `docs/decisions.md`
 
-| # | Question | Built as (⚑ DEFAULT) |
-|---|----------|----------------------|
-| Q1 | Name for the restart-on-ack alert? | "Rolling timer" in docs; **Timer** in the UI |
-| Q2 | Timers can ring overnight. Quiet hours in v1, or rely on Stop? | **Decided by MojoSOGO 2026-10-03 for timers:** each rolling timer may have an active time range ("Active from HH:MM to HH:MM"); it never rings outside it and its countdown restarts when the range opens (§4.2n, §5.3 rule 0). Household-wide quiet hours stay in Later (§12) |
-| Q3 | While a timer rings unacknowledged, re-alert or ring once? | Re-alert every 15 min, 4 alerts max, then silent in the Ringing bar |
-| Q4 | Should normal reminders nag too? | Off by default; per-event "repeat alert every" option |
-| Q5 | House announcements go to **all four** Echos (incl. Toasty and Kid's Room) and the Voice PE — also at night? | Yes, all surfaces, always; per-alert speaker choice is Later |
-| Q6 | App URL | **Decided by MojoSOGO 2026-10-03:** `https://enso.sogodojo.com` (Worker custom domain) |
-| Q7 | Accent color: v1 used blue, which collides with school-holiday blue | Indigo `#6366F1` |
-| Q8 | Snooze length | 10 min, single option |
-| Q9 | Can any member Done/Ack a fire assigned to someone else? | Yes |
-| Q10 | Can any member edit or delete any list item (not only their own)? | Was yes; since 2026-10-07 (MojoSOGO): anyone checks or unchecks any item, only its creator or an admin edits or deletes it (§6.3) |
-| Q11 | How long do bought / done items stay visible? | 30 days |
-| Q12 | Where do chores live? | Set up in **Alarms → Chores**; ticked off in **Lists → Today** (no fifth tab). **Superseded by Q166** (v1.28.0): their own 🧹 Chores tab |
-| Q13 | When do turns change? | Every Sunday (weekly), counted from the week the chore was made |
-| Q14 | Unfinished chores from earlier days? | Drop off Today quietly; a still-ringing fire stays in the Ringing bar |
-| Q15 | Can anyone tick anyone's chore? | Yes — any member, like fires (Q9) |
-| Q16 | Chore alert channels by default | Phone on, House off — same as the alarm form |
-| Q17 | Which Lists view opens first when none is remembered? | Shopping (unchanged); Today once chosen is remembered |
-| Q18 | Invite expiry | 7 days (unchanged) |
-| Q19 | Welcome card content | The three-line tour above; shown once per member per device |
-| Q20 | A signed-in member opens a `/join` link | The app opens as normal and the address becomes `/` |
-| Q21 | Welcome card when an existing member signs in on a new device | No — only right after joining |
-| Q23 | How many people can a list item be assigned to? | **Decided by MojoSOGO 2026-10-03:** one (or nobody) |
-| Q24 | Do lists behave differently? | **Decided by MojoSOGO 2026-10-03:** all alike — tap ticks, ✎ edits |
-| Q25 | Who may create, rename, delete lists? | Anyone creates; creator or admin renames/deletes; seeded lists admin-only |
-| Q26 | The old ✕ quick-remove on rows | Removed — tick is the quick action, Delete is in the item form |
-| Q27 | Where do things to do live? | **Decided by MojoSOGO 2026-10-03:** Lists picker, second entry |
-| Q28 | Plan it | **Decided:** creates a real calendar event; the idea becomes Planned |
-| Q29 | Reminders | **Decided:** when it starts, and on a picked date (09:00 local ⚑); whole household ⚑ |
-| Q31 | Street sweeping / per-person items | **Decided by MojoSOGO 2026-10-03:** optional events any person turns on; reminder the evening before at 8 pm |
-| Q32 | Is the creator of an optional event turned on automatically? | Yes ⚑ |
-| Q33 | School holidays | **Decided 2026-10-03:** removed; the 5 Fall break days deleted |
-| Q34 | Take out trash | **Decided:** optional, every Sunday 18:00, rings at 18:00, 🗑️ |
-| Q30 | Reading photos | **Decided:** Claude reads them (`claude-opus-5-5`); ≤ 40 reads a day ⚑ |
-| Q35 | Where do the thing form's Open / Map / Call buttons sit, and which maps app? | ⚑ To the right of Link, Address, Phone; Apple Maps on iPhone/iPad, Google Maps elsewhere |
-| Q36 | Announcements (§9.3): defaults of the box, length, who is pushed | ⚑ The box opens with House ticked, Phone unticked; at most 200 characters; at least one of Phone / House; the sender gets no push of their own; push goes to every active member (optins `audience`), and one without a phone gets the honest `failed: no_subscription` row; the push is titled "📢 Announcement" with "{name} says: {text}" as its body |
-| Q37 | Voice PE timeout now that the Worker speaks (§9.2) | ⚑ 25 s (the relay used 30 s) so a call fits the Worker's ~30 s `waitUntil` budget; it normally takes ~8 s |
-| Q38 | House badge and Status wording (§8.1, §8.6) | ⚑ Badges "🔇 House failing" and "🔇 House not set up", whose explanations name Home Assistant and the Cloudflare tunnel; Status line "working" / "failing since …" + the error / "not set up" / "not tried yet" |
-| Q39 | House state before anything has been spoken (§9.2) | ⚑ `untried`: no badge, Status says "not tried yet" — a quiet house is not a failure until a delivery fails |
-| Q40 | The laundry loop in the Ringing bar and on phones (§7D, §8.2) | ⚑ The washer row has **Move to dryer**, which opens the same dryer-minutes chooser as the card (exported from `Machines.tsx`); the dryer row has **Fold & out**. Phone notifications have no buttons; tapping one opens the app |
-| Q41 | Move to dryer while the dryer is still full (§7D.2) | ⚑ Refused in place: "The dryer still has Sam's load." The washer stays DONE — waiting and its reminders run out at 4; every later dryer alert adds " — Kai's load is waiting". Nothing moves automatically |
-| Q42 | The done message (§7D.3) | ⚑ "Sam, your laundry in the washer is done" / "… in the dryer is done", plus the waiting suffix; with no active owner "The laundry in the washer is done" |
-| Q43 | Undoing a mistaken start (§7D.2, §8.5) | ⚑ A running or done machine offers **Clear**: its fire closes `removed`, nothing rings, the machine is free. A free dryer also offers **Start** with the same chips |
-| Q44 | Overnight timer windows (§4.2n) | ⚑ Allowed (22:00–06:00 runs across midnight); only `from = to` is refused |
-| Q45 | Is the window's end inside it? | ⚑ Active from `from` up to but not including `to` (08:00–21:00: 20:59 rings, 21:00 does not) |
-| Q46 | An interval as long as the window or longer | ⚑ Refused, 400 — the timer could never ring inside it |
-| Q47 | Ringing when the window closes | ⚑ The fire goes back to `scheduled`, due at the next window start + interval: it leaves the Ringing bar, goes quiet, and the timer still shows running with its next time (§5.3 rule 0) |
-| Q48 | Starting a timer outside its window | ⚑ Allowed; the first ring is the next window start + interval |
-| Q49 | Editing the window of a running timer | ⚑ The open fire is not re-planned; rule 0 defers it when it comes due outside the new window |
-| Q50 | The timer form and row (§8.5) | ⚑ Two time inputs, "Active from / to", empty = always; the row shows the window; Next names the day when it isn't today |
-| Q51 | How often does the goat alert repeat (§7.7)? | ⚑ Every 15 min, up to 3 alerts (−30, −15, at sunset) until Done: the row has `renotify_min` 15, `max_alerts` 3 (the placement-advisor suggested one alert; the coordinator chose repeats so the goats are not forgotten) |
-| Q52 | How the sunset time reads | ⚑ "6:42" — 12-hour, no am/pm |
-| Q53 | Sunset precision | ⚑ Rounded to the nearest minute |
-| Q54 | Sun items on the calendar? | ⚑ Never, by rule: not in `/calendar`, the day sheet or the event routes |
-| Q55 | The Settings label for sun items | ⚑ Unchanged: "Optional calendar items" |
-| Q56 | The Ringing bar row of a sun item | ⚑ `· sunset` where an all-day reminder shows `· all day` |
-| Q57 | The household place | ⚑ 33.20 / −117.29 (ZIP 92056, Oceanside), set by migration 0016; no edit UI |
-| Q58 | Who edits or deletes the goat item | ⚑ Only coordinator SQL; the event routes give 404 |
-| Q59 | Sunrise too? | ⚑ No — sunset only |
-| Q60 | Where do recipes live (§8.1, §8.12)? | ⚑ Their own tab, "Recipes" 🍳, between Lists and Settings; five tabs fit at 320 px (Q12's "no fifth tab" was about chores) |
-| Q61 | Pasting a link | ⚑ Saves the recipe at once, then opens its view with the source note; ✎ fixes it |
-| Q62 | A recipe row | ⚑ A small thumbnail + the dish's name, plus a "watch it" badge when nothing was found; newest first |
-| Q63 | The same link pasted twice | ⚑ 409 `duplicate`; the PWA opens the existing recipe |
-| Q64 | The source note | ⚑ Says what was read ("From the description and captions"), plus "captions couldn't be read: {reason}" when that happened |
-| Q65 | Recipe reads per day | ⚑ 20 (`RECIPE_READS_PER_DAY`), counted apart from photo reads |
-| Q66 | Who edits or deletes a recipe? | Its creator or an admin (MojoSOGO 2026-10-07, §6.3); delete is soft |
-| Q67 | A hand edit of a "watch it" recipe | ⚑ Adding ingredients or steps sets found = true (found = has ingredients or steps) |
-| Q68 | A typed recipe with a video link | ⚑ Not in v1 — a typed recipe has no video |
-| Q69 | Add to Shopping | ⚑ Nothing picked at first, a "Pick all" chip; summary "Added 4 · Milk already on the list"; on a failure it stops and names what wasn't added |
-| Q70 | Privacy of recipe reading | ⚑ The video's text goes to Anthropic; the thumbnail loads from i.ytimg.com (no referrer). Accepted |
-| Q71 | By emoji: the order of the groups (§7E.5) | ⚑ Biggest group first; ties by the group's newest recipe, then the emoji string; newest first within a group; unrated last, newest first |
-| Q72 | Picking my emoji (§8.12) | ⚑ The household's emojis as chips (most used first, 12 at most), a one-emoji input with Set, and Clear when I have one |
-| Q73 | Everyone's emoji names a member the PWA doesn't know | ⚑ "Someone" |
-| Q74 | Newest \| By emoji | ⚑ Remembered per phone (`localStorage`), not per person on the server |
-| Q75 | A soft-deleted recipe's emojis | ⚑ Kept in `recipe_emojis` but never shown — only live recipes are returned |
-| Q76 | Whose comments are read (§7E.2) | ⚑ Only top-level comments by the video's own channel; viewers' text and the creator's replies inside threads are ignored |
-| Q77 | How many comments | ⚑ 20 threads, relevance order (1 quota unit); the kept text is capped at 5 000 characters |
-| Q78 | Comments turned off, or no creator's comment | ⚑ Not an error; no marker |
-| Q79 | Comments quota used up or failed | ⚑ The recipe is still saved, with "comments couldn't be read: {reason}" |
-| Q80 | The video's channel id is unknown | ⚑ No comments are read (never anyone else's) |
-| Q81 | The source note with comments | ⚑ "From the description, captions and the creator's comment" — what was read, joined "A, B and C" |
-| Q82 | Quota per read | ⚑ Two YouTube API units per read (video + comments); the 20-a-day cap is unchanged |
-| Q83 | Privacy of the creator's comments | ⚑ The creator's kept comment text goes to Anthropic too, like the description |
-| Q84 | A pasted transcript: the rest of the video's text (§7E.2b) | ⚑ The description and the creator's comments are fetched again (they are not stored): 2 quota units, and the read counts against the 20 a day |
-| Q85 | What a pasted transcript is called | ⚑ Its own source, `transcript` — "From the description and the transcript you added" (screenshots or pasted) — never `captions` |
-| Q86 | A pasted transcript that holds no recipe | ⚑ Only a reading that finds a recipe is saved; one that doesn't changes nothing (422, "nothing was changed"); no confirm dialog, the box says what it replaces |
-| Q87 | When the transcript, by hand, is offered | ⚑ Only on a "watch it" video recipe or one whose captions couldn't be read; the server allows any video recipe |
-| Q88 | Cleaning a pasted transcript | ⚑ Timestamps and YouTube's spoken durations dropped, chapter titles kept, whitespace collapsed, cut to `TRANSCRIPT_MAX` |
-| Q89 | The longest paste | ⚑ `PASTED_MAX` = 100 000 characters before cleaning |
-| Q90 | Wording | ⚑ "📷 Add transcript screenshots"; hint "On YouTube: ⋯ → Show transcript, then screenshot it."; "or paste the text"; **Read it** |
-| Q91 | A transcript when pasting the link | ⚑ Not offered on the paste-a-link step — read the video first, then add it on the recipe |
-| Q92 | How many screenshots | ⚑ At most 4 per read (he said one; a transcript usually needs a few) |
-| Q93 | Keeping the screenshots | ⚑ Not stored — read once and dropped; no R2, no migration (§12) |
-| Q94 | Screenshots or text | ⚑ Screenshots first (the phone); pasting the text is secondary, collapsed under "or paste the text" |
-| Q95 | Which captions failures go to the home PC (§7E.2c) | ⚑ Only `blocked` — `none` (no captions) and `failed` would fail at home too |
-| Q96 | How long the Worker waits for SogoAI (§7E.2c) | ⚑ 20 s (`HOME_CAPTIONS_TIMEOUT_MS`); longer is a failure, "from home: error: …" |
-| Q97 | The home PC couldn't read the captions either | ⚑ `captions_error` = "from home: {reason}" — shown "captions couldn't be read: from home: …" |
-| Q102 | Older recipes whose captions were blocked | ⚑ No backfill and no "try from home" button — only new reads ask |
-| Q104 | Limits on what the helper answers | ⚑ Text cut to `TRANSCRIPT_MAX` (20 000), a failure reason to 300 characters |
-| Q105 | Where the helper listens | ⚑ `127.0.0.1:8790` on SogoAI, loopback only, reached only through the `sogoai` Cloudflare Tunnel behind Access |
-| Q106 | Captions blocked and captions from home not set up | ⚑ `captions_error` = "from home: captions from home aren't set up." — shown "captions couldn't be read: from home: …" (the YouTube reason is not kept) |
-| Q107 | Who a ping from a Claude session goes to (§9.4) | ⚑ Always the founder; there is no `member` field (one sent is ignored) |
-| Q108 | The ping's title | ⚑ The caller's title (e.g. "🤖 Claude ⭕🔁🏠"), or "🤖 Claude"; at most 60 characters |
-| Q109 | A `level` for pings (like the FunHouse's) | ⚑ None — an emoji in the title does that job |
-| Q110 | How many pings | ⚑ 30 an hour, then 429 `rate_limited` |
-| Q111 | Are pings visible to the household? | ⚑ Yes — they show in Settings → Status' last 20 deliveries like any other delivery. His call later |
-| Q112 | SogoAI can't tell what a snapped item is (§7A.3) | ⚑ When SogoAI says UNKNOWN, Claude is asked, and that counts against the cap. If Claude can't tell either → 422 "Couldn't tell what that is — type it in." |
-| Q113 | Which snaps count against the daily cap | ⚑ Only Claude fallbacks count, sharing the 40-a-day `photo_reads` budget with Things; a name from SogoAI is free and uncounted |
-| Q114 | How long a snap may wait | ⚑ 20 s from the Worker to the helper (`HOME_IDENTIFY_TIMEOUT_MS`); 15 s from the helper to LM Studio |
-| Q115 | Which local model names items | ⚑ `IDENTIFY_MODEL=qwen-uncensored`, the always-loaded vision model on SogoAI. Unset → SogoAI counts as off and Claude is asked |
-| Q116 | How long a name | ⚑ The prompt asks for at most 60 characters (`ITEM_NAME_ASK`); the name is cut at 120 (`TEXT_MAX`) |
-| Q117 | The hint under a snapped name | ⚑ "Read from your photo — check it." `via` is always in the answer, but the UI doesn't show it |
-| Q118 | Snapping with text already in the box | ⚑ The name replaces whatever text is in the box |
-| Q119 | Snapping something already on the list | ⚑ The photo is attached on added, re-opened or already-there alike, replacing any older photo |
-| Q120 | Before Add | ⚑ The waiting photo shows as a thumbnail with ✕ |
-| Q121 | Seeing a kept photo | ⚑ A 📷 row marker; the photo in the ✎ form (tap for full size; Replace / Remove / Add) |
-| Q122 | Adding a photo in the item form | ⚑ It is not read — the form only keeps it |
-| Q123 | Bought items' photos | ⚑ Kept indefinitely; adding the item again re-opens it and brings its photo back |
-| Q124 | Names for the SogoAI pieces | ⚑ No renames: `CAPTIONS_TOKEN`, `HOME_CAPTIONS_URL` and the `captions-helper` files keep their names though they now carry `/identify` too |
-| Q125 | A person who hasn't chosen speakers (§9.2a) | ⚑ The default speakers (`ECHO_TARGETS` + `SATELLITE_ENTITY`, as before), so nothing changes until someone ticks |
-| Q126 | An alert for several people | ⚑ Spoken on every speaker any of them ticked (the union) |
-| Q127 | Announcements | ⚑ For every active member: everyone's ticked speakers together |
-| Q128 | Nobody it is for has a speaker ticked | ⚑ Not spoken at all; push still goes out. An announcement with House alone is 409 `no_speakers` |
-| Q129 | Who sets a person's speakers | ⚑ Only that person, in Settings → Me; admins can't set anyone else's |
-| Q130 | Which Alexa entries are not speakers | **Decided by MojoSOGO 2026-10-04: tidy.** ⚑ Matched by name: `This Device` and any name containing `Alexa App` are hidden; everything else Alexa Media Player lists stays |
-
-| Q131 | Sign in with my phone (§6.6): limits | ⚑ A request lives 2 minutes; at most 3 per email per 15 minutes (over that: the same 202, no push); at most one pending per member — a new request turns the old one `denied` (the row is kept, it is the rate-limit count) |
-| Q132 | A wrong number on the phone | ⚑ Denies the request; no second try on the same request — the PC starts again |
-| Q133 | The "New sign-in on …" push | ⚑ After a **password** sign-in only (not after a phone approval, signup or setup); push only, never house; only to a member with a phone subscribed (none → no row); sent before the login answers |
-| Q134 | The approve screen | ⚑ A full page at `/approve-login#{id}`, not a modal; with the phone signed out, the sign-in form shows first and the approve screen follows sign-in (the id kept in `sessionStorage`) |
-| Q135 | The notice push title | ⚑ "🔑 Ensō sign-in" for both the request and the new-sign-in notice; the request's body "Sign-in request from Chrome on Windows — tap to check" |
-| Q136 | Where the approve screen says the browser is | ⚑ Cloudflare's rough city and country for the waiting browser ("Oceanside, US"), or "Place unknown" |
-| Q137 | A request that was approved but not collected in time | ⚑ Expires with the request (2 minutes from creation); the PC says "No answer in 2 minutes." |
-| Q138 | A link reading's own link | ⚑ The form's Link stays the pasted link; a link the look-up found (a ticket page, say) may go in the note, never replaces it |
-| Q139 | Which budget link readings use | ⚑ The same 40-a-day `photo_reads` budget as photos (one read per tap, counted before Claude is asked); no new table |
-| Q140 | How hard a link reading looks | ⚑ At most 3 web searches and 2 page fetches per tap |
-| Q141 | Sending a link to Anthropic | ⚑ The link, the page's text and the searches go to Anthropic, as photos do (Q30) |
-| Q143 | "Closest" for a link with several locations | ⚑ Closest to the household's own place (Oceanside, the sun-alerts location), which MojoSOGO named "San Diego"; with no place set, every location goes in the note |
-| Q144 | Where the movies & shows list lives (§8.14) | ⚑ A third option in the Lists picker, "Movies & shows (n)", not a new tab |
-| Q145 | Where to watch: which country | ⚑ The United States only (`WATCH_COUNTRY` `US`); theaters: up to 3 showing it, closest to the household's place |
-| Q146 | Which ratings | ⚑ Rotten Tomatoes critics (Tomatometer) and audience (Popcornmeter), as rottentomatoes.com shows them; unknown → "🍅 —" |
-| Q147 | Which budget look-ups use | ⚑ The same 40-a-day `photo_reads` budget; each Find, 📷 or Check again is one read |
-| Q148 | How hard a look-up looks | ⚑ At most 5 web searches and 3 page fetches |
-| Q149 | A video clip itself | ⚑ Not read in v1: paste the clip's link, or screenshot a frame |
-| Q150 | The picture a show is found from | ⚑ Read once, never stored |
-| Q151 | Saving a look-up | ⚑ Find opens the show form filled; nothing is saved until Save (as a thing's link reading) |
-| Q152 | The same show twice | ⚑ Same title (ignoring case and spaces) and year → 409 "… is already on the list.", watched or not |
-| Q153 | Editing how to watch | ⚑ Lines can be removed (✕) or refreshed (Check again), not typed by hand |
-| Q154 | Who may change a show | Anyone adds or marks watched; its creator or an admin edits or deletes (MojoSOGO 2026-10-07, §6.3) |
-| Q155 | The row's way to watch | ⚑ The best option: theater, then stream, tv, rent, buy |
-| Q156 | Comments read for a YouTube link | ⚑ The top 20 by relevance (one quota unit), plus the title, channel and description; replies not read; other sites' comments only if Claude's own page fetch shows them |
-| Q157 | Lists' emojis | ⚑ A list without its own shows one picked from its name (keyword table in §7A.1, else 📋); Today 🧹, Things to do ✅, Movies & shows 🎬 are fixed |
-| Q158 | When the Lists popup opens | ⚑ On every tap of the bottom tab's 🛒 Lists (and the list button), not when the app opens on Lists; closing it stays on the remembered list |
-| Q159 | A done load nobody has moved (§7D.2, §8.5) | ⚑ A done washer or dryer offers **Still loaded**: the reminders start over now (alert 1, then every 15 min, 4 in all, Phone + House), saying "… is still in the washer — move it to the dryer" / "… still in the dryer — take it out". Move, Fold & out or Clear stops them as before |
-| Q160 | A load nobody started in the app, or one that finished early (§7D.2, §8.5) | ⚑ A free or running machine offers **Done now**: free asks whose load, Owner unknown preselected (MojoSOGO 2026-10-10: "don't assume an owner"); the machine shows DONE — waiting and the done alerts ring at once, then Still loaded works as usual |
-| Q161 | Machine alerts on "all devices" (§7D.3) | Everyone's phones and every speaker HA lists (decided by MojoSOGO 2026-10-05); ⚑ the `Everywhere` group is left out so each Echo speaks once; HA unreadable → the default speakers |
-| Q162 | A machine alert outside its hours (§7D.5) | ⚑ It waits and the reminders start over when the hours open (not dropped); only admins edit the hours, on the Machines section |
-| Q163 | Who may change what done looks like (§7B.6) | The chore's creator or an admin, like the chore itself (MojoSOGO 2026-10-07, §6.3) |
-| Q164 | How much a chore's done standard holds | ⚑ Up to 8 areas; each a name ≤ 40, up to 12 expectations ≤ 120 characters, and up to 4 photos |
-| Q165 | Ticking expectations (§8.15) | ⚑ Only to walk through the job while the sheet is open; never saved, cleared when it closes |
-| Q166 | Where chores live (§8.1, §8.15) | ⚑ Their own 🧹 Chores tab between Alarms and Lists: Today on top, All chores under it; they left Alarms and the Lists popup |
-| Q142 | Where "Fill in from this link" sits | ⚑ A full-width button right under the Link field, only when the field holds a usable link; reading starts on the tap, never on paste |
-| Q167 | A link's duplicate key (§7E.6) | ⚑ The cleaned link: no fragment; Facebook links on `www.facebook.com` keeping only `v`, `id`, `story_fbid`, `fbid`; elsewhere `utm_*`, `fbclid`, `gclid`, `mibextid`, `igsh`, `igshid`, `si` dropped and the rest kept |
-| Q168 | A link recipe's picture and name (§7E.6, §8.12) | ⚑ No thumbnail (nothing stored or hotlinked); the site's name (Facebook, Instagram, TikTok, Pinterest, else the host) in place of the channel |
-| Q169 | The transcript, by hand, on a link recipe (§7E.2b) | ⚑ Offered like a video's; nothing is re-fetched — Claude reads the screenshots or text with the recipe's title and site |
-| Q170 | Where a link's recipe may come from (§7E.6) | ⚑ The page, the post's or reel's caption, or the creator's own recipe for that dish where the post points to it; never another creator's |
-| Q171 | A recipe in another language (§7E.2) | ⚑ Always saved in English, translated faithfully; the original is not kept (the link or video still is) |
-| Q172 | Metric amounts (§7E.2) | ⚑ Converted to US units by Claude when read, rounded to kitchen measures (180 °C → 350 °F); the metric original is not kept; typed recipes are never converted |
-| Q173 | Screenshots in the recipe form (§8.12, §7E.2b) | ⚑ On every existing recipe, typed ones included; Claude reads them with the title (nothing fetched); a brand-new recipe takes them after its first Save |
-| Q174 | A recipe's screenshot as its picture (§7E.2b, §8.12) | ⚑ The first screenshot of the latest successful read is kept and shown whole at the top of the view and as the row's picture, ahead of a YouTube thumbnail; a new read replaces it; no separate upload or remove |
-| Q175 | A recipe's picture by hand (§8.12) | ⚑ 📷 Add photo in the recipe form, on new and saved recipes alike, by the recipe's creator or an admin (§6.3); it replaces a kept screenshot and is replaced by a later screenshot read; nothing is read from it |
-| Q176 | A recipe's picture in the list (§8.12) | Whole, never cropped, inside the usual 64 × 36 slot; every row the same height (decided by MojoSOGO 2026-10-05); YouTube thumbnails keep their crop |
-| Q177 | When a mess goes to To talk about (§7B.7) | ⚑ When everyone asked has said Not me, or 24 h after the report with nobody claiming it |
-| Q178 | Who sees balances (§7B.7) | ⚑ Each member sees the pairs they are in; admins see every pair |
-| Q179 | Who records the outcome of the house talk (§7B.7) | ⚑ Any admin: whose it was (1 point owed to the reporter) or nobody's (closed) |
-| Q180 | Mess sizes (§7B.7) | ⚑ None: every mess is 1 point |
-| Q181 | Who settles a point (§7B.7) | ⚑ The one owed (Paid back or Let it go), or an admin |
-| Q182 | Taking back "That was me" (§7B.7) | ⚑ Not by the claimer; an admin can record someone else or nobody's |
-| Q183 | Pushes for a mess (§7B.7) | Asks to everyone but the reporter, up to 4, 15 min apart, plus an in-app banner until answered (decided by MojoSOGO 2026-10-05); ⚑ one push to each admin when it goes to To talk about; ⚑ never spoken in the house |
-| Q184 | Naming the reporter (§7B.7) | ⚑ Yes: "Sam cleaned this up" |
-| Q185 | A mess photo (§7B.7) | ⚑ Required to report; deleted when settled, closed or deleted, and at most 30 days after the report |
-| Q186 | Counting founder pings (§9.4) | Founder pings are counted by elimination in `src/worker/deliveries.ts` `opsPingsSince` (a fire-less push with a title that is neither a sign-in notice nor a mess ask), so a future kind of fire-less push could quietly count. ⚑ Keep the elimination (tested in `test/deliveries.test.ts`); the alternative is a `deliveries` kind/marker column |
-| Q187 | Keeping an event's screenshot (§7.8) | ⚑ Not kept: it is read and dropped; events have no photo |
-| Q188 | An ambiguous place in a screenshot (§7.8) | ⚑ Read as the one nearest the household (Oceanside) |
-| Q189 | What a screenshot may fill (§7.8) | ⚑ Only fields not changed since the form opened; a timed reading sets the times, a date-only one makes it All day |
-| Q190 | An event's location from a screenshot (§7.8) | ⚑ Fills the Address (§7.9), when it hasn't been changed since the form opened (until v1.37.0 it was the first line of Notes) |
-| Q191 | A timer's start announcement (§5.5a) | ⚑ Opt-in per timer, only with active hours (a timer without a window has no day to start); worded "Pushups timer started — every 60 minutes", on the timer's own channels and people; the push is titled "📢 Announcement" |
-| Q192 | A late start announcement (§5.5a) | ⚑ Said up to 60 min after the window opens (an outage, or Start tapped soon after the opening); later than that, nothing until the next day |
-| Q193 | Opening an event's address (§7.9) | ⚑ "Open in Maps" in the form, as an Apple Maps link (the family's phones are iPhones); the day sheet doesn't show the address |
-| Q194 | What 📋 Paste reads (§7.9) | ⚑ Anything copied — a picture or text — is read by Claude on the shared 40-a-day budget, even a bare address (so it comes back cleaned up and the nearest one is picked) |
-| Q195 | What 📋 Paste fills (§7.9) | ⚑ The whole form, like a screenshot (v1.37.0 filled only the Address; changed when MojoSOGO asked for existing events to take later info) |
-| Q196 | Later info on an existing event (§7.9a) | ⚑ What the paste names wins over what's saved, except the title (kept) and the notes (added under, never replaced); a date alone keeps the times; nothing saved until Save |
-| Q197 | Pasting a link into an event (§7.9) | ⚑ Only a paste that is just one link reads the page (fetched, then looked up with web search, like a thing's link); a link inside other text is read as text |
-| Q198 | Things to bring (§7.10) | ⚑ A list to remember, shown in the event form and said in the reminder; no ticking things off as they're packed |
-| Q199 | How the reminder says the list (§7.10) | ⚑ "Reminder: Soccer — bring: shin guards, water bottle and snacks", on every alert of the reminder |
-| Q200 | Where the weather comes from (§7.11) | ⚑ Open-Meteo's free forecast (no key, no account), in °F, refreshed once a day just after midnight |
-| Q201 | Weather on past days (§7.11) | ⚑ None: only today and the next 6 days carry an emoji; yesterday's is dropped at the daily refresh |
-| Q202 | Where the weather emoji sits (§7.11) | ⚑ The day cell's top-right corner, apart from the two day icons; high and low only in the day sheet |
-| Q203 | Turning the weather off (§7.11) | ⚑ No switch: everyone sees it (it could become a row of Optional calendar items if wanted) |
-| Q204 | The dish washer's name and icon (§7D.6) | ⚑ "Dish washer" 🍽️, after the clothes dryer on the Machines section |
-| Q205 | Ending a dish washer load (§7D.6) | ⚑ **Emptied** (the dryer's Fold & out, renamed for dishes); Still loaded restarts its reminders like the laundry |
-| Q206 | When the dish washer's alerts sound (§7D.6) | ⚑ Like the laundry's: every phone and speaker, only in the machine alert hours (they wait outside them) |
-| Q207 | The dish washer's minutes (§7D.6) | ⚑ 60 / 90 / 120 / 150 min chips (dish cycles run longer than the laundry's) |
-| Q208 | The build stamp where a screen has no bottom inset (§8.1) | ⚑ The bar's bottom strip is at least 14 px tall so the stamp always shows |
-| Q209 | How long the house can be quiet (§9.2b) | ⚑ 1 hour, 2 hours, 4 hours or Rest of today |
-| Q210 | When "Rest of today" ends (§9.2b) | ⚑ At household-local midnight |
-| Q211 | Who can quiet the house, and for whom (§9.2b) | ⚑ Any member; the whole household's speakers at once; the line says who set it |
-| Q212 | What happens to alerts while quiet (§9.2b) | ⚑ Skipped on the speakers, not replayed later; phones are unchanged; announcements are quiet too (House only → refused); a repeating reminder speaks again after quiet ends |
-| Q213 | What "I'm away" on an alert does (§9.2c) | ⚑ Stops that alert's speakers; phones keep reminding; the alert stays open and is not snoozed; it is in the app's Ringing bar, not a phone notification button |
-| Q214 | How long "I'm away" lasts (§9.2c) | ⚑ Until that alert is closed; whatever replaces it (next timer countdown, Still loaded, next step) speaks again. No "back home" undo |
-| Q215 | Which alerts go phone first (§9.2d) | ⚑ Every alert kind with both Phone and House ticked; House-only alerts speak from the first; Announce and timer start announcements unchanged |
-| Q216 | Phone first on an alert that doesn't repeat (§9.2d) | ⚑ It is spoken on its one alert, so a House alert is never silently dropped |
-| Q217 | What picking a person changes (§7D.7) | ⚑ Only whether the house speaks: with someone, every phone and every speaker as before; the person's own speaker picks and phone are not singled out |
-| Q218 | Does the dish washer's starter get the alert (§7D.7) | ⚑ Preselected (the chooser follows the owner chip) but can be cleared to Nobody |
-| Q219 | An alert person who is no longer active (§7D.7) | ⚑ Treated as nobody: phones only |
-| Q220 | Changing who is alerted on a load already running (§7D.7) | ⚑ Not offered; Clear and start again. Move carries it to the dryer |
-| Q221 | How many alerts My alerts keeps (§9.5) | ⚑ The newest 200 shown; nothing is deleted from the database |
-| Q222 | An alarm's push in My alerts (§9.5) | ⚑ "Alarm", apart from "Reminder" |
-| Q223 | A timer start announcement in My alerts (§9.5) | ⚑ "Announcement" (the row carries nothing that tells it apart) |
-| Q224 | Deleting alerts (§9.5) | ⚑ Each person's own list only; ❌ hides one with no asking; Clear all asks first |
-| Q225 | A notification tapped while signed out (§9.5) | ⚑ Sign in first, then the card opens |
-| Q226 | Settings as a menu (§8.6) | ⚑ Eight buttons in this order: Me, Calendar items, Phone alerts, Speakers, Alerts, Household, Members, Status; each opens in a modal, closing returns to the menu |
-| Q227 | Where Log out sits (§8.6) | ⚑ Under the Settings grid, not inside Me |
-| Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
+Every Q-numbered question, MojoSOGO's answer, and every ⚑ DEFAULT awaiting it live in
+[`docs/decisions.md`](docs/decisions.md). A new ⚑ default gets the next Q number there; this spec
+names it where it applies ("⚑ Q221").
 
 ---
 
-## 14. Prototype status (2026-10-10)
+## 14. Status and deviations — in `docs/history.md`
 
-Built: M0–M4 and M4a fully (alarms, with their API tests), plus the later §7 work:
-household days off (§7.3), grouped multi-day bars (§7.1), monthly-by-weekday repeat
-(§4.3) and the 📈 options-expiration marker (§7.4). M6 was first built as a LAN relay
-(relay + API + contract test + logon launcher); v1.7.0 retired it for direct House delivery
-(below). **M5 Web Push** is built (v1.3.0, refined in v1.4.0; §9.1): `web-push.ts` sends (VAPID header per
-origin, reused for 1 h; parallel sends to one origin share one signing), `push.ts` records
-results, `POST /push/test`, `sw.js` (no fetch listener; `_headers` serves it `no-cache` —
-checked under `wrangler dev`), the Phone alerts row in Settings → Me. P1–P9 green against a fake
-push service, with the payload decrypted by an independent RFC 8291 decryptor (253 tests).
-Built as: keys missing → every push delivery `push_not_configured` (checked before
-subscriptions); a test push whose every phone fails → 502 with the failure, not `{ sent: 0 }`;
-missing keys on `/push/test` → 503; a failed notification action shows a second notification
-saying so. **Needs a real phone:** Turn on → Send a test on the iPhone home-screen app and on
-Android, the lock-screen reminder, Android Done/Snooze buttons, the Blocked and
-add-to-Home-Screen states, and a revoked subscription showing `failed` in Status. **Deviation:** §10's
-"refetch when a push arrives" is not built — an open app picks the alert up on its 30 s poll, and a
-reopened app reloads (§8.10). The §2.5 architecture guard is in place (map, test, `arch:audit`). M4b Lists is built
-with its API tests (L1–L12) and its 320 px manual check passed on 2026-10-03. M4c
-Chores is built (C1–C14 green; migration 0006 applied to the local dev database with
-existing fires and deliveries intact; the Laundry loop exercised end to end through the
-live local API — ring, house message, Done → wait, Undo). **Its 320 px manual check is
-still to do** (the browser extension was unavailable). M4d Invites is built (I1–I6 and
-the link round-trip tests green; `uqr` builds into its own 10 kB lazy chunk, absent from
-the entry chunk). Its manual check — a real QR scanned by a phone at home — is still to do.
-**M4f installed app + always fresh** is built: manifest named Ensō with PNG icons, iPhone
-home-screen tags, `AppRefresh` (reload on resume unless a dialog is open; pull to refresh)
-— verified with real touch events in an emulated phone; its on-iPhone check is still to do.
-The ensō mark (scripts/draw-enso.mjs) and the opening screen are built; the 7 iPhone launch
-images are rendered from it. Its on-iPhone check is still to do.
-**M6 House delivery, direct** (v1.7.0; 273 tests incl. H1–H9 and the rewritten AN3): the LAN
-relay is retired (`relay/`, `/relay/*`, `RELAY_TOKEN`, `settings.relay_last_seen` all gone); the
-Worker speaks through Cloudflare Tunnel + Access (`src/worker/house.ts`, §9.2) — on each tick
-(step 4) and, for an announcement, at once inside `waitUntil`. Tests run against a fake HA at
-`https://ha.test` with fake secrets; the pinned test config is "not configured". Built as: with
-House not configured, every takeable house row becomes `failed` `house_not_configured` (attempts
-unchanged — nothing was tried); a result is written only while the row still carries this drain's
-claim. Migration 0013 is applied only in tests so far. **Still owed (manual):** the tunnel, the
-Access policy and the three secrets set up (README); a real announcement spoken through the
-tunnel on the Echos + Voice PE; a scheduled House reminder spoken; the 🔇 badges and the Status
-line seen at 320 px.
-**M4k Announcements** (v1.6.0; 266 tests incl. AN1–AN8): 📢 Announce at the top of the Alarms
-tab → `POST /announce` → a fire-less `house` delivery the relay spoke (the Worker since v1.7.0) as "{name} says: …" and/or
-a push to every other active member, sent at once; migration 0012 makes `deliveries.fire_id`
-nullable (applied only in tests so far); the push payload gains `tag`. Built as: Phone only with
-nobody else to push to → 409 `no_recipients` rather than a quiet success. **Still to check:**
-the box at 320 px and on the iPhone, an announcement spoken on the Echos + Voice PE, and one
-arriving on another member's phone.
-**Timer active time range** (v1.9.0; 308 tests incl. TW1–TW12, the `/timers` window rows, a
-tick across close and open, and TW-M): migration 0015 (`timers.active_from` / `active_to`, no
-CHECK), `TimerWindow` / `timerWindow` / `timerWindowError` / `inside` / `nextTimerDue` and
-`stepFire` rule 0 in `engine.ts` (the snooze shape — no new close reason, no new fire),
-`householdTz` exported once from `db.ts`, `sourceOf`'s timer branch builds `cfg.window`, and the
-timer form's Active from / to with the row's `· 08:00–21:00` and a day-naming Next. Built as: a
-time that is not `HH:MM`, or only one end set, is 400 "Active from and to must both be HH:MM
-times, or both empty."; the form adds a dim "Both empty = always." line under the two inputs.
-Migration 0015 is applied only in tests so far. **Still owed (manual):** the form and row at
-320 px, and a real timer going quiet at its window's end and ringing after it opens.
-**Machine card fix** (v1.8.1): whose load and "done ~20:35" sit on the button line, wrapping —
-at 320 px the old one-line layout cut the time off. Two-tap start checked at 320 px.
-**M4l The laundry loop** (v1.8.0; 290 tests incl. L1–L13): migration 0014 (`machines`, seeded
-free; `fires` rebuilt with kind `machine` + `machine_id`, `uq_machine_open`), `machines.ts`, the
-`/machines` routes, the Machines cards + chooser on the Alarms tab, machine rows in the Ringing
-bar (Move to dryer / Fold & out). Built as: each transition's machine-row writes are guarded by
-the row's `started_at` as read inside the same batch as the fire writes, so a stale tap rolls
-the whole batch back (tested with the second of two rows stale) → 409 `conflict`; `sourceOf`
-now takes `now` (the dryer's "load is waiting" is derived at alert time); the chooser is a
-modal; Clear asks once; a disabled owner's load alerts everyone with "The laundry in the … is
-done". Migration 0014 is applied only in tests so far. **Still owed (manual):** the cards and
-the chooser at 320 px, a two-tap start on the iPhone, and a real done reminder spoken in the
-house.
-**M4p Each person's recipe emoji** (v1.12.0; 415 tests incl. RE1–RE9 and RE-M): migration 0018
-(`recipe_emojis`), `PUT/DELETE /recipes/{id}/emoji` (the member from the session; `emojiError`; the
-recipe's `updatedAt` untouched), `emojis` on every recipe through one route helper (the list in one
-joined query), `myEmoji` / `byMyEmoji` / `usedEmojis` in `src/shared/recipes.ts`, `RecipeEmoji.tsx` in
-the view, my emoji on each row and the Newest | By emoji chips (`enso.recipeSort`). Built as: equal
-By emoji groups compare their newest recipe's `createdAt` alone (with the id too, the emoji string could
-never decide); `things-api.test.ts` now warms the SDK in `beforeAll` like the recipe tests (its request test
-timed out at 5 s under the full parallel run, on main too). Migration 0018 is
-applied only in tests so far. **Still owed:** apply 0018 in production; the chips, the picker and the
-rows checked at 320 px and on the iPhone.
-**M4o Recipes** (v1.11.0; 394 tests incl. R1–R12 and RC-M): migration 0017 (`recipes`,
-`recipe_reads`, `uq_recipe_video`), `RECIPE_SOURCE` / `CAPTIONS_FAILURE`, `src/shared/recipes.ts`,
-`youtube.ts` (Data API v3), `youtube-captions.ts` (the unofficial attempt), `recipe-reader.ts` (via
-`claude.ts`, untouched), the `/recipes` routes, and the 🍳 Recipes tab with `RecipeView` and `RecipeForm`;
-the tab bar is now one equal grid column per tab. Tests reach only fakes: the pinned config has both
-keys empty (R2 asserts zero fetches), and the pipeline tests run the real Worker with fake keys and a
-fetch spy that refuses every host but the four fakes. Built as: `source` is a JSON list of
-`RECIPE_SOURCE` (so no CHECK); `captions_error` keeps the reason text; found is recomputed on every
-save as "has ingredients or steps"; the read is counted at step 8 even when Claude is then skipped
-(§7E.2); a cut never ends inside an emoji's surrogate pair (found by R11's producer-vs-consumer
-check). The recipe tests warm the lazily imported SDK in `beforeAll` — under the full parallel run
-the first Claude call's import alone took over 5 s. Migration 0017 is applied only in tests so far.
-**Still owed:** apply 0017 in production; set `YOUTUBE_API_KEY` in a real PowerShell window (§2.4);
-the five tabs, the paste box, the view and the form checked at 320 px and on the iPhone; a real video
-read on the deployed URL (does YouTube let the Worker read captions, or is `captions_error` always
-set from Cloudflare's addresses?), and its ingredients added to Shopping.
-**M4n Sun-timed alerts — the goat alert** (v1.10.0; 330 tests incl. S1–S3, G1–G7, SA-M and
-M1-VOCAB with `events.start_sun`): migration 0016 (`settings.latitude` / `longitude` set to
-33.20 / −117.29, `events.start_sun`), `SUN_EVENT`, `src/shared/sun.ts` (NOAA general solar position
-algorithm), `planReminderFires(…, place)` skipping an occurrence with no sunset, the sunset text,
-sun events off `/calendar` and the event routes, `startSun` on `/fires`, `· sunset` in the Ringing
-bar. Built as: `alertMessage`'s trailing `sunsetAt` is `string | null` — `null` reads "— before
-sunset"; `sourceOf` reads the place and tz in the reminder SELECT (a join on the settings row).
-S1 is checked against an independent implementation of the NOAA spreadsheet formulas in the test;
-the general algorithm agrees within ±1 min on the S1 dates (elsewhere in the year it can differ
-by up to ~1.4 min, e.g. 2026-09-22, the general algorithm's known accuracy). `migration-0013.test.ts`
-now applies migrations only through 0013, so a later settings column does not break H9.
-Migration 0016 is applied only in tests so far. **Still owed:** apply 0016 in production, run the
-insert below, Shelly and John opt in, and a real goat alert arrives and is spoken.
-**Production insert (coordinator only, after 0016 is applied; never a migration or a seed).** Run
-it from a **UTF-8 file** (`wrangler d1 execute enso --remote --file goat.sql`) so the 🐐 survives —
-never typed into a console. Replace `evt_<16 base32>` with a fresh id (`evt_` + 16 lower-case Crockford
-base32 characters, `0123456789abcdefghjkmnpqrstvwxyz`, as `newId` makes) and both `<now>` with the current UTC ISO instant:
-
-```sql
-INSERT INTO events (id, title, notes, start_date, start_time, end_date, end_time, recurrence, assigned_to,
-  remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at,
-  is_alarm, optional, emoji, start_sun)
-VALUES ('evt_<16 base32>', 'Put the goats away', NULL, '2026-10-03', NULL, '2026-10-03', NULL, '{"freq":"DAILY"}', '[]',
-  30, '["push","house"]', 15, 3, (SELECT id FROM members WHERE role = 'owner' ORDER BY created_at LIMIT 1),
-  '<now>', '<now>', 0, 1, '🐐', 'sunset');
-```
-
-No `event_optins` row is inserted: it is off for everyone until each person turns it on in
-Optional calendar items (Shelly and John will).
-**M4u Snap an item** (v1.18.0, §7A.3; 540 tests incl. SN1–SN15 and SN-M): decided by MojoSOGO 2026-10-04. 📷 beside
-Add on every list (`ItemPhoto.tsx`) → `POST /list-items/read-photo` (`routes/item-photos.ts`): SogoAI first —
-`identifyFromHome` POSTs the image through Access to the helper's new `POST /identify`, which asks LM Studio's
-`IDENTIFY_MODEL` (`home/identify.ts`) — and the Claude API (`readItemPhoto`) only when SogoAI gives no name, counted
-against the shared 40-a-day `photo_reads`. The rules are `src/shared/item-reading.ts`; `IDENTIFY_FAILURE` and
-`ITEM_READ_VIA` join vocab. The name fills the box with "Read from your photo — check it."; after Add the waiting
-photo is PUT to the item. Migration 0023 (`list_items.photo_key`, §4.2v); `/list-items/{id}/photo` PUT / GET / DELETE;
-deleting an item or a list deletes its photos from R2; items carry `hasPhoto` and `updatedAt`; 📷 row marker; the
-photo in the ✎ form (PhotoField, saved on Save). `build:home` is still one file importing only `node:http` (6.2 →
-9.8 kB). **Deviations:** `src/worker/access.ts`'s `AccessRequest.body` type widened to `string | ArrayBuffer` (type
-only) — a string body can't carry the image's bytes. The helper's `main()` reads every request's body (keeping
-nothing past 4 MB) before `handle()` checks the path, method and bearer, so the 413 can come after them as specified.
-**Still owed (coordinator):** deploy, then apply 0023 in production; update the helper on SogoAI (the new `.mjs`,
-`IDENTIFY_MODEL=qwen-uncensored` in its env file, restart; README); a real item snapped on the iPhone and named by
-SogoAI; the add row, thumbnail and ✎ form photo checked at 320 px (not checked in a browser in this build).
-**M4w Sign in with my phone** (v1.20.0, live 2026-10-04, 0025 applied in production; §6.6, §8.13; decided by MojoSOGO 2026-10-04; 568
-tests incl. PL1–PL15 and PL-M): **Sign in with my phone** on the sign-in page (`PhoneSignIn.tsx`, hosted by
-`SignIn.tsx`) → `POST /auth/phone-login` → the identical 202 + waiting cookie for every well-formed email (a
-decoy row with `member_id` NULL for an unknown, disabled or rate-limited one) and, inside `waitUntil`, a push with
-`notice 'login'` and `url` `/approve-login#{id}`; the push opens `ApproveLogin.tsx` (sw.js navigates or opens the
-`url`); the right number approves and the waiting browser's next poll claims the row once and gets its session.
-Rules in `src/shared/phone-login.ts`, routes in `src/worker/routes/phone-login.ts`; `LOGIN_REQUEST_STATUS`,
-`LOGIN_VIEW`, `NOTICE_KIND` join vocab; migration 0025 (§4.2x); the push payload gains `url`; `/ops/notify`'s hourly
-count ignores notices; a password sign-in sends "New sign-in on …" to a member with a phone. Built as (not in the
-brief): `LOGIN_VIEW` is a vocab tuple (the wire's four statuses, derived, never stored); the column is
-`match_number` (`MATCH` is an SQLite operator); a used request polls `expired` but shows `approved` on the phone
-(`approveView`); the new-sign-in notice is sent before the login answers rather than in `waitUntil` (a test logging
-in must see a settled state — and a member without a phone gets no row); the waiting cookie is `Path`-scoped to
-`/api/v1/auth/phone-login`. sw.js's new `notificationclick` branch has no automated test (no test covers sw.js).
-**Still owed (coordinator):** merge (0024 / §4.2w and the app version belong to `feature/house-speakers` — bump the
-app version at merge), deploy, then apply 0025 in production; on the real iPhone: a PC asks, the push arrives,
-tapping it opens the approve page (also from a signed-out phone and with the app already open), the right number
-signs the PC in, a wrong one refuses; the sign-in page's new button and both screens checked at 320 px (not checked
-in a browser in this build).
-**M4t Ping the founder's phone** (v1.17.0, §9.4): decided by MojoSOGO 2026-10-04. `POST /ops/notify` (`routes/ops.ts`,
-rules in `src/shared/ops.ts`) — Bearer `OPS_NOTIFY_TOKEN` in constant time (unset → 503 `ops_notify_off`), one
-fire-less `push` delivery to the founder (`FOUNDER_SQL`, now exported from `routes/members.ts`) carrying its own
-`title` (migration 0022, §4.2u), sent at once; 30 an hour, counted from deliveries rows. `push.ts` shows a fire-less
-delivery as `title ?? "📢 Announcement"`. README: the token file and the PowerShell / curl one-liners. Tests
-ON1–ON9 and ON-M reach only a fake push service. Built as (a guard the brief did not name): before setup there is no
-founder → 409 `no_recipients`, nothing written. **Still owed (coordinator):** deploy, apply 0022 in production,
-`wrangler secret put OPS_NOTIFY_TOKEN` and the token file, then a real ping arriving on his iPhone with its title.
-**Captions from home, in-line** (v1.16.0, §7E.2c): decided by MojoSOGO 2026-10-04 — no polling. When
-YouTube blocks the Worker's captions request, from-video asks SogoAI in-line (`home-captions.ts`: one GET
-through Cloudflare Access and the `sogoai` tunnel to `HOME_CAPTIONS_URL`, the `enso-worker` service
-token plus Bearer `CAPTIONS_TOKEN`, 20 s), reads the recipe once and saves it complete, counted once.
-The job queue is deleted: `captions-jobs.ts`, `routes/captions.ts` (`/captions/claim`, `/captions/report`),
-the cron give-up, `CAPTIONS_JOB`, the job texts, `captionsPending` and the PWA's pending line and 10 s
-poll. Migration 0021 drops 0020's columns and index (§4.2t). The helper is now a `127.0.0.1:8790` server
-(`handle` + a `node:http` `main`); §2.5 allows `package:node:http` in `home/`. Tests H-C1–H-C9, CJ-M,
-CJ-D reach only fakes. **Still owed:** deploy the Worker, then apply 0021 in production, then swap the
-helper on SogoAI (its env file holds `CAPTIONS_TOKEN` only); a real blocked video read on the deployed
-URL, saved with `captions` in its source.
-**M4s Captions from home** (v1.15.0, §7E.2c): the first build polled — a job queue on the recipe row
-(migration 0020), `POST /captions/claim` / `/captions/report`, and a helper that polled every 10 s.
-Superseded by v1.16.0 above; 0020 stays (applied migrations are
-never edited) and 0021 drops it.
-**M4r The transcript, by hand** (v1.14.0): `POST /recipes/{id}/transcript` (§7E.2b) taking 1–4
-screenshots (base64 in JSON, read as image blocks, never stored) and/or pasted text, `transcript` in
-`RECIPE_SOURCE`, `cleanTranscript` / `PASTED_MAX` / `parseScreenshots` / `SCREENSHOTS_MAX` in
-`src/shared/recipes.ts`, the screenshots line in `recipe-reader.ts`, `RecipeTranscript.tsx` in the recipe
-view (§8.12). No migration. The daily-cap check is one helper shared with from-video. Tests
-R16–R20 reach only fakes. **Not done:** a retry of the captions attempt as YouTube's iOS client —
-LOGIN_REQUIRED is IP reputation, and no test can reach Cloudflare's addresses, so it is deferred.
-**Still owed:** real transcript screenshots from the iPhone read on the deployed URL; the picker,
-thumbnails and paste box checked at 320 px on the iPhone (the file picker's Photo Library / Take Photo
-sheet is iOS-only).
-**M4q The creator's comments** (v1.13.0): migration 0019 (`recipes.comments_error`), `comments`
-in `RECIPE_SOURCE`, `lookUpComments` in `youtube.ts` (one shared failure mapping with `lookUpVideo`),
-`creatorComments` in `src/shared/recipes.ts`, the comments step run beside the captions attempt, the
-prompt's "Creator's comments" section and the source note. Tests reach only fakes (every from-video
-world answers `commentThreads`). Migration 0019 is applied only in tests so far. **Still owed:** apply
-0019 in production; a real video whose recipe is only in the creator's comment read on the deployed URL.
-**Captions fix** (v1.12.1): captions are read through YouTube's player endpoint as its Android app;
-the website route returned empty caption files for every video. Four real videos read from the home
-PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
-captions (5 ingredients, 6 steps — it had been "watch it").
-**Settings menu** (v1.49.0, §8.6; asked by MojoSOGO 2026-10-11; SM1–SM4): the Settings tab is a grid of eight
-buttons like the Lists popup (shared `PickGrid`): Me, Calendar items, Phone alerts, Speakers, Alerts, Household,
-Members, Status (the admin two hidden from others). Each opens its area in a modal; closing returns to the grid. Log
-out is under the grid. A tapped alert notification opens Alerts on its card. No setting changed; §8.6 no longer lists
-push subscriptions under Status, which was never built there (Phone alerts shows this phone's state). Q226–Q227 are
-⚑ defaults. **Still owed:** check the grid and each area on the iPhone at 320 px.
-**My alerts** (v1.48.0, §9.5, §4.2zn; asked by MojoSOGO 2026-10-11; MA1–MA8, MA-M): Settings → Alerts lists every
-push I got (newest 200), each line with a red ❌, Clear all at the top, a tap opens its card with the whole message,
-time, source and result. Tapping a phone notification opens the app on that card. Migration 0041. Q221–Q225 are ⚑
-defaults. **Still owed:** tap a real Ozymandias ping on the iPhone and land on its card.
-**Alert when done** (v1.47.0, §7D.7, §4.2zm; asked by MojoSOGO 2026-10-11; AL1–AL6, AL-M): starting a machine (or
-Done now) asks *Alert when done* — Nobody · phones only, or a member (preselected to whose load). With nobody, every
-phone hears it and no speaker does; with someone, as before. Owner unknown on Done now means nobody. Loads already
-running keep alerting their owner. Migration 0040. Q217–Q220 are ⚑ defaults. **Still owed:** start the dish washer
-with Nobody and hear only phones.
-**Phone first, then the house** (v1.46.0, §9.2d; asked by MojoSOGO 2026-10-10; PF1–PF3): an alert with Phone and House
-that repeats rings phones only the first time and adds the speakers from the second alert. House-only and one-shot
-alerts speak at once. Q215–Q216 are ⚑ defaults. **Still owed:** hear it on a real repeating alert.
-**I'm away on an alert** (v1.46.0, §9.2c, §4.2zl; asked by MojoSOGO 2026-10-10; AW1–AW4, AW-M): every Ringing bar
-row has **Away**: that alert stops speaking on the house speakers, stays open, and phones keep reminding until it is
-done. Migration 0039. Q213–Q214 are ⚑ defaults. Built as: the Away answer returns the caller's fire even when it is an
-optional reminder hidden from their own list (§7.5). **Still owed:** tap Away on a real repeating alert and hear the
-speakers stay quiet while the phone keeps buzzing.
-**Quiet the house** (v1.45.0, §9.2b, §4.2zk; asked by MojoSOGO 2026-10-10; HQ1–HQ6, HQ-M): Alarms → 🤫 Quiet the
-house for 1 hour, 2 hours, 4 hours or the rest of today. While quiet no speaker says anything (alerts, timer
-starts, announcements); phones get every alert as before. It ends on its own, or with Turn off now, and shows who
-set it. Migration 0038. Q209–Q212 are ⚑ defaults. **Still owed:** quiet the house on the iPhone and see a phone
-alert arrive while the speakers stay silent.
-**Tab bar flush + build stamp** (v1.44.0, §8.1; asked by MojoSOGO 2026-10-10): the app frame is fixed to the
-whole screen so the tab bar sits on the bottom edge of the installed iPhone app, and the opening screen's build
-stamp shows all the time under the tabs (Q208 ⚑). No migration. **Still owed:** see it on the iPhone.
-**Owner unknown on Done now** (v1.43.0, §7D.2–7D.3; asked by MojoSOGO 2026-10-10; UK1–UK2): Done now on a free
-machine no longer assumes an owner (Owner unknown is preselected). A load with no owner alerts "Clothes washer
-finished; Owner unknown; Please cycle to dryer" / "Clothes dryer finished: Owner unknown: Please unload", moves on
-unowned, and the card and Ringing bar say "owner unknown". The clothes washer's 45 min chip is dropped. No migration.
-**Still owed:** a Done now with nobody named, heard on a speaker.
-**Clothes washer, clothes dryer and dish washer** (v1.42.0, §7D.6, §4.2zj; asked by MojoSOGO 2026-10-10; DW1–DW4,
-DW-M): Washer and Dryer are now labelled Clothes washer and Clothes dryer (ids and data unchanged), and a third card,
-🍽️ Dish washer, starts, rings when done, Done now / Still loaded / Clear like the laundry, and ends with Emptied. The
-card shows who started it ("started by Sam"). The clothes washer's chips are 30 / 60 / 90 / 120. Migration 0037. Q204–Q207 are ⚑ defaults. **Still owed:** a real
-dish washer load started and emptied on the iPhone.
-**Weather on the calendar** (v1.41.0, §7.11, §4.2zi; asked by MojoSOGO 2026-10-10; WX1–WX6, WX-M): the next 7 days
-each show the forecast emoji in the cell's corner, and the day sheet says the words, high and low. Open-Meteo, once a
-day from the minute tick, at the household place. Migration 0036. Q200–Q203 are ⚑ defaults. **Still owed:** see it
-live on the iPhone after the first refresh.
-**Things to bring** (v1.40.0, §7.10; asked by MojoSOGO 2026-10-10; EB1–EB5, EB-M): an event has an optional list
-of things to bring, edited under the Address, and its reminder says "— bring: a, b and c" on the phone and the
-speakers. Migration 0035. Q198–Q199 are ⚑ defaults. **Still owed:** hearing a real reminder with a list.
-**Paste a link into an event** (v1.39.0, §7.9; asked by MojoSOGO 2026-10-09; EA6–EA7): Paste now finds a copied
-link on the iPhone (`text/uri-list`), and a paste that is one link reads the page (fetch, look-up, fill) on the same
-budget. No migration. Q197 is a ⚑ default. **Still owed:** pasting the incognitosd.com event link on the iPhone.
-**Update an event from later info** (v1.38.0, §7.9a; asked by MojoSOGO 2026-10-09; EU1–EU5): 📷 Screenshot and
-📋 Paste sit above the Title on new and existing events; on an existing one what was copied updates the form
-(title kept, notes added under), and nothing saves until Save. Paste moved there from the Address box and now
-fills the whole form (Q195). No migration. Q196 is a ⚑ default. **Still owed:** pasting a "moved to…" text onto a
-real event on the iPhone.
-**An event's address, paste to fill** (v1.37.0, §7.9, §4.2zg; asked by MojoSOGO 2026-10-09; EA1–EA5, EA-M): an
-optional Address on every event with 📋 Paste (the clipboard's picture through `/events/read-photo`, its text through
-the new `POST /events/read-text`, both on the 40-a-day budget) and Open in Maps. A screenshot's location now fills the
-Address instead of the first line of Notes (Q190). Migration 0034. Q193–Q195 are ⚑ defaults. **Still owed:** Paste
-tried on the iPhone with a copied text and a copied screenshot.
-**Rolling timer day start** (v1.36.0, §5.5a, §4.2zf; asked by MojoSOGO 2026-10-08; TS1–TS5, TS-M): a timer with
-active hours can **📢 Announce the start of each day** — when its window opens the house and phones hear
-"Pushups timer started — every 60 minutes"; then it rings after the interval and each Ack starts the next one,
-as before. Migration 0033. Q191–Q192 are ⚑ defaults. **Still owed:** hearing it at a real window opening.
-**Own entries only** (v1.35.0, §6.3; asked by MojoSOGO 2026-10-07 before adding two kids as plain members; A8–A12):
-writes to someone else's thing, show, recipe or list item (and their photos, Plan it, a recipe re-read) and to the areas
-of someone else's chore are now 403 `forbidden` for a non-admin; checking a list item, want / watched on a show, alarm
-acks, chore steps, the machines and mess answers stay open to everyone. The forms go read-only for those entries
-(`cannotChangeText` in `shared/roles.ts`). Q10, Q66, Q154, Q163 and Q175 changed accordingly. No migration. This applies to
-every non-admin member, adults too. **Still owed:** a kid's phone check (ack an alarm, answer a mess, tick Shopping).
-**Fill in an event from a screenshot** (v1.34.0, §7.8; asked by MojoSOGO 2026-10-06; EP1–EP6): 📷 Fill in from a
-screenshot in the new-event form, `POST /events/read-photo` on the shared 40-a-day photo budget, fields the person
-hasn't changed filled (timed or All day), the location as the first line of Notes. No migration. Q187–Q190 are ⚑
-defaults. **Still owed:** a real invite screenshot read on the iPhone.
-**Steward pass 2, everything** (v1.33.2; approved by MojoSOGO 2026-10-06; behavior unchanged): each code item was placed
-by the placement-advisor and moved by the reorganizer in its own commit. There are four new owners: `src/shared/roles.ts`
-(ADMIN_ROLE, isAdmin, canChange: one creator-or-admin rule for routes and forms), `src/shared/photos.ts` (photo limits,
-bundled into home/), `src/shared/alert-limits.ts` (title and interval limits) and `frontend/src/components/usePhotoPick.tsx`.
-`canSee` joined the mess rules, normalizeInviteCode moved to `invite-link.ts`, the recipe read failures became one union
-with the Q78 rule as `commentsError`, the web-tool builders moved into `claude.ts`, and the list-add result is now
-vocabulary. New tests: migration 0028 and the RepeatFields mappings. Reports: `docs/steward/`.
-**Steward pass 1, items 1–5** (v1.33.1; approved by MojoSOGO 2026-10-05; behavior unchanged): the first
-code-steward pass's top five, each placed by the placement-advisor and moved by the reorganizer in its own commit.
-New owners `src/worker/recipe-reads.ts` (the recipe read pipelines and budget; `routes/recipes.ts` 274 → 229),
-`fire-rows.ts` (fire and chore-run rows and `sourceOf`; `tick.ts` 257 → 108), `deliveries.ts` (every deliveries
-INSERT and the founder-ping count, now under test), `photo-store.ts` (private R2 photos); the mess permissions
-moved into `src/shared/messes.ts`, shared by the route and the PWA. Report: `steward/2026-10-05-first-pass.md`.
-**Whose mess?** (v1.33.0, §7B.7, §8.15a, §4.2ze; asked by MojoSOGO 2026-10-05, after an AREC; MS1–MS14, MS-M):
-📸 Report a mess in the Chores tab, That was me / Not me asked by push up to 4 times 15 min apart and by an in-app
-banner, To talk about for unclaimed messes with the outcome recorded by an admin, and a Balances card of who owes
-whom. Migration 0032. Q177–Q185 (all but Q183's asks) are ⚑ defaults. **Still owed:** apply 0032 in production;
-the camera from the button and a push opening the banner on the real iPhone.
-**Whole pictures in the recipe list** (v1.32.1–1.32.2, §8.12; asked by MojoSOGO 2026-10-05): a recipe's own picture
-is scaled to fit the usual 64 × 36 row slot, never cropped, and every row keeps one height (Q176, decided).
-**A recipe's picture by hand** (v1.32.0, §8.12; asked by MojoSOGO 2026-10-05; RL13): 📷 Add photo in the recipe
-form sets the recipe's picture with nothing read. Q175 is a ⚑ default.
-**A recipe's screenshot as its picture** (v1.31.0, §7E.2b, §8.12, §4.2zd; asked by MojoSOGO 2026-10-05; RL12, RP-M):
-the first screenshot of a read that succeeds is kept in R2 and shown whole at the top of the recipe and as its row
-picture. Migration 0031. Q174 is a ⚑ default. **Still owed:** apply 0031 in production.
-**Screenshots in the recipe form** (v1.30.0, §8.12, §7E.2b; asked by MojoSOGO 2026-10-05; RL11): ✎ Edit on any
-recipe, typed ones included, offers Fill in from screenshots; a typed recipe's screenshots are read by Claude alone.
-Q173 is a ⚑ default.
-**US units** (v1.29.2, §7E.2; asked by MojoSOGO 2026-10-05; RL10): readings convert metric to °F, ounces / pounds,
-cups / spoons and inches. Q172 is a ⚑ default.
-**Recipes in English** (v1.29.1, §7E.2; asked by MojoSOGO 2026-10-05; RL10): every recipe reading — video,
-transcript or link — is saved in English, a Spanish reel's recipe translated. Q171 is a ⚑ default.
-**Recipes from any link** (v1.29.0, §7E.6, §4.2zc; asked by MojoSOGO 2026-10-05; RL1–RL9, RL-M): the paste box
-takes any link and detects its kind — a YouTube video reads as before; a Facebook reel or post, a recipe site or
-any page is fetched (a login wall kept, never fatal) and looked up by Claude with web fetch and search, then
-filled with the recipe schema. The link is cleaned of share and tracking junk and is the duplicate key.
-`/recipes/from-video` is now the same handler as `/recipes/from-link`. Migration 0030. Q167–Q170 are ⚑ defaults.
-Tests reach only fakes. **Still owed:** apply 0030 in production; the Facebook reel from the ask read on the
-deployed URL (Facebook may show the Worker a login wall; then Claude's own fetch and search are what is left,
-and the screenshots fallback).
-**Chores tab + what done looks like** (v1.28.0, §7B.6, §8.15, §4.2zb; asked by MojoSOGO 2026-10-05; CA1–CA8,
-CA-M): chores have their own 🧹 tab (Today, All chores) and left Alarms and the Lists popup; each chore has a
-**What done looks like** sheet of areas with photos and expectations, editable by anyone. Migration 0029. Q163–Q166
-are ⚑ defaults. Checked at 320 px in an emulated phone: the six tabs fit, the sheet and the area editor
-lay out. **Still owed:** apply 0029 in production; the same on the iPhone, with a real camera photo.
-**Machine alert hours** (v1.27.0, §7D.5, §5.3 rule 0b, §4.2za; asked by MojoSOGO 2026-10-05; L19–L21): washer and dryer
-alerts sound only weekdays 5:30–8:30pm and weekends 9am–9pm, editable by admins on the Machines section; outside
-them an alert waits and the reminders start over at the opening. Migration 0028. Q162 is a ⚑ default.
-**Machine alerts to all devices** (v1.26.0, §7D.3; asked by MojoSOGO 2026-10-05; L4, HS11): washer and dryer
-alerts push every active member and are spoken on every speaker HA lists (Everywhere left out), whatever anyone
-ticked. Q161's Everywhere rule is a ⚑ default.
-**Done now** (v1.25.0, §7D.2, §8.5; asked by MojoSOGO 2026-10-05; L16–L17): the app tolerates loads nobody recorded.
-A free machine's **Done now** asks whose load and marks it done now; a running one's finishes early. The done alerts
-ring at once. No migration. Q160 is a ⚑ default awaiting MojoSOGO.
-**Still loaded** (v1.24.0, §7D.2–7D.3, §8.5; asked by MojoSOGO 2026-10-05; L14–L15): a done washer or dryer card
-offers **Still loaded**, which closes its fire `superseded` and starts a new one now, so the 15-minute reminders run
-again from the first, telling the household to move the load to the dryer or take it out. No migration. Q159 is a ⚑
-default awaiting MojoSOGO.
-**Lists popup** (v1.23.0, §8.8, §7A.1; asked by MojoSOGO 2026-10-05; L21–L22 and LE-M): tapping 🛒 Lists in the tab
-bar opens a popup of buttons, one per list with its emoji and open count, the remembered list marked; the old
-`<select>` is gone. Lists gain an emoji (migration 0027, §4.2z), set in the new-list form and ⋯ options, else picked
-from the name. Checked locally at 375 px (two columns, names wrap to two lines, the remembered list marked). Q157–Q158 are ⚑ defaults awaiting MojoSOGO.
-**M4x Movies & shows** (v1.22.0, §7F, §8.14; asked by MojoSOGO 2026-10-05; 596 tests incl. W1–W14 and W-M): Lists →
-**Movies & shows** — type a title, paste a link or snap a picture, and **Find** has Claude look it up (web search ≤ 5
-with `user_location` country US, web fetch ≤ 3) and fill the show form: Rotten Tomatoes critics / audience, how to watch
-in the US (theaters closest to home, streaming, tv, rent, buy), summary. Nothing is saved until Save; Check again
-refreshes a saved one; Watched records who and when. Counted in the 40-a-day `photo_reads` budget. Migration 0026
-(§4.2y). Placement: `spendPhotoRead` (photo-reads.ts) and `householdPlace` (db.ts) opened first in their own commit.
-Built as (not in the first draft of the spec): **Add it by hand** after a failed or empty look-up, so a show can always
-be added. Checked locally at 320 px (rows one line, 44 px, no sideways scroll; the form fits) with the look-up off; the
-look-up itself is tested only against a fake Claude. **Still owed:** a real title, clip link and screenshot looked up on
-the deployed URL (the first run against the real API); v1.22.1 reads a YouTube link's comments (W15); Q144–Q156 are ⚑ defaults awaiting MojoSOGO; follow-ups in §12.2.
-**Fill a thing from a link** (v1.21.0, §7C.4b, §8.11; asked by MojoSOGO 2026-10-04; D14–D22 green; v1.21.1 picks the location closest to home): under the thing
-form's Link, **🔗 Fill in from this link** fetches the page from the Worker (title, meta, JSON-LD, text), has Claude
-look it up with web search (≤ 3) and web fetch (≤ 2), then fills the empty fields marked *from link — check it*.
-Counted in the 40-a-day `photo_reads` budget. No migration. Tests reach only a fake site and a fake Claude; the
-pairing of server tools and the two requests has **not yet been run against the real API**. **Still owed:** a real
-event link read on the deployed URL; Q138–Q142 are ⚑ defaults awaiting MojoSOGO.
-**M4v Each person's speakers** (v1.19.0, §9.2a; 552 tests incl. HS1–HS10 and HS-M): decided by MojoSOGO
-2026-10-04. Settings → Me lists Home Assistant's Echos and Voice PE, asked live through the tunnel with one
-`/api/template` call; each person ticks theirs. A house delivery is written with the speakers of everyone it is for
-(the union; anyone not chosen, or nobody at all, → the default speakers, as before) and spoken only there; a surface
-with no speaker is not called. Built as: `classifyHouse` takes the called surfaces' results and is `failed` when none
-was called (never a quiet `sent`); the screen shows "not chosen" with every box unticked and names the defaults.
-Migration 0024 applied in production and v1.19.0 deployed 2026-10-04. The real list (15 Alexa entries + the
-Voice PE) seen on MojoSOGO's phone; v1.19.1 hides the Alexa apps and labels the rest Alexa (Q130). **Still owed:** the real speaker list seen
-on the iPhone (the template's `integration_entities('alexa_media')` may list more than the four Echos); each person's
-ticks; a reminder for one person heard only on their speakers.
-**Identify fix** (v1.18.1): SogoAI's qwen3.6 thinks even with ` /no_think`; at `max_tokens` 100 it was cut off
-with an empty answer every time, which silently sent every photo to the paid Claude fallback. Now 1024
-(`IDENTIFY_MAX_TOKENS`), and a cut-off empty answer is an honest `failed` ("ran out of room"). Verified through
-the tunnel with a real photo. **Verified by MojoSOGO 2026-10-04 on his phone:** a soy-sauce bottle read by SogoAI
-as "Signature Select Less Sodium Soy Sauce", added to Shopping with its photo kept; no Claude read used.
-**Verified by MojoSOGO 2026-10-03:** 📢 announcements spoken through the tunnel (Echos + Voice PE
-`ok`); John opted in to 🐐 Put the goats away (first real alert 2026-10-04 18:00, sunset 18:30).
-**Push fix** (v1.7.1): no `Topic` header — Apple refused pushes carrying one (BadWebPushTopic)
-since v1.6.0. Verified 2026-10-03: a test push arrived on MojoSOGO's iPhone home-screen app.
-**Emoji instead of a dot** (v1.5.1): on phones an event whose emoji shows beside the date has no
-dot (§7.1); checked at 320 px.
-**Open from the thing form** (v1.5.0): ↗ link, 🗺️ maps, 📞 call beside the fields, checked at
-320 px (44 px buttons, no sideways scroll). Still to check on the iPhone: Maps and the call sheet open.
-**Link fix** (v1.4.1; 260 tests): one `webLink` rule — a bare `www.….com` from a flyer or typed
-is kept with `https://` added; other schemes are refused (§7C.1).
-**M4j thing details** are built (v1.3.0; 245 tests): address / phone / cost, photo reading
-fills them, the form's text fields grow to fit. Title and Link stay one line.
-**M4i calendar tidy** is built (v1.2.0; 243 tests; 0010 applied locally with nothing but the
-school table lost; no "school" left in code). Checked at 320 and 440 px: day icons sit on the
-date's line inside the cell (15🧹, 16📈, 18🗑️). Known limit: on the **1st** of a month the
-month tag ("OCT") fills the line, so that day's icon is clipped (still in the day sheet).
-**M4h optional events + certain weeks** is built (O1–O9 + §4.3 rows green, 225 tests; 0009
-applied locally with nothing lost; v1.1.0). Built as: reminders of optional events are planned
-for everyone and only deliveries and /fires are filtered; a non-optional event's House rule is
-unchanged; a single-week list stays "certain weeks" in the form. **Owed (warning band):**
-`EventForm.tsx` is at 91 % of its cap — the next addition there opens the named seam first
-(the reminder block onto AlertFields), a placement decision, not the next author's.
-**M4g Things to do** is built (D1–D13 green, 213 tests; 0008 applied to local data with
-every fire and delivery intact; create → photo → Plan it exercised on the live local API).
-Built as: a status set to `planned` directly is refused (use Plan it); Plan it on a non-idea
-is 409; the planned event carries no reminder and is all-day unless a time is given; a
-picked reminder date equal to the start date is one reminder (the start one). Photo
-reading uses `client.beta.messages.parse` (the beta path carries `fallbacks`).
-**M7: live at https://enso.sogodojo.com (2026-10-03)** — production D1 `enso` (all 7
-migrations), carry-over of settings + 5 school holidays, secrets SETUP_TOKEN and
-RELAY_TOKEN only, the same build as the home-network server. Owner setup and the shared
-phone + house reminder check are still to do. Local dev keeps its own database through
-`preview_database_id` (local D1 state is keyed by that id). M4e Lists of your own is built (L1–L20 green; 0007 verified against the
-local dev data). Admins (§6.3, A1–A7) are built; `Settings.tsx` is at 89 % of its ceiling after the
-members-list controls — the next addition there is a placement decision.
-
-Deviations from this spec, deliberately:
-
-- **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
-  fetch handler, no caching — so §8.10's always-fresh holds.
-- `compatibility_date` is `2026-08-20` — the bundled workerd rejects later dates.
-- §10 "Freshness" polls every 30 s. The `phone-ui` skill says *never poll*; polling
-  was kept because a ringing timer must appear without a user action. Revisit when
-  push lands (a push can trigger the refresh instead). ⚑
-- Fixed while building (already reflected above): `login_failures` table; the
-  reminder unique index covers only **open** fires (a closed `removed` fire must not
-  block its rescheduled replacement); all-day reminders fire at 09:00 local ⚑.
+What is built, what was built differently from this spec, and what is still owed live in
+[`docs/history.md`](docs/history.md) §14, kept apart so a session reads the behavior here without the
+build log. `docs/where-things-stand.md` keeps the short list of what is owed now.
 
 ---
 
