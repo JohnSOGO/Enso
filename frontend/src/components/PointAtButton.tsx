@@ -1,5 +1,5 @@
 // SPEC §8.16 ⚑ Q234 — 🎯 Point at it, this device's switch (localStorage, not the account), the toggle signal, and the
-// 🎯 button that turns pick mode on and off. A leaf: Modal, SettingsMe and PointAt import it; it imports no component.
+// ◎ button (bottom left) that turns pick mode on and off. A leaf: Modal, SettingsMe and PointAt import it; it imports no component.
 import { useSyncExternalStore } from 'react';
 
 const KEY = 'enso.pointAt';

@@ -7,6 +7,24 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Steward pass 17, whole tree (code-steward)
+
+- **Run:** after the v1.58.0 release (SPEC 2.99 §8.16, pick mode like Ozymandias, with the ◎ button). Also covers v1.54.1–v1.57.1 (FunHouse for machines, custom minutes, poller cursor, two machines buttons, Chores menu, tagline, Settings About, bounties and score with migration 0044, shorter thread pings). Audited e21ab6c..265334e.
+- **Verdict:** SOUND. Typecheck green, 823/823 tests (110 files), arch:audit quiet (EventForm.tsx 88%, Calendar.tsx 87%, routes/recipes.ts 87%, engine.ts 86%).
+- **Placement audit:** 11 receipts checked against 13 code commits. Each landed where its verdict said. 0 code commits without a receipt. fa96805 (◎) rides on the pick-mode receipt. 5493411 (.vbs) is outside SOURCE_EXT.
+- **Top finding:** routes/bounties.ts Done catches every batch error as a 409 "waiting for OK", where its siblings machines/cooking re-throw non-constraint errors. No losing-tap guard is tested (bounties take/Done, machines, cooking) (MED-LOW, S).
+- **Handoffs:** waiting on MojoSOGO's pick: (1) the Done re-throw plus the losing-tap tests (absorbs pass 16's conflict-guard item); (2) wording: PickGrid's caller list now missing Chores (stop listing callers). The pick-mode wording slips (SettingsMe label, PointAtButton header, PointAt map row, where-things-stand header) were fixed at once as v1.59.1 by the thread that shipped v1.58.0. Still open, all LOW: pass 11's two §7D notes, pass 10's house-row helper, the snooze-keeps-away test, the machines.ts alert-hours seam. Pass 6 items 1, 3 and 4 (alertMessage options, read-budget wording, EVENT_NOTES_MAX) fell off the carry list without a decision; MojoSOGO to retire or re-list them.
+- **Restraint:** the PickGrid + Modal menu glue now has three copies (Settings, Alarms, Chores), about 4 lines each with no rule, so no PickMenu until a fourth; the active-admins query twice; the name lookup twice; /take's SQL mirroring dibHolds (atomic guard); /earnings ok's unconditional UPDATE (a dropped earning never scores); the finisherOf route import; selectorFor kept in point-line.ts.
+
+## 2026-10-11 — v1.59.1: Point at it label and comment match ◎ (placement-advisor)
+
+- **Ask:** SPEC 3.01 §8.16 wording only. The Settings → 🙂 Me switch label still said "tap 🎯 … get a line naming it", but since v1.58.0 the button is ◎, pick mode stays on, and it copies several lines. The PointAtButton header comment still said "🎯 button".
+- **Verdict:** `frontend/src/components/SettingsMe.tsx` (label) and `frontend/src/components/PointAtButton.tsx` (header comment). REUSE, add nothing.
+- **Flow stage:** render
+- **Why:** text-only fixes inside the files whose map rows already own the switch and the ◎ button. No logic, imports or fan-in change. The label is client UI copy, not a vocabulary string.
+- **Caps:** SettingsMe.tsx 37/300, PointAtButton.tsx 30/300; unchanged in effect.
+- **Sources read:** frontend/src/components/SettingsMe.tsx, frontend/src/components/PointAtButton.tsx, docs/module-ownership.md (rows 197–198), scripts/arch.ts.
+
 ## 2026-10-11 — v1.59.0: A done photo on an earning (placement-advisor)
 
 - **Ask:** SPEC 3.00 §7B.8 "A done photo": PUT/GET /earnings/{id}/photo, `Bounty.earningId`, `Earning.hasPhoto`, §4.2zr migration 0045 (`earnings.photo_key`), and §8.15b (the Waiting for OK thumbnail, 📷 Add photo on my own pending row, the Done sheet with an optional photo).
