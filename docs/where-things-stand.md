@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-11, v1.60.3, main = production.*
+*Last updated 2026-10-11, v1.60.4, main = production.*
 
 ## Running where
 
@@ -49,7 +49,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 ## Owed
 
 - Bounties and Score (v1.57.0, §7B.8, §8.15b, migration 0044): an admin posts a bounty and a kid's phone gets the push; the kid
-  taps I'll do it then Done with a camera photo (v1.59.0); the admin's phone gets "🪙 Waiting for OK" and OKs it; 🏅 Score shows it (BS1–BS3). Also (v1.60.0): an admin posts with a camera picture, the kid's card shows it, and it is gone once paid. Q249–Q255, Q260 are ⚑ defaults.
+  taps I'll do it then Done with a camera photo (v1.59.0); the admin's phone gets "🪙 Waiting for OK" and OKs it; 🏅 Score shows it (BS1–BS3). Also (v1.60.0): an admin posts with a camera picture, the kid's card shows it, and it is gone once paid; an admin's own Done has no 📷 (BS4). Q249–Q255, Q260, Q261 are ⚑ defaults.
 - Cooking timers (v1.54.0, §7D.8): on the iPhone at 320 px, Alarms → 🍳 Cooking machines → ＋ Cooking timer, start an air fryer
   for 1 minute, Edit it, hear it done, tap Off, then the red ✕. Q239–Q243 are ⚑ defaults.
 - Alarms tab as a menu (v1.53.0, §8.5): on the iPhone at 320 px, open each of ⏰ Alarms, ⏱ Rolling timers, 🫧 Machines;

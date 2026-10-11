@@ -7,13 +7,24 @@ carry its result.
 
 ---
 
-## 2026-10-11 — v1.60.3: standalone document height 100lvh so the tab bar isn't clipped (placement-advisor)
+## 2026-10-11 — v1.60.4: standalone document height 100lvh so the tab bar isn't clipped (placement-advisor)
 
-- **Ask:** SPEC 3.05 §8.1 "Flush at the bottom", follow-up to v1.60.2. On the iOS 26 installed app (viewport-fit=cover, black-translucent) the tab bar was cut off about 59pt above the screen bottom: `html` 100%/dvh is short by the top safe-area inset, `body { overflow: hidden }` clips there, only 100lvh is the full screen. Add `@media (display-mode: standalone) { html { height: 100lvh; } }` in theme.css; `.app`'s standalone `height: 100vh` becomes `100lvh`.
+- **Ask:** SPEC 3.06 §8.1 "Flush at the bottom", follow-up to v1.60.2. On the iOS 26 installed app (viewport-fit=cover, black-translucent) the tab bar was cut off about 59pt above the screen bottom: `html` 100%/dvh is short by the top safe-area inset, `body { overflow: hidden }` clips there, only 100lvh is the full screen. Add `@media (display-mode: standalone) { html { height: 100lvh; } }` in theme.css; `.app`'s standalone `height: 100vh` becomes `100lvh`.
 - **Verdict:** `frontend/src/theme.css` (html base sizing) + `frontend/src/App.module.css` (`.app` override) [EXISTING]
 - **Flow stage:** render
 - **Why:** each rule goes to the owner of the box it sizes. v1.60.2 rejected theme.css while only `.app` looked short; the device moved the clip to `html`/`body`. Scoped to standalone so browser tabs keep 100% / `inset: 0`. Only `html` overridden; body/#root inherit. A JS viewport measure was rejected (turns a CSS fact into state).
 - **Caps:** theme.css about 103/300, App.module.css about 49/300. No file newly in the warning band.
+
+## 2026-10-11 — v1.60.3: no photo on an admin's own Done (placement-advisor)
+
+- **Ask:** Do not offer 📷 Add photo on the one-off Done sheet to an admin, whose Done is OK'd at once (⚑ Q252). The sheet shows Done / Cancel and a line saying the points count at once. No server change. SPEC 3.05 §8.15b, ⚑ Q261, from steward pass 18 finding 1.
+- **Verdict:** `frontend/src/components/BountyDone.tsx` [EXISTING]
+- **Flow stage:** render
+- **Why:** The sheet already owns the one-off Done flow, and this only changes what it shows to one kind of finisher. The admin test reuses `isAdmin` from `src/shared/roles.ts`, which Messes.tsx already imports, so the PWA does not re-derive a role rule. okAtOnce and the routes already decide the payout, so there is nothing to add server-side. A new component or a flag on the caller was rejected because the decision belongs to the sheet that renders the photo control. Blast radius: one 53-line leaf file. The photo-upload path is left in place for non-admins.
+- **Caps:** BountyDone.tsx goes from 53 lines to about 55-60 against a cap of 300. No file is newly in the warning band.
+- **Sources read:** frontend/src/components/BountyDone.tsx, scripts/arch.ts (caps), docs/module-ownership.md (rows for BountyDone.tsx and roles.ts), src/shared/roles.ts (isAdmin), src/shared/bounties.ts (okAtOnce), SPEC.md (§8.15b at 4430-4462, BT13, version line), docs/decisions.md (Q252), frontend/src/components (shared/roles imports).
+
+---
 
 ## 2026-10-11 — Steward pass 18, whole tree (code-steward)
 

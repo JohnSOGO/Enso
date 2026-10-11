@@ -262,3 +262,4 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q258 | How long a done photo is kept (§7B.8) | ⚑ Until the earning is OK'd or dropped (Not yet, Undo, bounty deleted); then deleted from R2 |
 | Q259 | A replaced done photo and the browser cache (§8.15b) | ⚑ The app adds its own `?v=` to the photo's address after an upload; nothing on the wire changes |
 | Q260 | A bounty's picture (§7B.8) | ⚑ Optional, one per one-off, set by an admin when posting or later from the card; everyone sees it; deleted when the bounty is paid or deleted |
+| Q261 | An admin's own Done sheet (§8.15b) | ⚑ No 📷 Add photo: an admin's Done is OK'd at once (Q252), so a photo would be refused and deleted; the sheet says "Your points count at once." |

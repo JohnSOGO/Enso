@@ -1,16 +1,19 @@
 // SPEC §8.15b — the Done sheet on a one-off: 📷 Add photo (optional; the phone offers camera or library, shrunk as a
 // thing's photo), then Done → POST /bounties/{id}/done and the photo → PUT /earnings/{earningId}/photo (§7B.8). If the
-// photo fails, the Done stands and the refusal shows here. Holds only its draft.
+// photo fails, the Done stands and the refusal shows here. An admin gets no 📷: their Done is OK'd at once (⚑ Q261).
+// Holds only its draft.
 import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { Thumb } from './PhotoField';
 import { shrinkPicked, usePhotoPick } from './usePhotoPick';
 import { errorText, post, upload } from '../api';
 import { useApp } from '../state';
+import { isAdmin } from '../../../src/shared/roles';
 import type { Bounty } from '../../../src/shared/bounties';
 
 export function BountyDone({ bounty, onClose }: { bounty: Bounty; onClose: () => void }) {
-  const { refresh } = useApp();
+  const { me, refresh } = useApp();
+  const admin = isAdmin(me);
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [src, setSrc] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -44,10 +47,12 @@ export function BountyDone({ bounty, onClose }: { bounty: Bounty; onClose: () =>
         <button className="primary" disabled={busy} onClick={done}>{busy ? 'Sending…' : 'Done'}</button>
         <button onClick={onClose}>Cancel</button>
       </>}>
-      <p className="muted">A photo of the finished job lets an admin say OK from anywhere. It is optional.</p>
-      {pick.input}
-      {src && <Thumb src={src} alt={`The finished job: ${bounty.title}`} />}
-      <button type="button" onClick={pick.open}>📷 {photo ? 'Replace photo' : 'Add photo'}</button>
+      {admin ? <p className="muted">Your points count at once.</p> : <>
+        <p className="muted">A photo of the finished job lets an admin say OK from anywhere. It is optional.</p>
+        {pick.input}
+        {src && <Thumb src={src} alt={`The finished job: ${bounty.title}`} />}
+        <button type="button" onClick={pick.open}>📷 {photo ? 'Replace photo' : 'Add photo'}</button>
+      </>}
     </Modal>
   );
 }
