@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Steward pass 19, whole tree (code-steward)
+
+- **Run:** after the v1.62.0 release (SPEC 3.11 §7D.9, 🪙 Bounty from a done machine load). Also covers v1.60.1–v1.61.0.
+- **Verdict:** SOUND. Typecheck green, 834/834 tests, arch:audit quiet (machines.ts 238/300, routes/bounties.ts 229/300).
+- **Placement audit:** 9 receipts against 10 code commits, no mismatches. 53e4b54 (v1.59.2 tab bar) likely renumbered to v1.60.2.
+- **Top finding:** none new. Pass 18 #1 fixed in v1.60.3; pass 17's items fixed in v1.60.7.
+- **Handoffs:** 0 new. Carried, waiting on MojoSOGO's pick: `useBlobUrl` in usePhotoPick.tsx (reorganizer, S, before the next photo sheet), plus older LOW items from passes 6, 10, 11 and 16.
+- **Restraint:** the machines → bounties import (a constant, no cycle); the machines.ts map row naming its consumers; no UI test for the 🪙 button (rule covered by LB1); no bounty-photos.ts split yet (229, under ~250).
+
 ## 2026-10-11 — v1.62.0: 🪙 Bounty from a done load (placement-advisor)
 
 - **Ask:** SPEC 3.11 §7D.9 and §8.5 🪙 Bounty (⚑ Q263). On a done machine card, admins get [🪙 Bounty], which opens the ＋ Bounty sheet with the title from a pure `loadBountyTitle(id, ownerName)` in machines.ts, cut to BOUNTY_TITLE_MAX. Test LB1. It posts an ordinary one-off bounty: no server change, no migration.
