@@ -33,8 +33,9 @@ it('FP4: forFunhouse and funhouseNotice', () => {
   expect(forFunhouse({ channel: 'push', title: '🤖 Claude ⭕🔁🏠' })).toBe(true);
   expect(forFunhouse({ channel: 'push', title: '🏛️ Ozymandias' })).toBe(false);
   expect(funhouseNotice(A)).toEqual({
-    source: 'Claude', level: 'attention', text: '🧵 Thread needs you: text dlv_a', sig: '⭕🔁🏠', beep: 'look', id: 'dlv_a',
+    source: 'Claude', level: 'attention', text: 'text dlv_a', sig: '⭕🔁🏠', beep: 'look', id: 'dlv_a',
   });
+  expect(funhouseNotice(B).text).toBe('🤖 Claude: text dlv_b');
 });
 
 it('FP5: an Ozymandias ping is skipped; one bridge POST a poll, the next poll sends the next', async () => {

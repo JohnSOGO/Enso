@@ -474,6 +474,8 @@ is tapped, or Esc (Alt+P toggles on a keyboard); every tap while on is swallowed
 CSS selector), `Screen:`, build stamp. A mouse gets an outline and a crosshair. Checked in headless Chromium, mouse and
 touch: two picks in a row each landed on the clipboard with the tab unchanged, the bar and Esc stop it, taps work after.
 **Still owed:** PA3–PA4 on the iPhone.
+**Shorter FunHouse thread pings** (v1.57.1, §9.4a; MojoSOGO 2026-10-11: "the prefix has too many words"): a 🧵
+thread ping reaches the FunHouse as its text alone, which threads now write as `Enso:<thread title> "<ACTION what>"`.
 **Bounties and Score** (v1.57.0, §7B.8, §8.15b, migration 0044, Q249–Q256; asked by MojoSOGO 2026-10-11 after the AREC
 `arec-chore-bounties.md`): admins put points on a chore (paid to whoever finishes a run) or post a one-off job; anyone
 takes it (I'll do it, 3 h) and says Done; an admin OKs it (or Not yet), then it counts. 🏅 Score shows everyone's

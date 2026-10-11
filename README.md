@@ -278,7 +278,7 @@ Cloud sessions can't read the token file. The project's cloud environment carrie
 waits on MojoSOGO, with the title "🧵 Thread needs you":
 
 ```bash
-curl -sS -m 10 -X POST https://enso.sogodojo.com/api/v1/ops/notify -H "Authorization: Bearer $ENSO_OPS_NOTIFY_TOKEN" -H 'Content-Type: application/json; charset=utf-8' --data "$(jq -nc --arg t 'Thread title: what is needed' '{text:$t[:200],title:"🧵 Thread needs you"}')"
+curl -sS -m 10 -X POST https://enso.sogodojo.com/api/v1/ops/notify -H "Authorization: Bearer $ENSO_OPS_NOTIFY_TOKEN" -H 'Content-Type: application/json; charset=utf-8' --data "$(jq -nc --arg t 'Enso:Thread title "RUN deploy"' '{text:$t[:200],title:"🧵 Thread needs you"}')"
 ```
 
 ### The same pings on the FunHouse (SPEC §9.4a)

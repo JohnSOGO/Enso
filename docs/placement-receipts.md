@@ -9,12 +9,23 @@ carry its result.
 
 ## 2026-10-11 — v1.58.0: 🎯 pick mode stays on, Ozy-style text with a CSS selector, toast instead of modal (placement-advisor)
 
-- **Ask:** SPEC 2.98 §8.16 (modeled on the Ozymandias dashboard's pick mode). 🎯 turns pick mode on until 🎯 again, the bar, Esc, or Alt+P. While on: a top bar, a hover outline for a mouse (a class on the element under the pointer), a crosshair cursor. Every tap is captured, swallowed and copied, then shown in a toast (4 s, or 15 s with "Copy blocked"), with no 📍 Pointed at modal. The text becomes multi-line: `Enso pick: <tab>` / `Where:` modals and groups joined " > " / `Element: <kind> "<name>"` / `Selector:` (stops at the nearest id, else tag.class (first 2) with :nth-of-type where siblings share the tag, joined " > ") / `Screen: WxH` (phone below 700 wide) / build stamp.
+- **Ask:** SPEC 2.99 §8.16 (modeled on the Ozymandias dashboard's pick mode). 🎯 turns pick mode on until 🎯 again, the bar, Esc, or Alt+P. While on: a top bar, a hover outline for a mouse (a class on the element under the pointer), a crosshair cursor. Every tap is captured, swallowed and copied, then shown in a toast (4 s, or 15 s with "Copy blocked"), with no 📍 Pointed at modal. The text becomes multi-line: `Enso pick: <tab>` / `Where:` modals and groups joined " > " / `Element: <kind> "<name>"` / `Selector:` (stops at the nearest id, else tag.class (first 2) with :nth-of-type where siblings share the tag, joined " > ") / `Screen: WxH` (phone below 700 wide) / build stamp.
 - **Verdict:** frontend/src/point-line.ts, frontend/src/components/PointAtButton.tsx, frontend/src/components/PointAt.tsx (+ PointAt.module.css) [EXISTING]. Build waited on the §8.16 text.
 - **Flow stage:** render and capture intent (PWA only); point-line.ts is the PWA's own naming rule.
 - **Why:** point-line.ts (91/300, one importer) already owns naming the tapped element. selectorFor is another way of naming it, and pickText replaces pointLine outright, so its concern stays one. A separate selector module was rejected as classitis at this size. PointAtButton.tsx (26/300) keeps the switch and the signal, which turns from arm into toggle; it holds no pick state. PointAt.tsx (74/300) already owns the capture-phase layer and the result display; swapping the modal for a toast and adding hover, crosshair and keys keeps it one concern (the pick layer). A generic Toast component was rejected (no second user). Threats avoided: module-level `let` for pick state; the phone/desktop size rule leaking into the layer (it lives in pickText); a stale hover class left on app elements after off or unmount; the copy moving out of the gesture handlers (v1.52.1).
 - **Caps:** point-line.ts ~130/300; PointAt.tsx ~120/300; PointAtButton.tsx ~26/300; PointAt.module.css ~35/300. Nothing in the band; no re-pins.
 - **Sources read:** docs/module-ownership.md (PointAt rows, state.tsx row), docs/placement-receipts.md (v1.52.0, v1.52.1), scripts/arch.ts, SPEC.md §8.16, frontend/src/point-line.ts, frontend/src/components/PointAt.tsx, frontend/src/components/PointAtButton.tsx, frontend/src/components/PointAt.module.css.
+## 2026-10-11 — v1.57.1: FunHouse 🧵 thread ping shows its text only (placement-advisor)
+
+- **Ask:** SPEC 2.98 §9.4a, MojoSOGO 2026-10-11: "the funhouse has a small display; the prefix has too many words: have it say {name of project}:{name of thread} \"message\"". In the FunHouse poller's bridge body, a 🧵 thread ping sends only its text (threads now write it as `Enso:<thread title> "<ACTION what>"`), with no "title: " prefix. 🤖 pings and FunHouse alerts keep "title: text". Test FP4.
+- **Verdict:** home/funhouse-poller.ts, funhouseNotice() [EXISTING]
+- **Flow stage:** deliver (the home-PC FunHouse leg)
+- **Why:** funhouseNotice is already the one builder of the bridge body, so this changes one expression inside one owner. It branches on the 🧵 title prefix the same way forFunhouse does. Rejected: changing the ping in the Worker (/ops/notify or /ops/pings), because the phone push shows title and text separately and the contract stays the same. Rejected: a vocab.ts constant, because this is a home-side display format with no Worker import.
+- **Caps:** home/funhouse-poller.ts 98 → 99 of 300 (no CEILINGS pin). Nothing is newly in the warning band.
+- **Reorganizer:** none needed.
+
+---
+
 ## 2026-10-11 — v1.57.0: Bounties and the score (placement-advisor)
 
 - **Ask:** SPEC 2.97 §7B.8 Bounties and the score, §8.15b (🪙 Bounties / ＋ Bounty / 🏅 Score screens, 🪙 n on Today and All chores), §4.2zq migration 0044, §10 rows for /bounties, /chores/{id}/bounty, /earnings, and the §9.4 founder-ping predicate leaving out bounty pushes.
