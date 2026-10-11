@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Steward pass 15, whole tree (code-steward)
+
+- **Run:** after the v1.53.0 release (SPEC 2.87 §8.5: the Alarms tab as a PickGrid menu of ⏰ Alarms, ⏱ Rolling timers and 🫧 Machines, each in a Modal; Machines wording for every machine). Also covers v1.51.0, v1.51.1, v1.52.0 and v1.52.1. Audited 3b9b2cb..bdb1895.
+- **Verdict:** SOUND. Typecheck green, 783/783 tests (104 files), arch:audit quiet (engine.ts 86%, tick.ts 120/148, Alarms.tsx 170/300).
+- **Placement audit:** 5 receipts checked against 5 code commits (0f2346f, 4c823c5, f439bdc, 81e675b, bdb1895); each landed where its verdict said. 0 code commits without a receipt (5d9c9b4 was pass 14's handoff; 82579d3 is docs only).
+- **Top finding:** the PickGrid.tsx header comment and its module-ownership row still cite only §8.6/§8.8 and "both popups"; Alarms (§8.5) is now a third caller. A wording fix (LOW), waiting on MojoSOGO's pick.
+- **Handoffs:** 1 to worker (the PickGrid comment and row). Still open, all LOW: pass 11's two §7D notes, pass 10's house-row helper note, the snooze-keeps-away test, the machines.ts alert-hours seam (228/300). Pass 14's handoffs are done (5d9c9b4).
+- **Restraint:** Settings and Alarms now share a ~6-line menu pattern (two copies only, so a PickMenu would be speculative until a third copy); the duplicated flex spacer; the `as Section` cast; the typed 'funhouse' Channel literals; the remaining washer and dryer wording, which describes real laundry behavior.
+
+---
+
 ## 2026-10-11 — v1.53.0: Alarms tab becomes a menu of three sections; Machines wording (placement-advisor)
 
 - **Ask:** SPEC 2.87 §8.5 (v1.53.0), UI only, asked by MojoSOGO. Announce and Quiet the house stay at the top of the Alarms tab. Below them a PickGrid of ⏰ Alarms, ⏱ Rolling timers and 🫧 Machines opens the tapped section in a titled Modal, as Settings does (§8.6). The sections drop their h2 and keep ＋ Add. The Machines intro line is shorter and no longer implies laundry only. MachineHours "Washer and dryer alerts…" becomes "Machine alerts…".
