@@ -17,10 +17,10 @@ const EVENING_BEFORE = '780';
 const RENOTIFY_OPTIONS: [string, string][] = [['off', 'Off'], ['5', 'Every 5 min'], ['10', 'Every 10 min'], ['15', 'Every 15 min'], ['30', 'Every 30 min']];
 
 /** The Reminder section a stored reminder (or none) shows as. */
-export function reminderOf(reminder: Reminder | null | undefined): ReminderValue {
+export function reminderOf(reminder: Reminder | null | undefined, founder = false): ReminderValue {
   return {
     remind: reminder ? String(reminder.offsetMin) : 'none',
-    ...flagsOf(reminder?.channels),
+    ...flagsOf(reminder?.channels, founder),
     renotify: reminder?.renotifyMin ? String(reminder.renotifyMin) : 'off',
   };
 }

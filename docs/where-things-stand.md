@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-11, v1.51.0, main = production.*
+*Last updated 2026-10-11, v1.51.1, main = production.*
 
 ## Running where
 

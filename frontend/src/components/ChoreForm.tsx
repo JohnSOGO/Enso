@@ -5,7 +5,7 @@ import { Modal } from './Modal';
 import { ChannelChecks, DayChips, RenotifySelect, channelsOf, flagsOf, pickOneWay } from './AlertFields';
 import type { Chore } from './Chores';
 import { del, errorText, patch, post } from '../api';
-import { useApp } from '../state';
+import { useApp, useIsFounder } from '../state';
 import { CHORE_TIMING, type ChoreTiming } from '../../../src/shared/vocab';
 import { DONE_MEANS_MAX, PEOPLE_MAX, STEPS_MAX, TITLE_MAX, WAIT_MAX } from '../../../src/shared/chores';
 import { canChange } from '../../../src/shared/roles';
@@ -20,6 +20,7 @@ const chip = { padding: '4px 10px', minHeight: 44 } as const;
 
 export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: () => void }) {
   const { me, members, refresh } = useApp();
+  const founder = useIsFounder();
   const init = useMemo(() => ({
     title: chore?.title ?? '', doneMeans: chore?.doneMeans ?? '', days: chore?.days ?? [],
     timing: chore?.timing ?? CHORE_TIMING[0], time: chore?.time ?? '08:00', nudge: chore?.nudge ?? false,
@@ -27,9 +28,9 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
     steps: chore
       ? chore.steps.map((st): StepDraft => ({ title: st.title, wait: st.waitMin ? String(st.waitMin) : '', memberId: st.memberId }))
       : [{ title: '', wait: '', memberId: null } as StepDraft],
-    ...flagsOf(chore?.channels),
+    ...flagsOf(chore?.channels, founder),
     renotify: chore?.renotifyMin ? String(chore.renotifyMin) : 'off',
-  }), [chore]);
+  }), [chore, founder]);
   const [f, setF] = useState(init);
   // A new chore's one step is named after the chore until that step is edited (§8.5).
   const [follow, setFollow] = useState(!chore);

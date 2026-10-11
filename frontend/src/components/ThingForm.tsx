@@ -10,7 +10,7 @@ import { ThingPhoto, photoSrc } from './ThingPhoto';
 import { ThingPlan } from './ThingPlan';
 import { ThingLinkFill } from './ThingLinkFill';
 import { del, errorText, get, patch, post, upload } from '../api';
-import { useApp } from '../state';
+import { useApp, useIsFounder } from '../state';
 import { canChange, cannotChangeText } from '../../../src/shared/roles';
 import type { Channel, ThingStatus } from '../../../src/shared/vocab';
 import {
@@ -51,17 +51,18 @@ function WithGo({ href, icon, label, children }: { href: string | null; icon: st
   );
 }
 
-const formOf = (t: Thing | null) => ({
+const formOf = (t: Thing | null, founder = false) => ({
   title: t?.title ?? '', windowStart: t?.windowStart ?? '', windowEnd: t?.windowEnd ?? '',
   place: t?.place ?? '', address: t?.address ?? '', phone: t?.phone ?? '', cost: t?.cost ?? '', url: t?.url ?? '', note: t?.note ?? '',
   remindStart: t?.remindStart ?? false, remindOnSet: !!t?.remindOn, remindOn: t?.remindOn ?? '',
-  ...flagsOf(t?.channels),
+  ...flagsOf(t?.channels, founder),
 });
 type Form = ReturnType<typeof formOf>;
 
 export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: () => void }) {
   const { me, refresh } = useApp();
-  const [init, setInit] = useState(() => formOf(thing));
+  const founder = useIsFounder();
+  const [init, setInit] = useState(() => formOf(thing, founder));
   const [f, setF] = useState<Form>(init);
   const latest = useRef(f);
   latest.current = f;

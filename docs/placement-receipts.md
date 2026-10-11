@@ -7,6 +7,16 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.51.1: FunHouse tick founder-only, default on for him (placement-advisor)
+
+- **Ask:** SPEC 2.84 §9.4b Q230 (decided by MojoSOGO 2026-10-11): only the founder sees the 🎪 FunHouse tick; his new alerts and Announce box open with it ticked; nobody else sees it unless the alert they open already has it. Server unchanged. FH8 (flagsOf).
+- **Verdict:** [EXISTING] frontend/src/components/AlertFields.tsx (`flagsOf(channels?, funhouseByDefault = false)`, ChannelChecks hides the chip unless founder or already ticked) + frontend/src/state.tsx (`useIsFounder()`); callers Alarms, Timers, ChoreForm, ThingForm, Announce, ReminderFields (`reminderOf(r, founder)`), EventForm (`blank(date, founder)` at both call sites).
+- **Flow stage:** render
+- **Why:** founder status is cross-cutting identity, so the hook lives in state.tsx (home of Me/Member/memberById), not in the channel-fields file; the default and chip visibility stay with AlertFields' channel-checkbox concern. A stored channel list always wins over the new default.
+- **Caps:** AlertFields ~92/300, state.tsx ~106/300, EventForm 196/223 (band 201 not entered). Nothing newly in the band.
+
+---
+
 ## 2026-10-11 — v1.51.0: FunHouse as an alert destination, channel 'funhouse' (placement-advisor)
 
 - **Ask:** SPEC §9.4b (v1.51.0, SPEC 2.83), schema §4.2zo (migration 0042), asked by MojoSOGO ("Add funhouse as reachable location for alerts"). A third channel 🎪 FunHouse beside Phone and House on every ticked alert (event reminders and alarms, timers and their start announcement, chores, things, Announce); one row per alert (member_id NULL, title = pushTitle), listed by GET /ops/pings with `channel`, marked sent on listing, forwarded by the PC poller with source 'Ensō'. It follows the phone's rules: away stops it, quiet and phone first do not, an optional event needs a non-empty audience. Machines keep MACHINE_CHANNELS.

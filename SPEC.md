@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.83 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.84 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4689,8 +4689,10 @@ desk device on the dev PC. It rides §9.4a: the PC poller already asks Ensō eve
 `deliveries` row on the `funhouse` channel (§4.2zo) that the same `GET /ops/pings` lists. Nothing new runs anywhere.
 
 **Where it is ticked:** everywhere Phone / House are (`ChannelChecks`, §8.5; an event's Remind via, §8.4): alarms and
-event reminders, rolling timers (and their start announcement, §5.5a), chores, things to do, and 📢 Announce. Every
-member sees it ⚑ Q230. Validation already takes any `CHANNEL`; at least one of the three is still required. Machines
+event reminders, rolling timers (and their start announcement, §5.5a), chores, things to do, and 📢 Announce. It is
+MojoSOGO's desk, so only **the founder** (§6.3) sees the tick, and a new alert (or the Announce box) of his opens with it
+**ticked**; nobody else sees it unless the alert they open already has it ticked (Q230, decided by MojoSOGO 2026-10-11:
+"funhouse is really just for MojoSOGO … default off for others"). The server takes it from anyone. Validation already takes any `CHANNEL`; at least one of the three is still required. Machines
 keep `MACHINE_CHANNELS` (Phone + House) ⚑ Q231.
 
 **The row:** `channel` `funhouse`, `member_id` NULL, the same `message` as the alert's push, `title` = what the phone
@@ -4723,6 +4725,7 @@ would show (`pushTitle`, §9.5: "Ensō" for a fire, "📢 Announcement" otherwis
 | FH5 | `GET /ops/pings` with a ping and a `funhouse` row | both, oldest first, `channel` `push` / `funhouse`; the `funhouse` row is now `sent` |
 | FH6 | `forFunhouse` / `funhouseNotice` on a `funhouse` row titled "Ensō" | true; `source` "Ensō" |
 | FH7 | a timer start announcement with FunHouse ticked | one `funhouse` row |
+| FH8 | `flagsOf(undefined, true)` / `flagsOf(undefined, false)` / `flagsOf(['house'], true)` | Phone + FunHouse / Phone / House only |
 | FH-M | migration 0042 | §4.2zo's check |
 
 ### 9.5 My alerts — `src/shared/alert-history.ts`, `/me/alerts` — asked by MojoSOGO 2026-10-11

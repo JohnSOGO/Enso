@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
 import { ChannelChecks, RenotifySelect, SHORT, channelsOf, flagsOf, pickOneWay } from './AlertFields';
 import { del, errorText, get, patch, post } from '../api';
-import { useApp } from '../state';
+import { useApp, useIsFounder } from '../state';
 import { WEEKDAY, type Channel } from '../../../src/shared/vocab';
 import { utcToLocal, weekdayOf } from '../../../src/shared/time';
 import { canChange } from '../../../src/shared/roles';
@@ -106,13 +106,14 @@ export function TimersSection({ onEdit }: { onEdit: (t: Timer | null) => void })
 
 export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: () => void }) {
   const { me, members, refresh } = useApp();
+  const founder = useIsFounder();
   const init = useMemo(() => ({
     title: timer?.title ?? '', interval: String(timer?.intervalMin ?? 60),
-    ...flagsOf(timer?.channels),
+    ...flagsOf(timer?.channels, founder),
     renotify: timer ? (timer.renotifyMin ? String(timer.renotifyMin) : 'off') : '15',
     assignedTo: timer?.assignedTo ?? [],
     activeFrom: timer?.activeFrom ?? '', activeTo: timer?.activeTo ?? '', announceStart: timer?.announceStart ?? false,
-  }), [timer]);
+  }), [timer, founder]);
   const [f, setF] = useState(init);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
