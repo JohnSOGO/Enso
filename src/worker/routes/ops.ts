@@ -1,12 +1,13 @@
-// SPEC §9.4 — POST /ops/notify: a Claude Code session pushes a message to the founder's phone. No session:
+// SPEC §9.4 — POST /ops/notify: a Claude Code session pushes a message to the founder's phone; §9.4a — GET
+// /ops/pings: the dev PC's FunHouse poller lists the recent ones. No session:
 // a Bearer OPS_NOTIFY_TOKEN, compared in constant time (unset → 503, never open). One fire-less `push`
 // delivery with its own title, sent at once. No house row, ever. The token and the header are never
 // logged, and never put in a message or a detail.
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { OPS_NOTIFY_PER_HOUR, opsNotifyError, opsTitle, opsWindowStart } from '../../shared/ops';
 import { all, first, nowIso } from '../db';
-import { opsPingsSince, pushDelivery } from '../deliveries';
+import { opsPingsAfter, opsPingsSince, pushDelivery } from '../deliveries';
 import { body, fail } from '../http';
 import { sendPushDeliveries } from '../push';
 import { FOUNDER_SQL } from './members';
@@ -23,11 +24,28 @@ async function sameSecret(a: string, b: string): Promise<boolean> {
   return diff === 0;
 }
 
-ops.post('/ops/notify', async (c) => {
+/** §9.4 steps 1–2, for both routes: unset → 503, a wrong or missing bearer → 401; null = through. */
+async function opsGate(c: Context<AppEnv>): Promise<Response | null> {
   const token = c.env.OPS_NOTIFY_TOKEN;
   if (!token) return fail(c, 503, 'ops_notify_off', 'Pinging the phone is not set up on this server.');
   const given = /^Bearer (.+)$/.exec(c.req.header('authorization') ?? '')?.[1] ?? '';
   if (!(await sameSecret(given, token))) return fail(c, 401, 'unauthorized', 'A valid ops token is required.');
+  return null;
+}
+
+ops.get('/ops/pings', async (c) => {
+  const shut = await opsGate(c);
+  if (shut) return shut;
+  const now = nowIso();
+  const raw = Date.parse(c.req.query('after') ?? '');
+  const after = Number.isNaN(raw) ? null : new Date(raw).toISOString();
+  const pings = await opsPingsAfter(c.env.DB, after, opsWindowStart(now), OPS_NOTIFY_PER_HOUR);
+  return c.json({ pings });
+});
+
+ops.post('/ops/notify', async (c) => {
+  const shut = await opsGate(c);
+  if (shut) return shut;
 
   const b = await body(c);
   const err = opsNotifyError({ text: b.text, title: b.title });

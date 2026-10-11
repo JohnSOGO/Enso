@@ -4643,7 +4643,7 @@ an ISO instant → the whole last hour. Reading changes nothing (the phone push 
 `home/dist/funhouse-poller.mjs`, started by `home/funhouse-poller.cmd`; Node globals, `node:fs` and its own file only):
 - The token is read from `%USERPROFILE%\.enso\ops-notify-token` at start (the same file §9.4 uses; no new copy).
   Missing or empty → it logs that and exits 1. The token is never logged.
-- Every `FUNHOUSE_POLL_MS = 15000` ⚑ it asks `/ops/pings?after=<the last handled at>`; at start `after` is
+- Every `FUNHOUSE_POLL_MS = 15000` ⚑ it asks `https://enso.sogodojo.com/api/v1/ops/pings?after=<the last handled at>`; at start `after` is
   10 minutes ago ⚑ (a restart re-sends at most those; the bridge drops a repeated `id`).
 - **Which pings:** a title starting with 🤖 or 🧵 (Claude's) ⚑ Q228. Others (🏛️ Ozymandias, which already
   reaches the FunHouse itself) are skipped and counted as handled.
@@ -4657,7 +4657,7 @@ an ISO instant → the whole last hour. Reading changes nothing (the phone push 
 | # | Check | Expected |
 |---|---|---|
 | FP1 | `GET /ops/pings` with no token set; a wrong token | 503 `ops_notify_off`; 401 `unauthorized` |
-| FP2 | two pings, an announcement, a sign-in notice, a mess ask, a fire's push, a ping older than an hour | only the two pings, oldest first, `{ id, title, text, at }` |
+| FP2 | two pings, an announcement, a sign-in notice, a ping older than an hour | only the two pings, oldest first, `{ id, title, text, at }` (mess asks and a fire's pushes are left out by the same predicate §9.4's count uses) |
 | FP3 | `after` = the first ping's `at`; `after=nonsense` | only the second; both |
 | FP4 | `funhouseNotice` / `forFunhouse` | the body above; 🤖 and 🧵 titles → true, "🏛️ Ozymandias" → false |
 | FP5 | one poll with a fake Ensō and bridge: a 🏛️ ping then two 🧵 pings | one bridge POST (the first 🧵), `after` = its `at`; next poll sends the second |

@@ -7,6 +7,16 @@ carry its result.
 
 ---
 
+## 2026-10-11 — The same pings on the FunHouse: GET /ops/pings + home poller (placement-advisor)
+
+- **Ask:** SPEC §9.4a (v1.50.0, SPEC 2.80) and the API row `GET /ops/pings?after=`, asked by MojoSOGO ("also not msg funhouse; that best"). The read route lists the founder pings of the last hour after `after`, with the same bearer as `/ops/notify`; the home-side `home/funhouse-poller.ts` (+ `.cmd`, built by `npm run build:home`) polls it and POSTs Claude's pings (🤖 / 🧵) to the FunHouse bridge at 127.0.0.1:8765, at most one per poll.
+- **Verdict:** [EXISTING] `src/worker/routes/ops.ts` — the GET handler; the 503/401 check becomes one file-local guard shared with POST; `after` parsed and normalised with toISOString in the route. [EXISTING] `src/worker/deliveries.ts` — `opsPingsAfter` beside `opsPingsSince`, both over one file-local founder-ping predicate. [NEW row] `home/funhouse-poller.ts` — pure forFunhouse / funhouseNotice, pollOnce with injected fetch and token, `main` the only node:fs user. The Home table heading loses "SogoAI". `scripts/arch.ts` home/ LAYERS: `package:node:fs` allowed, `why` updated; `build:home` bundles both entries to home/dist.
+- **Flow stage:** route + persist-read (Worker); deliver (home poller).
+- **Why:** ops.ts already owns the ops token door and deliveries.ts "what is a founder ping"; a second copy of that WHERE clause would let the §9.4 hourly count and the §9.4a list drift, so the predicate is shared. The poller is an outbound poller, not SogoAI's inbound server, so a leaf module rather than a second concern in captions-helper.ts. `src/shared/ops.ts` rejected for the bridge helpers (one consumer; the spec keeps the poller to its own file). node:fs is allowed for all of home/; the owner row records the poller as its only user. No module-level `let`.
+- **Caps:** routes/ops.ts 52 → ~70/300; deliveries.ts 45 → ~60/300; home/funhouse-poller.ts new, ~90/300. Nothing in the band; no CEILINGS change.
+
+---
+
 ## 2026-10-11 — Settings as a menu of buttons (placement-advisor)
 
 - **Ask:** SPEC §8.6 (v1.49.0, SPEC 2.79), asked by MojoSOGO: "clean up settings similar to lists". The Settings tab becomes a grid of buttons in the Lists-popup style: 🙂 Me, 📅 Calendar items, 📱 Phone alerts, 🔊 Speakers, 🔔 Alerts, 🏠 Household, 👥 Members, 📊 Status, with Log out under the grid. A tap opens that area in the shared Modal; ✕, Escape or the backdrop returns to the menu; the Alerts notification tap opens Alerts directly. Layout and navigation only.

@@ -208,3 +208,48 @@ it('ON7: the 31st ping within the hour → 429 rate_limited and no row; announce
   expect(r.json.message).toBeTruthy();
   expect(await count()).toBe(before);
 });
+
+// SPEC §9.4a (FP1–FP3) — GET /ops/pings: the founder pings of the last hour, for the FunHouse poller.
+const pingsWith = async (bindings: Record<string, unknown>, headers: Record<string, string> = AUTH) => {
+  const res = await worker.fetch(new Request(`${BASE}/ops/pings`, { headers }), { ...env, ...bindings } as any, createExecutionContext());
+  return { status: res.status, json: await res.json<any>() };
+};
+
+it('FP1: GET /ops/pings with no token set → 503 ops_notify_off; a wrong or missing bearer → 401', async () => {
+  expect(await pingsWith({ OPS_NOTIFY_TOKEN: '' })).toMatchObject({ status: 503, json: { error: 'ops_notify_off' } });
+  for (const headers of [{ authorization: 'Bearer nope' }, {}] as Record<string, string>[]) {
+    const r = await new Client().req('GET', '/ops/pings', undefined, headers);
+    expect(r.status).toBe(401);
+    expect(r.json.error).toBe('unauthorized');
+    expect(JSON.stringify(r.json)).not.toContain(TOKEN);
+  }
+});
+
+it('FP2–FP3: only founder pings of the last hour, oldest first; after narrows, a bad after is ignored', async () => {
+  const o = await owner();
+  const founder = await meId(o);
+  await env.DB.prepare('DELETE FROM deliveries WHERE fire_id IS NULL').run();
+  const at = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000).toISOString();
+  const row = (id: string, title: string | null, created: string, notice: string | null = null) => env.DB.prepare(
+    `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, title, notice, status, created_at, updated_at)
+     VALUES (?, NULL, 1, 'push', ?, ?, ?, ?, 'sent', ?, ?)`).bind(id, founder, `msg ${id}`, title, notice, created, created);
+  const first = at(20), second = at(5);
+  await env.DB.batch([
+    row('dlv_p2', '🧵 Thread needs you', second),
+    row('dlv_p1', '🏛️ Ozymandias', first),
+    row('dlv_ann', null, at(10)), // an announcement
+    row('dlv_login', 'Sign in?', at(10), 'login'), // a sign-in notice
+    row('dlv_old', '🤖 Claude', at(61)), // older than the hour
+  ]);
+
+  const all = await new Client().req('GET', '/ops/pings', undefined, AUTH);
+  expect(all.status).toBe(200);
+  expect(all.json.pings).toEqual([
+    { id: 'dlv_p1', title: '🏛️ Ozymandias', text: 'msg dlv_p1', at: first },
+    { id: 'dlv_p2', title: '🧵 Thread needs you', text: 'msg dlv_p2', at: second },
+  ]);
+  const after = await new Client().req('GET', `/ops/pings?after=${encodeURIComponent(first)}`, undefined, AUTH);
+  expect(after.json.pings.map((p: { id: string }) => p.id)).toEqual(['dlv_p2']);
+  const bad = await new Client().req('GET', '/ops/pings?after=nonsense', undefined, AUTH);
+  expect(bad.json.pings.map((p: { id: string }) => p.id)).toEqual(['dlv_p1', 'dlv_p2']);
+});

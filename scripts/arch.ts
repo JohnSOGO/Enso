@@ -31,8 +31,8 @@ export const LAYERS: Layer[] = [
   { from: 'frontend/src/', banned: ['src/worker/', 'scripts/', 'home/'], why: 'the PWA talks to the Worker over HTTP only' },
   {
     from: 'home/', banned: ['src/', 'frontend/', 'scripts/', 'package:'],
-    allowed: ['src/worker/youtube-captions.ts', 'src/shared/item-reading.ts', 'package:node:http'],
-    why: 'youtube-captions.ts, item-reading.ts, its own siblings, node:http and Node globals only (§7E.2c, §7A.3)',
+    allowed: ['src/worker/youtube-captions.ts', 'src/shared/item-reading.ts', 'package:node:http', 'package:node:fs'],
+    why: 'youtube-captions.ts, item-reading.ts, its own siblings, node:http, node:fs and Node globals only (§7E.2c, §7A.3, §9.4a)',
   },
 ];
 
