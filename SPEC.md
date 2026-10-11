@@ -4249,12 +4249,14 @@ stays on, where every tap is captured, swallowed, and copied as a few lines he p
 
 - **Off by default.** Settings → 🙂 Me has a switch **🎯 Point at it** that turns it on **for this device only**
   (kept in the browser, not the account) ⚑ (Q234). Any member can turn it on.
-- **While the switch is on**, a small round **🎯** button sits at the bottom left above the tab bar on every tab, and a
-  **🎯** sits in every modal's header beside ✕ ⚑ (Q235). Nothing else changes; every other tap works as before.
-- **Tapping 🎯 turns pick mode on; it stays on** until a 🎯 or the bar is tapped again, or **Esc** is pressed. On a
+- **While the switch is on**, a small faint round **◎** button sits in the bottom left corner just above the tab bar on
+  every tab, and a **◎** sits in every modal's header beside ✕ ⚑ (Q235). Like Ozymandias's (MojoSOGO 2026-10-11: "I like
+  the way ozymandias has the bottom left circle activator"), every ◎ turns amber while pick mode is on. Nothing else
+  changes; every other tap works as before.
+- **Tapping ◎ turns pick mode on; it stays on** until a ◎ or the bar is tapped again, or **Esc** is pressed. On a
   keyboard **Alt+P** turns it on and off (only while the switch is on) ⚑ (Q236). While on:
   - a bar across the top (inside the topmost open modal when one is open, so it is never hidden behind it) says
-    **"🎯 Pick mode: tap anything to copy where it is · tap here to stop"**;
+    **"◎ Pick mode: tap anything to copy where it is · tap here or ◎ to stop"**;
   - with a mouse, the thing under the pointer gets an outline and the pointer is a crosshair;
   - **every tap is captured, not acted on:** whatever is under the finger does nothing (no button press, no tick, no
     field focus, no keyboard, no select opening, no link).
@@ -4288,9 +4290,9 @@ stays on, where every tap is captured, swallowed, and copied as a few lines he p
 
 **Acceptance (PA1–PA4):** PA1 the text is built as above from its pieces (tab, modals, groups, thing, kind, selector,
 size, stamp), names are cut to their lengths, empty pieces are left out, and the selector stops at an id and adds
-`:nth-of-type` only where a sibling shares the tag; PA2 switch off, no 🎯 shows anywhere and Alt+P does nothing;
+`:nth-of-type` only where a sibling shares the tag; PA2 switch off, no ◎ shows anywhere and Alt+P does nothing;
 PA3 (manual, on the iPhone) on, tapping a tick box, a button, a text field and a select does none of their actions and
-each lands on the clipboard (paste into a Claude thread); tapping the bar or 🎯 stops it and taps work normally after;
+each lands on the clipboard (paste into a Claude thread); tapping the bar or ◎ stops it and taps work normally after;
 PA4 (manual) a pick inside an open modal names the modal and the bar shows above it.
 
 ### 8.7 Theme

@@ -1,4 +1,4 @@
-// SPEC §8.16 ⚑ Q235–Q236 — the pick layer, rendered once by the frame: the floating 🎯, pick mode on until a 🎯, the bar
+// SPEC §8.16 ⚑ Q235–Q236 — the pick layer, rendered once by the frame: the floating ◎, pick mode on until a ◎, the bar
 // or Esc (Alt+P toggles), the bar (inside the topmost open modal so it is never behind it), the capture-phase listeners
 // that swallow every tap while on, the outline and crosshair for a mouse, then each pick straight to the clipboard and
 // a toast with the text. What the text says is point-line.ts's.
@@ -105,7 +105,7 @@ export function PointAtLayer({ tab }: { tab: string }) {
   return (
     <>
       {enabled && <PointAtButton className={s.float} />}
-      {on && createPortal(<div className={s.bar} data-point-at role="status">🎯 Pick mode: tap anything to copy where it is · tap here to stop</div>, home)}
+      {on && createPortal(<div className={s.bar} data-point-at role="status">◎ Pick mode: tap anything to copy where it is · tap here or ◎ to stop</div>, home)}
       {toast && createPortal(
         <div className={s.toast} data-pick-toast role="status">
           <strong>{toast.copied ? '✓ Copied. Paste it into Claude.' : 'Copy blocked: press and hold to select this text.'}</strong>

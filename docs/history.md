@@ -467,7 +467,8 @@ the website route returned empty caption files for every video. Four real videos
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
 **🎯 Pick mode like Ozymandias** (v1.56.0, §8.16, Q236–Q237 revised; MojoSOGO 2026-10-11: "look at ozymandias and do
-it like that"): modeled on the Ozymandias dashboard's `pick_mode.js`. 🎯 now turns pick mode on until a 🎯 or the bar
+it like that"): modeled on the Ozymandias dashboard's `pick_mode.js`. The 🎯 became Ozy's small faint ◎ circle bottom left, amber
+while on ("I like the way ozymandias has the bottom left circle activator"). ◎ now turns pick mode on until a ◎ or the bar
 is tapped, or Esc (Alt+P toggles on a keyboard); every tap while on is swallowed and copied, and a toast shows the text
 (the 📍 Pointed at modal is gone). The text is Ozy's lines: `Enso pick:` tab, `Where:`, `Element:`, `Selector:` (a real
 CSS selector), `Screen:`, build stamp. A mouse gets an outline and a crosshair. Checked in headless Chromium, mouse and

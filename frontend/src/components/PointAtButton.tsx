@@ -19,8 +19,12 @@ export function setPointAtOn(on: boolean) {
 export const togglePick = () => { toggle.dispatchEvent(new Event('toggle')); };
 export function onToggle(f: () => void) { toggle.addEventListener('toggle', f); return () => toggle.removeEventListener('toggle', f); }
 
-/** `data-point-at` marks it so a tap on it in pick mode stops it instead of being named. Renders nothing when off. */
+/** The ◎ (like Ozymandias's pick button); amber while pick mode is on (`html.enso-pick-on`, PointAt.module.css).
+ *  `data-point-at` marks it so a tap on it in pick mode stops it instead of being named. Renders nothing when off. */
 export function PointAtButton({ className = 'plain' }: { className?: string }) {
   if (!usePointAtOn()) return null;
-  return <button type="button" className={className} data-point-at aria-label="Point at it" title="Point at it" onClick={togglePick}>🎯</button>;
+  return (
+    <button type="button" className={`${className} enso-pick-button`} data-point-at aria-label="Pick mode: tap anything to copy where it is"
+      title="Pick mode (Alt+P): tap anything to copy where it is" onClick={togglePick}>◎</button>
+  );
 }
