@@ -7,6 +7,29 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Alert when done on machine loads (placement-advisor)
+
+- **Ask:** SPEC §7D.7 (v1.47.0, SPEC 2.76; migration 0040, §4.2zm). Each machine load has an optional alert person, `machines.alert_id`: absent → the owner, null → nobody, else an active member. With nobody the fire goes to phones only; with someone it is today's Phone + House on every speaker. MachineChooser gains an "Alert when done" chip group, and the card shows who is alerted.
+- **Verdict:**
+  - [REORGANIZER FIRST] Extract the §7D.5 alert hours from src/shared/machines.ts to src/shared/machine-hours.ts [NEW row] (done, entry above).
+  - [EXISTING] src/shared/machines.ts: MachineRow.alert_id, the transitions carry or clear it, parseStart and parseDoneNow take alertId, machineAlert(quietUntil, alertId) gives push-only channels when null.
+  - [EXISTING] src/worker/fire-rows.ts: sourceOf resolves alert_id to an active member.
+  - [EXISTING] src/worker/routes/machines.ts: passes alertId through, writes alert_id in machineWrites, returns alertId in the view.
+  - [EXISTING] frontend/src/components/Machines.tsx: the chooser chips and the card line.
+  - Migration 0040 with test/migration-0040.test.ts.
+- **Flow stage:** rules (machines.ts) / route + persist (routes/machines.ts, 0040) / source of the fire's channels (fire-rows.ts sourceOf) / render (Machines.tsx). Delivery is unchanged; tick.ts untouched (step 2 already writes no house row when the channels leave House out).
+- **Why:** who is alerted is an attribute of the load and of its fire's channels, so it belongs to the existing §7D owners. One function (machineAlert) holds the "nobody → phones only" choice.
+- **Built as:** the AL1–AL6 tests live in their own file, test/machine-alert.test.ts, beside test/machines.test.ts (517 lines). Spec gaps the advisor flagged are settled in §7D.7 / §13 as Q217–Q220 ⚑.
+- **Caps:** machines.ts 204 → ~226/300; fire-rows.ts ~152/300; routes/machines.ts ~141/300; Machines.tsx 168/300. Nothing in the band.
+
+## 2026-10-11 — Machine alert hours out of machines.ts (reorganizer)
+
+- **Trigger:** placement-advisor extract-first verdict for v1.47.0 "Alert when done" (machines), which adds to src/shared/machines.ts; the standing machine-hours note from steward pass 8.
+- **Seam moved:** the §7D.5 alert hours (DayHours / MachineHours, DEFAULT_MACHINE_HOURS, hoursOn, machineQuietUntil, machineHoursOf, parseMachineHours) from `src/shared/machines.ts` to `src/shared/machine-hours.ts` [NEW row]. Callers re-pointed: src/worker/fire-rows.ts, src/worker/routes/machines.ts, frontend/src/components/MachineHours.tsx, test/machines.test.ts. No re-export.
+- **Room opened:** machines.ts: 246 → 204 lines; global cap 300 (no pin, nothing to ratchet). machine-hours.ts new, 45/300.
+- **Behavior:** preserved. Typecheck green, 750/750 tests (95 files), arch:audit quiet. The moved code is byte-for-byte the same; L19 and parseMachineHours tests and GET/PATCH /machines/hours pass unchanged.
+- **Restraint:** one seam, the one the advisor named. The transitions, the done message and machineAlert stay in machines.ts, and nothing was split for the feature itself.
+
 ## 2026-10-11 — Steward pass, whole tree (code-steward)
 
 - **Run:** after the v1.45.0 (SPEC 2.74 §9.2b, Quiet the house, migration 0038, PR #39) and v1.46.0 (SPEC 2.75 §9.2c–9.2d, I'm away on one alert and phone first, migration 0039, PR #40) releases; audited 57b4dba against dd9f2d5.

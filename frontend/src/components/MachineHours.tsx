@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { errorText, get, patch } from '../api';
 import { useApp } from '../state';
-import type { DayHours, MachineHours } from '../../../src/shared/machines';
+import type { DayHours, MachineHours } from '../../../src/shared/machine-hours';
 import { isAdmin } from '../../../src/shared/roles';
 
 const DAYS = [['weekday', 'Weekdays'], ['weekend', 'Weekends']] as const;

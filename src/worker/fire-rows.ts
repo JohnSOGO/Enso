@@ -2,7 +2,8 @@
 import { newChoreFire, timerWindow, type AlertConfig, type ChoreAlertText, type FireRow, type NewFire } from '../shared/engine';
 import { DEFAULT_MAX_ALERTS, choreFireContext, choreFromRow, planChoreRuns, type Chore, type ChoreRow, type ChoreRun } from '../shared/chores';
 import { isStartReminder, type ThingRow } from '../shared/things';
-import { doneMessage, isMachineId, isStillLoaded, machineAlert, machineHoursOf, machineQuietUntil, waitingLoad, type MachineRow } from '../shared/machines';
+import { doneMessage, isMachineId, isStillLoaded, machineAlert, waitingLoad, type MachineRow } from '../shared/machines';
+import { machineHoursOf, machineQuietUntil } from '../shared/machine-hours';
 import type { Channel, SunEvent } from '../shared/vocab';
 import { utcToLocal } from '../shared/time';
 import { sunsetUtc } from '../shared/sun';
@@ -102,7 +103,7 @@ export async function sourceOf(
     const quietUntil = machineQuietUntil(machineHoursOf(st), st.timezone, now);
     return {
       title: doneMessage(m.id, owner, waiting ? await nameOf(waiting.owner_id) : undefined, isStillLoaded(m, fire.due_at)),
-      ...machineAlert(quietUntil),
+      ...machineAlert(quietUntil, (await nameOf(m.alert_id)) !== null ? m.alert_id : null), // §7D.7: nobody active → phones only
     };
   }
   if (fire.kind === 'thing') {
