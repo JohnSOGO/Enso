@@ -2,9 +2,9 @@
 // Let it go / Done, the waiting push to admins, OK / Not yet, chore bounties paid on a run's last step and dropped
 // on undo (both Done paths), the score, and the founder-ping predicate leaving bounty pushes out. Push goes nowhere
 // (no subscriptions): each push is still a delivery row.
-import { env } from 'cloudflare:test';
+import { SELF, env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { Client, member, owner } from './helpers';
+import { BASE, Client, member, owner } from './helpers';
 import { NEW_BOUNTY_TITLE, TAKE_HOURS, WAITING_TITLE } from '../src/shared/bounties';
 import { addMinutes } from '../src/shared/time';
 import { opsPingsAfter, opsPingsSince } from '../src/worker/deliveries';
@@ -182,6 +182,60 @@ describe('M4ab bounties', () => {
     const since = addMinutes(new Date().toISOString(), -60);
     expect(await opsPingsSince(env.DB, since)).toBe(0);
     expect(await opsPingsAfter(env.DB, null, since, 100)).toEqual([]);
+  });
+
+  describe('a done photo', () => {
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3]);
+    const raw = (c: Client, method: string, path: string, body?: Uint8Array, type = 'image/jpeg') => SELF.fetch(BASE + path, {
+      method, body, headers: { cookie: c.cookie, ...(body ? { 'content-type': type } : {}) },
+    });
+    const objects = async (id: string) => (await env.PHOTOS.list({ prefix: `earnings/${id}/` })).objects.length;
+    const doneWithPhoto = async (title: string, by: Client) => {
+      const x = await post(title, 1);
+      const done = (await by.post(`/bounties/${x.id}/done`)).json;
+      expect(done.earningId).toBeTruthy();
+      expect((await raw(by, 'PUT', `/earnings/${done.earningId}/photo`, jpeg)).status).toBe(204);
+      return done.earningId as string;
+    };
+
+    it('BT19 the one who did it adds a photo; anyone sees it', async () => {
+      const id = await doneWithPhoto('Mop the floor', b);
+      expect((await waitingFor('Mop the floor'))[0].hasPhoto).toBe(true);
+      const r = await raw(cc, 'GET', `/earnings/${id}/photo`);
+      expect(r.headers.get('cache-control')).toBe('private, max-age=3600');
+      expect(new Uint8Array(await r.arrayBuffer())).toEqual(jpeg);
+      expect((await waitingFor('Kitchen trash')).every((e: any) => e.hasPhoto === false)).toBe(true);
+    });
+
+    it('BT20 not the earner → 403; after OK → 409; a bad type → 400', async () => {
+      const id = await doneWithPhoto('Dust the shelf', b);
+      expect((await raw(cc, 'PUT', `/earnings/${id}/photo`, jpeg)).status).toBe(403);
+      expect((await raw(b, 'PUT', `/earnings/${id}/photo`, jpeg, 'text/plain')).status).toBe(400);
+      await a.post(`/earnings/${id}/ok`);
+      expect((await raw(b, 'PUT', `/earnings/${id}/photo`, jpeg)).status).toBe(409);
+    });
+
+    it('BT21 replace keeps one object; OK, Not yet and Undo delete it', async () => {
+      const id = await doneWithPhoto('Water plants', b);
+      await raw(b, 'PUT', `/earnings/${id}/photo`, jpeg);
+      expect(await objects(id)).toBe(1);
+      await a.post(`/earnings/${id}/ok`);
+      expect(await objects(id)).toBe(0);
+      expect((await raw(a, 'GET', `/earnings/${id}/photo`)).status).toBe(404);
+      const back = await doneWithPhoto('Feed the goats', cc);
+      await a.post(`/earnings/${back}/not-yet`);
+      expect(await objects(back)).toBe(0);
+      const chore = (await a.post('/chores', { title: 'Wipe table', days: ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'], timing: 'by',
+        time: '23:59', people: [A], steps: [{ title: 'Wipe table' }] })).json.id;
+      await a.put(`/chores/${chore}/bounty`, { points: 1 });
+      const run = (await a.get('/chores/today')).json.runs.find((r: any) => r.choreId === chore);
+      await b.post(`/chore-runs/${run.id}/done`);
+      const [w] = await waitingFor('Wipe table');
+      expect((await raw(b, 'PUT', `/earnings/${w.id}/photo`, jpeg)).status).toBe(204);
+      expect(await objects(w.id)).toBe(1);
+      await b.post(`/chore-runs/${run.id}/undo`);
+      expect(await objects(w.id)).toBe(0);
+    });
   });
 
   it('BT18 no session', async () => {

@@ -7,6 +7,18 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.58.0: A done photo on an earning (placement-advisor)
+
+- **Ask:** SPEC 2.98 §7B.8 "A done photo": PUT/GET /earnings/{id}/photo, `Bounty.earningId`, `Earning.hasPhoto`, §4.2zr migration 0045 (`earnings.photo_key`), and §8.15b (the Waiting for OK thumbnail, 📷 Add photo on my own pending row, the Done sheet with an optional photo).
+- **Verdict:** EXISTING routes/bounties.ts (both routes; photo_key NULL and the R2 delete on OK / Not yet / bounty delete), earnings.ts (the undo drop returns the dropped key), routes/chores.ts stepRun (deletes it after its batch), photo-store.ts (`'earnings'` prefix), shared/bounties.ts (wire fields, EarningRow.photo_key), Bounties.tsx (Thumb, 📷 on my row). NEW row `frontend/src/components/BountyDone.tsx` (the Done sheet). New migration 0045 + BT-M2 test.
+- **Flow stage:** route → persist (earnings.ts, stepRun's batch, R2 via photo-store.ts) → render. No new rule.
+- **Why:** routes/bounties.ts already owns the earning resource and its `pending()` loader; the delete-on-decision pattern is messes.ts's. The undo path keeps v1.57.0's single seam: earnings.ts returns the key and stays free of I/O; stepRun deletes after the batch. The Done sheet is its own leaf (a modal with a draft and a two-call sequence, as BountyForm).
+- **Rejected:** a new routes/earning-photos.ts (copies `pending()`); R2 deletes inside earnings.ts; a `canAddPhoto` shared rule (one comparison; the 409 is `pending()`'s); a vocab entry; PhotoField's full form component on a list row.
+- **Caps:** routes/bounties.ts 175 → 199/300; Bounties.tsx 130 → 148/300; BountyDone.tsx ~55; routes/chores.ts ~197/300. Nothing newly in the warning band; no reorganizer.
+- **Open → settled:** a replaced photo keeps its URL under `private, max-age=3600`; the app adds its own `?v=` after an upload (§8.15b, ⚑ Q259).
+
+---
+
 ## 2026-10-11 — v1.57.0: Bounties and the score (placement-advisor)
 
 - **Ask:** SPEC 2.97 §7B.8 Bounties and the score, §8.15b (🪙 Bounties / ＋ Bounty / 🏅 Score screens, 🪙 n on Today and All chores), §4.2zq migration 0044, §10 rows for /bounties, /chores/{id}/bounty, /earnings, and the §9.4 founder-ping predicate leaving out bounty pushes.

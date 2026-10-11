@@ -64,6 +64,7 @@ async function stepRun(env: Env, runId: string, member: Finisher, now: string, a
   const earn = await runEarningWrites(db, cr.chore.id, cr.run, r.run, member, now);
   await db.batch([...changeStatements(db, r, now), ...earn.stmts]);
   if (earn.pushIds.length) await sendPushDeliveries(env, earn.pushIds, now);
+  if (earn.dropKey) await env.PHOTOS.delete(earn.dropKey);
   return { run: r.run, chore: cr.chore, change: r, bounty: earn.bounty };
 }
 

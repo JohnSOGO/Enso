@@ -4425,7 +4425,8 @@ Chore bounties                                   (admins only)
 - **Waiting for OK**: every pending earning, oldest first: title (a chore's marked "(chore)"), points, who, when, and
   the done photo as a thumbnail when there is one (tap for full size, as §8.8's item photo). On my own pending row,
   **📷 Add photo** (or **📷 Replace photo**): the phone offers camera or library, the photo is shrunk as a thing's
-  photo (§7C.3) and sent at once. Admins also get **OK**, **Not yet** and a who select (active members, the earner
+  photo (§7C.3) and sent at once; the thumbnail's address then carries a fresh `?v=` so a replaced photo shows at once
+  despite the hour's cache ⚑ Q259. Admins also get **OK**, **Not yet** and a who select (active members, the earner
   first); OK sends the one picked. Empty → the section is left out.
 - **Done** on a one-off opens a small sheet: **📷 Add photo** (optional), then **Done** / **Cancel**. Done sends the
   Done, then the photo to the new earning; if the photo fails, the Done stands and the refusal shows with 📷 Add photo

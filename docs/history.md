@@ -466,6 +466,10 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Done photo on a bounty** (v1.58.0, §7B.8, §8.15b, migration 0045, Q257–Q259; asked by MojoSOGO 2026-10-11 "allow child
+to snap a photo of completed work so adult can approve remotely"): Done on a one-off opens a sheet with an optional
+photo; a chore run's photo is added from Waiting for OK; admins see it there full size and OK or send back. Deleted on
+OK or drop. **Still owed:** BS2 with the camera on a real phone.
 **Bounties and Score** (v1.57.0, §7B.8, §8.15b, migration 0044, Q249–Q256; asked by MojoSOGO 2026-10-11 after the AREC
 `arec-chore-bounties.md`): admins put points on a chore (paid to whoever finishes a run) or post a one-off job; anyone
 takes it (I'll do it, 3 h) and says Done; an admin OKs it (or Not yet), then it counts. 🏅 Score shows everyone's
