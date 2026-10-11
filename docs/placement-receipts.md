@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Steward pass 18, whole tree (code-steward)
+
+- **Run:** after the v1.60.0 release (SPEC 3.02 §7B.8, a bounty's picture, migration 0046). Also covers v1.59.0 (done photo, migration 0045) and v1.59.1 (Point at it label). Audited 265334e..50328a3 (the v1.60.0 head; v1.60.1–v1.60.2 landed after).
+- **Verdict:** MINOR DRIFT. Typecheck green, 829/829 tests (112 files), arch:audit quiet (EventForm.tsx 88%, Calendar.tsx 87%, routes/recipes.ts 87%, engine.ts 86%; routes/bounties.ts 228/300).
+- **Placement audit:** 3 receipts checked against 5 code commits. Each landed where its verdict said. 0 code commits without a receipt.
+- **Top finding:** an admin's Done with a photo is paid at once, so PUT /earnings/{id}/photo returns 409 "That is already OK'd." and BountyDone tells them to "Add it again from Waiting for OK", which is impossible. §8.15b does not cover this case. Fix: a ⚑ line in the spec, then hide the 📷 or skip the upload when Done answers `paid` in BountyDone.tsx (MED-LOW, S).
+- **Handoffs:** waiting on MojoSOGO's pick: (1) the admin Done-photo fix (worker); (3) `useBlobUrl` in usePhotoPick.tsx for the 4 copies of the preview effect, best done before the next photo sheet (reorganizer). (2) where-things-stand missing the v1.60.0 phone check: done with this receipt. Carried: pass 17's Done catch-all plus losing-tap tests, the PickGrid caller list (map row still missing Chores), and the older LOW items from passes 6, 10, 11 and 16.
+- **Restraint:** no routes/bounty-photos.ts yet (the receipt's ~250 trigger stands; only about 30 lines would move); no photo-store dropPhoto (a one-liner, Middle Man); no `<PhotoDraft>` component (two callers); dropBountyPhoto's separate write (same orphan risk the house accepts everywhere); a pending chore earning outliving a chore delete (predates this range); receipts-file formatting.
+
+---
+
 ## 2026-10-11 — v1.60.2: standalone PWA frame flush to screen bottom (placement-advisor)
 
 - **Ask:** SPEC 3.04 §8.1 "Flush at the bottom". On the installed iPhone app the fixed `.app` box (`inset: 0`) stops above the bottom safe area, so the tab bar floats. Add `@media (display-mode: standalone) { .app { bottom: auto; height: 100vh; } }`.
