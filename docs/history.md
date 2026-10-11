@@ -468,6 +468,10 @@ PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the d
 captions (5 ingredients, 6 steps — it had been "watch it").
 **Custom minutes box** (v1.54.2, §8.5; asked by MojoSOGO 2026-10-11): in the cooking box the minutes field sits in the
 chip row right after 60, a small box with a light gray "custom" hint; a chip and the box clear each other.
+**FunHouse poller never repeats after a restart** (v1.54.3, §9.4a, Q244; MojoSOGO "DUP" 2026-10-11): the poller saves
+its `after` to `%USERPROFILE%\.enso\funhouse-poller-after` and starts from it, because the bridge does not drop a
+repeated id (three alerts were replayed on each restart that day). The same day the poller task became hidden
+(`home/funhouse-poller-hidden.vbs`) and restarts itself within 5 minutes (README). FP7 is the test.
 **Machines ring the FunHouse** (v1.54.1, §7D.3 / §7D.7 / §9.4b, Q231; MojoSOGO 2026-10-11: "I am not getting funhouse
 alerts on completion"): the cause was Q231's ⚑ default, which kept machines on Phone + House only. Every machine fire
 (washer, dryer, dish washer, cooking timers) now also writes the 🎪 FunHouse row, with or without someone to alert; Away

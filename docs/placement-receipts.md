@@ -25,6 +25,16 @@ carry its result.
 - **Handoffs:** 3, waiting on MojoSOGO's pick: the conflict-guard test; pass 15's PickGrid header and row wording (still open); a §8.2 line for the cooking ringing row `🍳 label · [Off]` (whether the glyph varies by kind is MojoSOGO's call). Still open, all LOW: pass 11's two §7D notes, pass 10's house-row helper note, the snooze-keeps-away test, the machines.ts alert-hours seam.
 - **MS9 transient:** no logic or order bug found. MS9 is the heaviest test in messes-api (PBKDF2 signup, 3 R2 reports, about 15 requests) under the default 5 s timeout, so load is the likely cause. It doesn't check the status of its claim and settle calls; if it recurs, capture the failure text before changing anything.
 - **Restraint:** openCookFire repeats routes/machines.ts's open-fire query (one line, two copies); the `/UNIQUE|constraint/` regex in two routes; the separate guard writers; Pick, bigChip and AlertWhenDone exported from Machines.tsx to CookBox (two callers); COOK_GLYPH in the PWA; cookDayTick's one query per timer.
+## 2026-10-11 — v1.54.3: FunHouse poller keeps its `after` across restarts (placement-advisor)
+
+- **Ask:** SPEC 2.91 §9.4a, Q244 ("DUP"). The FunHouse poller re-sent the last alerts after every restart because `after` started at now − 10 min, and in practice the bridge doesn't drop repeated ids. Fix: a pure `startAfter(saved, nowMs)` (saved if it is a valid instant within FUNHOUSE_START_BACK_MS, else now − START_BACK). `main` reads and writes `%USERPROFILE%\.enso\funhouse-poller-after` beside the token, on start and whenever `after` changes. Test FP7.
+- **Verdict:** home/funhouse-poller.ts [EXISTING]
+- **Flow stage:** deliver (the home-PC FunHouse leg), with a pure rule (startAfter) next to pollOnce and the I/O in main.
+- **Why:** The poller's map row already owns the first `after` and names `main` as the only node:fs user, so this is one concern inside one owner. Rejected a new home/ module for the saved cursor (about 10 lines, one caller). Rejected anything in src/worker/: the Worker doesn't track which notices the PC has handled. The stale "bridge drops a repeated id" comment and the map row wording are corrected in the same commit.
+- **Caps:** home/funhouse-poller.ts goes from 85 to about 100 of 300 (no CEILINGS pin). Nothing is newly in the warning band.
+
+---
+
 ## 2026-10-11 — v1.54.1: Machine fires also ring the 🎪 FunHouse (placement-advisor)
 
 - **Ask:** SPEC 2.89 §7D.3 / §7D.7 / §7D.8 + §9.4b, Q231 decided. MojoSOGO: "I am not getting funhouse alerts on completion". Machine fires (washer, dryer, dish washer, cooking timers) also go to the FunHouse channel, both when there is someone to alert and when there is nobody.
