@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.94 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.95 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -89,7 +89,9 @@ usually in the house and hears house announcements. Every feature is judged by:
 - **Quiet by default.** Only time-critical things ring. Alert fatigue kills the app.
 - **No shaming.** Nothing overdue is shown in red to the household at large. Accountability is not shaming:
   a mess report (§7B.7) asks the person who left it to own up, and the parents enforce it — decided by MojoSOGO
-  2026-10-05. It is never spoken in the house, never red, and nobody sees a household scoreboard.
+  2026-10-05. It is never spoken in the house, never red, and nobody sees a household scoreboard. The one score is
+  the bounty score (§7B.8, decided by MojoSOGO 2026-10-11): points earned, everyone's shown by name, never ranked,
+  never negative, never red.
 - **Independent of vendor features.** The app owns its data; Alexa and Home Assistant
   only speak. No dependence on Alexa's lists, routines or skills.
 
@@ -353,6 +355,7 @@ This table says what each term means.
 | `expired` (login view) | A login request past its `expires_at` while still `pending` or `approved`, or one already `used`, as the waiting browser is told — derived from `now`, never stored |
 | `login` / `new_sign_in` | A sign-in notice push (§6.6): a phone-approval request / "New sign-in on …" after a password sign-in. Not an `ALERT_KIND`: no fire, no actions |
 | `paid` / `forgiven` | How a point owed for a mess was settled (§7B.7): paid back in person / let go |
+| `open` / `taken` / `pending` / `paid` (bounty) | A one-off bounty (§7B.8): anyone can take it / someone said I'll do it in the last 3 h / done, waiting for an admin's OK / OK'd, its points count — derived, never stored |
 | `open` / `discuss` / `owed` / `closed` / `settled` (mess) | A mess report (§7B.7): asking who left it / on To talk about / claimed or recorded, a point owed / closed as nobody's / the point paid back or let go — derived from the row |
 | `sogoai` / `claude` | Who named a snapped item (§7A.3): SogoAI's local vision model (free) / the Claude API (the fallback) |
 | `at` | Chore rings at its time, like an alarm |
@@ -870,6 +873,24 @@ Notes on it:
 
 **Migration check (CK-M):** see §7D.8.
 
+### 4.2zq Schema change — `migrations/0044_bounties.sql`
+
+Asked by MojoSOGO 2026-10-11 (§7B.8).
+
+Schema: [`migrations/0044_bounties.sql`](migrations/0044_bounties.sql). The migration is the schema; it is not copied here.
+
+Notes on it:
+- `chores.bounty` — the points a run pays its finisher; NULL = none.
+- `bounties` — the one-offs; soft-deleted (pushes point at them). The dib is `taken_by` + `taken_at`; it lapses by
+  time alone, so nothing clears it.
+- `earnings` — one row per piece of work done: exactly one of `bounty_id` / `chore_run_id`, the earner, the points
+  copied then, `ok_by`/`ok_at`, and `dropped_at` for Not yet or Undo (never deleted: waiting pushes point at them).
+  At most one live earning per bounty and per run (partial unique indexes).
+- `deliveries.bounty_id` / `deliveries.earning_id` mark the two bounty pushes so the founder-ping predicate (§9.4)
+  leaves them out.
+
+Additive only; it runs before the deploy. **Migration check (BT-M):** see §7B.8.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1130,7 +1151,7 @@ For one alert of one fire:
   - from the second alert on, append `" (alert {n})"`
 
 A delivery with **no fire** is an announcement (§9.3, `POST /announce`), a sign-in notice (§6.6), a
-founder ping (§9.4, `POST /ops/notify`) or a mess ask (§7B.7). `tick` writes only the last of these, in
+founder ping (§9.4, `POST /ops/notify`), a mess ask (§7B.7) or a bounty push (§7B.8). `tick` writes only mess asks, in
 step 3b (§5.6); every fire-less row is written through `src/worker/deliveries.ts`.
 
 ### 5.8 Engine acceptance tables (M1 — each row is a test)
@@ -2382,6 +2403,110 @@ the next ask. Then expired photos are deleted.
 | MS13 | no photo; a bad type; a note of 121 chars; an unknown chore | 400; 400; 400 naming note; 404 |
 | MS14 | the ops hourly limit with 30 mess asks in the hour | a ping still goes (mess asks don't count) |
 | MS-M | migration check (§4.2ze) | rows written before 0032 survive; `deliveries.mess_id` NULL on them; `foreign_key_check` empty |
+
+### 7B.8 Bounties and the score — `src/shared/bounties.ts` (pure)
+
+Asked by MojoSOGO 2026-10-11 (reviewed first as an AREC, `arec-chore-bounties.md`): "I want a bounty system... for
+scheduled chores or one off, a bounty can be set and anyone can claim the bounty. Keep score for house
+participation." Examples: trash to the street on trash day, the can back in after, the kitchen trash, empty a bin,
+clean the downstairs toilet. And: "child claims bounty and it goes pending; then gets adults approval via app." His
+picks: **ADM** (only admins set bounties), **CNF** (points count only after an admin's OK), **PUB** (everyone sees
+everyone's score). It is the positive twin of a mess (§7B.7): a mess is a point owed to one person, a bounty is
+points earned from the house. The two are never mixed: Balances stay mess points only.
+
+**Two kinds.**
+
+- **A chore bounty** — an admin puts points on a chore (`chores.bounty`, 1–10). Every run of it then pays whoever
+  finishes it: when a run's last step is done (§7B.3), an **earning** is written for `done_by` with the chore's points
+  at that moment. Turns, rings and Today are unchanged; anyone could already finish anyone's run (§6.3). A multi-step
+  chore pays whoever finishes the last step ⚑ Q247. **Undo** of a finished run (§7B.3) drops its earning, OK'd or not.
+  Changing or clearing a chore's bounty never changes earnings already written.
+- **A one-off bounty** — an admin posts a job with a title, an optional note and points. It is done once.
+
+**An earning** is points a member has done the work for: pending until an admin taps **OK**, then it counts. An admin
+may name someone else when OK-ing ("it was Sam who took the can in"). **Not yet** drops it: no points; a one-off goes
+back to the one who said Done as their dib, fresh ⚑ Q248; a chore run stays done but pays nothing. When the one who
+finishes is an admin, the earning is OK'd by them at once ⚑ Q249.
+
+**A one-off's state** — `bountyStatus(b, earning, now)`, derived, never stored (`BOUNTY_STATUS`, §3), first match
+wins: `paid` (its live earning is OK'd) · `pending` (its live earning waits for OK) · `taken` (someone said **I'll do
+it** less than `TAKE_HOURS` ago) · `open`. A deleted bounty is gone from every answer.
+
+**The rules** (pure; imports only vocab and time):
+
+- `POINTS_MIN` = 1, `POINTS_MAX` = 10 ⚑ Q246, `BOUNTY_TITLE_MAX` = 60, `BOUNTY_NOTE_MAX` = 120, `TAKE_HOURS` = 3 ⚑ Q248.
+- `parsePoints(v)` → an integer 1–10, or a message. `parseBountyInput({ title, note, points })` → the trimmed fields
+  or a message naming the field (title 1–60, note empty → null, at most 120).
+- `takeError(status, takenBy, me, myOtherDib)` → why **I'll do it** is refused, or null: not `open` (taken by someone
+  else, pending, paid); or I already hold a live dib on another one-off (one at a time) ⚑ Q248.
+- `doneError(status, takenBy, me)` → why **Done** is refused, or null: `pending` / `paid`; or `taken` by someone else.
+  No dib is needed to say Done.
+- `scoresOf(earnings, activeIds, today, tz)` → `Score[]` (`{ memberId, week, month }`) for every active member, zeros
+  included: the sum of the points of OK'd, live earnings whose `done_at` falls (household time) in this week
+  (Sunday-start, as turns, §7B.1) and in this calendar month ⚑ Q250. Never negative, never ranked.
+- Push texts: `newBountyMessage(title, points)` → `"{title} · {points} points. Open Ensō → Chores → Bounties."`, title
+  `NEW_BOUNTY_TITLE` "🪙 New bounty"; `waitingMessage(name, title, points)` → `"{name} says done: {title} · {points}
+  points. OK it in Chores → Bounties."`, title `WAITING_TITLE` "🪙 Waiting for OK".
+- Wire types: `Bounty` `{ id, title, note, points, createdBy, createdAt, status, takenBy, doneBy }` (`takenBy` only
+  while `taken`; `doneBy` the earner while `pending` or `paid`). `Earning` `{ id, kind: 'chore' | 'bounty', title,
+  points, memberId, doneAt }` (the waiting list). `Score` above.
+
+**Who may do what.**
+
+| Action | Who | When |
+|---|---|---|
+| Post or delete a one-off; set or clear a chore's bounty | admins (ADM) | delete: not once `paid` |
+| I'll do it / Let it go | any active member | `open` / my own live dib |
+| Done | any active member | `open`, or `taken` by me |
+| OK (optionally naming who) / Not yet | admins (CNF) | a pending earning |
+| See the bounties, the waiting list and everyone's score | everyone (PUB) | — |
+
+**Delivery.** Fire-less push deliveries (§9.1), **never `house`** ⚑ Q251: posting a one-off pushes everyone active
+but the poster once (`deliveries.bounty_id` set); a pending earning pushes every active admin once
+(`deliveries.earning_id` set). No repeats. Neither counts toward the `/ops/notify` limit nor reaches the FunHouse
+list (§9.4, §9.4a). A done photo is not part of v1 (§12.5).
+
+**The routes** — `src/worker/routes/bounties.ts`:
+
+- `GET /bounties` → `{ bounties: Bounty[], waiting: Earning[], scores: Score[] }`: one-offs `open`, `taken` and
+  `pending`, newest first; every pending earning, oldest first; `scoresOf` for every active member.
+- `POST /bounties { title, note?, points }` (admin) → 201 `Bounty`; the push to everyone else in the same request.
+- `POST /bounties/{id}/take` → `Bounty`. `POST /bounties/{id}/let-go` → `Bounty` (`open`).
+- `POST /bounties/{id}/done` → `Bounty` (`pending`, or `paid` when I am an admin); the waiting push to the admins.
+- `DELETE /bounties/{id}` (admin) → 204 (soft: `deleted_at`).
+- `PUT /chores/{id}/bounty { points: 1–10 | null }` (admin) → `{ choreId, bounty }`.
+- `POST /earnings/{id}/ok { memberId? }` (admin) → 204; `memberId`, when given, must be an active member.
+  `POST /earnings/{id}/not-yet` (admin) → 204.
+- `GET /chores` and `GET /chores/today` carry `bounty` (points or null) on each chore / run.
+- Refusals: not an admin → 403 `forbidden` "Only an admin can …"; the wrong state → 409 `bounty_state` with the
+  rule's message ("Kai is on it.", "That bounty is waiting for OK.", "That bounty is already paid.", "You're already
+  on Clean the toilet. Finish it or let it go first.", "That is already OK'd."); unknown or deleted → 404 "That bounty
+  no longer exists." / "That chore no longer exists." / "That earning no longer exists."; bad input → 400
+  `invalid_input` naming the field.
+
+**Acceptance (M4ab — each row is a test; fakes only):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| BT1 | admin A posts `{ title: " Clean the toilet ", points: 3 }`; B, C active | 201 `{ title: "Clean the toilet", status: open, points: 3 }`; one push each to B and C, title "🪙 New bounty", `bounty_id` set; none to A; no house row |
+| BT2 | B posts a bounty; B sets a chore's bounty | 403; 403 |
+| BT3 | title empty / 61 chars; points 0, 11, 2.5, "3"; note 121 chars | 400 `invalid_input` naming the field |
+| BT4 | B takes it; C takes it; C says Done | `taken`, `takenBy` B; 409 "B… is on it."; 409 |
+| BT5 | B takes a second bounty while holding the first | 409 "You're already on …" |
+| BT6 | B's dib is 3 h old; C takes it | allowed: the dib lapsed (`status` was `open`) |
+| BT7 | B says Done | `pending`, `doneBy` B; one push to each active admin, title "🪙 Waiting for OK", `earning_id` set; `waiting` lists it |
+| BT8 | admin OKs it; then B's score | `paid`, gone from `bounties`; B's `week` and `month` 3; a second OK → 409 |
+| BT9 | admin says Not yet on a pending one-off | `taken` by B again, fresh dib; no points; `waiting` empty |
+| BT10 | admin OKs naming C | the earning is C's: C scores, B doesn't |
+| BT11 | chore with bounty 2, a 2-step run; C does step 1, B does step 2 | one earning for B, 2 points, pending, the admins pushed; changing the chore's bounty to 5 leaves it at 2 |
+| BT12 | undo that run's last step; finish it again | the earning dropped (no points, gone from `waiting`); a new pending one |
+| BT13 | an admin finishes a chore bounty run / says Done on a one-off | OK'd at once, no waiting push |
+| BT14 | scores: an OK'd earning done last Saturday, one this Sunday, one last month; a pending one; a disabled member's | week counts Sunday's only; month counts this month's; pending ones don't count; every active member listed, zeros too; the disabled member not listed |
+| BT15 | admin deletes an open bounty; a paid one | 204, gone; 409 |
+| BT16 | ops hourly limit with 30 bounty pushes in the hour; the FunHouse ping list | a ping still goes; no bounty push in the list |
+| BT17 | `/chores` and `/chores/today` | `bounty` on each chore and run |
+| BT18 | no session | 401 |
+| BT-M | migration check (§4.2zq) | rows written before 0044 survive; `chores.bounty` and the new `deliveries` columns NULL on them; `foreign_key_check` empty |
 
 ---
 
@@ -4131,12 +4256,13 @@ chores** (the chore list of §8.5, with ＋ Add), and from Today or All chores, 
 
 **A menu** (v1.55.0, asked by MojoSOGO 2026-10-11: "Chores needs a modal after pressed, which chore sub category are
 we pushing into") ⚑ Q245: under the heading "Chores", the same grid as Settings and Alarms (§8.6, `PickGrid`) of
-**✅ Today**, **🧽 Messes**, **📋 All chores**, Today first. A tap opens that section in a modal titled with its emoji
+**✅ Today**, **🪙 Bounties**, **🧽 Messes**, **📋 All chores**, **🏅 Score**, Today first (Bounties and Score
+since v1.56.0, §8.15b ⚑ Q252). A tap opens that section in a modal titled with its emoji
 and name; ✕, Escape or a tap outside closes it back to the tab. A chore form, What done looks like sheet or Report a
 mess sheet opens on top of its section and closing it returns there. Nothing inside a section changed; only where it
 sits. The mess banner (§8.15a) stays on every screen.
 
-Acceptance (CM1–CM3): CM1 the tab shows the three buttons and no list; CM2 each button opens its section in a modal
+Acceptance (CM1–CM3): CM1 the tab shows the five buttons and no list; CM2 each button opens its section in a modal
 and ✕ returns to the grid; CM3 ticking a Today step, tapping a chore row, and 📸 Report a mess all work from inside
 their modal.
 
@@ -4242,6 +4368,43 @@ Balances
   with its photo, note and date, and — for the one owed or an admin — **Paid back** and **Let it go**. An admin
   also sees **Whose was it?** there, to correct one (⚑ Q182).
 - Nothing in red; the section reads the same for everyone apart from the buttons a person may use.
+
+### 8.15b Bounties and Score (§7B.8)
+
+**🪙 Bounties** — the modal:
+
+```
+Waiting for OK                                   (everyone sees it)
+  Clean the toilet · 3 · Kai · 10:42        [OK] [Not yet]  [Kai ▾]   (admins only: the buttons and who)
+  Trash to the curb (chore) · 2 · Sam · Tue
+Bounties                                         [＋ Bounty]  (admins only)
+  Clean the toilet · 🪙 3 · Kai is on it                     [Done] [Let it go]   (mine)
+  Empty the bathroom bin · 🪙 1                  [I'll do it] [Done]
+Chore bounties                                   (admins only)
+  Trash to the curb     [ 2 ▾ ]
+  Can back in           [ None ▾ ]
+```
+
+- **Waiting for OK**: every pending earning, oldest first: title (a chore's marked "(chore)"), points, who, when.
+  Admins also get **OK**, **Not yet** and a who select (active members, the earner first); OK sends the one picked.
+  Empty → the section is left out.
+- **Bounties**: each one-off, newest first: title, 🪙 points, the note as a dim second line, and "{name} is on it"
+  while taken ("You're on it" for mine). Buttons by what I may do (§7B.8): **I'll do it**, **Done**, **Let it go**.
+  An admin also gets ✕ **Delete** (accessible name "Delete Clean the toilet"; asks first). None → "No bounties right
+  now."
+- **＋ Bounty** (admins) opens a sheet: **Title** (one line, `maxLength` 60), **Points** (a select 1–10, default 1),
+  **Note** (one line, `maxLength` 120), then **Post** / **Cancel**. A refusal shows inside the sheet.
+- **Chore bounties** (admins): every chore with a select of None, 1–10; a change saves at once.
+- A chore with a bounty shows **🪙 n** after its title on Today and in All chores (§8.15), for everyone.
+- Buttons ≥ 44 px; nothing red.
+
+**🏅 Score** — the modal: a table of every active member by name (no order by points, no ranks), columns **This week**
+and **This month**, and a **House** row under it with the sums. Under the table, dim: "Points count once an admin
+says OK." Pending points are not shown here.
+
+Acceptance (BS1–BS3, manual on the iPhone at 320 px): BS1 an admin posts a bounty and a kid's phone gets the push;
+BS2 the kid taps I'll do it, then Done, and the admin's phone gets the waiting push and OKs it; BS3 Score shows the
+kid's points this week and the House row.
 
 ### 8.16 🎯 Point at it — name what I tapped
 
@@ -4772,8 +4935,8 @@ announcement, §9.3) that carries its own title (§4.2u). No session, no house r
    there is no founder → **409 `no_recipients`**, nothing written (never a row with no member).
 5. **Hourly limit:** the push deliveries with no fire, a non-NULL `title` and **no `notice`** created at or after
    `opsWindowStart(now)` are counted; at `OPS_NOTIFY_PER_HOUR` or more → **429 `rate_limited`**, and no
-   row is written. Announcements (title NULL), sign-in notices (§6.6, `notice` set) and a mess's asks (§7B.7,
-   `mess_id` set) never count.
+   row is written. Announcements (title NULL), sign-in notices (§6.6, `notice` set), a mess's asks (§7B.7,
+   `mess_id` set) and bounty pushes (§7B.8, `bounty_id` or `earning_id` set) never count.
 6. One delivery: `id` = `newId('dlv')`, `fire_id` NULL, `alert_number` 1, `channel` `push`, `member_id` =
    the founder, `message` = the trimmed text, `title` = `opsTitle(title)`, `queued`.
 7. Sent at once with `sendPushDeliveries` (§9.1); then **201 `{ deliveries: [{ id, status, detail }] }`**.
@@ -5034,6 +5197,12 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | POST | `/messes/{id}/decide` | owner | `{ memberId: string \| null }` → `Mess`: whose it was, or nobody's (§7B.7) |
 | POST | `/messes/{id}/settle` | the one owed, or owner | `{ how: 'paid' \| 'forgiven' }` → `Mess`; 409 unless owed (§7B.7) |
 | DELETE | `/messes/{id}` | reporter while unanswered, or owner | → 204 (§7B.7) |
+| GET | `/bounties` | member | → `{ bounties: Bounty[], waiting: Earning[], scores: Score[] }` (§7B.8) |
+| POST | `/bounties` | owner | `{ title, note?, points }` → `Bounty` (201); pushes everyone else once (§7B.8) |
+| POST | `/bounties/{id}/take` \| `/let-go` \| `/done` | member | → `Bounty`; 409 `bounty_state` on the wrong state (§7B.8) |
+| DELETE | `/bounties/{id}` | owner | → 204; 409 once paid (§7B.8) |
+| PUT | `/chores/{id}/bounty` | owner | `{ points: 1–10 \| null }` → `{ choreId, bounty }` (§7B.8) |
+| POST | `/earnings/{id}/ok` \| `/not-yet` | owner | `{ memberId? }` → 204; 409 unless pending (§7B.8) |
 | GET | `/things` | member | → `{ open: Thing[], closed: Thing[] }` (closed = done/dropped, last 60 days); `Thing = { id, title, note, place, address, phone, cost, url, windowStart, windowEnd, remindStart, remindOn, channels, hasPhoto, status, plannedEventId, plannedDate, createdBy, updatedAt }` |
 | POST | `/things` | member | thing fields → thing (201) |
 | GET/PATCH/DELETE | `/things/{id}` | GET member / writes creator or owner (§6.3) | GET → thing; PATCH fields, all optional, incl. `status` → thing; DELETE → 204 (and its photo) |
@@ -5138,7 +5307,8 @@ Captured from v1.0-draft so nothing is lost:
 - Turso / non-Cloudflare hosting
 - Adding list items by voice (Voice PE / Home Assistant intent → Worker). If built, it
   goes through Home Assistant's own Assist, never Alexa skills or lists.
-- Chore points, streaks or rewards — except the one point owed for a mess (§7B.7, decided by MojoSOGO 2026-10-05)
+- Chore points, streaks or rewards — except the one point owed for a mess (§7B.7, decided by MojoSOGO 2026-10-05) and
+  bounty points with their score (§7B.8, decided by MojoSOGO 2026-10-11)
 - Shopping list grouped by store aisle; list sharing outside the household; list ordering by hand
 
 ### 12.2 Movies & shows — follow-ups (suggested 2026-10-05, not built, need MojoSOGO's word)
@@ -5158,6 +5328,12 @@ Captured from v1.0-draft so nothing is lost:
 ### 12.4 Whose mess? — follow-ups (suggested 2026-10-05, not built, need MojoSOGO's word)
 
 - Paying a point back by taking one of the owed person's chore turns (needs a per-run swap that survives re-planning, §7B.3).
+
+### 12.5 Bounties — follow-ups (suggested 2026-10-11, not built, need MojoSOGO's word)
+
+- A photo with Done, so an admin can OK from work (deleted on OK, as a mess photo).
+- A chore bounty only for the person whose turn it is ("doing your turn earns").
+- Members suggesting a bounty for an admin to price; paying a mess point with bounty points; streaks.
 - A push to the reporter when someone claims their mess.
 - Mess sizes worth more than one point.
 
