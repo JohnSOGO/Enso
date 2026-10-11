@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Steward pass 11, whole tree (code-steward)
+
+- **Run:** after the v1.47.0 release (SPEC 2.76 §7D.7, Alert when done, migration 0040, PR #42) and the reorganizer extract of src/shared/machine-hours.ts. Audited e9fdb33 against f241cc3.
+- **Verdict:** SOUND. Typecheck green, 758/758 tests (97 files), arch:audit quiet (nearest: EventForm.tsx, Calendar.tsx and routes/recipes.ts at 87%; machines.ts 228/300; tick.ts 117/148).
+- **Placement audit:** 2 receipts checked against 2 code commits (1843aa9, e9fdb33); each landed as its verdict said. 0 code commits without a receipt.
+- **Top finding (LOW):** the machine card names the alert person through memberById, which includes disabled members, while the server treats a disabled alert person as nobody (Q219). Fix with §7D's next change: machinesView returns alertId null for an inactive member.
+- **Handoffs:** 2 to worker, both LOW, for the next §7D touch: the machinesView alertId fix, and the stale "default speakers" comment in fire-rows.ts sourceOf. Pass 10's house-row-helper note stands; the snooze-keeps-away test is still owed; migration-0040.test.ts already compares whole rows.
+- **Restraint:** machines.ts kept whole (cohesive; its next seam, the body parsers, is named but not owed). The active-member check stays in fire-rows.ts (needs a D1 read).
+
 ## 2026-10-11 — Alert when done on machine loads (placement-advisor)
 
 - **Ask:** SPEC §7D.7 (v1.47.0, SPEC 2.76; migration 0040, §4.2zm). Each machine load has an optional alert person, `machines.alert_id`: absent → the owner, null → nobody, else an active member. With nobody the fire goes to phones only; with someone it is today's Phone + House on every speaker. MachineChooser gains an "Alert when done" chip group, and the card shows who is alerted.
