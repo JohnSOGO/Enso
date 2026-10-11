@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.54.4: Alarms tab splits Machines into Washing machines and Cooking machines (placement-advisor)
+
+- **Ask:** SPEC 2.92 §8.5: the Alarms tab PickGrid goes from three buttons to four (⏰ Alarms, ⏱ Rolling timers, 🧺 Washing machines, 🍳 Cooking machines). Each machines button opens its own modal: MachinesSection alone, CookingSection alone. The groups' own h3 headings go, since the modal title names them.
+- **Verdict:** frontend/src/components/Alarms.tsx (SECTIONS and body map); Machines.tsx and Cooking.tsx (heading removal only) [EXISTING]
+- **Flow stage:** render
+- **Why:** Alarms.tsx already owns which section is open, so a fourth PickGrid entry is a data change in its SECTIONS list. Each group file keeps its single concern and only loses the heading the Modal title now provides; Cooking keeps its ＋ Cooking timer row with a flex spacer. Rejected: a new "MachinesMenu" wrapper (a hop for no concern). Ownership rows for Alarms, Machines, Cooking and MachineHours corrected in the same commit.
+- **Caps:** Alarms.tsx about 172/300, Machines.tsx about 173/300, Cooking.tsx about 71/300. None in the warning band.
+- **Sources read:** Alarms.tsx, Machines.tsx, Cooking.tsx, docs/module-ownership.md, scripts/arch.ts, SPEC.md §8.5.
+
 ## 2026-10-11 — v1.54.2: Cooking box custom minutes box in the chip row (placement-advisor)
 
 - **Ask:** SPEC 2.90 §8.5: the cooking box's minutes field moves into the "How long?" chip row as a small "custom" box after the 60 chip, with a light gray "custom" placeholder. A chip picks its value and empties the box; typing in the box unpicks the chips. UI only.

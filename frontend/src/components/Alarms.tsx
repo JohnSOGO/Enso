@@ -1,5 +1,5 @@
-// SPEC §8.5 — Alarms tab: 📢 Announce (§9.3), 🤫 Quiet the house (§9.2b), then a menu of three sections (Alarms: days of
-// week + time, Rolling timers, Machines), the tapped one in a Modal. Holds which section is open.
+// SPEC §8.5 — Alarms tab: 📢 Announce (§9.3), 🤫 Quiet the house (§9.2b), then a menu of four sections (Alarms: days of
+// week + time, Rolling timers, Washing machines, Cooking machines), the tapped one in a Modal. Holds which section is open.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Modal } from './Modal';
 import { PickGrid } from './PickGrid';
@@ -143,12 +143,12 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
   );
 }
 
-type Section = 'alarms' | 'timers' | 'machines';
+type Section = 'alarms' | 'timers' | 'washing' | 'cooking';
 
 /** ⚑ Q238 — the menu under Announce and Quiet the house, as on Settings (§8.6). */
 const SECTIONS: readonly { value: Section; emoji: string; label: string }[] = [
   { value: 'alarms', emoji: '⏰', label: 'Alarms' }, { value: 'timers', emoji: '⏱', label: 'Rolling timers' },
-  { value: 'machines', emoji: '🫧', label: 'Machines' },
+  { value: 'washing', emoji: '🧺', label: 'Washing machines' }, { value: 'cooking', emoji: '🍳', label: 'Cooking machines' },
 ];
 
 export function Alarms({ onEditAlarm, onEditTimer }: { onEditAlarm: (a: Alarm | null) => void; onEditTimer: (t: Timer | null) => void }) {
@@ -157,7 +157,8 @@ export function Alarms({ onEditAlarm, onEditTimer }: { onEditAlarm: (a: Alarm | 
   const body: Record<Section, () => ReactNode> = {
     alarms: () => <ScheduledSection onEdit={onEditAlarm} />,
     timers: () => <TimersSection onEdit={onEditTimer} />,
-    machines: () => <><MachinesSection /><CookingSection /></>, // §8.5 two groups
+    washing: () => <MachinesSection />,
+    cooking: () => <CookingSection />,
   };
   return (
     <div style={{ padding: 12, overflowY: 'auto', height: '100%' }}>

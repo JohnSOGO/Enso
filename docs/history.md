@@ -466,6 +466,8 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Two machines buttons** (v1.54.4, §8.5; asked by MojoSOGO 2026-10-11): the Alarms tab's 🫧 Machines button became
+🧺 Washing machines and 🍳 Cooking machines, each in its own modal; the cooking timers moved to the second. Q243 is now his.
 **Custom minutes box** (v1.54.2, §8.5; asked by MojoSOGO 2026-10-11): in the cooking box the minutes field sits in the
 chip row right after 60, a small box with a light gray "custom" hint; a chip and the box clear each other.
 **FunHouse poller never repeats after a restart** (v1.54.3, §9.4a, Q244; MojoSOGO "DUP" 2026-10-11): the poller saves
