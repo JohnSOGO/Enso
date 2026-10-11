@@ -4,9 +4,10 @@ import type { AppEnv } from '../env';
 import { MACHINE } from '../../shared/vocab';
 import type { FireRow } from '../../shared/engine';
 import {
-  MACHINE_LABEL, clearMachine, doneNowMachine, machineHoursOf, parseMachineHours, finishMachine, isMachineId, machineState, moveMachine, nextMachine, parseDoneNow, parseMove, parseStart,
+  MACHINE_LABEL, clearMachine, doneNowMachine, finishMachine, isMachineId, machineState, moveMachine, nextMachine, parseDoneNow, parseMove, parseStart,
   refusalText, remindMachine, startMachine, type MachineChange, type MachineResult, type MachineRow,
 } from '../../shared/machines';
+import { machineHoursOf, parseMachineHours } from '../../shared/machine-hours';
 import { activeMemberIds, all, first, nowIso } from '../db';
 import { body, fail } from '../http';
 import { requireMember, requireOwner } from '../session';

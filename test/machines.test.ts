@@ -6,8 +6,9 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Client, member, owner, tickAt } from './helpers';
 import {
   MACHINE_LABEL, MACHINE_MAX_ALERTS, MACHINE_RENOTIFY_MIN, finishLabel, machineMinutes, nextMachine, previousMachine, clearMachine, doneMessage, doneNowMachine, finishMachine, machineAlertConfig, machineState,
-  isStillLoaded, machineQuietUntil, moveMachine, parseMachineHours, DEFAULT_MACHINE_HOURS, parseDoneNow, parseMove, parseStart, refusalText, remindMachine, startMachine, waitingLoad, type MachineRow,
+  isStillLoaded, moveMachine, parseDoneNow, parseMove, parseStart, refusalText, remindMachine, startMachine, waitingLoad, type MachineRow,
 } from '../src/shared/machines';
+import { DEFAULT_MACHINE_HOURS, machineQuietUntil, parseMachineHours } from '../src/shared/machine-hours';
 import { alertMessage, applyAction, newMachineFire, pushActions, stepFire, type FireRow } from '../src/shared/engine';
 import { machineWrites } from '../src/worker/routes/machines';
 import { addMinutes, localToUtc } from '../src/shared/time';

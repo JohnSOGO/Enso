@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-11 — Machine alert hours out of machines.ts (reorganizer)
+
+- **Trigger:** placement-advisor extract-first verdict for v1.47.0 "Alert when done" (machines), which adds to src/shared/machines.ts; the standing machine-hours note from steward pass 8.
+- **Seam moved:** the §7D.5 alert hours (DayHours / MachineHours, DEFAULT_MACHINE_HOURS, hoursOn, machineQuietUntil, machineHoursOf, parseMachineHours) from `src/shared/machines.ts` to `src/shared/machine-hours.ts` [NEW row]. Callers re-pointed: src/worker/fire-rows.ts, src/worker/routes/machines.ts, frontend/src/components/MachineHours.tsx, test/machines.test.ts. No re-export.
+- **Room opened:** machines.ts: 246 → 204 lines; global cap 300 (no pin, nothing to ratchet). machine-hours.ts new, 45/300.
+- **Behavior:** preserved. Typecheck green, 750/750 tests (95 files), arch:audit quiet. The moved code is byte-for-byte the same; L19 and parseMachineHours tests and GET/PATCH /machines/hours pass unchanged.
+- **Restraint:** one seam, the one the advisor named. The transitions, the done message and machineAlert stay in machines.ts, and nothing was split for the feature itself.
+
 ## 2026-10-11 — Steward pass, whole tree (code-steward)
 
 - **Run:** after the v1.45.0 (SPEC 2.74 §9.2b, Quiet the house, migration 0038, PR #39) and v1.46.0 (SPEC 2.75 §9.2c–9.2d, I'm away on one alert and phone first, migration 0039, PR #40) releases; audited 57b4dba against dd9f2d5.

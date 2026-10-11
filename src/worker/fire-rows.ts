@@ -2,7 +2,8 @@
 import { newChoreFire, timerWindow, type AlertConfig, type ChoreAlertText, type FireRow, type NewFire } from '../shared/engine';
 import { DEFAULT_MAX_ALERTS, choreFireContext, choreFromRow, planChoreRuns, type Chore, type ChoreRow, type ChoreRun } from '../shared/chores';
 import { isStartReminder, type ThingRow } from '../shared/things';
-import { doneMessage, isMachineId, isStillLoaded, machineAlert, machineHoursOf, machineQuietUntil, waitingLoad, type MachineRow } from '../shared/machines';
+import { doneMessage, isMachineId, isStillLoaded, machineAlert, waitingLoad, type MachineRow } from '../shared/machines';
+import { machineHoursOf, machineQuietUntil } from '../shared/machine-hours';
 import type { Channel, SunEvent } from '../shared/vocab';
 import { utcToLocal } from '../shared/time';
 import { sunsetUtc } from '../shared/sun';
