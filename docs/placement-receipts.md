@@ -7,6 +7,16 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.56.0: Settings → ℹ️ About (placement-advisor)
+
+- **Ask:** SPEC 2.96 §8.6 (new area, MojoSOGO 2026-10-11 "add 'about' button in settings; modal shows splash screen, logo, revision, developed by"): a 9th Settings PickGrid button ℹ️ About for everyone, whose modal shows the §8.10 opening-screen look (/icon.svg, "Ensō", the tagline, `__ENSO_BUILD__`) and "Developed by MojoSOGO · with Claude". No server, API or migration change.
+- **Verdict:** frontend/src/components/SettingsAbout.tsx + SettingsAbout.module.css [NEW row]; frontend/src/components/Settings.tsx (one AREAS entry, one body entry) [EXISTING]; test/settings-about.test.ts (new).
+- **Flow stage:** render
+- **Why:** Every Settings area is its own leaf component, and Settings.tsx only holds which one is open, so About follows SettingsMe and SettingsStatus. The tagline is written once in source, as `TAGLINE` exported by SettingsAbout.tsx. index.html must stay plain HTML that paints before any script (§8.10), so it keeps its literal copy, and test/settings-about.test.ts asserts that index.html contains each half (index.html and SettingsAbout both loaded at run time like test/recipe-transcript.test.ts; a static `?raw` import fails the Worker typecheck). Rejected: rendering the About body inline in Settings.tsx (a second concern for the menu); vocab.ts for the tagline (display copy, already rejected by the v1.55.1 receipt); a separate tagline.ts (a map row for one const with one importer); injecting the tagline into index.html from vite.config.ts like %ENSO_BUILD% (build machinery to avoid a one-line test).
+- **Caps:** Settings.tsx 59/99 → 62/99 (CEILINGS unchanged); SettingsAbout.tsx 19/300. No file enters the warning band.
+- **Reorganizer:** none needed.
+- **Sources read:** scripts/arch.ts, docs/module-ownership.md, docs/placement-receipts.md (latest three), Settings.tsx, frontend/index.html, SPEC.md §8.6, test/point-at.test.ts, test/repeat-fields.test.ts, RecipeView.tsx imports, vitest.config.ts.
+
 ## 2026-10-11 — Steward pass 16 handoff TXT: wording only (no placement needed for code)
 
 - **Ask:** MojoSOGO picked TXT from pass 16 (and said no to TST): PickGrid's header comment and map row now name its three callers (§8.5 Alarms, §8.6 Settings, §8.8 Lists); SPEC 2.95 §8.2 gains the cooking timer's Ringing bar row (`🍳 label · person` with **[Off]**, glyph fixed, ⚑ Q246). Comment and docs only; no behavior change, no version bump, no deploy.

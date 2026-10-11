@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.95 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.96 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3649,6 +3649,7 @@ Settings
 [ 📱 Phone alerts  ] [ 🔊 Speakers       ]
 [ 🔔 Alerts        ] [ 🏠 Household      ]   ← Household and Members: admins only
 [ 👥 Members       ] [ 📊 Status         ]
+[ ℹ️ About         ]
 [ Log out ]
 ```
 
@@ -3669,11 +3670,16 @@ Settings
   (good) with the last success time; `failing` → "failing since {lastFailedAt}" (bad) with
   `lastError` beneath; `not_configured` → "not set up" (bad); `untried` → "not tried yet"
   (neutral). Then the last 20 deliveries with their status badge.
+- **ℹ️ About** (asked by MojoSOGO 2026-10-11, last in the grid, for everyone ⚑ Q247): the opening screen's look
+  (§8.10) inside the modal: the ensō logo, **Ensō**, the tagline, and the build stamp as the revision; then
+  **"Developed by MojoSOGO · with Claude"** ⚑ (Q248). Nothing to change, nothing fetched.
 - **Log out** sits under the grid, not inside an area ⚑ (Q227). No menu button is marked chosen.
 
 **Acceptance (SM1–SM4):** SM1 the tab shows the grid, with Household and Members only for an admin; SM2 each
 button opens its area titled with its name, and closing returns to the grid; SM3 a tapped alert notification opens
-Settings → 🔔 Alerts on its card, and closing the card leaves the Alerts list open; SM4 every setting listed above is
+Settings → 🔔 Alerts on its card, and closing the card leaves the Alerts list open; SM5 ℹ️ About shows the logo,
+Ensō, the same tagline as the opening screen (a test holds `frontend/index.html` to it) and the same build stamp as
+under the tabs; SM4 every setting listed above is
 reachable and behaves as before (manual, on the iPhone at 320 px: the grid is two columns, one under 360 px).
 
 ### 8.8 Lists screen

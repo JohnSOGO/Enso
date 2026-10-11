@@ -248,3 +248,5 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q243 | Where cooking timers sit (§8.5) | **Decided by MojoSOGO 2026-10-11:** their own 🍳 Cooking machines button on the Alarms tab, beside 🧺 Washing machines (was ⚑ one Machines modal with two groups) |
 | Q244 | Where the FunHouse poller starts after a restart (§9.4a) | ⚑ From the `after` it saved last when within 10 min (nothing repeats); else 10 min back (older notices from a longer outage are skipped) |
 | Q245 | How the Chores tab shows its sections (§8.15) | ⚑ A menu of ✅ Today · 🧽 Messes · 📋 All chores, each in its own modal, as Settings and Alarms (was all three stacked on the tab) |
+| Q247 | Where Settings → ℹ️ About sits (§8.6) | ⚑ Last button in the grid, after 📊 Status, for every member |
+| Q248 | The About credit line (§8.6) | ⚑ "Developed by MojoSOGO · with Claude" (no other author is named in SPEC or README) |
