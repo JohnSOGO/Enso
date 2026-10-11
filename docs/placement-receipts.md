@@ -7,6 +7,20 @@ carry its result.
 
 ---
 
+## 2026-10-10 — Quiet the house (placement-advisor)
+
+- **Ask:** SPEC §9.2b (with §4.2zk migration 0038, the §10 `/house/quiet` row, §8.5; HQ1–HQ6, HQ-M; ⚑ Q209–Q212). Any member can quiet the household's speakers for 1 h / 2 h / 4 h / rest of today. While quiet, no `house` row is written by tick step 2, timer start announcements or POST /announce (House only → 409 `house_quiet`); phones carry on unchanged.
+- **Verdict:** [EXISTING] src/shared/vocab.ts (HOUSE_QUIET_FOR); src/worker/tick.ts, src/worker/timer-starts.ts, src/worker/routes/announce.ts (gate the house row); src/worker/index.ts (mount); frontend/src/components/Alarms.tsx (host). [NEW rows] src/shared/house-quiet.ts (quietEnd / quietState / quietError, pure); src/worker/house-quiet.ts (houseQuiet(db, now) read only); src/worker/routes/house-quiet.ts (GET/PUT/DELETE, the writes); frontend/src/components/HouseQuiet.tsx. Migration 0038 with its own test.
+- **Flow stage:** rules (shared/house-quiet.ts, vocab) / route + persist (routes/house-quiet.ts, 0038) / read gate at the three persisters (tick, timer-starts, announce) / render (HouseQuiet.tsx).
+- **Why:**
+  - Quiet is a household setting, not a member's speaker choice or a delivery concern. That rules out speaker-choices.ts (per-member, "never writes") and house.ts (delivery "never decides what is sent", and it gates too late).
+  - The read is a leaf with fan-in 4. The writes have one caller each, so they stay in the route ("routes validate and persist").
+  - The route is its own file, not routes/household.ts, whose row already carries five concerns. This follows the announce / optins / ops one-feature grain.
+  - The PWA calls the shared quietState, so the line and the server cannot disagree.
+  - Not merged with machines.ts machineQuietUntil (§7D.5 delays; §9.2b skips).
+  - Tick reads quiet once before step 2 and puts it into the existing house condition, so no HA call is made while quiet.
+- **Caps:** tick.ts 114 → 116/148 (outside the band, no re-pin); timer-starts.ts, announce.ts, index.ts, Alarms.tsx, vocab.ts each gain a few lines, all well under 300. New files are small. Nothing newly in the band; no reorganizer.
+
 ## 2026-10-10 — Steward pass, whole tree (code-steward)
 
 - **Run:** after the v1.44.0 release (SPEC 2.73 §8.1, tab bar flush via `.app` position: fixed, build stamp under the tabs via Vite `define` `__ENSO_BUILD__`, new frontend/src/build-stamp.d.ts, PR #37); audited 31e101f against f756118.

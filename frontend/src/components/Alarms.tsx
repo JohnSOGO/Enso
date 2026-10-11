@@ -1,9 +1,10 @@
-// SPEC §8.5 — Alarms tab: 📢 Announce (§9.3), Scheduled alarms (days of week + time), Rolling timers and Machines.
+// SPEC §8.5 — Alarms tab: 📢 Announce (§9.3), 🤫 Quiet the house (§9.2b), Scheduled alarms (days of week + time), Rolling timers and Machines.
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
 import { TimersSection, type Timer } from './Timers';
 import { MachinesSection } from './Machines';
 import { Announce } from './Announce';
+import { HouseQuiet } from './HouseQuiet';
 import { ChannelChecks, DayChips, RenotifySelect, SHORT, daysText } from './AlertFields';
 import { del, errorText, get, patch, post } from '../api';
 import { useApp } from '../state';
@@ -143,6 +144,7 @@ export function Alarms({ onEditAlarm, onEditTimer }: { onEditAlarm: (a: Alarm | 
     <div style={{ padding: 12, overflowY: 'auto', height: '100%' }}>
       <h1 style={{ fontSize: '1.15rem', marginBottom: 12 }}>Alarms</h1>
       <Announce />
+      <HouseQuiet />
       <ScheduledSection onEdit={onEditAlarm} />
       <TimersSection onEdit={onEditTimer} />
       <MachinesSection />

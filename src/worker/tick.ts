@@ -13,6 +13,7 @@ import { choreRunInserts, insertFire, sourceOf, updateFire } from './fire-rows';
 import { sendPushDeliveries } from './push';
 import { allHouseSpeakers, sendHouseDeliveries } from './house';
 import { deliverySpeakers } from './speaker-choices';
+import { houseQuiet } from './house-quiet';
 import { messTick } from './mess-asks';
 import { timerStartTick } from './timer-starts';
 import { weatherTick } from './weather-days';
@@ -61,6 +62,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
   const open = await all<FireRow>(db, `SELECT * FROM fires WHERE state != 'closed' ORDER BY due_at`);
   const newDeliveryIds: string[] = [];
   let everySpeakerNow: Promise<string[] | null> | undefined; // asked of HA at most once a tick (§7D.3)
+  const quiet = await houseQuiet(db, now); // §9.2b: while quiet, no house row at all
   for (const fire of open) {
     const src = await sourceOf(db, fire, now);
     if (!src) continue;
@@ -84,8 +86,8 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
           stmts.push(d.stmt);
         }
       }
-      // §9.2a: on the speakers of everyone it is for — none ticked by any of them → not spoken (§7D.3: a machine, every speaker).
-      const speakers = !(src.cfg.channels.includes('house') && aud.house) ? []
+      // §9.2a: on the speakers of everyone it is for — none ticked by any of them, or the house quiet (§9.2b) → not spoken (§7D.3: a machine, every speaker).
+      const speakers = quiet || !(src.cfg.channels.includes('house') && aud.house) ? []
         : src.allSpeakers ? (everySpeakerNow ??= allHouseSpeakers(env), await everySpeakerNow) : await deliverySpeakers(db, aud.push);
       if (speakers === null || speakers.length) {
         stmts.push(houseDelivery(db, { ...base, message, speakers }, now).stmt);
