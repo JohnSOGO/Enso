@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.91 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.92 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3785,11 +3785,14 @@ least 0.8 s so it never flickers:
 ```
             ◯   (the ensō, large)
            Ensō
+ Closing the loop. Peace of mind, every day.
    https://enso.sogodojo.com
       v0.2.0 · a99e5db
 ```
-- Centred on `--bg`: the ensō, **Ensō** in a large, light-weight serif-free type, and the
-  **full address the app is served from** (`location.origin`, so the home-network server
+- Centred on `--bg`: the ensō, **Ensō** in a large, light-weight serif-free type, under it
+  the tagline **"Closing the loop. Peace of mind, every day."** (MojoSOGO's exact words,
+  2026-10-11) in small light text, breaking only between its two sentences so it fits 320 px,
+  then the **full address the app is served from** (`location.origin`, so the home-network server
   shows its own) in small dim text, and under it the **build stamp** — `v{version} ·
   {commit}` (decided by MojoSOGO 2026-10-03): the app version from `package.json` and the
   short git commit the page was built from, written into the page **at build time** (never
@@ -3799,7 +3802,7 @@ least 0.8 s so it never flickers:
   feature bumps the minor (`1.1.0`, `1.2.0`, …), each fix-only merge bumps the patch. The
   version lives only in `package.json` (the stamp reads it); the spec's own version line is
   separate and counts spec revisions.
-  Nothing else — no spinner, no tagline.
+  Nothing else — no spinner.
 - One source: the screen is plain HTML in `index.html`, outside the React root, so it
   appears before any script loads; `App` removes it when ready (signed in or not).
 - iPhone shows its own launch image before the page exists: `apple-touch-startup-image`

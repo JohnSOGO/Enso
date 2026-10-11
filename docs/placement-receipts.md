@@ -7,6 +7,16 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.54.4: Opening-screen tagline (placement-advisor)
+
+- **Ask:** SPEC 2.92 §8.10: the tagline "Closing the loop. Peace of mind, every day." under the "Ensō" heading on the opening screen, and the iPhone splash PNGs re-rendered from that screen.
+- **Verdict:** `frontend/index.html` (#splash) [EXISTING, reuse; no new module]
+- **Flow stage:** render
+- **Why:** §8.10 makes the opening screen plain HTML in index.html so it paints before any script. A static tagline is one `<p>` there plus its CSS. index.html is outside `SOURCE_EXT`, with no cap, map row or fan-in.
+- **Rejected:** a React component in frontend/src/ (would show only after the bundle loads, and copy the screen); `vocab.ts` (display copy, and the splash cannot import it); the sign-in screens (no logo there); drawing the PNGs separately (§8.10 says they are rendered from this screen).
+- **Caps:** none affected. No file enters the warning band.
+- **Sources read:** frontend/index.html, scripts/arch.ts, docs/module-ownership.md.
+
 ## 2026-10-11 — v1.54.2: Cooking box custom minutes box in the chip row (placement-advisor)
 
 - **Ask:** SPEC 2.90 §8.5: the cooking box's minutes field moves into the "How long?" chip row as a small "custom" box after the 60 chip, with a light gray "custom" placeholder. A chip picks its value and empties the box; typing in the box unpicks the chips. UI only.
