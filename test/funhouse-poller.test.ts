@@ -1,10 +1,10 @@
 // SPEC §9.4a (FP4–FP6) — the FunHouse poller's pure parts and one poll over a fake Ensō and a fake bridge (no
-// network, no filesystem): Claude's pings only, at most one bridge POST a poll, 503 retried, 4xx not.
+// network, no filesystem); FH6 (§9.4b) FunHouse alerts. Claude's pings and FunHouse alerts only, at most one bridge POST a poll, 503 retried, 4xx not.
 import { expect, it } from 'vitest';
 import { BRIDGE_URL, ENSO_API, forFunhouse, funhouseNotice, pollOnce, type Ping } from '../home/funhouse-poller';
 
 const TOKEN = 'poller-test-token';
-const ping = (id: string, title: string, at: string): Ping => ({ id, title, text: `text ${id}`, at });
+const ping = (id: string, title: string, at: string, channel: Ping['channel'] = 'push'): Ping => ({ id, channel, title, text: `text ${id}`, at });
 const OZY = ping('dlv_o', '🏛️ Ozymandias', '2026-10-11T01:00:00.000Z');
 const A = ping('dlv_a', '🧵 Thread needs you', '2026-10-11T01:01:00.000Z');
 const B = ping('dlv_b', '🤖 Claude', '2026-10-11T01:02:00.000Z');
@@ -29,9 +29,9 @@ function world(pings: Ping[], bridge: number[]) {
 }
 
 it('FP4: forFunhouse and funhouseNotice', () => {
-  expect(forFunhouse('🧵 Thread needs you')).toBe(true);
-  expect(forFunhouse('🤖 Claude ⭕🔁🏠')).toBe(true);
-  expect(forFunhouse('🏛️ Ozymandias')).toBe(false);
+  expect(forFunhouse({ channel: 'push', title: '🧵 Thread needs you' })).toBe(true);
+  expect(forFunhouse({ channel: 'push', title: '🤖 Claude ⭕🔁🏠' })).toBe(true);
+  expect(forFunhouse({ channel: 'push', title: '🏛️ Ozymandias' })).toBe(false);
   expect(funhouseNotice(A)).toEqual({
     source: 'Claude', level: 'attention', text: '🧵 Thread needs you: text dlv_a', sig: '⭕🔁🏠', beep: 'look', id: 'dlv_a',
   });
@@ -60,4 +60,15 @@ it('FP6: the bridge answering 503 → after unchanged, sent again; 400 → handl
   expect(await pollOnce(start, down)).toBe(start);
   const offline = { fetch: (async () => { throw new Error('ECONNREFUSED'); }) as typeof fetch, token: TOKEN, log: () => {} };
   expect(await pollOnce(start, offline)).toBe(start);
+});
+
+it('FH6: a FunHouse alert is always forwarded, with source Ensō', async () => {
+  const fh = ping('dlv_f', 'Ensō', '2026-10-11T01:03:00.000Z', 'funhouse');
+  expect(forFunhouse(fh)).toBe(true);
+  expect(funhouseNotice(fh)).toEqual({
+    source: 'Ensō', level: 'attention', text: 'Ensō: text dlv_f', sig: '⭕🔁🏠', beep: 'look', id: 'dlv_f',
+  });
+  const w = world([OZY, fh], []);
+  expect(await pollOnce('2026-10-11T00:50:00.000Z', w.deps)).toBe(fh.at);
+  expect(w.sent).toEqual([funhouseNotice(fh)]);
 });

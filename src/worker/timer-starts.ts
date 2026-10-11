@@ -2,7 +2,7 @@
 // deliveries (§4.2k) on the timer's channels and audience; the rules and the words are src/shared/timer-start.ts.
 import type { Env } from './env';
 import { activeMemberIds, all, householdTz, parseJson } from './db';
-import { houseDelivery, pushDelivery } from './deliveries';
+import { funhouseDelivery, houseDelivery, pushDelivery } from './deliveries';
 import { sendPushDeliveries } from './push';
 import { deliverySpeakers } from './speaker-choices';
 import { houseQuiet } from './house-quiet';
@@ -44,6 +44,7 @@ export async function timerStartTick(env: Env, now: string): Promise<void> {
     }
     const speakers = !quiet && channels.includes('house') && aud.house ? await deliverySpeakers(db, aud.push) : [];
     if (speakers === null || speakers.length) stmts.push(houseDelivery(db, { message, speakers }, now).stmt);
+    if (aud.funhouse) stmts.push(funhouseDelivery(db, { message }, now).stmt); // §9.4b, not quieted
     if (stmts.length) await db.batch(stmts);
   }
   if (pushIds.length) await sendPushDeliveries(env, pushIds, now);

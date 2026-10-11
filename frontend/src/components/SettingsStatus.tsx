@@ -1,6 +1,7 @@
 // SPEC §8.6 ⚑ Q38 — Settings → 📊 Status: the House announcements line and the recent deliveries table.
 import { useApp, type Status } from '../state';
 import type { DeliveryStatus } from '../../../src/shared/vocab';
+import { CHANNEL_ICON } from './AlertFields';
 import s from './Lists.module.css';
 
 const STATUS_BADGE: Record<DeliveryStatus, string> = { sent: 'good', partial: 'warn', failed: 'bad', queued: 'neutral', claimed: 'neutral' };
@@ -30,7 +31,7 @@ export function SettingsStatus() {
             {status.recentDeliveries.map((d) => (
               <tr key={d.id}>
                 <th scope="row" className={s.flexible} title={`${d.message}${d.detail ? `\n${d.detail}` : ''}`}>{d.message}{d.member ? ` → ${d.member}` : ''}</th>
-                <td className={s.rigid}>{d.channel === 'push' ? '📱' : '🔊'}<span className="visually-hidden">{d.channel}</span></td>
+                <td className={s.rigid}>{CHANNEL_ICON[d.channel]}<span className="visually-hidden">{d.channel}</span></td>
                 <td className={s.rigid}><span className={`badge ${STATUS_BADGE[d.status] ?? 'neutral'}`} title={d.detail ?? ''}>{d.status}</span></td>
                 <td className={s.rigid}>{localTime(d.createdAt)}</td>
               </tr>

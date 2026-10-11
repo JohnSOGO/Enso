@@ -13,7 +13,7 @@ export function announceError(input: { text: unknown; channels: unknown }): stri
   const { text, channels } = input;
   if (typeof text !== 'string' || text.trim().length === 0) return 'Write a message to announce.';
   if (text.trim().length > ANNOUNCE_MAX) return `Keep the message to ${ANNOUNCE_MAX} characters.`;
-  if (!Array.isArray(channels) || channels.length === 0) return 'Pick at least one way to announce (Phone or House).';
+  if (!Array.isArray(channels) || channels.length === 0) return 'Pick at least one way to announce (Phone, House or FunHouse).';
   if (!channels.every((c) => isOneOf(CHANNEL, c))) return `Channels must be from: ${CHANNEL.join(', ')}.`;
   if (new Set(channels).size !== channels.length) return 'Each channel at most once.';
   return null;

@@ -1,6 +1,6 @@
 // SPEC §8.5 — fields shared by the alarm, timer and chore forms: day chips + days text,
-// channel checkboxes, repeat-alert options. Each form keeps its own state and labels.
-import { WEEKDAY, type Weekday } from '../../../src/shared/vocab';
+// channel checkboxes and the flags ⇄ channels mapping (§9.4b), repeat-alert options. Each form keeps its own state and labels.
+import { CHANNEL, WEEKDAY, type Channel, type Weekday } from '../../../src/shared/vocab';
 
 export const SHORT: Record<Weekday, string> = { SU: 'Sun', MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat' };
 export const WEEKDAYS: Weekday[] = ['MO', 'TU', 'WE', 'TH', 'FR'];
@@ -35,14 +35,40 @@ export function DayChips({ days, onChange }: { days: Weekday[]; onChange: (days:
   );
 }
 
-/** The 📱 Phone / 🔊 House "Alert via" checkboxes. */
-export function ChannelChecks({ push, house, onChange }: {
-  push: boolean; house: boolean; onChange: (c: { push: boolean; house: boolean }) => void;
+/** Each channel's glyph and name; SettingsStatus shows the glyph too. */
+export const CHANNEL_ICON: Record<Channel, string> = { push: '📱', house: '🔊', funhouse: '🎪' };
+export const CHANNEL_NAME: Record<Channel, string> = { push: 'Phone', house: 'House', funhouse: 'FunHouse' };
+
+/** A form's one tick per channel. */
+export type ChannelFlags = Record<Channel, boolean>;
+
+/** The ticks a stored channel list shows as; none stored (a new alert) → Phone only. */
+export function flagsOf(channels?: readonly Channel[]): ChannelFlags {
+  const on = channels ?? ['push'];
+  return Object.fromEntries(CHANNEL.map((c) => [c, on.includes(c)])) as ChannelFlags;
+}
+
+/** The channel list to save for these ticks, in CHANNEL order. */
+export const channelsOf = (f: ChannelFlags): Channel[] => CHANNEL.filter((c) => f[c]);
+
+/** "Pick at least one way to {verb} (Phone, House or FunHouse)." */
+export function pickOneWay(verb: string): string {
+  const names = CHANNEL.map((c) => CHANNEL_NAME[c]);
+  return `Pick at least one way to ${verb} (${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}).`;
+}
+
+/** The 📱 Phone / 🔊 House / 🎪 FunHouse "Alert via" checkboxes. */
+export function ChannelChecks({ value, onChange, label = 'Alert via' }: {
+  value: ChannelFlags; onChange: (c: ChannelFlags) => void; label?: string;
 }) {
+  const flags = flagsOf(channelsOf(value)); // only the channel keys, whatever else the form's state holds
   return (
-    <div className="row wrap" style={{ marginBottom: 12 }} role="group" aria-label="Alert via">
-      <label className="chip" style={{ padding: '4px 8px' }}><input type="checkbox" checked={push} onChange={(e) => onChange({ push: e.target.checked, house })} /> 📱 Phone</label>
-      <label className="chip" style={{ padding: '4px 8px' }}><input type="checkbox" checked={house} onChange={(e) => onChange({ push, house: e.target.checked })} /> 🔊 House</label>
+    <div className="row wrap" style={{ marginBottom: 12 }} role="group" aria-label={label}>
+      {CHANNEL.map((c) => (
+        <label key={c} className="chip" style={{ padding: '4px 8px' }}>
+          <input type="checkbox" checked={flags[c]} onChange={(e) => onChange({ ...flags, [c]: e.target.checked })} /> {CHANNEL_ICON[c]} {CHANNEL_NAME[c]}
+        </label>
+      ))}
     </div>
   );
 }

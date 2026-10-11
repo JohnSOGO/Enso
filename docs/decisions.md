@@ -231,3 +231,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q22 | What is an admin? | **Decided by MojoSOGO 2026-10-03:** same powers as the founder; any admin can make/remove admins; the founder can never be demoted or disabled |
 | Q228 | Which founder pings the FunHouse poller shows (§9.4a) | ⚑ Titles starting 🤖 or 🧵 (Claude's); others, such as 🏛️ Ozymandias which reaches the FunHouse itself, are skipped |
 | Q229 | How a ping looks on the FunHouse (§9.4a) | ⚑ source "Claude", level `attention`, beep `look`, sig ⭕🔁🏠, text "title: text" |
+| Q230 | Who sees the 🎪 FunHouse tick (§9.4b) | ⚑ Every member, everywhere Phone / House are |
+| Q231 | Machines and the FunHouse (§9.4b) | ⚑ Machines keep Phone + House; no FunHouse |
+| Q232 | Which rules the FunHouse follows (§9.4b) | ⚑ The phone's: Away stops it, Quiet the house does not, phone first does not delay it |
+| Q233 | How an Ensō alert looks on the FunHouse (§9.4b) | ⚑ As a ping (Q229) with source "Ensō" |

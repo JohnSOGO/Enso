@@ -14,7 +14,7 @@ import { EventFillBar } from './EventFillBar';
 import { AddressField } from './AddressField';
 import { BringField } from './BringField';
 import { RepeatFields, ownWeek, repeatOf, toRecurrence, weeksOf, type RepeatValue } from './RepeatFields';
-import { ReminderFields, reminderOf, toReminder, type ReminderValue } from './ReminderFields';
+import { ReminderFields, reminderError, reminderOf, toReminder, type ReminderValue } from './ReminderFields';
 
 interface Form extends RepeatValue, ReminderValue {
   title: string; address: string; bring: string[]; notes: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string;
@@ -85,7 +85,7 @@ export function EventForm({ eventId, date, onClose }: Props) {
 
   const save = () => run(async () => {
     if (!form) return;
-    if (form.remind !== 'none' && !form.push && !form.house) throw new Error('Pick at least one way to be reminded (Phone or House).');
+    if (reminderError(form)) throw new Error(reminderError(form)!);
     if (form.repeat === 'WEEKLY' && form.byDay.length === 0) throw new Error('Pick at least one day of the week.');
     if (form.repeat === 'MONTHLY_WEEKS' && form.weeks.length === 0) throw new Error('Pick at least one week of the month.');
     const payload = toPayload(form);

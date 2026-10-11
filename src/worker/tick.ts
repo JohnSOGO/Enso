@@ -8,7 +8,7 @@ import type { Recurrence } from '../shared/recurrence';
 import { addMinutes } from '../shared/time';
 import type { Env } from './env';
 import { activeMemberIds, all, first, parseJson, placeOf } from './db';
-import { houseDelivery, pushDelivery } from './deliveries';
+import { funhouseDelivery, houseDelivery, pushDelivery } from './deliveries';
 import { choreRunInserts, insertFire, sourceOf, updateFire } from './fire-rows';
 import { sendPushDeliveries } from './push';
 import { allHouseSpeakers, sendHouseDeliveries } from './house';
@@ -88,6 +88,8 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
           stmts.push(d.stmt);
         }
       }
+      // §9.4b: the FunHouse follows the phone — away stops it; quiet and phone first do not.
+      if (aud.funhouse && !fire.away_by) stmts.push(funhouseDelivery(db, { ...base, message }, now).stmt);
       // §9.2a: on the speakers of everyone it is for — none ticked by any of them, the house quiet (§9.2b) or someone away from this alert (§9.2c), or a phone-first alert 1 (§9.2d) → not spoken (§7D.3: a machine, every speaker).
       const speakers = quiet || fire.away_by || !(aud.house && speaksOnHouse(next.alert_count, src.cfg)) ? []
         : src.allSpeakers ? (everySpeakerNow ??= allHouseSpeakers(env), await everySpeakerNow) : await deliverySpeakers(db, aud.push);

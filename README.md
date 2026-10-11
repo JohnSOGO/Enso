@@ -284,7 +284,8 @@ curl -sS -m 10 -X POST https://enso.sogodojo.com/api/v1/ops/notify -H "Authoriza
 ### The same pings on the FunHouse (SPEC §9.4a)
 
 The FunHouse bridge on the dev PC listens only on 127.0.0.1:8765, so the dev PC pulls: `home/funhouse-poller.ts`
-asks `GET /api/v1/ops/pings` every 15 s and hands Claude's pings (🤖 / 🧵) to the bridge. It reads the same token
+asks `GET /api/v1/ops/pings` every 15 s and hands Claude's pings (🤖 / 🧵) and every alert with 🎪 FunHouse ticked (§9.4b)
+to the bridge. It reads the same token
 file. Build it and start it at logon (once, in a normal PowerShell on the dev PC):
 
 ```powershell

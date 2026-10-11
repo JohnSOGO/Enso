@@ -466,6 +466,12 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**FunHouse as a place alerts go** (v1.51.0, §9.4b, migration 0042; asked by MojoSOGO 2026-10-11; FH1–FH7, FH-M): a third
+tick 🎪 FunHouse beside Phone and House on alarms, event reminders, timers (and their start announcement), chores, things and
+📢 Announce. A ticked alert writes one `funhouse` delivery that `GET /ops/pings` lists (now with `channel`) and marks sent;
+the PC poller forwards every one, source "Ensō". It follows the phone's rules: Away stops it, Quiet the house and phone
+first don't. Machines keep Phone + House. Q230–Q233 are ⚑ defaults. **Still owed:** rebuild and restart the PC poller
+(README); tick FunHouse on a real alert and see it on the desk.
 **Pings on the FunHouse** (v1.50.0, §9.4a; asked by MojoSOGO 2026-10-11; FP1–FP6): `GET /ops/pings` lists the founder
 pings of the last hour, and `home/funhouse-poller.ts` on the dev PC polls it every 15 s and hands Claude's (🤖 / 🧵) to
 the FunHouse bridge on 127.0.0.1:8765, one a poll. Project threads in the cloud ping with the title "🧵 Thread needs

@@ -5,7 +5,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Modal } from './Modal';
 import { Grow } from './Grow';
-import { ChannelChecks } from './AlertFields';
+import { ChannelChecks, channelsOf, flagsOf, pickOneWay } from './AlertFields';
 import { ThingPhoto, photoSrc } from './ThingPhoto';
 import { ThingPlan } from './ThingPlan';
 import { ThingLinkFill } from './ThingLinkFill';
@@ -55,7 +55,7 @@ const formOf = (t: Thing | null) => ({
   title: t?.title ?? '', windowStart: t?.windowStart ?? '', windowEnd: t?.windowEnd ?? '',
   place: t?.place ?? '', address: t?.address ?? '', phone: t?.phone ?? '', cost: t?.cost ?? '', url: t?.url ?? '', note: t?.note ?? '',
   remindStart: t?.remindStart ?? false, remindOnSet: !!t?.remindOn, remindOn: t?.remindOn ?? '',
-  push: t ? t.channels.includes('push') : true, house: t ? t.channels.includes('house') : false,
+  ...flagsOf(t?.channels),
 });
 type Form = ReturnType<typeof formOf>;
 
@@ -92,10 +92,10 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
   }
 
   function body() {
-    const channels: Channel[] = [...(f.push ? ['push' as const] : []), ...(f.house ? ['house' as const] : [])];
+    const channels = channelsOf(f);
     const remindStart = f.remindStart && !!f.windowStart;
     if (f.remindOnSet && !f.remindOn) throw new Error('Pick the date for the reminder.');
-    if ((remindStart || f.remindOnSet) && !channels.length) throw new Error('Pick at least one way to be reminded (Phone or House).');
+    if ((remindStart || f.remindOnSet) && !channels.length) throw new Error(pickOneWay('be reminded'));
     const text = (v: string) => v.trim() || null;
     return {
       title: f.title, windowStart: f.windowStart || null, windowEnd: f.windowEnd || null,
@@ -203,7 +203,7 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
                 onChange={(e) => set('remindOn', e.target.value)} />
             </div>
           </div>
-          <ChannelChecks push={f.push} house={f.house} onChange={(c) => setF({ ...f, ...c })} />
+          <ChannelChecks value={f} onChange={(c) => setF({ ...f, ...c })} />
         </fieldset>
         {saved && canEdit && (
           <div className="row wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>

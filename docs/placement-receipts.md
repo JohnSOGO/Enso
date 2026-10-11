@@ -7,6 +7,16 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.51.0: FunHouse as an alert destination, channel 'funhouse' (placement-advisor)
+
+- **Ask:** SPEC §9.4b (v1.51.0, SPEC 2.83), schema §4.2zo (migration 0042), asked by MojoSOGO ("Add funhouse as reachable location for alerts"). A third channel 🎪 FunHouse beside Phone and House on every ticked alert (event reminders and alarms, timers and their start announcement, chores, things, Announce); one row per alert (member_id NULL, title = pushTitle), listed by GET /ops/pings with `channel`, marked sent on listing, forwarded by the PC poller with source 'Ensō'. It follows the phone's rules: away stops it, quiet and phone first do not, an optional event needs a non-empty audience. Machines keep MACHINE_CHANNELS.
+- **Verdict:** [EXISTING] everywhere: vocab.ts CHANNEL; optins.ts audience().funhouse (the house expression); migration 0042 (0012-style rebuild, every current column and index); deliveries.ts funhouseDelivery (title derived from pushTitle) and opsPingsAfter (FOUNDER_PING OR funhouse, with channel, no status filter; opsPingsSince unchanged); tick.ts step 2, timer-starts.ts and routes/announce.ts write the row (announce's house_quiet only when House is the sole channel); routes/ops.ts a file-local mark-sent UPDATE (deliveries.ts keeps "never updates a status"); home/funhouse-poller.ts forFunhouse(ping) and the source; AlertFields.tsx the 🎪 tick, channelsOf/flagsOf over CHANNEL, one Record<Channel> icon table also used by SettingsStatus.tsx; the six forms swap to the helpers. No new row, no reorganizer, no CEILINGS change.
+- **Flow stage:** rules (vocab, optins); persist (migration, deliveries, tick, timer-starts, announce, ops mark-sent); deliver (home poller); render (AlertFields, the forms, SettingsStatus).
+- **Why:** FunHouse fits the House shape (one row per alert, no member), so each stage's owner extends it. The title is derived inside the writer so it cannot drift from the phone. The hourly count stays on FOUNDER_PING. The list must not filter on status: the poller sends one a poll on an `after` cursor, so a row marked sent before it is forwarded has to stay listable. Rejected: a new src/worker/funhouse.ts (an empty shell); a generic channel-row writer (push needs a member, house speakers); the flags mapping in each form (six copies today).
+- **Caps:** tick.ts 118 → 120/148; EventForm.tsx net-zero (195/223); deliveries.ts 56 → ~70/300; routes/ops.ts ~77/300; announce.ts ~74/300; AlertFields.tsx ~85/300. arch:audit quiet.
+
+---
+
 ## 2026-10-11 — Steward pass 14, whole tree (code-steward)
 
 - **Run:** after the v1.50.0 release (SPEC 2.82 §9.4a, GET /ops/pings + home/funhouse-poller.ts, PR #50), with v1.49.2 (PR #49); audited 3b9b2cb against 2542f2c.

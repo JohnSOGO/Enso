@@ -1,8 +1,9 @@
 // SPEC §8.4 — the event form's Reminder section: reminder select incl. the evening-before option,
-// Remind via Phone/House, repeat-the-alert select; and the reminder ⇄ form mapping.
+// Remind via Phone/House/FunHouse, repeat-the-alert select; and the reminder ⇄ form mapping.
 import { type Channel } from '../../../src/shared/vocab';
+import { ChannelChecks, channelsOf, flagsOf, pickOneWay, type ChannelFlags } from './AlertFields';
 
-export interface ReminderValue { remind: string; push: boolean; house: boolean; renotify: string }
+export interface ReminderValue extends ChannelFlags { remind: string; renotify: string }
 
 /** A stored event reminder, as the API returns and accepts it. */
 export interface Reminder { offsetMin: number; channels: Channel[]; renotifyMin: number | null }
@@ -19,15 +20,18 @@ const RENOTIFY_OPTIONS: [string, string][] = [['off', 'Off'], ['5', 'Every 5 min
 export function reminderOf(reminder: Reminder | null | undefined): ReminderValue {
   return {
     remind: reminder ? String(reminder.offsetMin) : 'none',
-    push: reminder ? reminder.channels.includes('push') : true,
-    house: reminder ? reminder.channels.includes('house') : false,
+    ...flagsOf(reminder?.channels),
     renotify: reminder?.renotifyMin ? String(reminder.renotifyMin) : 'off',
   };
 }
 
+/** Why this Reminder section can't be saved, or null: a reminder needs at least one channel. */
+export const reminderError = (v: ReminderValue): string | null =>
+  v.remind !== 'none' && !channelsOf(v).length ? pickOneWay('be reminded') : null;
+
 /** The reminder to save for this Reminder section (null when None). */
 export function toReminder(v: ReminderValue): Reminder | null {
-  const channels: Channel[] = [...(v.push ? ['push' as const] : []), ...(v.house ? ['house' as const] : [])];
+  const channels = channelsOf(v);
   return v.remind === 'none' ? null : {
     offsetMin: Number(v.remind), channels, renotifyMin: v.renotify === 'off' ? null : Number(v.renotify),
   };
@@ -50,10 +54,7 @@ export function ReminderFields({ value, allDay, onChange }: Props) {
       </label>
       {value.remind !== 'none' && (
         <>
-          <div className="row wrap" style={{ marginBottom: 12 }} role="group" aria-label="Remind via">
-            <label className="chip" style={{ padding: '4px 8px' }}><input type="checkbox" checked={value.push} onChange={(e) => onChange({ push: e.target.checked })} /> 📱 Phone</label>
-            <label className="chip" style={{ padding: '4px 8px' }}><input type="checkbox" checked={value.house} onChange={(e) => onChange({ house: e.target.checked })} /> 🔊 House</label>
-          </div>
+          <ChannelChecks label="Remind via" value={value} onChange={onChange} />
           <label className="field"><span>Repeat the alert until handled</span>
             <select value={value.renotify} onChange={(e) => onChange({ renotify: e.target.value })}>
               {RENOTIFY_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}

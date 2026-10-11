@@ -1,7 +1,7 @@
 // SPEC §3 — the only place these strings are defined. Import; never retype.
 
 export const ALERT_KIND = ['reminder', 'timer', 'chore', 'thing', 'machine'] as const;
-export const CHANNEL = ['push', 'house'] as const;
+export const CHANNEL = ['push', 'house', 'funhouse'] as const; // §9.4b funhouse: the FunHouse desk device, via the PC poller
 export const FIRE_STATE = ['scheduled', 'ringing', 'closed'] as const;
 export const CLOSE_REASON = ['done', 'acked', 'missed', 'superseded', 'stopped', 'removed'] as const;
 export const ACTION = ['done', 'snooze', 'ack'] as const;
