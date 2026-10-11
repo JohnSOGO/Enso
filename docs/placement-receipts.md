@@ -7,6 +7,40 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.60.1: standalone PWA frame flush to screen bottom (placement-advisor)
+
+- **Ask:** SPEC 3.03 §8.1 "Flush at the bottom". On the installed iPhone app the fixed `.app` box (`inset: 0`) stops above the bottom safe area, so the tab bar floats. Add `@media (display-mode: standalone) { .app { bottom: auto; height: 100vh; } }`.
+- **Verdict:** `frontend/src/App.module.css` [EXISTING]
+- **Flow stage:** render
+- **Why:** the bug is in `.app`, owned by App.tsx's frame (§8.1) under the `frontend/src/*.module.css` row. Pure presentation. Scoped to standalone so browser tabs keep `inset: 0`; theme.css (global base) rejected. `.tabs` safe-area padding and `.fab` offset unchanged; check on device.
+- **Caps:** App.module.css about 50/300. No file newly in the warning band.
+
+## 2026-10-11 — v1.60.0: A bounty's picture (placement-advisor)
+
+- **Ask:** SPEC 3.02 §7B.8 "A bounty's picture":
+  - PUT/GET /bounties/{id}/photo (admins set it; anyone reads it).
+  - `Bounty.hasPhoto` and migration 0046 (`bounties.photo_key`).
+  - The picture is deleted when the bounty is paid or deleted.
+  - §8.15b: the ＋ Bounty sheet gets 📷 Add photo (sent after Post); the card shows a thumbnail; an admin's card gets 📷 Add/Replace.
+- **Verdict:** EXISTING, no new row, plus a new migration 0046 and its test. By file:
+  - routes/bounties.ts: both routes, plus the deletes on OK, on an admin's instant Done, and on DELETE.
+  - photo-store.ts: the `'bounties'` prefix.
+  - shared/bounties.ts: BountyRow.photo_key and Bounty.hasPhoto.
+  - BountyForm.tsx: the photo pick, PUT after Post.
+  - Bounties.tsx: the thumbnail and the admin 📷.
+- **Flow stage:** route → persist (D1 + R2 via photo-store.ts) → render. No new rule.
+- **Why:** bounties.ts already owns the bounty, `loadBounty`/`view`, and every point where a bounty becomes paid or deleted, so the deletes must live there. This mirrors v1.59.0.
+- **Rejected:**
+  - A routes/bounty-photos.ts now: it needs exported loaders, and the deletes stay behind anyway.
+  - A shared `canSetPhoto` rule: it is one status check.
+  - A vocab entry.
+  - Deleting on Not yet: the bounty is still live.
+- **Caps:** routes/bounties.ts 199 → 228/300 (band at 270), with a second photo route pair in one file. Bounties.tsx 148 → 153/300. BountyForm.tsx 45 → 73/300. shared/bounties.ts ~128/300. photo-store.ts 35/300. Nothing newly in the band; no re-pins.
+- **Seam named for next time:** both photo route pairs + dropPhoto → `src/worker/routes/bounty-photos.ts`, with bounties.ts exporting loadBounty/pending (the lists.ts/item-photos.ts pattern). Extract when bounties.ts would pass ~250.
+- **Sources read:** docs/module-ownership.md (photo and bounty rows), docs/placement-receipts.md (v1.59.0, steward pass 17), scripts/arch.ts (caps), SPEC.md §7B.8 "A bounty's picture", src/worker/routes/bounties.ts (199 lines). Line counts and wire types for photo-store.ts, shared/bounties.ts, BountyForm.tsx, Bounties.tsx, BountyDone.tsx and earnings.ts.
+
+---
+
 ## 2026-10-11 — Steward pass 17, whole tree (code-steward)
 
 - **Run:** after the v1.58.0 release (SPEC 2.99 §8.16, pick mode like Ozymandias, with the ◎ button). Also covers v1.54.1–v1.57.1 (FunHouse for machines, custom minutes, poller cursor, two machines buttons, Chores menu, tagline, Settings About, bounties and score with migration 0044, shorter thread pings). Audited e21ab6c..265334e.
@@ -15,14 +49,6 @@ carry its result.
 - **Top finding:** routes/bounties.ts Done catches every batch error as a 409 "waiting for OK", where its siblings machines/cooking re-throw non-constraint errors. No losing-tap guard is tested (bounties take/Done, machines, cooking) (MED-LOW, S).
 - **Handoffs:** waiting on MojoSOGO's pick: (1) the Done re-throw plus the losing-tap tests (absorbs pass 16's conflict-guard item); (2) wording: PickGrid's caller list now missing Chores (stop listing callers). The pick-mode wording slips (SettingsMe label, PointAtButton header, PointAt map row, where-things-stand header) were fixed at once as v1.59.1 by the thread that shipped v1.58.0. Still open, all LOW: pass 11's two §7D notes, pass 10's house-row helper, the snooze-keeps-away test, the machines.ts alert-hours seam. Pass 6 items 1, 3 and 4 (alertMessage options, read-budget wording, EVENT_NOTES_MAX) fell off the carry list without a decision; MojoSOGO to retire or re-list them.
 - **Restraint:** the PickGrid + Modal menu glue now has three copies (Settings, Alarms, Chores), about 4 lines each with no rule, so no PickMenu until a fourth; the active-admins query twice; the name lookup twice; /take's SQL mirroring dibHolds (atomic guard); /earnings ok's unconditional UPDATE (a dropped earning never scores); the finisherOf route import; selectorFor kept in point-line.ts.
-
-## 2026-10-11 — v1.59.2: standalone PWA frame flush to screen bottom (placement-advisor)
-
-- **Ask:** SPEC 3.02 §8.1 "Flush at the bottom". On the installed iPhone app the fixed `.app` box (`inset: 0`) stops above the bottom safe area, so the tab bar floats. Add `@media (display-mode: standalone) { .app { bottom: auto; height: 100vh; } }`.
-- **Verdict:** `frontend/src/App.module.css` [EXISTING]
-- **Flow stage:** render
-- **Why:** the bug is in `.app`, owned by App.tsx's frame (§8.1) under the `frontend/src/*.module.css` row. Pure presentation. Scoped to standalone so browser tabs keep `inset: 0`; theme.css (global base) rejected. `.tabs` safe-area padding and `.fab` offset unchanged; check on device.
-- **Caps:** App.module.css about 50/300. No file newly in the warning band.
 
 ## 2026-10-11 — v1.59.1: Point at it label and comment match ◎ (placement-advisor)
 

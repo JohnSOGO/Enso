@@ -1,5 +1,6 @@
 // SPEC §7B.8 — bounties: one-offs (post, I'll do it, Let it go, Done, delete), a chore's bounty, an admin's OK / Not
-// yet on an earning, its done photo (R2 `earnings/{id}/…`, private, deleted on OK / Not yet / delete), and everyone's score. The rules and words are src/shared/bounties.ts; an earning and its waiting
+// yet on an earning, its done photo (R2 `earnings/{id}/…`, private, deleted on OK / Not yet / delete), a one-off's
+// picture (R2 `bounties/{id}/…`, admins set it, deleted once paid or deleted), and everyone's score. The rules and words are src/shared/bounties.ts; an earning and its waiting
 // push are written through earnings.ts. Never decides a state itself.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
@@ -28,6 +29,7 @@ function view({ b, earning }: Loaded, now: string): Bounty {
   return {
     id: b.id, title: b.title, note: b.note, points: b.points, createdBy: b.created_by, createdAt: b.created_at, status,
     takenBy: status === 'taken' ? b.taken_by : null, doneBy: earning?.member_id ?? null, earningId: earning?.id ?? null,
+    hasPhoto: !!b.photo_key,
   };
 }
 
@@ -123,6 +125,7 @@ bounties.post('/bounties/:id/done', requireMember, async (c) => {
     return refuse(c, 'That bounty is waiting for OK.'); // uq_earning_bounty: someone said Done first
   }
   if (w.pushIds.length) await sendPushDeliveries(c.env, w.pushIds, now);
+  if (finisherOf(me).admin) await dropBountyPhoto(c, l.b.id); // ⚑ Q252: an admin's Done is paid at once
   return answer(c, l.b.id);
 });
 
@@ -132,10 +135,11 @@ bounties.delete('/bounties/:id', requireMember, requireOwner, async (c) => {
   if (bountyStatus(l.b, l.earning, nowIso()) === 'paid') return refuse(c, 'That bounty is already paid.');
   const db = c.env.DB, now = nowIso();
   await db.batch([
-    db.prepare('UPDATE bounties SET deleted_at = ? WHERE id = ?').bind(now, l.b.id),
+    db.prepare('UPDATE bounties SET deleted_at = ?, photo_key = NULL WHERE id = ?').bind(now, l.b.id),
     db.prepare('UPDATE earnings SET dropped_at = ?, photo_key = NULL WHERE bounty_id = ? AND dropped_at IS NULL').bind(now, l.b.id),
   ]);
   await dropPhoto(c, l.earning);
+  if (l.b.photo_key) await c.env.PHOTOS.delete(l.b.photo_key);
   return c.body(null, 204);
 });
 
@@ -152,6 +156,14 @@ bounties.put('/chores/:id/bounty', requireMember, requireOwner, async (c) => {
 /** Removes a decided earning's done photo from R2; the caller's UPDATE sets photo_key NULL (§7B.8). */
 const dropPhoto = async (c: Context<AppEnv>, e: EarningRow | null) => { if (e?.photo_key) await c.env.PHOTOS.delete(e.photo_key); };
 
+/** A paid one-off's picture: the key read first, the row cleared, then the object deleted (§7B.8 ⚑ Q260). */
+async function dropBountyPhoto(c: Context<AppEnv>, bountyId: string) {
+  const key = (await first<{ k: string | null }>(c.env.DB, 'SELECT photo_key AS k FROM bounties WHERE id = ?', bountyId))?.k;
+  if (!key) return;
+  await c.env.DB.prepare('UPDATE bounties SET photo_key = NULL WHERE id = ?').bind(bountyId).run();
+  await c.env.PHOTOS.delete(key);
+}
+
 /** A live, pending earning, or the refusal to send. */
 async function pending(c: Context<AppEnv>): Promise<EarningRow | Response> {
   const e = await first<EarningRow>(c.env.DB, 'SELECT * FROM earnings WHERE id = ? AND dropped_at IS NULL', c.req.param('id'));
@@ -167,6 +179,7 @@ bounties.post('/earnings/:id/ok', requireMember, requireOwner, async (c) => {
   await c.env.DB.prepare('UPDATE earnings SET member_id = ?, ok_by = ?, ok_at = ?, photo_key = NULL WHERE id = ?')
     .bind(who, c.get('member').id, nowIso(), e.id).run();
   await dropPhoto(c, e);
+  if (e.bounty_id) await dropBountyPhoto(c, e.bounty_id);
   return c.body(null, 204);
 });
 
@@ -196,4 +209,20 @@ bounties.put('/earnings/:id/photo', requireMember, async (c) => {
 bounties.get('/earnings/:id/photo', requireMember, async (c) => {
   const e = await first<EarningRow>(c.env.DB, 'SELECT * FROM earnings WHERE id = ? AND dropped_at IS NULL', c.req.param('id'));
   return servePhoto(c, c.env.PHOTOS, e?.photo_key, 'That photo no longer exists.');
+});
+
+bounties.put('/bounties/:id/photo', requireMember, requireOwner, async (c) => {
+  const l = await loadBounty(c);
+  if (l instanceof Response) return l;
+  if (bountyStatus(l.b, l.earning, nowIso()) === 'paid') return refuse(c, 'That bounty is already paid.');
+  const photo = await photoBody(c);
+  if (photo instanceof Response) return photo;
+  await replacePhoto(c.env.PHOTOS, 'bounties', l.b.id, photo.bytes, photo.type, l.b.photo_key,
+    (key) => c.env.DB.prepare('UPDATE bounties SET photo_key = ? WHERE id = ?').bind(key, l.b.id).run());
+  return c.body(null, 204);
+});
+
+bounties.get('/bounties/:id/photo', requireMember, async (c) => {
+  const b = await first<BountyRow>(c.env.DB, 'SELECT * FROM bounties WHERE id = ? AND deleted_at IS NULL', c.req.param('id'));
+  return servePhoto(c, c.env.PHOTOS, b?.photo_key, 'That picture no longer exists.');
 });
