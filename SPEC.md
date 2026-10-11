@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.04 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 3.05 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4451,7 +4451,8 @@ Chore bounties                                   (admins only)
   first); OK sends the one picked. Empty → the section is left out.
 - **Done** on a one-off opens a small sheet: **📷 Add photo** (optional), then **Done** / **Cancel**. Done sends the
   Done, then the photo to the new earning; if the photo fails, the Done stands and the refusal shows with 📷 Add photo
-  still on the waiting row.
+  still on the waiting row. An admin's sheet has no 📷 (their Done is OK'd at once, nothing waits for a photo): only
+  the dim line "Your points count at once." and **Done** / **Cancel** ⚑ Q261 (v1.60.3).
 - **Bounties**: each one-off, newest first: title, 🪙 points, the note as a dim second line, its picture as a
   thumbnail when there is one (tap for full size), and "{name} is on it" while taken ("You're on it" for mine). Buttons by what I may do (§7B.8): **I'll do it**, **Done**, **Let it go**.
   An admin also gets ✕ **Delete** (accessible name "Delete Clean the toilet"; asks first). None → "No bounties right
@@ -4468,10 +4469,11 @@ Chore bounties                                   (admins only)
 and **This month**, and a **House** row under it with the sums. Under the table, dim: "Points count once an admin
 says OK." Pending points are not shown here.
 
-Acceptance (BS1–BS3, manual on the iPhone at 320 px): BS1 an admin posts a bounty and a kid's phone gets the push;
+Acceptance (BS1–BS4, manual on the iPhone at 320 px): BS1 an admin posts a bounty and a kid's phone gets the push;
 BS2 the kid taps I'll do it, then Done with a photo from the camera, and the admin's phone gets the waiting push, sees
 the photo full size and OKs it; BS3 Score shows the
-kid's points this week and the House row.
+kid's points this week and the House row; BS4 an admin taps Done on a one-off and sees no 📷, only "Your points
+count at once." (Q261).
 
 ### 8.16 🎯 Point at it — name what I tapped
 
