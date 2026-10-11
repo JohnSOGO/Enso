@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-11 — v1.57.1: FunHouse 🧵 thread ping shows its text only (placement-advisor)
+
+- **Ask:** SPEC 2.98 §9.4a, MojoSOGO 2026-10-11: "the funhouse has a small display; the prefix has too many words: have it say {name of project}:{name of thread} \"message\"". In the FunHouse poller's bridge body, a 🧵 thread ping sends only its text (threads now write it as `Enso:<thread title> "<ACTION what>"`), with no "title: " prefix. 🤖 pings and FunHouse alerts keep "title: text". Test FP4.
+- **Verdict:** home/funhouse-poller.ts, funhouseNotice() [EXISTING]
+- **Flow stage:** deliver (the home-PC FunHouse leg)
+- **Why:** funhouseNotice is already the one builder of the bridge body, so this changes one expression inside one owner. It branches on the 🧵 title prefix the same way forFunhouse does. Rejected: changing the ping in the Worker (/ops/notify or /ops/pings), because the phone push shows title and text separately and the contract stays the same. Rejected: a vocab.ts constant, because this is a home-side display format with no Worker import.
+- **Caps:** home/funhouse-poller.ts 98 → 99 of 300 (no CEILINGS pin). Nothing is newly in the warning band.
+- **Reorganizer:** none needed.
+
+---
+
 ## 2026-10-11 — v1.57.0: Bounties and the score (placement-advisor)
 
 - **Ask:** SPEC 2.97 §7B.8 Bounties and the score, §8.15b (🪙 Bounties / ＋ Bounty / 🏅 Score screens, 🪙 n on Today and All chores), §4.2zq migration 0044, §10 rows for /bounties, /chores/{id}/bounty, /earnings, and the §9.4 founder-ping predicate leaving out bounty pushes.
