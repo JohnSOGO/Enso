@@ -264,3 +264,4 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q262 | A stale FunHouse notice (§9.4a) | ⚑ Older than 10 min at poll time → skipped, never shown (same window as the start-up look-back) |
 | Q260 | A bounty's picture (§7B.8) | ⚑ Optional, one per one-off, set by an admin when posting or later from the card; everyone sees it; deleted when the bounty is paid or deleted |
 | Q261 | An admin's own Done sheet (§8.15b) | ⚑ No 📷 Add photo: an admin's Done is OK'd at once (Q252), so a photo would be refused and deleted; the sheet says "Your points count at once." |
+| Q263 | A bounty from a done machine load (§7D.9, §8.5) | ⚑ 🪙 Bounty on every done card (washer, dryer, dish washer), admins only as every one-off (ADM); a plain one-off with a prefilled title, not tied to the machine: moving or finishing the load does not pay it |

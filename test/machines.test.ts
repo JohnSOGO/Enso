@@ -6,7 +6,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Client, member, owner, tickAt } from './helpers';
 import {
   MACHINE_LABEL, MACHINE_MAX_ALERTS, MACHINE_RENOTIFY_MIN, finishLabel, machineMinutes, nextMachine, previousMachine, clearMachine, doneMessage, doneNowMachine, finishMachine, machineAlertConfig, machineState,
-  isStillLoaded, moveMachine, parseDoneNow, parseMove, parseStart, refusalText, remindMachine, startMachine, waitingLoad, type MachineRow,
+  isStillLoaded, loadBountyTitle, moveMachine, parseDoneNow, parseMove, parseStart, refusalText, remindMachine, startMachine, waitingLoad, type MachineRow,
 } from '../src/shared/machines';
 import { DEFAULT_MACHINE_HOURS, machineQuietUntil, parseMachineHours } from '../src/shared/machine-hours';
 import { alertMessage, applyAction, newMachineFire, pushActions, stepFire, type FireRow } from '../src/shared/engine';
@@ -513,5 +513,15 @@ describe('M4l /machines (L3–L12)', () => {
     const d = await deliveriesOf(fire.id);
     expect(d.filter((x) => x.channel === 'push').map((x) => x.member_id).sort()).toEqual([A, B].sort());
     expect(d.find((x) => x.channel === 'push').message).toBe('The laundry in the clothes washer is done');
+  });
+});
+
+describe('§7D.9 a bounty from a done load', () => {
+  it('LB1 loadBountyTitle', () => {
+    expect(loadBountyTitle('washer', 'Sam')).toBe("Move Sam's load to the clothes dryer");
+    expect(loadBountyTitle('dryer', 'Sam')).toBe("Take Sam's load out of the clothes dryer and fold it");
+    expect(loadBountyTitle('washer', null)).toBe('Move the load to the clothes dryer');
+    expect(loadBountyTitle('dishwasher', 'Sam')).toBe('Empty the dish washer');
+    expect(loadBountyTitle('dryer', 'A'.repeat(60)).length).toBe(60);
   });
 });
