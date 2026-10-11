@@ -7,14 +7,40 @@ carry its result.
 
 ---
 
-## 2026-10-11 — v1.56.0: 🎯 pick mode stays on, Ozy-style text with a CSS selector, toast instead of modal (placement-advisor)
+## 2026-10-11 — v1.57.0: 🎯 pick mode stays on, Ozy-style text with a CSS selector, toast instead of modal (placement-advisor)
 
-- **Ask:** SPEC 2.94 §8.16 (modeled on the Ozymandias dashboard's pick mode). 🎯 turns pick mode on until 🎯 again, the bar, Esc, or Alt+P. While on: a top bar, a hover outline for a mouse (a class on the element under the pointer), a crosshair cursor. Every tap is captured, swallowed and copied, then shown in a toast (4 s, or 15 s with "Copy blocked"), with no 📍 Pointed at modal. The text becomes multi-line: `Enso pick: <tab>` / `Where:` modals and groups joined " > " / `Element: <kind> "<name>"` / `Selector:` (stops at the nearest id, else tag.class (first 2) with :nth-of-type where siblings share the tag, joined " > ") / `Screen: WxH` (phone below 700 wide) / build stamp.
+- **Ask:** SPEC 2.97 §8.16 (modeled on the Ozymandias dashboard's pick mode). 🎯 turns pick mode on until 🎯 again, the bar, Esc, or Alt+P. While on: a top bar, a hover outline for a mouse (a class on the element under the pointer), a crosshair cursor. Every tap is captured, swallowed and copied, then shown in a toast (4 s, or 15 s with "Copy blocked"), with no 📍 Pointed at modal. The text becomes multi-line: `Enso pick: <tab>` / `Where:` modals and groups joined " > " / `Element: <kind> "<name>"` / `Selector:` (stops at the nearest id, else tag.class (first 2) with :nth-of-type where siblings share the tag, joined " > ") / `Screen: WxH` (phone below 700 wide) / build stamp.
 - **Verdict:** frontend/src/point-line.ts, frontend/src/components/PointAtButton.tsx, frontend/src/components/PointAt.tsx (+ PointAt.module.css) [EXISTING]. Build waited on the §8.16 text.
 - **Flow stage:** render and capture intent (PWA only); point-line.ts is the PWA's own naming rule.
 - **Why:** point-line.ts (91/300, one importer) already owns naming the tapped element. selectorFor is another way of naming it, and pickText replaces pointLine outright, so its concern stays one. A separate selector module was rejected as classitis at this size. PointAtButton.tsx (26/300) keeps the switch and the signal, which turns from arm into toggle; it holds no pick state. PointAt.tsx (74/300) already owns the capture-phase layer and the result display; swapping the modal for a toast and adding hover, crosshair and keys keeps it one concern (the pick layer). A generic Toast component was rejected (no second user). Threats avoided: module-level `let` for pick state; the phone/desktop size rule leaking into the layer (it lives in pickText); a stale hover class left on app elements after off or unmount; the copy moving out of the gesture handlers (v1.52.1).
 - **Caps:** point-line.ts ~130/300; PointAt.tsx ~120/300; PointAtButton.tsx ~26/300; PointAt.module.css ~35/300. Nothing in the band; no re-pins.
 - **Sources read:** docs/module-ownership.md (PointAt rows, state.tsx row), docs/placement-receipts.md (v1.52.0, v1.52.1), scripts/arch.ts, SPEC.md §8.16, frontend/src/point-line.ts, frontend/src/components/PointAt.tsx, frontend/src/components/PointAtButton.tsx, frontend/src/components/PointAt.module.css.
+## 2026-10-11 — v1.56.0: Settings → ℹ️ About (placement-advisor)
+
+- **Ask:** SPEC 2.96 §8.6 (new area, MojoSOGO 2026-10-11 "add 'about' button in settings; modal shows splash screen, logo, revision, developed by"): a 9th Settings PickGrid button ℹ️ About for everyone, whose modal shows the §8.10 opening-screen look (/icon.svg, "Ensō", the tagline, `__ENSO_BUILD__`) and "Developed by MojoSOGO · with Claude". No server, API or migration change.
+- **Verdict:** frontend/src/components/SettingsAbout.tsx + SettingsAbout.module.css [NEW row]; frontend/src/components/Settings.tsx (one AREAS entry, one body entry) [EXISTING]; test/settings-about.test.ts (new).
+- **Flow stage:** render
+- **Why:** Every Settings area is its own leaf component, and Settings.tsx only holds which one is open, so About follows SettingsMe and SettingsStatus. The tagline is written once in source, as `TAGLINE` exported by SettingsAbout.tsx. index.html must stay plain HTML that paints before any script (§8.10), so it keeps its literal copy, and test/settings-about.test.ts asserts that index.html contains each half (index.html and SettingsAbout both loaded at run time like test/recipe-transcript.test.ts; a static `?raw` import fails the Worker typecheck). Rejected: rendering the About body inline in Settings.tsx (a second concern for the menu); vocab.ts for the tagline (display copy, already rejected by the v1.55.1 receipt); a separate tagline.ts (a map row for one const with one importer); injecting the tagline into index.html from vite.config.ts like %ENSO_BUILD% (build machinery to avoid a one-line test).
+- **Caps:** Settings.tsx 59/99 → 62/99 (CEILINGS unchanged); SettingsAbout.tsx 19/300. No file enters the warning band.
+- **Reorganizer:** none needed.
+- **Sources read:** scripts/arch.ts, docs/module-ownership.md, docs/placement-receipts.md (latest three), Settings.tsx, frontend/index.html, SPEC.md §8.6, test/point-at.test.ts, test/repeat-fields.test.ts, RecipeView.tsx imports, vitest.config.ts.
+
+## 2026-10-11 — Steward pass 16 handoff TXT: wording only (no placement needed for code)
+
+- **Ask:** MojoSOGO picked TXT from pass 16 (and said no to TST): PickGrid's header comment and map row now name its three callers (§8.5 Alarms, §8.6 Settings, §8.8 Lists); SPEC 2.95 §8.2 gains the cooking timer's Ringing bar row (`🍳 label · person` with **[Off]**, glyph fixed, ⚑ Q246). Comment and docs only; no behavior change, no version bump, no deploy.
+
+## 2026-10-11 — v1.55.1: Opening-screen tagline (placement-advisor)
+
+- **Ask:** SPEC 2.94 §8.10: the tagline "Closing the loop. Peace of mind, every day." under the "Ensō" heading on the opening screen, and the iPhone splash PNGs re-rendered from that screen.
+- **Verdict:** `frontend/index.html` (#splash) [EXISTING, reuse; no new module]
+- **Flow stage:** render
+- **Why:** §8.10 makes the opening screen plain HTML in index.html so it paints before any script. A static tagline is one `<p>` there plus its CSS. index.html is outside `SOURCE_EXT`, with no cap, map row or fan-in.
+- **Rejected:** a React component in frontend/src/ (would show only after the bundle loads, and copy the screen); `vocab.ts` (display copy, and the splash cannot import it); the sign-in screens (no logo there); drawing the PNGs separately (§8.10 says they are rendered from this screen).
+- **Caps:** none affected. No file enters the warning band.
+- **Sources read:** frontend/index.html, scripts/arch.ts, docs/module-ownership.md.
+
+---
+
 ## 2026-10-11 — v1.55.0: Chores tab becomes a section menu (placement-advisor)
 
 - **Ask:** Make the 🧹 Chores tab a menu like Alarms/Settings: heading Chores, a PickGrid of ✅ Today · 🧽 Messes · 📋 All chores, and a tap opens that section in a Modal titled emoji + name, with nothing inside the sections changing (SPEC 2.93 §8.15, ⚑ Q245).

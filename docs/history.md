@@ -466,7 +466,7 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
-**🎯 Pick mode like Ozymandias** (v1.56.0, §8.16, Q236–Q237 revised; MojoSOGO 2026-10-11: "look at ozymandias and do
+**🎯 Pick mode like Ozymandias** (v1.57.0, §8.16, Q236–Q237 revised; MojoSOGO 2026-10-11: "look at ozymandias and do
 it like that"): modeled on the Ozymandias dashboard's `pick_mode.js`. The 🎯 became Ozy's small faint ◎ circle bottom left, amber
 while on ("I like the way ozymandias has the bottom left circle activator"). ◎ now turns pick mode on until a ◎ or the bar
 is tapped, or Esc (Alt+P toggles on a keyboard); every tap while on is swallowed and copied, and a toast shows the text
@@ -474,6 +474,13 @@ is tapped, or Esc (Alt+P toggles on a keyboard); every tap while on is swallowed
 CSS selector), `Screen:`, build stamp. A mouse gets an outline and a crosshair. Checked in headless Chromium, mouse and
 touch: two picks in a row each landed on the clipboard with the tab unchanged, the bar and Esc stop it, taps work after.
 **Still owed:** PA3–PA4 on the iPhone.
+**Settings → About** (v1.56.0, §8.6, Q247–Q248; asked by MojoSOGO 2026-10-11): a ℹ️ About button, last in the
+Settings grid, opens the opening screen's look (logo, Ensō, tagline, build stamp) and "Developed by MojoSOGO · with
+Claude". The tagline is written once in `SettingsAbout.tsx`; a test holds `index.html` to it.
+**Opening-screen tagline** (v1.55.1, §8.10; MojoSOGO 2026-10-11): "Closing the loop. Peace of mind, every day." sits
+under **Ensō** on the opening screen, and the seven iPhone launch PNGs were re-rendered from it (headless Chromium, so
+their font is the Linux sans, not Segoe UI as before; the live screen uses the phone's own font). Sign-in screens
+show no logo, so they have no tagline.
 **Chores menu** (v1.55.0, §8.15, Q245; asked by MojoSOGO 2026-10-11): the 🧹 Chores tab is a menu of ✅ Today,
 🧽 Messes and 📋 All chores, each opening in its own modal like Settings and Alarms. Nothing inside changed.
 **Two machines buttons** (v1.54.4, §8.5; asked by MojoSOGO 2026-10-11): the Alarms tab's 🫧 Machines button became

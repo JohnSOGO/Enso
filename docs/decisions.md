@@ -236,14 +236,17 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q232 | Which rules the FunHouse follows (§9.4b) | ⚑ The phone's: Away stops it, Quiet the house does not, phone first does not delay it |
 | Q233 | How an Ensō alert looks on the FunHouse (§9.4b) | ⚑ As a ping (Q229) with source "Ensō" |
 | Q234 | Where 🎯 Point at it is turned on (§8.16) | ⚑ A switch in Settings → 🙂 Me, off by default, for this device only (kept in the browser); any member may turn it on |
-| Q235 | Where the 🎯 sits while on (§8.16) | ⚑ Since v1.56.0 a small faint round ◎ (like Ozymandias), bottom left just above the tab bar on every tab, and one in every modal header beside ✕; amber while pick mode is on |
-| Q236 | How long pick mode lasts (§8.16) | ⚑ Since v1.56.0 (like Ozymandias): stays on until a ◎ or the bar is tapped, or Esc; Alt+P toggles while the switch is on (was one tap) |
-| Q237 | What the pick text says (§8.16) | ⚑ Since v1.56.0, Ozymandias's PDASH pick lines: `Enso pick:` tab / `Where:` modals > groups / `Element:` kind "name" / `Selector:` CSS / `Screen:` WxH / build stamp (was one 📍 line) |
+| Q235 | Where the 🎯 sits while on (§8.16) | ⚑ Since v1.57.0 a small faint round ◎ (like Ozymandias), bottom left just above the tab bar on every tab, and one in every modal header beside ✕; amber while pick mode is on |
+| Q236 | How long pick mode lasts (§8.16) | ⚑ Since v1.57.0 (like Ozymandias): stays on until a ◎ or the bar is tapped, or Esc; Alt+P toggles while the switch is on (was one tap) |
+| Q237 | What the pick text says (§8.16) | ⚑ Since v1.57.0, Ozymandias's PDASH pick lines: `Enso pick:` tab / `Where:` modals > groups / `Element:` kind "name" / `Selector:` CSS / `Screen:` WxH / build stamp (was one 📍 line) |
 | Q238 | Alarms tab as a menu (§8.5) | ⚑ Announce and Quiet the house stay on the tab; below them three buttons (⏰ Alarms, ⏱ Rolling timers, 🫧 Machines), each opens in a modal |
 | Q239 | Cooking timer kinds (§7D.8) | ⚑ Air fryer 🍟, Stove 🍳, Oven 🔥, Microwave ⚡, Other ⏲️, plus an optional name ("Oven 2") |
 | Q240 | Cooking timer minutes (§7D.8) | ⚑ Any whole number 1–600, with quick chips 1–60 |
 | Q241 | How a cooking timer rings (§7D.8) | ⚑ At any hour (not the machine alert hours), every 5 minutes, 4 alerts; phones always, speakers when someone is picked |
 | Q242 | Cooking timers' end of day (§7D.8) | ⚑ At local midnight every timer not running and not still alerting is closed; one still going stays until it rings out |
+| Q246 | A cooking timer's glyph in the Ringing bar (§8.2) | ⚑ 🍳 for every kind (the fire view carries no kind); the card in Cooking machines shows the kind's own glyph |
 | Q243 | Where cooking timers sit (§8.5) | **Decided by MojoSOGO 2026-10-11:** their own 🍳 Cooking machines button on the Alarms tab, beside 🧺 Washing machines (was ⚑ one Machines modal with two groups) |
 | Q244 | Where the FunHouse poller starts after a restart (§9.4a) | ⚑ From the `after` it saved last when within 10 min (nothing repeats); else 10 min back (older notices from a longer outage are skipped) |
 | Q245 | How the Chores tab shows its sections (§8.15) | ⚑ A menu of ✅ Today · 🧽 Messes · 📋 All chores, each in its own modal, as Settings and Alarms (was all three stacked on the tab) |
+| Q247 | Where Settings → ℹ️ About sits (§8.6) | ⚑ Last button in the grid, after 📊 Status, for every member |
+| Q248 | The About credit line (§8.6) | ⚑ "Developed by MojoSOGO · with Claude" (no other author is named in SPEC or README) |

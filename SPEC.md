@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 2.94 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 2.97 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3408,6 +3408,8 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
   dryer-minutes chooser the Machines card uses (§8.5); `🧺 Clothes dryer · Sam` with **[Fold &
   out]**; `🧺 Dish washer · Sam` (who started it, §7D.6) with **[Emptied]**. No Done:
   a machine fire is closed only by the `/machines` routes (§7D.2), or `/cooking` (§7D.8). ⚑ Q40
+- Cooking timer row (§7D.8): `🍳 Air fryer · Sam` (its label, then who started it) with **[Off]**. The glyph is 🍳 for
+  every kind ⚑ Q246.
 - **Away** (§9.2c) on every row not yet away: "I've seen it, I'm not home." The speakers and phones stop for that alert;
   the row stays. An away row shows `· away ({name})` instead of the button.
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
@@ -3647,6 +3649,7 @@ Settings
 [ 📱 Phone alerts  ] [ 🔊 Speakers       ]
 [ 🔔 Alerts        ] [ 🏠 Household      ]   ← Household and Members: admins only
 [ 👥 Members       ] [ 📊 Status         ]
+[ ℹ️ About         ]
 [ Log out ]
 ```
 
@@ -3667,11 +3670,16 @@ Settings
   (good) with the last success time; `failing` → "failing since {lastFailedAt}" (bad) with
   `lastError` beneath; `not_configured` → "not set up" (bad); `untried` → "not tried yet"
   (neutral). Then the last 20 deliveries with their status badge.
+- **ℹ️ About** (asked by MojoSOGO 2026-10-11, last in the grid, for everyone ⚑ Q247): the opening screen's look
+  (§8.10) inside the modal: the ensō logo, **Ensō**, the tagline, and the build stamp as the revision; then
+  **"Developed by MojoSOGO · with Claude"** ⚑ (Q248). Nothing to change, nothing fetched.
 - **Log out** sits under the grid, not inside an area ⚑ (Q227). No menu button is marked chosen.
 
 **Acceptance (SM1–SM4):** SM1 the tab shows the grid, with Household and Members only for an admin; SM2 each
 button opens its area titled with its name, and closing returns to the grid; SM3 a tapped alert notification opens
-Settings → 🔔 Alerts on its card, and closing the card leaves the Alerts list open; SM4 every setting listed above is
+Settings → 🔔 Alerts on its card, and closing the card leaves the Alerts list open; SM5 ℹ️ About shows the logo,
+Ensō, the same tagline as the opening screen (a test holds `frontend/index.html` to it) and the same build stamp as
+under the tabs; SM4 every setting listed above is
 reachable and behaves as before (manual, on the iPhone at 320 px: the grid is two columns, one under 360 px).
 
 ### 8.8 Lists screen
@@ -3787,11 +3795,14 @@ least 0.8 s so it never flickers:
 ```
             ◯   (the ensō, large)
            Ensō
+ Closing the loop. Peace of mind, every day.
    https://enso.sogodojo.com
       v0.2.0 · a99e5db
 ```
-- Centred on `--bg`: the ensō, **Ensō** in a large, light-weight serif-free type, and the
-  **full address the app is served from** (`location.origin`, so the home-network server
+- Centred on `--bg`: the ensō, **Ensō** in a large, light-weight serif-free type, under it
+  the tagline **"Closing the loop. Peace of mind, every day."** (MojoSOGO's exact words,
+  2026-10-11) in small light text, breaking only between its two sentences so it fits 320 px,
+  then the **full address the app is served from** (`location.origin`, so the home-network server
   shows its own) in small dim text, and under it the **build stamp** — `v{version} ·
   {commit}` (decided by MojoSOGO 2026-10-03): the app version from `package.json` and the
   short git commit the page was built from, written into the page **at build time** (never
@@ -3801,7 +3812,7 @@ least 0.8 s so it never flickers:
   feature bumps the minor (`1.1.0`, `1.2.0`, …), each fix-only merge bumps the patch. The
   version lives only in `package.json` (the stamp reads it); the spec's own version line is
   separate and counts spec revisions.
-  Nothing else — no spinner, no tagline.
+  Nothing else — no spinner.
 - One source: the screen is plain HTML in `index.html`, outside the React root, so it
   appears before any script loads; `App` removes it when ready (signed in or not).
 - iPhone shows its own launch image before the page exists: `apple-touch-startup-image`
@@ -4243,7 +4254,7 @@ Balances
 ### 8.16 🎯 Point at it — name what I tapped
 
 Asked by MojoSOGO 2026-10-11: "click the screen and the control … its location/path in the display can be captured
-so I don't have to over explain", without clashing with what a tap already does. Since v1.56.0 it works like the
+so I don't have to over explain", without clashing with what a tap already does. Since v1.57.0 it works like the
 Ozymandias dashboard's pick mode (MojoSOGO 2026-10-11: "look at ozymandias and do it like that"): a **pick mode** that
 stays on, where every tap is captured, swallowed, and copied as a few lines he pastes into a Claude thread.
 
@@ -4284,7 +4295,7 @@ stays on, where every tap is captured, swallowed, and copied as a few lines he p
   Element: checkbox "FunHouse"
   Selector: dialog > div._body_x1 > label:nth-of-type(2) > input
   Screen: 430x932 (phone)
-  v1.56.0 · 1a2b3c4
+  v1.57.0 · 1a2b3c4
   ```
 - It names what is already on screen; it reads no data from the server and is stored nowhere.
 

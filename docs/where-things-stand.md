@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-11, v1.54.3, main = production.*
+*Last updated 2026-10-11, v1.55.1, main = production.*
 
 ## Running where
 
@@ -52,7 +52,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
   for 1 minute, Edit it, hear it done, tap Off, then the red ✕. Q239–Q243 are ⚑ defaults.
 - Alarms tab as a menu (v1.53.0, §8.5): on the iPhone at 320 px, open each of ⏰ Alarms, ⏱ Rolling timers, 🫧 Machines;
   ＋ Add an alarm and Save, land back on the list (AM1–AM3). Q238 is a ⚑ default.
-- 🎯 Point at it (v1.52.0–v1.56.0, §8.16): on the iPhone, turn it on in Settings → 🙂 Me, tap the faint ◎ bottom left (pick mode stays on, ◎ turns amber), then pick a tick box, a button, a text field and a select (none should act, each lands on the clipboard) and one inside a modal; tap the bar to stop (PA3–PA4). Q234–Q237 are ⚑ defaults.
+- 🎯 Point at it (v1.52.0–v1.57.0, §8.16): on the iPhone, turn it on in Settings → 🙂 Me, tap the faint ◎ bottom left (pick mode stays on, ◎ turns amber), then pick a tick box, a button, a text field and a select (none should act, each lands on the clipboard) and one inside a modal; tap the bar to stop (PA3–PA4). Q234–Q237 are ⚑ defaults.
 - FunHouse alerts (v1.51.0, §9.4b): rebuild + restart the PC poller, then tick 🎪 FunHouse on a real alert and see it on the desk. Q230–Q233 are ⚑ defaults.
 - Prune about 25 old merged topic branches.
 - Look into the intermittent test-runner crash.

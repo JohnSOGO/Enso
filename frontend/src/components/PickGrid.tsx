@@ -1,4 +1,4 @@
-// SPEC §8.6 / §8.8 — the grid of emoji buttons both popups use (Settings areas, Lists). Holds no state and never
+// SPEC §8.5 / §8.6 / §8.8 — the grid of emoji buttons its three menus use (Alarms sections, Settings areas, Lists). Holds no state and never
 // decides what a pick means; the screen that renders it does.
 import type { ReactNode } from 'react';
 import s from './PickGrid.module.css';
