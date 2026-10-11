@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-11, v1.49.2, main = production.*
+*Last updated 2026-10-11, v1.50.0, main = production.*
 
 ## Running where
 
@@ -16,6 +16,7 @@ the working agreement in `CLAUDE.md`.
 | Home helper | sogoai.sogodojo.com → SogoAI 127.0.0.1:8790 | Tunnel `sogoai` (Cloudflared service on SogoAI), the same Access token plus Bearer `CAPTIONS_TOKEN`. It fetches YouTube captions (§7E.2c) and names item photos with LM Studio's `qwen-uncensored` (§7A.3). Built from `home/` with `npm run build:home`. Its notes on SogoAI: `C:\Users\Public\git\SogolAI\ENSO-HOME-HELPER.md`. |
 | Weather forecast | api.open-meteo.com (free, no key) | `WEATHER_URL` var in wrangler.toml; fetched once a day by the tick (§7.11). Empty turns weather off. |
 | Claude → MojoSOGO's phone | `POST /api/v1/ops/notify` | Bearer `OPS_NOTIFY_TOKEN` (README "Ping MojoSOGO's phone"). Always goes to the founder, John Redman, who is MojoSOGO. |
+| Claude → the FunHouse | `GET /api/v1/ops/pings`, polled by the dev PC | Scheduled task "Enso FunHouse poller" on SogoGamerPC runs `home/funhouse-poller.cmd` (README "The same pings on the FunHouse"); hands Claude's pings to the bridge on 127.0.0.1:8765. Cloud threads ping with `ENSO_OPS_NOTIFY_TOKEN` from the project's cloud environment. |
 
 ## Secrets: where the values live (never in the repo)
 

@@ -466,6 +466,11 @@ world answers `commentThreads`). Migration 0019 is applied only in tests so far.
 the website route returned empty caption files for every video. Four real videos read from the home
 PC, and verified in production 2026-10-04: "Blending Chicken" re-read from the description and
 captions (5 ingredients, 6 steps — it had been "watch it").
+**Pings on the FunHouse** (v1.50.0, §9.4a; asked by MojoSOGO 2026-10-11; FP1–FP6): `GET /ops/pings` lists the founder
+pings of the last hour, and `home/funhouse-poller.ts` on the dev PC polls it every 15 s and hands Claude's (🤖 / 🧵) to
+the FunHouse bridge on 127.0.0.1:8765, one a poll. Project threads in the cloud ping with the title "🧵 Thread needs
+you" once their environment carries `ENSO_OPS_NOTIFY_TOKEN` and allows enso.sogodojo.com. Q228–Q229 are ⚑ defaults.
+**Still owed:** start the poller on the dev PC (README); a real thread ping seen on the phone and the FunHouse.
 **Away silences phones too** (v1.49.2, §9.2c; MojoSOGO 2026-10-11 "mojosogo still getting tostig notifications and
 he away", picked ALL): an away alert writes no push row either, so nobody's phone rings for it; it still steps and stays in
 the Ringing bar. Machine loads were the case: they ping every phone (§7D.3). AW2/AW4 now expect no delivery rows.

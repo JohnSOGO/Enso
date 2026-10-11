@@ -270,3 +270,33 @@ curl -s -X POST https://enso.sogodojo.com/api/v1/ops/notify -H "Authorization: B
 no alerts turned on; `push_not_configured` — the push keys are missing; or the push service's error).
 Errors: 503 `ops_notify_off`, 401 `unauthorized`, 400 `invalid_input`, 429 `rate_limited`. Never print
 the token or the Authorization header.
+
+### From a project thread in the cloud
+
+Cloud sessions can't read the token file. The project's cloud environment carries it as the environment variable
+`ENSO_OPS_NOTIFY_TOKEN` (same value), with `enso.sogodojo.com` under Allowed domains. A thread pings only when it
+waits on MojoSOGO, with the title "🧵 Thread needs you":
+
+```bash
+curl -sS -m 10 -X POST https://enso.sogodojo.com/api/v1/ops/notify -H "Authorization: Bearer $ENSO_OPS_NOTIFY_TOKEN" -H 'Content-Type: application/json; charset=utf-8' --data "$(jq -nc --arg t 'Thread title: what is needed' '{text:$t[:200],title:"🧵 Thread needs you"}')"
+```
+
+### The same pings on the FunHouse (SPEC §9.4a)
+
+The FunHouse bridge on the dev PC listens only on 127.0.0.1:8765, so the dev PC pulls: `home/funhouse-poller.ts`
+asks `GET /api/v1/ops/pings` every 15 s and hands Claude's pings (🤖 / 🧵) to the bridge. It reads the same token
+file. Build it and start it at logon (once, in a normal PowerShell on the dev PC):
+
+```powershell
+cd C:\Users\Public\git\Enso; git pull; npm run build:home
+$action  = New-ScheduledTaskAction -Execute 'C:\Users\Public\git\Enso\home\funhouse-poller.cmd' -WorkingDirectory 'C:\Users\Public\git\Enso\home'
+$trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+$settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -MultipleInstances IgnoreNew
+Register-ScheduledTask -TaskName 'Enso FunHouse poller' -Action $action -Trigger $trigger -Settings $settings -Force
+Start-ScheduledTask -TaskName 'Enso FunHouse poller'; Start-Sleep 3
+Get-Content C:\Users\Public\git\Enso\home\funhouse-poller.log -Tail 3   # "funhouse poller: … every 15s"
+```
+
+After a change to `home/funhouse-poller.ts`: `npm run build:home`, then stop the node process running
+`funhouse-poller.mjs` and `Start-ScheduledTask -TaskName 'Enso FunHouse poller'`. `funhouse-poller.log` gets one line
+per notice (the ping id and the bridge's answer), never the token.

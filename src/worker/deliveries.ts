@@ -1,8 +1,9 @@
 // SPEC §5.7, §9.1–9.4, §6.6, §7B.7 — writing deliveries rows: the one INSERT for a push row and the one for a
-// house row, each queued with created_at = updated_at = now, and the one predicate for what is a founder ping.
+// house row, each queued with created_at = updated_at = now, and the one predicate for what is a founder ping
+// (counted for §9.4's limit, listed for §9.4a's FunHouse poller).
 // Never sends (push.ts, house.ts do), never updates a status.
 import type { NoticeKind } from '../shared/vocab';
-import { first, newId } from './db';
+import { all, first, newId } from './db';
 
 export interface Written { id: string; stmt: D1PreparedStatement }
 
@@ -34,12 +35,22 @@ export function houseDelivery(db: D1Database, r: HouseRow, now: string): Written
   return { id, stmt };
 }
 
-/**
- * How many founder pings (§9.4) were written at or after `since`: a fire-less push with a title that is neither a
- * sign-in notice (§6.6) nor a mess ask (§7B.7). Kept beside the writers it must tell apart.
- */
+/** What a founder ping is (§9.4): a fire-less push with a title that is neither a sign-in notice (§6.6) nor a mess ask
+ *  (§7B.7). Kept beside the writers it must tell apart; the hourly count and the FunHouse list (§9.4a) both read it. */
+const FOUNDER_PING = `channel = 'push' AND fire_id IS NULL AND title IS NOT NULL AND notice IS NULL AND mess_id IS NULL`;
+
+/** How many founder pings were written at or after `since`. */
 export async function opsPingsSince(db: D1Database, since: string): Promise<number> {
   return (await first<{ n: number }>(db,
-    `SELECT COUNT(*) AS n FROM deliveries
-      WHERE channel = 'push' AND fire_id IS NULL AND title IS NOT NULL AND notice IS NULL AND mess_id IS NULL AND created_at >= ?`, since))!.n;
+    `SELECT COUNT(*) AS n FROM deliveries WHERE ${FOUNDER_PING} AND created_at >= ?`, since))!.n;
+}
+
+export interface OpsPing { id: string; title: string; text: string; at: string }
+
+/** §9.4a — the founder pings written at or after `since` and after `after` (when given), oldest first, at most `limit`. */
+export async function opsPingsAfter(db: D1Database, after: string | null, since: string, limit: number): Promise<OpsPing[]> {
+  return all<OpsPing>(db,
+    `SELECT id, title, message AS text, created_at AS at FROM deliveries
+      WHERE ${FOUNDER_PING} AND created_at >= ? AND (? IS NULL OR created_at > ?)
+      ORDER BY created_at, id LIMIT ?`, since, after, after, limit);
 }
