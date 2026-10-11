@@ -15,7 +15,7 @@ export const WAITING_TITLE = '🪙 Waiting for OK';
 /** A `bounties` row (§4.2zq). */
 export interface BountyRow {
   id: string; title: string; note: string | null; points: number; created_by: string;
-  taken_by: string | null; taken_at: string | null; deleted_at: string | null; created_at: string;
+  taken_by: string | null; taken_at: string | null; deleted_at: string | null; created_at: string; photo_key: string | null;
 }
 
 /** An `earnings` row (§4.2zq). */
@@ -27,7 +27,7 @@ export interface EarningRow {
 /** A one-off as the API sends it. */
 export interface Bounty {
   id: string; title: string; note: string | null; points: number; createdBy: string; createdAt: string;
-  status: BountyStatus; takenBy: string | null; doneBy: string | null; earningId: string | null;
+  status: BountyStatus; takenBy: string | null; doneBy: string | null; earningId: string | null; hasPhoto: boolean;
 }
 
 /** A pending earning, for the Waiting for OK list. */

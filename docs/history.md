@@ -470,6 +470,10 @@ captions (5 ingredients, 6 steps — it had been "watch it").
 to snap a photo of completed work so adult can approve remotely"): Done on a one-off opens a sheet with an optional
 photo; a chore run's photo is added from Waiting for OK; admins see it there full size and OK or send back. Deleted on
 OK or drop. **Still owed:** BS2 with the camera on a real phone.
+**A bounty's picture** (v1.60.0, §7B.8, §8.15b, migration 0046, Q260; asked by MojoSOGO 2026-10-11 "if I create a
+bounty, let me add a picture"): ＋ Bounty has 📷 Add photo (sent after Post; Post again retries only the picture);
+the card shows it to everyone; an admin's card has 📷 Add / Replace. Deleted once paid (OK, or an admin's own Done)
+or deleted. **Still owed:** try it on a real phone.
 **Point at it label matches ◎** (v1.59.1, §8.16; steward pass 17): the Settings → 🙂 Me switch label said "tap 🎯 …
 get a line"; it now says tap ◎ bottom left, tap anything, tap ◎ again to stop.
 **🎯 Pick mode like Ozymandias** (v1.58.0, §8.16, Q236–Q237 revised; MojoSOGO 2026-10-11: "look at ozymandias and do

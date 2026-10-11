@@ -236,6 +236,34 @@ describe('M4ab bounties', () => {
       await b.post(`/chore-runs/${run.id}/undo`);
       expect(await objects(w.id)).toBe(0);
     });
+
+    it('BT22 an admin sets a bounty picture; anyone reads it; gone once paid or deleted', async () => {
+      const pics = async (id: string) => (await env.PHOTOS.list({ prefix: `bounties/${id}/` })).objects.length;
+      const x = await post('Weed the garden', 2);
+      expect(x.hasPhoto).toBe(false);
+      expect((await raw(a, 'PUT', `/bounties/${x.id}/photo`, jpeg)).status).toBe(204);
+      expect((await raw(a, 'PUT', `/bounties/${x.id}/photo`, jpeg)).status).toBe(204);
+      expect(await pics(x.id)).toBe(1);
+      expect((await list(b)).bounties.find((y: any) => y.id === x.id).hasPhoto).toBe(true);
+      const r = await raw(cc, 'GET', `/bounties/${x.id}/photo`);
+      expect(r.status).toBe(200);
+      expect(new Uint8Array(await r.arrayBuffer())).toEqual(jpeg);
+      expect((await raw(b, 'PUT', `/bounties/${x.id}/photo`, jpeg)).status).toBe(403);
+      const done = (await b.post(`/bounties/${x.id}/done`)).json;
+      expect(await pics(x.id)).toBe(1); // still pending
+      await a.post(`/earnings/${done.earningId}/ok`);
+      expect(await pics(x.id)).toBe(0);
+      expect((await raw(b, 'GET', `/bounties/${x.id}/photo`)).status).toBe(404);
+      expect((await raw(a, 'PUT', `/bounties/${x.id}/photo`, jpeg)).status).toBe(409);
+      const mine = await post('Sweep the porch', 1);
+      await raw(a, 'PUT', `/bounties/${mine.id}/photo`, jpeg);
+      await a.post(`/bounties/${mine.id}/done`); // an admin's Done is paid at once
+      expect(await pics(mine.id)).toBe(0);
+      const y = await post('Wash the car', 3);
+      await raw(a, 'PUT', `/bounties/${y.id}/photo`, jpeg);
+      expect((await a.del(`/bounties/${y.id}`)).status).toBe(204);
+      expect(await pics(y.id)).toBe(0);
+    });
   });
 
   it('BT18 no session', async () => {
