@@ -29,7 +29,7 @@ myAlerts.get('/me/alerts', requireMember, async (c) => {
       return {
         id: r.id, title: pushTitle({ hasFire, title: r.title }), message: r.message,
         source: alertSource({ hasFire, kind: r.kind, isAlarm: r.is_alarm === 1, notice: r.notice, messId: r.mess_id, title: r.title }),
-        kind: hasFire ? r.kind : null, alertNumber: hasFire ? r.alert_number : null, fireId: hasFire ? r.fire_id : null, status: r.status, detail: r.detail, createdAt: r.created_at,
+        kind: hasFire ? r.kind : null, alertNumber: hasFire ? r.alert_number : null, fireId: hasFire ? r.fire_id : null, messId: r.mess_id, status: r.status, detail: r.detail, createdAt: r.created_at,
       };
     }),
   });

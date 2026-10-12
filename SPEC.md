@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.33 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.34 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5329,7 +5329,8 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 
 **API** (`src/worker/routes/my-alerts.ts`, member):
 - `GET /me/alerts` → `{ alerts: MyAlert[] }`, `MyAlert = { id, title, message, source, kind, alertNumber, fireId,
-  status, detail, createdAt }` — `kind`, `alertNumber` and `fireId` only for a fire's push (else null).
+  messId, status, detail, createdAt }` — `kind`, `alertNumber` and `fireId` only for a fire's push (else null);
+  `messId` only for a mess ask's push (else null).
 - `DELETE /me/alerts/{id}` → 204, sets `dismissed_at`; **404 `not_found`** when it isn't my push or is already
   hidden.
 - `DELETE /me/alerts` → `{ cleared }`, the number newly hidden (all of mine, not just the 200 shown).
@@ -5355,6 +5356,11 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
   handled." A fire no longer ringing shows "Already handled." instead ⚑ Q272. Other pushes (pings,
   announcements) have nothing to act on: just Close. The buttons are the Ringing bar's own
   (`frontend/src/components/FireActions.tsx`), one copy.
+- **Answer a mess from the card** (v1.74.0, asked by MojoSOGO 2026-10-12: "On the modal that opens from tapping an
+  alert, let me respond directly from the modal"): a Whose mess? push's card, while that mess still asks me
+  (§7B.7, the banner's list), shows its photo and **That was me** / **Not me** (the banner's own buttons,
+  §8.15a); one tap answers and closes the card. Already answered, or no longer asking me → "Already answered."
+  ⚑ Q283. Bounty pushes (🪙) keep just Close for now ⚑ Q283.
 
 **Acceptance (M4u — each row is a test):**
 
@@ -5369,6 +5375,7 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | MA7 | the push payload of a fire, an announcement, a ping; the test push | `alertId` = the delivery id; the test push's `null` |
 | MA8 | sw.js | contains `ALERTS_PATH` and builds `${ALERTS_PATH}?alert=` from `data.alertId` (v1.49.1, steward pass 12) |
 | MA9 | `GET /me/alerts` with a reminder's push and a ping | the reminder's `fireId` = its fire's id; the ping's `fireId` null |
+| MA10 | `GET /me/alerts` with a mess ask's push and a ping | the ask's `messId` = the mess's id; the ping's `messId` null |
 | MA-M | migration 0041 | §4.2zn's check |
 
 ---

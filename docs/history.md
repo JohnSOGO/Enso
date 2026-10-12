@@ -877,6 +877,10 @@ creator (the chip with the colored border), when taking part, comes first in the
 **MojoSOGO first** (v1.73.4, SPEC 3.33, §8.3): v1.73.3 put the event's creator first; he meant himself, so the founder
 (MojoSOGO) comes first whenever he takes part.
 
+**Answer a mess from its alert card** (v1.74.0, SPEC 3.34, §9.5, Q283; MojoSOGO 2026-10-12: "On the modal that opens
+from tapping an alert, let me respond directly from the modal"): a Whose mess? card that still asks me shows the photo
+and That was me / Not me; one tap answers and closes it; else "Already answered." `GET /me/alerts` gains `messId`.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
