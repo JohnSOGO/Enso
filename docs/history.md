@@ -868,6 +868,9 @@ calendar line shows one green dot for it.
 **Family bubble on the calendar** (v1.73.1, SPEC 3.30, §7.1; MojoSOGO 2026-10-12: "Also in the calendar view; one bubble with
 family word"): the calendar line for an event for everyone shows a green pill saying Family, not a green dot.
 
+**No arrows on event name chips** (v1.73.2, SPEC 3.31, §8.3; MojoSOGO 2026-10-12: "This is a calendar event not rotation.
+Make sense to remove arrows?"): the day sheet's name chips read "Clover", not "→ Clover".
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

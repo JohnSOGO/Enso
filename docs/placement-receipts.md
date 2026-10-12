@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.73.2: No arrows on day-sheet name chips (placement-advisor)
+
+- **Ask:** SPEC 3.31 §8.3: the day sheet's participant chips drop the "→ " prefix (a calendar event is not a rotation).
+- **Verdict:** frontend/src/components/DaySheet.tsx [EXISTING]
+- **Flow stage:** render
+- **Why:** One display string inside the owner of the day sheet's chips. participants.ts decides who, not how a chip reads.
+- **Caps:** DaySheet.tsx ~58/300, unchanged.
+
 ## 2026-10-12 — v1.73.1: Family pill on the day-cell event line (placement-advisor)
 
 - **Ask:** SPEC 3.30 §7.1: an event for everyone (participants().family) shows a small green var(--good) "Family" pill sized from the line height on the day cell's event line, replacing the single green dot.

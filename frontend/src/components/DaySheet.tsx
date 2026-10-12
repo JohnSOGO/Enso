@@ -36,7 +36,7 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
             <span className={s.meta}>
               {who.family ? <span className="chip" style={{ borderColor: 'var(--good)', background: 'var(--good)', color: '#0F172A', fontWeight: 600 }}>Family</span> : <>
                 {!who.ids.includes(o.createdBy) && <span className="chip" style={{ borderColor: o.color }}>{o.creatorName}</span>}
-                {who.ids.map((id) => <span key={id} className="chip" style={id === o.createdBy ? { borderColor: o.color } : undefined}>→ {memberById(id)?.displayName ?? 'unknown member'}</span>)}
+                {who.ids.map((id) => <span key={id} className="chip" style={id === o.createdBy ? { borderColor: o.color } : undefined}>{memberById(id)?.displayName ?? 'unknown member'}</span>)}
               </>}
             </span>
           </span>
