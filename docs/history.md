@@ -856,6 +856,10 @@ option to show time as 24hr or 12 hr applies every where"): Settings → 🙂 Me
 one formatter, `clockText`; before, most screens showed 24-hour and a few (machine hours, sunset pushes, the approve
 card) 12-hour. Everyone starts on 12-hour. Time pickers stay the phone's own.
 
+**Unassigned emoji beside the day number** (v1.72.1, SPEC 3.28, §7.1/§7.2, Q273, Q277; MojoSOGO 2026-10-12: "If assigned
+to no one put emoji next to day of month number"): an event with nobody assigned shows its emoji beside the date number
+and gets no line; if the two-icon limit hides it, it keeps its line.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

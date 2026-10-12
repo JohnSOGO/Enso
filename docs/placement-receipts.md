@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.72.1: Unassigned event emoji as a day icon (placement-advisor)
+
+- **Ask:** In a calendar day cell, a single-day event with nobody assigned and an emoji shows that emoji as a day icon (after the holiday and 📈, two at most) and gets no line. If the cap hides it, it keeps its line. Unassigned events without an emoji and assigned events are unchanged. SPEC 3.28 §7.1/§7.2, Q273, Q277.
+- **Verdict:** `frontend/src/components/DayCell.tsx` [EXISTING]
+- **Flow stage:** render
+- **Why:** Presentation inside the owner of the date line and the event lines. DayCell.tsx is 86/300 with one concern. Rejected `src/shared/` (display, not a shared rule) and `day-lines.ts` (fit math unchanged; it only gets a smaller line count).
+- **Caps:** DayCell.tsx about 90/300. Nothing newly in the band.
+
 ## 2026-10-12 — v1.72.0: §8.17 Clock: 12-hour or 24-hour (placement-advisor)
 
 - **Ask:** SPEC 3.27 §8.17 (+ §4.2zv, migration 0049 `member_prefs.clock_24h`): each member picks 12-hour or 24-hour in

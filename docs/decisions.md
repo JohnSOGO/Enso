@@ -274,7 +274,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q270 | A sunset chore's alert text (§7B.3) | ⚑ The ordinary chore text ("Chore for A: Get the eggs"), no "sunset at h:mm" added |
 | Q271 | How a sunset chore shows its time (§8.5) | ⚑ `sunset −30` (or `sunset` at 0) where the clock time was; the form's Before sunset box starts at 30 min; `time` keeps the form's last clock value, so lists still sort by it |
 | Q272 | An alert card whose fire is no longer ringing (§9.5) | ⚑ It says "Already handled." and keeps only Delete and Close; a ping or announcement card has no act button (nothing to ack) |
-| Q273 | A calendar line for an event with nobody assigned (§7.1) | ⚑ Its emoji alone; with no emoji, one dot in the event's color |
+| Q273 | A calendar line for an event with nobody assigned (§7.1) | **Decided by MojoSOGO 2026-10-12 (v1.72.1):** its emoji goes beside the date number, no line; with no emoji, one dot in the event's color |
 | Q274 | Calendar lines that still don't fit at the smallest size (§7.1) | ⚑ As many as fit, the last becomes `+N` |
 | Q275 | Event emoji beside the date number once it leads its own line (§7.2) | ⚑ Moved: only the holiday and 📈 stay beside the number, so an emoji shows once |
 | Q276 | Wide-screen (≥ 480px) calendar lines (§7.1) | ⚑ Same emoji + dots, then the start time and title |
@@ -282,3 +282,4 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q278 | How a 12-hour time looks (§8.17) | ⚑ `6:30pm`: no leading zero, lower-case am/pm, no space (fits the calendar) |
 | Q279 | The time pickers (§8.17) | ⚑ Left as the phone's own control; they follow the phone's setting, not Enso's |
 | Q280 | Shared channels' clock (speakers, FunHouse) (§8.17) | ⚑ 12-hour; a phone push follows its member's choice |
+| Q277 | Several unassigned emoji events for one free day-icon slot (§7.2) | ⚑ First in line order (all-day, then by start time); the rest keep their lines |

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.27 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.28 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1536,8 +1536,11 @@ approval (they just approved it), not after signup or setup. Push only, never ho
   - Under the date-number line, **each single-day event gets its own line**, in the order
     `/calendar` sends them (all-day first, then by start time).
   - A line is the event's **emoji** (§7.6), then **one dot per participant** (`assignedTo`)
-    in that member's color. ⚑ An event with nobody assigned shows its emoji alone; with no
-    emoji either, one dot in the event's color, so it is never unmarked (Q273). A member who
+    in that member's color. An event with **nobody assigned and an emoji** shows that emoji
+    **beside the date number** instead (§7.2) and gets no line (MojoSOGO 2026-10-12: "If assigned
+    to no one put emoji next to day of month number"); if the two-icon limit hides it, it keeps
+    a line with its emoji, so it is never unmarked. Nobody assigned and no emoji: one dot in the
+    event's color (Q273). A member who
     can't be found gets the event's color.
   - At ≥ 480px the start time and title follow the dots, truncated with an ellipsis.
   - **Auto scale:** the lines share the room left under the date line and the multi-day
@@ -1585,8 +1588,9 @@ the 5 carried-over "Fall break" days (deleted, not converted — his choice).
 
 **Day icons** — a day's icons sit **to the right of the date number, on the same line, at
 every width** (phones included; never on the line below — decided by MojoSOGO). Icons, in
-order: the public holiday's emoji and 📈 (§7.4); at most **two**. Since v1.71.0 an event's emoji
-sits at the start of its own line under the number instead (§7.1, Q275). Each is shown only if
+order: the public holiday's emoji, 📈 (§7.4), then the emoji of the day's single-day events
+with **nobody assigned**, in the order of their lines (Q277); at most **two**. An assigned
+event's emoji sits at the start of its own line under the number instead (§7.1, Q275). Each is shown only if
 it is on for the member (§7.5).
 
 - **Legend:** shown once, directly under the sticky month header: a yellow square
@@ -1709,7 +1713,7 @@ An event may carry **one emoji** (`events.emoji`, optional; decided by MojoSOGO)
 sweeping 🧹, taking out the trash 🗑️. It must be a single emoji (one grapheme of emoji
 presentation, ≤ 16 bytes) — anything else is 400 with a message. Where it shows:
 - at the start of the event's line in each day cell where it occurs, before the
-  participant dots (§7.1);
+  participant dots (§7.1); beside the date number instead when nobody is assigned (§7.2);
 - before the title in the day sheet and in Optional calendar items;
 - in the Ringing bar and alert text it is **not** added (messages stay plain text).
 
