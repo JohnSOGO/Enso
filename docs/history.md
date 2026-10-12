@@ -874,6 +874,9 @@ Make sense to remove arrows?"): the day sheet's name chips read "Clover", not "�
 **Creator first** (v1.73.3, SPEC 3.32, §8.3; MojoSOGO 2026-10-12: "Ok and sort with MojoSOGO color first"): the event's
 creator (the chip with the colored border), when taking part, comes first in the day sheet chips and the calendar dots.
 
+**MojoSOGO first** (v1.73.4, SPEC 3.33, §8.3): v1.73.3 put the event's creator first; he meant himself, so the founder
+(MojoSOGO) comes first whenever he takes part.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

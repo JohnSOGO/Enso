@@ -25,7 +25,7 @@ describe('event participants (§7.1, §8.3)', () => {
     expect(participants(['a'], [m('a')]).family).toBe(false);
     expect(participants([], house)).toEqual({ family: false, ids: [] });
   });
-  it('FA5 the creator, when taking part, comes first; otherwise order is kept', () => {
+  it('FA5 the founder, when taking part, comes first; otherwise order is kept', () => {
     expect(participants(['b', 'c', 'a'], house, 'a').ids).toEqual(['a', 'b', 'c']);
     expect(participants(['b', 'c'], house, 'a').ids).toEqual(['b', 'c']);
   });
