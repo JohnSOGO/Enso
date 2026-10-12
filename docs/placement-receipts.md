@@ -7,6 +7,25 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.66.0: Announce ignores Quiet the house (placement-advisor)
+
+- **Ask:** SPEC §9.2b / §9.3 / §9.4b — Announce always speaks on every speaker HA lists, even while the house is quiet (MojoSOGO 2026-10-12 "announcements are special").
+- **Verdict:** `src/worker/routes/announce.ts` [EXISTING] — a deletion: the houseQuiet read, the 409 `house_quiet` branch and the `!quiet` speaker gate, plus the now-unused imports (houseQuiet, utcToLocal, householdTz).
+- **Flow stage:** persist (whether the route writes the house row).
+- **Why:** the quiet check is a persistence gate inside the route that owns POST /announce; removing it adds no code. src/shared/house-quiet.ts unchanged; src/worker/house-quiet.ts keeps three readers (tick, timer-starts, GET /house/quiet). Rejected: an "isAnnouncementExempt" helper (speculative — the exemption is the absence of a check). Spec (§9.2b, HQ5, §9.4b, API row), tests HQ5 / FH4 and map rows 81 / 94 changed in the same commit.
+- **Caps:** announce.ts 69 → ~63 lines against GLOBAL_FILE_CAP 300. Nothing enters the band.
+- **Sources read:** src/worker/routes/announce.ts; docs/module-ownership.md; scripts/arch.ts; SPEC.md §9.2b, §9.4b, §10; tests referencing house_quiet; frontend HouseQuiet.tsx (grep).
+## 2026-10-12 — v1.65.0: Members joined-date pill; revoked invites hidden after 24 h (placement-advisor)
+
+- **Ask:** MojoSOGO 2026-10-12, "same screen; remove 'revoked' after 24 hours; so I should see when active accounts joined". SPEC §8.6: each member row gets a "joined <date>" pill from members.created_at, as a 5th grid column. SPEC §8.9: a revoked invite is hidden from the Invites list once revoked more than 24 hours ago (filtered in the app; server unchanged).
+- **Verdict:** src/worker/routes/members.ts (GET /members selects `created_at AS joinedAt`), frontend/src/state.tsx (`Member.joinedAt: string`), frontend/src/components/SettingsMembers.tsx + SettingsMembers.module.css (pill and 5th column), frontend/src/components/Invites.tsx (24 h filter; `shortDate` exported for reuse) [EXISTING]
+- **Flow stage:** route (one more column in the list) + render (pill, filter)
+- **Why:** Every part already has an owner: members.ts the members list (row 86), state.tsx the Member type (row 139), SettingsMembers the grid (row 202), Invites the invite states (row 209). Presentation only, no shared rule needed. Rejected: filtering revoked invites on the server (history stays in D1); a second date formatter (Invites' `shortDate` is exported instead). The join date is visible to every member; not sensitive, and §8.6 says so.
+- **Caps:** members.ts ~73/300; state.tsx 107/300; SettingsMembers.tsx ~59/300; SettingsMembers.module.css 9/300; Invites.tsx ~76/300. No file newly in the band.
+- **Sources read:** docs/module-ownership.md (rows 80, 86, 139, 196, 202, 209); scripts/arch.ts; docs/placement-receipts.md (head); src/worker/routes/members.ts; frontend/src/state.tsx; SettingsMembers.tsx/.module.css; Invites.tsx; SPEC.md §8.9.
+
+---
+
 ## 2026-10-12 — v1.64.0: Members tab as a grid of pills (placement-advisor)
 
 - **Ask:** SPEC §8.6 Settings → 👥 Members: lay the members table out again as a grid with one row of pills per member (name with colour dot, role Owner / Admin / Member or Disabled, a tappable Make / Remove admin pill with today's asks, a tappable Disable / Enable pill). Behaviour unchanged. It must fit a phone and scroll sideways when too narrow.
@@ -1830,18 +1849,18 @@ REORG RECEIPT
 - **Caps:** SettingsAbout.tsx 18 → 18 lines, SettingsAbout.module.css 9 → 9, against GLOBAL_FILE_CAP 300. No file newly in the band.
 - **Sources read:** frontend/src/components/SettingsAbout.tsx; frontend/src/components/SettingsAbout.module.css; docs/module-ownership.md (row 204); scripts/arch.ts (WORKING_BUFFER, GLOBAL_FILE_CAP, WARN_AT); docs/placement-receipts.md; test/settings-about.test.ts.
 
-## 2026-10-12 — v1.65.0: Rooms own the "what done looks like" areas (placement-advisor)
+## 2026-10-12 — v1.67.0: Rooms own the "what done looks like" areas (placement-advisor)
 
-- **Ask:** SPEC §7B.6 rewritten as "Rooms" for v1.65.0: a `rooms` table (rom_ ids, name 1–40, position); migration 0047 rebuilds chore_areas → room_areas and chore_area_photos → room_area_photos with the same ids, turns each chore that has areas into a room named after it, adds a nullable chores.room_id. ROOMS_MAX 30, ROOM_NAME_MAX 40, parseRoomInput, Room / RoomArea wire types. Routes /rooms, /rooms/{id}, /rooms/{id}/areas, /room-areas/{id}(/photos), /room-area-photos/{id}; deleting a room clears chores.room_id. A chore's roomId is validated and areaCount comes from its room.
+- **Ask:** SPEC §7B.6 rewritten as "Rooms" for v1.67.0: a `rooms` table (rom_ ids, name 1–40, position); migration 0047 rebuilds chore_areas → room_areas and chore_area_photos → room_area_photos with the same ids, turns each chore that has areas into a room named after it, adds a nullable chores.room_id. ROOMS_MAX 30, ROOM_NAME_MAX 40, parseRoomInput, Room / RoomArea wire types. Routes /rooms, /rooms/{id}, /rooms/{id}/areas, /room-areas/{id}(/photos), /room-area-photos/{id}; deleting a room clears chores.room_id. A chore's roomId is validated and areaCount comes from its room.
 - **Verdict:** EXISTING (renamed): src/shared/rooms.ts, src/worker/routes/rooms.ts, frontend RoomSheet.tsx, RoomAreaForm.tsx. NEW rows: frontend/src/components/Rooms.tsx (list + ＋ Add room + useRooms) and frontend/src/components/ChoreSheet.tsx (the chore's 📋 sheet: Done means + RoomSections + ✎ Edit chore). NEW migration 0047 + its test.
 - **Flow stage:** rules (shared/rooms.ts), route + persist (routes/rooms.ts, routes/chores.ts), render (Rooms, RoomSheet, ChoreSheet, ChoreForm).
 - **Why:** areas change parent, so the existing area owners keep the concern under the new name; no new module per stage. One file each for rooms and areas in the route and in the rules: a room with its sections is one concern and stays under cap (routes/rooms.ts ~205; split off routes/room-areas.ts only past ~250). The chore's 📋 sheet is split out of RoomSheet so one component does not hold both a chore's sheet and a room's sheet. The room-existence check stays in routes/chores.ts through an export from routes/rooms.ts, keeping shared/chores.ts pure and away from the band. R2 prefix kept as `chore-areas/` (no R2 rewrite, photo-store.ts untouched).
 - **Caps:** routes/rooms.ts ~205, shared/rooms.ts ~60, routes/chores.ts ~196, shared/chores.ts ~246 (closest to the band), RoomSheet.tsx ~125, ChoreForm.tsx ~190, Chores.tsx ~116, against GLOBAL_FILE_CAP 300. No file newly in the band, no CEILINGS change.
 - **Sources read:** scripts/arch.ts; docs/module-ownership.md; docs/placement-receipts.md; src/shared/chore-areas.ts; src/worker/routes/chore-areas.ts; frontend ChoreAreas.tsx; line counts of the touched files; greps for areaCount, chore-areas and PhotoPrefix; SPEC.md §7B.6 and API rows.
 
-## 2026-10-12 — v1.65.0 delta: Rooms list in Household, Days off to Calendar (placement-advisor)
+## 2026-10-12 — v1.67.0 delta: Rooms list in Household, Days off to Calendar (placement-advisor)
 
-- **Ask:** amendment to the v1.65.0 Rooms placement (SPEC §7B.6, §8.6, §7.3): the Rooms list lives in Settings → 🏠 Household (admins), SettingsHousehold rendering `<RoomsList/>` from Rooms.tsx. Days off moves out of Household into Settings → 📅 Calendar (renamed from "Calendar items"), admins only. The chore's 📋 sheet can edit sections through RoomSections, gated by the room's canChange.
+- **Ask:** amendment to the v1.67.0 Rooms placement (SPEC §7B.6, §8.6, §7.3): the Rooms list lives in Settings → 🏠 Household (admins), SettingsHousehold rendering `<RoomsList/>` from Rooms.tsx. Days off moves out of Household into Settings → 📅 Calendar (renamed from "Calendar items"), admins only. The chore's 📋 sheet can edit sections through RoomSections, gated by the room's canChange.
 - **Verdict:** NEW row frontend/src/components/DaysOff.tsx. EXISTING: Settings.tsx (label + admin-gated DaysOff in the calendar body), SettingsHousehold.tsx (DaysOff out, RoomsList in), Rooms.tsx (RoomsList + useRooms; no Chores section), RoomSheet.tsx (RoomSections editor gated by the room's createdBy).
 - **Flow stage:** render.
 - **Why:** DaysOff is a household-wide admin setting (/settings), OptionalItems is one member's own prefs and opt-ins (/me, /events/{id}/optin); merging them would give OptionalItems two audiences and two endpoints, so DaysOff is its own leaf. Settings.tsx composes the two in one area body, within its row. Open point settled as ⚑ Q266: POST /rooms is admins only, matching the admin-only Household screen.

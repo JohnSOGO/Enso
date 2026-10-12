@@ -236,11 +236,12 @@ describe('admins (SPEC §6.3)', () => {
     expect(r.json.message).toMatch(/Enable/);
   });
 
-  it('A6 GET /members carries role and isFounder; exactly one founder', async () => {
+  it('A6 GET /members carries role, isFounder and joinedAt; exactly one founder', async () => {
     const o = await owner();
     await member(o);
     const list = (await o.get('/members')).json;
     expect(list.every((m: any) => typeof m.isFounder === 'boolean' && typeof m.role === 'string')).toBe(true);
+    expect(list.every((m: any) => !Number.isNaN(Date.parse(m.joinedAt)))).toBe(true); // §8.6 joined pill
     expect(list.filter((m: any) => m.isFounder)).toHaveLength(1);
     expect(list.find((m: any) => m.isFounder).email).toBe(OWNER.email);
   });

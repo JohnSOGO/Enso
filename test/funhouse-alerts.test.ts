@@ -1,5 +1,5 @@
 // SPEC §9.4b FH1–FH4, FH7 — 🎪 FunHouse as a place alerts go: one `funhouse` row per alert, following the phone's
-// rules (away stops it; quiet the house and phone first do not), from the tick, a timer start and Announce.
+// rules (away stops it; quiet the house and phone first do not), from the tick, a timer start and Announce (which ignores quiet).
 import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test';
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import worker from '../src/worker/index';
@@ -64,7 +64,7 @@ it('FH3: a repeating Phone + House + FunHouse reminder, alert 1 → phones and t
   expect(chans).not.toContain('house');
 });
 
-it('FH4: Announce FunHouse only; House + FunHouse while quiet → the funhouse row only', async () => {
+it('FH4: Announce FunHouse only; House + FunHouse while quiet → both rows (Announce ignores quiet)', async () => {
   const only = await call('POST', '/announce', { text: 'Dinner', channels: ['funhouse'] });
   expect(only.status, JSON.stringify(only.json)).toBe(201);
   expect(only.json.deliveries.map((d: any) => d.channel)).toEqual(['funhouse']);
@@ -73,7 +73,7 @@ it('FH4: Announce FunHouse only; House + FunHouse while quiet → the funhouse r
   await quiet();
   const both = await call('POST', '/announce', { text: 'Dinner', channels: ['house', 'funhouse'] });
   expect(both.status).toBe(201);
-  expect(both.json.deliveries.map((d: any) => d.channel)).toEqual(['funhouse']);
+  expect(both.json.deliveries.map((d: any) => d.channel)).toEqual(['funhouse', 'house']);
 });
 
 it("FH7: a timer's start announcement with FunHouse ticked → one funhouse row", async () => {

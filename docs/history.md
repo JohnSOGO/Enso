@@ -476,6 +476,9 @@ dishwasher"): a done card (all three machines) shows 🪙 Bounty to admins, open
 `loadBountyTitle` prefilled. A plain one-off, not tied to the machine; no server change, no migration. LB1 green.
 Built as: the prefilled sheet asks to discard on Cancel only when something changed.
 
+**📢 Announce ignores Quiet the house** (v1.66.0, §9.2b, §9.3, Q212; MojoSOGO 2026-10-12 "announcements are special;
+they announce everywhere because it is a house important announcement"): an announcement is spoken on every speaker
+even while the house is quiet; the 409 `house_quiet` is gone. Alerts and timer starts are still silenced by quiet.
 **📢 Announce reaches every speaker and every phone** (v1.63.0, §9.3, Q36, Q127; MojoSOGO 2026-10-12 "I am not hearing
 the announement button audio on all devices and not getting notifications on all devices"): an announcement is spoken on
 every speaker Home Assistant lists (as machines, §7D.3), not just the ones members ticked, and pushed to every active
@@ -801,10 +804,14 @@ edit select circle should only be visible to mojosogo"): `usePointAtOn` is false
 and Disable should all be pills in one row, rows and columns"): `SettingsMembers.tsx` draws a four-column grid of pills
 (own CSS module) instead of the table; asks, PATCH bodies and who sees which pill unchanged. Not yet checked on the iPhone.
 
+**Joined pill; old revoked invites hidden** (v1.65.0, SPEC 3.17, §8.6, §8.9; MojoSOGO 2026-10-12 "remove 'revoked' after 24 hours; so I
+should see when active accounts joined"): GET /members adds `joinedAt` (members.created_at); each Members row gets a
+"joined Oct 4" pill. `Invites.tsx` leaves out invites revoked more than 24 h ago; the server list is unchanged.
+
 **About tagline on two lines** (v1.64.1, §8.6 SM5; MojoSOGO 2026-10-12 picked the About popup: "Two lines"):
 "Closing the loop." sits over "Peace of mind, every day." in Settings → ℹ️ About. The opening screen (§8.10) unchanged.
 
-**Rooms** (v1.65.0, §7B.6, §4.2zt, §8.6, §8.15, Q266–Q268; MojoSOGO 2026-10-12: "define rooms as its own thing, then
+**Rooms** (v1.67.0, §7B.6, §4.2zt, §8.6, §8.15, Q266–Q268; MojoSOGO 2026-10-12: "define rooms as its own thing, then
 chores get assigned to the room … rooms get sections like kitchen already has … do not lose the kitchen we have",
 and "move Days off into its own calendar section; move room definitions here in Household"): what done looks like moved
 from a chore to a room. Migration 0047 turned the Kitchen chore's areas into a Kitchen room (same area and photo ids,
