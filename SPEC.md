@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.14 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.15 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3862,10 +3862,12 @@ Settings
   line hides it, **Clear all** at the top. A tapped phone notification opens Settings with this area open, on its
   card.
 - **🏠 Household (admins):** name, timezone, days off (§7.3).
-- **👥 Members (admins):** members list: one line per member — name · **Owner** / **Admin** chip (nothing for a
-  regular member) · **Make admin** / **Remove admin** (asks first; never on the founder) · **Disable** /
-  **Enable** (never on the founder). An admin removing their own admin role is warned
-  that they will lose these settings at once. Then **invites (§8.9)**.
+- **👥 Members (admins):** a grid, one row of pills per member, in four columns (MojoSOGO 2026-10-12): **name**
+  (colour dot) · **role** (**Owner** / **Admin** / **Member** ⚑ Q264; **Disabled** in red instead while disabled
+  ⚑ Q265) · **Make admin** / **Remove admin** (asks first; never on the founder or a disabled member) ·
+  **Disable** / **Enable** (never on the founder). The last two are tappable pills. On a phone too narrow for a row,
+  the grid scrolls sideways. An admin removing their own admin role is warned that they will lose these settings at
+  once. Then **invites (§8.9)**.
 - **📊 Status:** a **House announcements** line from `house` (§9.2) ⚑ (Q38): `ok` → "working"
   (good) with the last success time; `failing` → "failing since {lastFailedAt}" (bad) with
   `lastError` beneath; `not_configured` → "not set up" (bad); `untried` → "not tried yet"

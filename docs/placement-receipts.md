@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.64.0: Members tab as a grid of pills (placement-advisor)
+
+- **Ask:** SPEC §8.6 Settings → 👥 Members: lay the members table out again as a grid with one row of pills per member (name with colour dot, role Owner / Admin / Member or Disabled, a tappable Make / Remove admin pill with today's asks, a tappable Disable / Enable pill). Behaviour unchanged. It must fit a phone and scroll sideways when too narrow.
+- **Verdict:** `frontend/src/components/SettingsMembers.tsx` + new `frontend/src/components/SettingsMembers.module.css` [EXISTING; the CSS is covered by the `components/*.module.css` row]
+- **Flow stage:** render
+- **Why:** The SettingsMembers row owns this screen. The grid styles are specific to it, so they go in a same-named CSS module, not Lists.module.css (shared list tables and tick rows). The pill look reuses theme.css `.chip` / `.badge`. Logic, asks and visibility rules stay as they are; role checks stay in src/shared/roles. The Member pill and Disabled-in-place-of-role are ⚑ Q264–Q265, written into §8.6 first. Row 202 wording: "members table" → "members grid".
+- **Caps:** SettingsMembers.tsx 51 → ~58/300; SettingsMembers.module.css new, ~10/300. No file newly in the band.
+- **Sources read:** frontend/src/components/SettingsMembers.tsx; docs/module-ownership.md (rows 140, 202, 217, 218); scripts/arch.ts; docs/placement-receipts.md (head); frontend/src/theme.css (.chip/.badge); SPEC.md §8.6.
+
+---
+
 ## 2026-10-12 — v1.63.0: Announce reaches every speaker and every member's phone (placement-advisor)
 
 - **Ask:** POST /announce speaks on every speaker HA lists via `allHouseSpeakers(env)` (null = the defaults), as machines do (§7D.3), instead of the union of members' ticked speakers; it pushes to every active member including the sender. SPEC §9.3, MojoSOGO 2026-10-12 "not hearing the announcement … on all devices".

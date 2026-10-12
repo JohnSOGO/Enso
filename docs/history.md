@@ -797,6 +797,10 @@ first." Washer (Move to clothes dryer) and dish washer (Emptied) unchanged.
 edit select circle should only be visible to mojosogo"): `usePointAtOn` is false for everyone but the founder, so the
 ◎ (tab bar and modal headers), Alt+P and the Settings → 🙂 Me switch are gone for other members. His behavior unchanged.
 
+**👥 Members as rows of pills** (v1.64.0, §8.6, Q264–Q265; MojoSOGO 2026-10-12: "each name and role and Admin status
+and Disable should all be pills in one row, rows and columns"): `SettingsMembers.tsx` draws a four-column grid of pills
+(own CSS module) instead of the table; asks, PATCH bodies and who sees which pill unchanged. Not yet checked on the iPhone.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

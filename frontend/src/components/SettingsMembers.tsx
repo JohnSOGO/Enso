@@ -1,11 +1,11 @@
-// SPEC §8.6, §6.3 — Settings → 👥 Members (admins): the members table (Owner / Admin chip, Make / Remove admin with
-// its asks, Disable / Enable); hosts Invites (§8.9).
+// SPEC §8.6, §6.3 — Settings → 👥 Members (admins): the members grid, one row of pills per member (name, role,
+// Make / Remove admin with its asks, Disable / Enable); hosts Invites (§8.9).
 import { patch } from '../api';
 import { useApp } from '../state';
 import { ADMIN_ROLE, isAdmin } from '../../../src/shared/roles';
 import { useAction } from './useAction';
 import { Invites } from './Invites';
-import s from './Lists.module.css';
+import s from './SettingsMembers.module.css';
 
 export function SettingsMembers() {
   const { me, members, refresh } = useApp();
@@ -20,30 +20,35 @@ export function SettingsMembers() {
   return (
     <>
       {errorEl}
-      <table className={s.table}>
-        <thead><tr><th scope="col">Name</th><th scope="col">Role</th><th scope="col"><span className="visually-hidden">Access</span></th></tr></thead>
-        <tbody>
+      <div className={s.scroll}>
+        <div className={s.grid} role="table" aria-label="Members">
           {members.map((m) => (
-            <tr key={m.id}>
-              <th scope="row" className={s.flexible} title={m.email}><span style={{ color: m.color }}>●</span> {m.displayName}</th>
-              <td className={s.rigid}>
-                {m.disabledAt && <span className="badge bad">disabled</span>}{' '}
-                {isAdmin(m) && <span className="chip">{m.isFounder ? 'Owner' : 'Admin'}</span>}
-              </td>
-              <td className={s.rigid}>
-                {!m.isFounder && (
-                  <span className="row" style={{ gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    {!m.disabledAt && <button disabled={busy} onClick={() => setAdmin(m.id, m.displayName, !isAdmin(m))}>{isAdmin(m) ? 'Remove admin' : 'Make admin'}</button>}
-                    <button disabled={busy} onClick={() => run(async () => { await patch(`/members/${m.id}`, { disabled: !m.disabledAt }); refresh(); })}>
-                      {m.disabledAt ? 'Enable' : 'Disable'}
-                    </button>
-                  </span>
+            <div key={m.id} className={s.row} role="row">
+              <span role="rowheader" className={`chip ${s.name}`} title={m.email}>
+                <span style={{ color: m.color }}>●</span> {m.displayName}
+              </span>
+              <span role="cell">
+                {m.disabledAt ? <span className="badge bad">Disabled</span>
+                  : <span className="chip">{m.isFounder ? 'Owner' : isAdmin(m) ? 'Admin' : 'Member'}</span>}
+              </span>
+              <span role="cell">
+                {!m.isFounder && !m.disabledAt && (
+                  <button className={s.pill} disabled={busy} onClick={() => setAdmin(m.id, m.displayName, !isAdmin(m))}>
+                    {isAdmin(m) ? 'Remove admin' : 'Make admin'}
+                  </button>
                 )}
-              </td>
-            </tr>
+              </span>
+              <span role="cell">
+                {!m.isFounder && (
+                  <button className={s.pill} disabled={busy} onClick={() => run(async () => { await patch(`/members/${m.id}`, { disabled: !m.disabledAt }); refresh(); })}>
+                    {m.disabledAt ? 'Enable' : 'Disable'}
+                  </button>
+                )}
+              </span>
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      </div>
 
       <Invites />
     </>
