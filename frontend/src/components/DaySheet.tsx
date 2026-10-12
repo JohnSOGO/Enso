@@ -25,7 +25,7 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
   const timed = items.filter((o) => !o.allDay);
 
   const row = (o: DayData['items'][number]) => {
-    const who = participants(o.assignedTo, members); // §8.3: each person once; everyone → one green Family chip
+    const who = participants(o.assignedTo, members, o.createdBy); // §8.3: each person once; everyone → one green Family chip
     return (
       <li key={`${o.eventId}-${o.date}`}>
         <button className={s.item} onClick={() => onOpenEvent(o)}>

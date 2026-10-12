@@ -36,9 +36,9 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
   // §7.1 one line per single-day event: emoji, then a dot per participant; shrunk to fit, then +N.
   const room = rowH - DATE_LINE - (lanes > 0 ? lanes * (barH + 1) + 2 : 0);
   const fit = fitLines(room, single.length);
-  const isFamily = (o: Occurrence) => participants(o.assignedTo, members).family; // §7.1: everyone → a green Family pill
+  const isFamily = (o: Occurrence) => participants(o.assignedTo, members, o.createdBy).family; // §7.1: everyone → a green Family pill
   const marks = (o: Occurrence) => {
-    const who = participants(o.assignedTo, members); // §7.1: each person once
+    const who = participants(o.assignedTo, members, o.createdBy); // §7.1: each person once
     if (who.family) return [];
     return who.ids.length
       ? who.ids.map((id) => memberById(id)?.color ?? o.color)

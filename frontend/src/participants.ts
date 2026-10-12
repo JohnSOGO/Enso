@@ -3,9 +3,11 @@
 
 export interface Participants { family: boolean; ids: string[] }
 
-/** Dedupes `assignedTo`; `family` when it covers every active member of a household of two or more. */
-export function participants(assignedTo: string[], members: { id: string; disabledAt: string | null }[]): Participants {
-  const ids = [...new Set(assignedTo)];
+/** Dedupes `assignedTo` (with `first`, e.g. the creator, moved to the front when present); `family` when it
+ *  covers every active member of a household of two or more. */
+export function participants(assignedTo: string[], members: { id: string; disabledAt: string | null }[], first?: string): Participants {
+  const unique = [...new Set(assignedTo)];
+  const ids = first && unique.includes(first) ? [first, ...unique.filter((id) => id !== first)] : unique;
   const active = members.filter((m) => !m.disabledAt);
   const family = active.length >= 2 && active.every((m) => ids.includes(m.id));
   return { family, ids };
