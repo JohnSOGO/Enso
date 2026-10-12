@@ -1,5 +1,5 @@
 // SPEC §7B, §10 — chores: CRUD, today's runs, step done/undo, and edit re-plan persistence; `bounty` on each chore and
-// run, and a run change's earning written or dropped in the same batch through earnings.ts (§7B.8).
+// run, and a run change's earning written or dropped in the same batch through earnings.ts (§7B.8); `roomId` checked and `areaCount` read through routes/rooms.ts (§7B.6).
 // Every rule (turns, planning, advance/undo, re-plan, validation) is src/shared/chores.ts;
 // this route loads rows, calls it, and writes each result in ONE db.batch.
 import { Hono, type Context } from 'hono';
@@ -15,7 +15,7 @@ import { body, fail } from '../http';
 import { requireMember } from '../session';
 import { canChange } from '../../shared/roles';
 import { choreRunInserts, insertFire, loadChoreRun, updateChoreRun, updateFire } from '../fire-rows';
-import { areaCounts, choreAreaDeletes } from './chore-areas';
+import { choreAreaCounts as areaCounts, choreRoomId } from './rooms';
 import { runEarningWrites, type Finisher } from '../earnings';
 import { sendPushDeliveries } from '../push';
 import { isAdmin } from '../../shared/roles';
@@ -31,7 +31,7 @@ function choreView(row: ChoreRow, today: string, active: string[], areaCount: nu
     id: c.id, title: c.title, doneMeans: c.done_means, days: c.days, timing: c.timing, time: c.time, nudge: c.nudge,
     people: c.people, steps: c.steps, channels: c.channels, renotifyMin: c.renotify_min, createdBy: row.created_by,
     thisWeek: assigneeFor(c, today, active), nextWeek: assigneeFor(c, addDays(today, 7), active), areaCount,
-    bounty: row.bounty,
+    bounty: row.bounty, roomId: row.room_id,
   };
 }
 
@@ -101,18 +101,22 @@ chores.get('/chores', requireMember, async (c) => {
 chores.post('/chores', requireMember, async (c) => {
   const db = c.env.DB, now = nowIso(), tz = await householdTz(db);
   const active = await activeMemberIds(db);
-  const input = parseChoreInput(await body(c), active);
+  const b = await body(c);
+  const input = parseChoreInput(b, active);
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
+  const room = await choreRoomId(db, b);
+  if (typeof room === 'string') return fail(c, 400, 'invalid_input', room);
   const id = newId('chr'), today = utcToLocal(now, tz).date;
   // Plan today's and tomorrow's runs straight away, so the new chore is on Today without waiting for a tick.
   await db.batch([
     db.prepare(
       `INSERT INTO chores (id, title, done_means, days, timing, time, nudge, people, steps, channels, renotify_min, max_alerts,
-         start_date, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(id, ...choreColumns(input), input.max_alerts, today, c.get('member').id, now, now),
+         start_date, created_by, created_at, updated_at, room_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(id, ...choreColumns(input), input.max_alerts, today, c.get('member').id, now, now, room.roomId ?? null),
     ...choreRunInserts(db, { ...input, id, start_date: today }, tz, now, addMinutes(now, MATERIALIZE_AHEAD_H * 60), active),
   ]);
-  return c.json(choreView((await first<ChoreRow>(db, 'SELECT * FROM chores WHERE id = ?', id))!, today, active, 0), 201);
+  const areaCount = (await areaCounts(db)).get(id) ?? 0;
+  return c.json(choreView((await first<ChoreRow>(db, 'SELECT * FROM chores WHERE id = ?', id))!, today, active, areaCount), 201);
 });
 
 chores.patch('/chores/:id', requireMember, async (c) => {
@@ -120,13 +124,16 @@ chores.patch('/chores/:id', requireMember, async (c) => {
   if (row instanceof Response) return row;
   const db = c.env.DB, now = nowIso(), tz = await householdTz(db);
   const active = await activeMemberIds(db), today = utcToLocal(now, tz).date;
-  const input = parseChoreInput({ ...choreView(row, today, active, 0), ...(await body(c)) }, active);
+  const b = await body(c);
+  const input = parseChoreInput({ ...choreView(row, today, active, 0), ...b }, active);
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
+  const room = await choreRoomId(db, b);
+  if (typeof room === 'string') return fail(c, 400, 'invalid_input', room);
   const chore: Chore = { ...input, id: row.id, start_date: row.start_date };
   const stmts = [db.prepare(
     `UPDATE chores SET title = ?, done_means = ?, days = ?, timing = ?, time = ?, nudge = ?, people = ?, steps = ?, channels = ?,
-       renotify_min = ?, updated_at = ? WHERE id = ?`,
-  ).bind(...choreColumns(input), now, row.id)];
+       renotify_min = ?, room_id = ?, updated_at = ? WHERE id = ?`,
+  ).bind(...choreColumns(input), room.roomId === undefined ? row.room_id : room.roomId, now, row.id)];
   // §7B.3: unstarted runs from today on are re-planned in place; runs are never deleted.
   const runs = await all<ChoreRun>(db,
     'SELECT id, chore_id, date, assignee_id, step, done_at, done_by FROM chore_runs WHERE chore_id = ? AND step = 0 AND date >= ?', row.id, today);
@@ -145,17 +152,14 @@ chores.delete('/chores/:id', requireMember, async (c) => {
   if (row instanceof Response) return row;
   const db = c.env.DB, now = nowIso();
   // Soft delete; the runs stay (history). Every open fire of its runs closes `removed` (§7B.3).
-  // What done looks like goes outright: its areas, their photo rows, then the R2 objects (§7B.6).
-  const areas = await choreAreaDeletes(db, row.id);
+  // Its room and the room's areas stay: they belong to the room (§7B.6).
   await db.batch([
-    ...areas.stmts,
     db.prepare('UPDATE chores SET deleted_at = ?, updated_at = ? WHERE id = ?').bind(now, now, row.id),
     db.prepare(
       `UPDATE fires SET state = 'closed', close_reason = 'removed', closed_at = ?
         WHERE state != 'closed' AND chore_run_id IN (SELECT id FROM chore_runs WHERE chore_id = ?)`,
     ).bind(now, row.id),
   ]);
-  if (areas.keys.length) await c.env.PHOTOS.delete(areas.keys);
   return c.json({ ok: true });
 });
 

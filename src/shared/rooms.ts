@@ -1,20 +1,32 @@
-// SPEC §7B.6 — what done looks like: a chore's areas (name, expectations, reference photos). Limits, input
-// validation and the wire type. Pure; imports nothing.
+// SPEC §7B.6 — rooms and what done looks like: a room's sections (name, expectations, reference photos). Limits, input
+// validation and the wire types. Pure; imports nothing.
 
+export const ROOMS_MAX = 30;
+export const ROOM_NAME_MAX = 40;
 export const AREAS_MAX = 8;
 export const AREA_NAME_MAX = 40;
 export const EXPECTATIONS_MAX = 12;
 export const EXPECTATION_MAX = 120;
 export const AREA_PHOTOS_MAX = 4;
 
-/** An area as the API sends it. `photos` are photo ids, oldest first; a photo key is never on the wire. */
-export interface ChoreArea {
+/** A room as the API sends it. */
+export interface Room { id: string; name: string; areaCount: number; createdBy: string | null; updatedAt: string }
+
+/** A section of a room as the API sends it. `photos` are photo ids, oldest first; a photo key is never on the wire. */
+export interface RoomArea {
   id: string;
-  choreId: string;
+  roomId: string;
   name: string;
   expectations: string[];
   photos: string[];
   updatedAt: string;
+}
+
+/** POST/PATCH /rooms body → the room's name, or a message naming the field. */
+export function parseRoomInput(b: Record<string, unknown>): { name: string } | string {
+  const name = typeof b.name === 'string' ? b.name.trim() : '';
+  if (!name || name.length > ROOM_NAME_MAX) return `name must be 1–${ROOM_NAME_MAX} characters.`;
+  return { name };
 }
 
 export interface AreaInput { name: string; expectations: string[] }

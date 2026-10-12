@@ -797,6 +797,13 @@ first." Washer (Move to clothes dryer) and dish washer (Emptied) unchanged.
 edit select circle should only be visible to mojosogo"): `usePointAtOn` is false for everyone but the founder, so the
 ◎ (tab bar and modal headers), Alt+P and the Settings → 🙂 Me switch are gone for other members. His behavior unchanged.
 
+**Rooms** (v1.64.0, §7B.6, §4.2zt, §8.6, §8.15, Q264–Q266; MojoSOGO 2026-10-12: "define rooms as its own thing, then
+chores get assigned to the room … rooms get sections like kitchen already has … do not lose the kitchen we have",
+and "move Days off into its own calendar section; move room definitions here in Household"): what done looks like moved
+from a chore to a room. Migration 0047 turned the Kitchen chore's areas into a Kitchen room (same area and photo ids,
+same R2 keys) and pointed the chore at it. Rooms are listed and added in Settings → 🏠 Household; a chore picks its
+room in its form; the chore's 📋 sheet shows its room's areas. Days off moved to Settings → 📅 Calendar (admins).
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

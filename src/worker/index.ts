@@ -14,7 +14,7 @@ import { household } from './routes/household';
 import { lists } from './routes/lists';
 import { itemPhotos } from './routes/item-photos';
 import { chores } from './routes/chores';
-import { choreAreas } from './routes/chore-areas';
+import { rooms } from './routes/rooms';
 import { messes } from './routes/messes';
 import { bounties } from './routes/bounties';
 import { things } from './routes/things';
@@ -57,7 +57,7 @@ api.route('/', household);
 api.route('/', itemPhotos); // §7A.3 /list-items/read-photo and /list-items/{id}/photo
 api.route('/', lists);
 api.route('/', chores);
-api.route('/', choreAreas); // §7B.6 what done looks like
+api.route('/', rooms); // §7B.6 rooms and what done looks like
 api.route('/', messes); // §7B.7 whose mess?
 api.route('/', bounties); // §7B.8 bounties and the score
 api.route('/', thingPhotos); // before things: /things/read-photo must not match /things/:id

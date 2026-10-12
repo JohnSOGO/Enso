@@ -1,4 +1,4 @@
-// SPEC §8.5 — the chore form (modal): title, done means, days, at/by, time, people in turn
+// SPEC §8.5 — the chore form (modal): title, done means, room (§7B.6), days, at/by, time, people in turn
 // order, steps, channels, repeat alert. The server validates (§7B.4); its 400 shows in the dialog.
 import { useMemo, useState } from 'react';
 import { Modal } from './Modal';
@@ -9,6 +9,7 @@ import { useApp, useIsFounder } from '../state';
 import { CHORE_TIMING, type ChoreTiming } from '../../../src/shared/vocab';
 import { DONE_MEANS_MAX, PEOPLE_MAX, STEPS_MAX, TITLE_MAX, WAIT_MAX } from '../../../src/shared/chores';
 import { canChange } from '../../../src/shared/roles';
+import { useRooms } from './Rooms';
 
 interface StepDraft { title: string; wait: string; memberId: string | null }
 
@@ -21,8 +22,9 @@ const chip = { padding: '4px 10px', minHeight: 44 } as const;
 export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: () => void }) {
   const { me, members, refresh } = useApp();
   const founder = useIsFounder();
+  const { rooms } = useRooms();
   const init = useMemo(() => ({
-    title: chore?.title ?? '', doneMeans: chore?.doneMeans ?? '', days: chore?.days ?? [],
+    title: chore?.title ?? '', doneMeans: chore?.doneMeans ?? '', roomId: chore?.roomId ?? '', days: chore?.days ?? [],
     timing: chore?.timing ?? CHORE_TIMING[0], time: chore?.time ?? '08:00', nudge: chore?.nudge ?? false,
     people: chore?.people ?? [],
     steps: chore
@@ -64,7 +66,7 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
     if ((f.timing === 'at' || nudge) && !channels.length) throw new Error(pickOneWay('alert'));
     const last = f.steps.length - 1;
     const body = {
-      title: f.title, doneMeans: f.doneMeans.trim() || null, days: f.days, timing: f.timing, time: f.time, nudge,
+      title: f.title, doneMeans: f.doneMeans.trim() || null, roomId: f.roomId || null, days: f.days, timing: f.timing, time: f.time, nudge,
       people: f.people, channels, renotifyMin: f.renotify === 'off' ? null : Number(f.renotify),
       steps: f.steps.map((st, i) => ({ title: st.title, waitMin: i < last && st.wait ? Number(st.wait) : null, memberId: st.memberId })),
     };
@@ -85,6 +87,12 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
         <label className="field"><span>Done means…</span>
           <input value={f.doneMeans} maxLength={DONE_MEANS_MAX} placeholder="e.g. Bins at the curb, lids shut"
             onChange={(e) => setF({ ...f, doneMeans: e.target.value })} />
+        </label>
+        <label className="field"><span>Room</span>
+          <select value={f.roomId} onChange={(e) => setF({ ...f, roomId: e.target.value })}>
+            <option value="">No room</option>
+            {rooms?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
         </label>
         <DayChips days={f.days} onChange={(days) => setF({ ...f, days })} />
 
@@ -166,7 +174,7 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
       </fieldset>
       {chore && canEdit && (
         <div className="row wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-          <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete chore "${chore.title}" and what done looks like for it?`)) run(() => del(`/chores/${chore.id}`)); }}>Delete chore</button>
+          <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete chore "${chore.title}"? Its room stays.`)) run(() => del(`/chores/${chore.id}`)); }}>Delete chore</button>
         </div>
       )}
     </Modal>

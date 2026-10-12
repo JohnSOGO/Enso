@@ -19,7 +19,7 @@ import s from './Lists.module.css';
 export interface Chore {
   id: string; title: string; doneMeans: string | null; days: Weekday[]; timing: ChoreTiming; time: string;
   nudge: boolean; people: string[]; steps: ChoreStep[]; channels: Channel[]; renotifyMin: number | null;
-  createdBy: string; thisWeek: string | null; nextWeek: string | null; areaCount: number; bounty: number | null;
+  createdBy: string; thisWeek: string | null; nextWeek: string | null; areaCount: number; bounty: number | null; roomId: string | null;
 }
 
 type Section = 'today' | 'bounties' | 'messes' | 'all' | 'score';

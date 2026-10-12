@@ -1,4 +1,4 @@
-// SPEC §8.6 — the Settings menu: one PickGrid button per area (Household and Members for admins only), the open
+// SPEC §8.6 — the Settings menu: one PickGrid button per area (Household and Members for admins only; Calendar adds Days off for admins), the open
 // area in a Modal titled with its name, Log out under the grid. Holds which area is open and no setting of its own;
 // a tapped alert notification (§9.5) opens Alerts on its card.
 import { useEffect, useState, type ReactNode } from 'react';
@@ -9,6 +9,7 @@ import { useAction } from './useAction';
 import { Modal } from './Modal';
 import { PickGrid } from './PickGrid';
 import { OptionalItems } from './OptionalItems';
+import { DaysOff } from './DaysOff';
 import { SettingsMe } from './SettingsMe';
 import { PhoneAlerts } from './PhoneAlerts';
 import { HouseSpeakers } from './HouseSpeakers';
@@ -22,7 +23,7 @@ type Area = 'me' | 'calendar' | 'phone' | 'speakers' | 'alerts' | 'household' | 
 
 /** ⚑ Q226, Q247 — the buttons in order; `admin` ones show only to admins. */
 const AREAS: readonly { value: Area; emoji: string; label: string; admin?: true }[] = [
-  { value: 'me', emoji: '🙂', label: 'Me' }, { value: 'calendar', emoji: '📅', label: 'Calendar items' },
+  { value: 'me', emoji: '🙂', label: 'Me' }, { value: 'calendar', emoji: '📅', label: 'Calendar' },
   { value: 'phone', emoji: '📱', label: 'Phone alerts' }, { value: 'speakers', emoji: '🔊', label: 'Speakers' },
   { value: 'alerts', emoji: '🔔', label: 'Alerts' }, { value: 'household', emoji: '🏠', label: 'Household', admin: true },
   { value: 'members', emoji: '👥', label: 'Members', admin: true }, { value: 'status', emoji: '📊', label: 'Status' },
@@ -40,7 +41,7 @@ export function Settings({ onLogout, openAlert, onAlertOpened }: { onLogout: () 
 
   const body: Record<Area, () => ReactNode> = {
     me: () => <SettingsMe />,
-    calendar: () => <OptionalItems />,
+    calendar: () => <><OptionalItems />{isAdmin(me) && <DaysOff />}</>,
     phone: () => <PhoneAlerts />,
     speakers: () => <HouseSpeakers />,
     alerts: () => <MyAlerts openId={openAlert} onOpened={onAlertOpened} />,

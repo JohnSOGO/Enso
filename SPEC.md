@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.14 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.15 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -56,7 +56,7 @@ A calendar PWA for one household. It has three kinds of alert:
 |------|--------------|----------------|---------|
 | **Event reminder** | Fires before/at a calendar event. | On the calendar, inside the event | "Dentist" at 14:30, remind 30 min before |
 | **Scheduled alarm** | Fires at a set time on chosen **days of the week**, every week. Not a calendar entry. | **Alarms** tab, not drawn on the calendar | "Take out trash" Tue 19:00 · "Morning meds" every day 08:00 |
-| **Chore** | A job on chosen days, **rotating** weekly between people, either *at* a time (rings) or *by* a time (quiet). It can be a **loop** of steps that hand off. | **🧹 Chores** tab: Today (tick off), All chores (set up), What done looks like (§8.15) | "Laundry": start the washer → move to dryer (60 min later) → fold & put away |
+| **Chore** | A job on chosen days, **rotating** weekly between people, either *at* a time (rings) or *by* a time (quiet). It can be a **loop** of steps that hand off. | **🧹 Chores** tab: Today (tick off), All chores (set up), What done looks like from its **room** (§7B.6, §8.15) | "Laundry": start the washer → move to dryer (60 min later) → fold & put away |
 | **Rolling timer** ⚑ name | A countdown that **restarts when acknowledged**, not on a fixed clock. | **Alarms** tab | "Check on the dog", 60 min |
 
 **Why scheduled alarms are not calendar events:** a daily alarm drawn on the
@@ -181,7 +181,7 @@ Cloudflare Tunnel + Access**.
 | Styling | CSS Modules + CSS custom properties | Follow `C:\Users\Public\git\MOJOSOGO-PREFERENCES.md` and the `phone-ui` skill |
 | Push | Web Push (VAPID) from the Worker via **`@block65/webcrypto-web-push` 2.0.0** (pinned exactly) | WebCrypto only. Sends `Content-Encoding: aes128gcm` (RFC 8291) + `Authorization: vapid t=…, k=…` (RFC 8292) — the legacy `aesgcm` that some libraries send is refused by Apple. The 2026-10-03 spike decrypted its output under Node **and** workerd, and cross-checked it with `http_ece`. |
 | House delivery | The Worker calls Home Assistant's REST API through **Cloudflare Tunnel + Access** (§9.2) | `src/worker/house.ts`; no process at home besides HA itself. |
-| Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Seven attachments, all through `src/worker/photo-store.ts`: a thing's photo (`things/…`, §7C.3), a list item's photo (`list-items/…`, §7A.3), chore-area photos (`chore-areas/…`, §7B.6), mess photos (`messes/…`, §7B.7), a bounty's picture and its done photo (`bounties/…`, `earnings/…`, §7B.8) and a recipe's picture (`recipes/…`, §7E.2b, §8.12). Private: photos are served only through the API to signed-in members. |
+| Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Seven attachments, all through `src/worker/photo-store.ts`: a thing's photo (`things/…`, §7C.3), a list item's photo (`list-items/…`, §7A.3), room-area photos (`chore-areas/…`, the prefix kept from before rooms, §7B.6), mess photos (`messes/…`, §7B.7), a bounty's picture and its done photo (`bounties/…`, `earnings/…`, §7B.8) and a recipe's picture (`recipes/…`, §7E.2b, §8.12). Private: photos are served only through the API to signed-in members. |
 | Reading photos and recipes | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4, §7A.3, §7E) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). One caller of the SDK: `src/worker/claude.ts`. A snapped list item is read by SogoAI first and by Claude only when SogoAI gives no name (§7A.3). |
 | Naming a snapped item at home | **LM Studio** on SogoAI, `http://127.0.0.1:1234/v1/chat/completions` (OpenAI-compatible), the always-loaded vision model named by `IDENTIFY_MODEL` (`qwen-uncensored`) (§7A.3) | Free. Reached only by the SogoAI helper, never by the Worker directly. |
 | Recipes from videos | **YouTube Data API v3** `videos.list?part=snippet&id=…` and `commentThreads.list?part=snippet&videoId=…&order=relevance&maxResults=20&textFormat=plainText` (§7E) | Secret `YOUTUBE_API_KEY`; 1 quota unit per call, so 2 per read ⚑ Q82. Plus an **unofficial, keyless** captions attempt (YouTube's player endpoint asked as its Android app), which may be blocked — a failure is recorded and shown, never faked. |
@@ -909,6 +909,20 @@ Schema: [`migrations/0046_bounty_photo.sql`](migrations/0046_bounty_photo.sql). 
 `bounties.photo_key` — the picture's private R2 key; NULL = none, or deleted when paid or deleted. Additive only; it
 runs before the deploy. **Migration check (BT-M3):** see §7B.8.
 
+### 4.2zt Schema change — `migrations/0047_rooms.sql`
+
+Asked by MojoSOGO 2026-10-12: "define rooms as its own thing, then chores get assigned to the room. The room is
+what the room should look like when complete … do not lose the kitchen we have" (§7B.6).
+
+Schema: [`migrations/0047_rooms.sql`](migrations/0047_rooms.sql). The migration is the schema; it is not copied here.
+
+Adds `rooms` and `chores.room_id` (NULL = no room). `chore_areas` / `chore_area_photos` are rebuilt as `room_areas` /
+`room_area_photos` (an area now belongs to a room). **Lossless:** every chore that had areas becomes a room of its
+title (`rom_` + the chore id's suffix, its creator and times kept) and points at it; every area and photo row keeps
+its id, name, expectations, position and R2 key, so nothing in R2 moves. A chore without areas gets no room.
+**Migration check (RM-M):** the Kitchen chore's areas and photo come through unchanged under the Kitchen room; the old
+tables are gone; `PRAGMA foreign_key_check` is empty.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1309,8 +1323,8 @@ to acknowledge alarms and *is this my mess*"). Every write to an entry is `canCh
 (`shared/roles.ts`): its creator or an admin; no creator → admins only. A refusal is 403 `forbidden`,
 "Only the creator or an admin can change this {noun}." This covers events, timers, alarms, chores, lists,
 **list items** (edit, assign, delete, photo), **things** (edit, Plan it, Done / Let it go / Put back, delete,
-photo), **shows** (edit, delete), **recipes** (edit, re-read from a transcript, delete, picture) and a chore's
-**areas** ("what done looks like": add, edit, delete, photos), which follow the **chore's** creator.
+photo), **shows** (edit, delete), **recipes** (edit, re-read from a transcript, delete, picture) and a room's
+**areas** ("what done looks like": add, edit, delete, photos), which follow the **room's** creator (§7B.6).
 Still open to every member, because they are taking part rather than changing someone's entry: acting on
 any fire (§5.4, so alarms are acknowledged by anyone), ticking a chore step, **checking or unchecking any list
 item** (a PATCH whose only field is `checked`), **marking any show watched or wanted again** (a PATCH whose only
@@ -1343,7 +1357,7 @@ its form shows "Only the creator or an admin can change this …" and no Save, D
 | A8 | member K (not admin) PATCHes / DELETEs a thing, show, recipe and list item someone else made; PUTs / DELETEs their photos; Plans the thing; re-reads the recipe | each 403 `forbidden`; nothing changed |
 | A9 | K does the same to their own thing, show, recipe and list item | allowed as before |
 | A10 | K checks and unchecks someone else's list item (`{ checked }` only); marks someone else's show watched (`{ status }` only) | both 200 |
-| A11 | K adds, edits or deletes an area (or its photos) of a chore someone else made; then of their own chore | 403 `forbidden`; allowed |
+| A11 | K adds, edits or deletes an area (or its photos) of a room an admin made | 403 `forbidden` (rooms are added by admins, ⚑ Q264) |
 | A12 | K acknowledges a ringing alarm someone else made; answers That was me / Not me on someone else's mess | 200 each, as before |
 
 ### 6.4 Login rate limit
@@ -1578,7 +1592,7 @@ it is on for the member (§7.5).
 - `publicHolidays(year, keys?)` returns the holidays (actual + observed dates) whose
   key is in `keys` (all when omitted).
 - **Household days off** = `settings.days_off` (JSON array of keys, §4.2b); `NULL` means `DEFAULT_DAYS_OFF` from `holidays.ts` (the ✓
-  column). The owner edits it in Settings → 🏠 Household → **Days off** (a checklist of
+  column). The owner edits it in Settings → 📅 Calendar → **Days off** (a checklist of
   every key in `HOLIDAYS`). `/calendar` returns only days-off holidays.
 
 **Observed rule:** applies to the fixed-date holidays Jan 1, Jun 19, Jul 4, Nov 11 and
@@ -1598,7 +1612,7 @@ is always marked too. New Year's Day on a Saturday is observed on Dec 31 of the
 
 ### 7.4 Monthly options expiration 📈 (`src/shared/markets.ts`)
 
-A per-member marker, off by default, switched on in Settings → 📅 Calendar items ("📈 Show monthly
+A per-member marker, off by default, switched on in Settings → 📅 Calendar ("📈 Show monthly
 options expiration"; `member_prefs.show_options_expiration`, §4.2c).
 
 - The date is the **3rd Friday** of each month; if that day is an exchange holiday
@@ -1615,7 +1629,7 @@ options expiration"; `member_prefs.show_options_expiration`, §4.2c).
 
 ### 7.5 Optional events — each person turns them on
 
-**Optional calendar items** (Settings → 📅 Calendar items) is the one list of everything a member can
+**Optional calendar items** (Settings → 📅 Calendar) is the one list of everything a member can
 switch on for their own calendar (decided by MojoSOGO 2026-10-03):
 1. **Public holidays** — built in, on by default (`member_prefs.show_public_holidays`);
 2. **📈 Monthly options expiration** — built in, off by default
@@ -2254,58 +2268,69 @@ rejection is 400 `invalid_input` with a message naming the field.
 | C13 | migration check (§4.2e) | old fires and deliveries intact after 0006 |
 | C14 | delete a chore while a step wait is pending | that fire closes `removed`; nothing rings |
 
-### 7B.6 What done looks like — areas, pictures, expectations — `src/shared/chore-areas.ts` (pure)
+### 7B.6 Rooms and what done looks like — `src/shared/rooms.ts` (pure)
 
-Asked by MojoSOGO 2026-10-05: "Chores needs its own section and an area for what done looks like with specific
-areas, pictures and a list of expectations." The one-line **Done means…** (§7B.4) stays as the summary; under it a
-chore can hold up to 8 **areas** — "Sink", "Counters", "Floor" — each with a list of **expectations** ("No dishes
-left in the sink", "Faucet wiped dry") and up to 4 **reference photos** of that area done right. Areas belong to the
-chore, not to a day's run: they say what done looks like every time. Nothing here changes turns, runs or fires.
+Asked by MojoSOGO 2026-10-05: "an area for what done looks like with specific areas, pictures and a list of
+expectations"; and 2026-10-12: "define rooms as its own thing, then chores get assigned to the room. The room is what
+the room should look like when complete … rooms get sections like kitchen already has." A **room** ("Kitchen",
+"Living room") holds up to 8 **areas** — "Sink", "Counters", "Floor" — each with a list of **expectations** ("No
+dishes left in the sink", "Faucet wiped dry") and up to 4 **reference photos** of that area done right. A chore may
+name **one room** (or none); its 📋 sheet shows the chore's **Done means…** (§7B.4) and then its room. Several chores
+may share a room. Areas say what done looks like every time; nothing here changes turns, runs or fires.
 
 **The rules** (pure; imports nothing):
 
-- `AREAS_MAX` = 8 per chore, `AREA_NAME_MAX` = 40, `EXPECTATIONS_MAX` = 12 per area, `EXPECTATION_MAX` = 120,
-  `AREA_PHOTOS_MAX` = 4 per area ⚑ Q164.
+- `ROOMS_MAX` = 30, `ROOM_NAME_MAX` = 40 ⚑ Q264. `AREAS_MAX` = 8 per room, `AREA_NAME_MAX` = 40,
+  `EXPECTATIONS_MAX` = 12 per area, `EXPECTATION_MAX` = 120, `AREA_PHOTOS_MAX` = 4 per area ⚑ Q164.
+- `parseRoomInput(body)` → `{ name }` (trimmed, 1–`ROOM_NAME_MAX`) or a message naming the field.
 - `parseAreaInput(body, current?)` → `{ name, expectations }` or a message naming the field. `name` is trimmed,
   1–`AREA_NAME_MAX`. `expectations` is a list of strings: each trimmed, empty ones dropped, each at most
   `EXPECTATION_MAX`, at most `EXPECTATIONS_MAX` left; absent = `[]` on create, unchanged on edit (`current`).
-- `ChoreArea` — the wire type: `{ id, choreId, name, expectations: string[], photos: string[], updatedAt }`;
-  `photos` are photo ids, oldest first. A photo key is never on the wire.
+- `Room` — `{ id, name, areaCount, createdBy, updatedAt }`. `RoomArea` — `{ id, roomId, name, expectations: string[],
+  photos: string[], updatedAt }`; `photos` are photo ids, oldest first. A photo key is never on the wire.
 
-**Who:** the **chore's** creator or an admin may add, change or delete an area and its photos (§6.3; decided by
-MojoSOGO 2026-10-07, Q163) — anyone else gets 403 `forbidden`. Anyone may read them.
+**Who:** an **admin** adds a room (rooms are set up in Settings → 🏠 Household, §8.6) ⚑ Q264. The room's creator or an
+admin renames or deletes it and adds, changes or deletes its areas and their photos (§6.3, Q163) — anyone else gets
+403 `forbidden`. Anyone may read them, and anyone who may change a chore picks its room.
 
-**The routes** — `src/worker/routes/chore-areas.ts`:
+**The routes** — `src/worker/routes/rooms.ts`:
 
-- `GET /chores/{id}/areas` → `ChoreArea[]` by `position`. The chore deleted or unknown → 404 "That chore no longer exists."
-- `POST /chores/{id}/areas` `{ name, expectations? }` → 201 area, `position` = after the last. At `AREAS_MAX`
-  → 400 `invalid_input` "A chore has at most 8 areas."
-- `PATCH /chore-areas/{id}` `{ name?, expectations? }` → the area. `DELETE /chore-areas/{id}` → 204, its photos'
-  rows and R2 objects gone.
-- `POST /chore-areas/{id}/photos` the raw image (`photoBody`, §7C.3's limits) → 201 the area. R2 key
-  `chore-areas/{areaId}/{random}.jpg`, private. At `AREA_PHOTOS_MAX` → 400 `invalid_input` "An area has at most 4 photos."
-- `GET /chore-area-photos/{id}` → the image, `Cache-Control: private, max-age=3600` (a photo id is never reused,
-  so it is never stale). `DELETE /chore-area-photos/{id}` → 204, the row and the object gone.
-- An area or photo that is gone, or whose chore is deleted → 404 "That area no longer exists." / "That photo no
-  longer exists."
-- **Deleting a chore** (soft, §7B.3) deletes its areas and their photos outright, rows and R2 objects, in the same
-  request.
-- `GET /chores` and `GET /chores/today` carry `areaCount` on each chore / run, so the app knows when there is
-  something to show (§8.15).
+- `GET /rooms` → `Room[]` by `position` (the order added). `POST /rooms` `{ name }` → 201 room; at `ROOMS_MAX` → 400
+  "A household has at most 30 rooms." `PATCH /rooms/{id}` `{ name }` → the room.
+- `DELETE /rooms/{id}` → 204: in one batch its areas and their photo rows go and every chore naming it gets
+  `room_id` NULL; then the R2 objects. Its chores keep going with no room.
+- `GET /rooms/{id}/areas` → `RoomArea[]` by `position`. An unknown room → 404 "That room no longer exists."
+- `POST /rooms/{id}/areas` `{ name, expectations? }` → 201 area, after the last. At `AREAS_MAX` → 400
+  "A room has at most 8 areas."
+- `PATCH /room-areas/{id}` `{ name?, expectations? }` → the area. `DELETE /room-areas/{id}` → 204, its photos' rows
+  and R2 objects gone.
+- `POST /room-areas/{id}/photos` the raw image (`photoBody`, §7C.3's limits) → 201 the area. R2 key
+  `chore-areas/{areaId}/{random}.jpg` (the prefix from before rooms, kept so nothing in R2 moves), private. At
+  `AREA_PHOTOS_MAX` → 400 "An area has at most 4 photos."
+- `GET /room-area-photos/{id}` → the image, `Cache-Control: private, max-age=3600`. `DELETE /room-area-photos/{id}` →
+  204, the row and the object gone.
+- An area or photo that is gone → 404 "That area no longer exists." / "That photo no longer exists."
+- **A chore's room:** `POST /chores` and `PATCH /chores/{id}` take `roomId` — null or `""` = none, an existing room's
+  id, anything else → 400 `invalid_input` naming `roomId`; a PATCH without it keeps the room. `GET /chores` carries
+  `roomId`; `GET /chores` and `GET /chores/today` carry `areaCount` = its room's areas (0 with no room).
+- **Deleting a chore** (soft, §7B.3) leaves its room and the room's areas alone.
 
 **Acceptance (M4y — each row is a test; fakes only):**
 
 | # | Setup / call | Expected |
 |---|---|---|
-| CA1 | POST an area `{ name: " Sink ", expectations: ["No dishes", " ", "Faucet dry"] }`; GET the chore's areas | 201 `{ name: "Sink", expectations: ["No dishes", "Faucet dry"], photos: [] }`; GET lists it; `areaCount` 1 on `/chores` and on today's run |
+| CA1 | POST an area `{ name: " Sink ", expectations: ["No dishes", " ", "Faucet dry"] }` on a room; a chore in that room | 201 `{ roomId, name: "Sink", expectations: ["No dishes", "Faucet dry"], photos: [] }`; GET lists it; `areaCount` 1 on `/rooms`, on the chore in `/chores` (with its `roomId`) and on its run today |
 | CA2 | a second area, then PATCH the first `{ name: "Kitchen sink" }` | areas in the order added; the PATCH keeps the expectations |
 | CA3 | name empty / 41 chars; 13 expectations; an expectation of 121 chars; a 9th area | 400 `invalid_input`, the message names the field |
 | CA4 | POST a photo, GET it, POST up to 4, then a 5th | the bytes round-trip with `private, max-age=3600`; the area lists 4 ids oldest first; the 5th is 400; no key in any answer |
 | CA5 | DELETE a photo; DELETE an area with photos | 204 and the object gone; 204, the area and every object of it gone |
-| CA6 | delete the chore | its areas' rows and objects gone; GET its areas → 404 |
-| CA7 | a member who is not the chore's creator adds, edits and deletes an area, adds and deletes a photo | each 403 `forbidden` (Q163, §6.3 A11) |
+| CA6 | delete a chore in a room; then delete the room | the room's areas and objects stay; then they go, GET its areas → 404, and its other chore shows `roomId` null, `areaCount` 0 |
+| CA7 | a member who did not make the room adds, edits and deletes an area, adds and deletes a photo | each 403 `forbidden` (Q163, §6.3 A11) |
 | CA8 | no session; a bad photo type | 401; 400 |
-| CA-M | migration check (§4.2zb) | rows written before 0029 survive; `foreign_key_check` empty |
+| RM1 | add " Bathroom " and "Garage", rename one; names empty / blank / 41 chars | trimmed, in the order added, `createdBy` set, renamed; 400 naming `name` |
+| RM2 | a chore given a room; PATCH its title; PATCH another room; PATCH `roomId: null`; an unknown room on PATCH and POST | the room kept, changed, cleared; 400 naming `roomId` |
+| RM3 | a non-admin renames / deletes an admin's room, reads its areas, adds a room | 403, 403, 200, 403 (⚑ Q264) |
+| RM-M | migration check (§4.2zt) | see §4.2zt |
 
 ### 7B.7 Whose mess? — mess reports and who owes whom — `src/shared/messes.ts` (pure)
 
@@ -3819,11 +3844,11 @@ Time      Chore            Days        This week
 ```
 
 - `at`/`by` after the time; a superscript step count when there is more than one step; 📋 after the
-  title when the chore has areas (§7B.6).
+  title when the chore's room has areas (§7B.6).
 - **This week** = whose turn it is now; when people take turns, `→` the next person.
 - Tapping a row opens the chore's **What done looks like** sheet (§8.15); its **✎ Edit chore** opens the
   **chore form** (modal):
-  - Title · **Done means…** (one line, e.g. "Bins at the curb, lids shut")
+  - Title · **Done means…** (one line, e.g. "Bins at the curb, lids shut") · **Room** (No room, then the rooms, §7B.6)
   - Days (chips Sun…Sat, plus "Every day" / "Weekdays")
   - **When:** ( ) **At** a time — it rings · ( ) **By** a time — quiet; ☐ nudge then
   - Time
@@ -3845,7 +3870,7 @@ what it does; only where it sits.
 
 ```
 Settings
-[ 🙂 Me            ] [ 📅 Calendar items ]
+[ 🙂 Me            ] [ 📅 Calendar       ]
 [ 📱 Phone alerts  ] [ 🔊 Speakers       ]
 [ 🔔 Alerts        ] [ 🏠 Household      ]   ← Household and Members: admins only
 [ 👥 Members       ] [ 📊 Status         ]
@@ -3854,14 +3879,17 @@ Settings
 ```
 
 - **🙂 Me:** name, color, and (founder only) **🎯 Point at it** on this device (§8.16).
-- **📅 Calendar items:** **Optional calendar items** — Public holidays, 📈 options expiration, then one line
-  per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5).
+- **📅 Calendar** (named "Calendar items" before v1.64.0): **Optional calendar items** — Public holidays, 📈 options
+  expiration, then one line per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); then,
+  for admins only, **Days off** (§7.3) ⚑ Q265 (asked by MojoSOGO 2026-10-12: move Days off "into its own calendar section").
 - **📱 Phone alerts:** this phone's state and Turn on / Turn off / Send a test (§9.1).
 - **🔊 Speakers:** **Speak my alerts on** (§9.2a).
 - **🔔 Alerts** (§9.5): every push this phone's member got, newest first — tap a line for its card, a red ❌ on each
   line hides it, **Clear all** at the top. A tapped phone notification opens Settings with this area open, on its
   card.
-- **🏠 Household (admins):** name, timezone, days off (§7.3).
+- **🏠 Household (admins):** name, timezone; then **Rooms** (§7B.6): one line per room (name · n areas), a
+  name box with **＋ Add room**. A tap opens the room's sheet: **✎ Rename room**, its areas exactly as the chore's
+  sheet shows them (§8.15, with ✎ / ＋ Add an area), **Delete room** (asks first; its chores stay, with no room).
 - **👥 Members (admins):** members list: one line per member — name · **Owner** / **Admin** chip (nothing for a
   regular member) · **Make admin** / **Remove admin** (asks first; never on the founder) · **Disable** /
   **Enable** (never on the founder). An admin removing their own admin role is warned
@@ -4375,7 +4403,9 @@ their modal.
 **All chores** — the chore list and chore form of §8.5, under the heading "All chores" with **＋ Add**.
 
 **What done looks like** — a sheet (modal) titled with the chore's title, opened by a row of All chores or a
-Today row's 📋:
+Today row's 📋. Since v1.64.0 the areas are the chore's **room's** (§7B.6): under Done means comes "Room: Kitchen"
+and then the room's areas; a chore with no room says "No room yet. Pick one in ✎ Edit chore." Areas edited here
+change the room, so every chore in it shows the change ⚑ Q266:
 
 ```
 ┌ Kitchen ─────────────────────────── ✕ ┐
@@ -4397,7 +4427,7 @@ Today row's 📋:
 
 - **Done means** first, when there is one; then each area in order: its name, its photos as thumbnails (tap for
   full size, as §8.8's item photo), and its expectations as a checklist. With no areas: "Nothing here yet. Add an
-  area — a part of the job, with photos of it done right and what to check."
+  area — a part of the room, with photos of it done right and what to check."
 - Ticking an expectation is only for walking through the job: ticks are kept while the sheet is open, never
   saved ⚑ Q165.
 - **✎** on an area (accessible name "Edit Sink") and **＋ Add an area** (hidden at 8) open the **area editor** in
@@ -4408,7 +4438,7 @@ Today row's 📋:
   then each new photo, then each removed photo's DELETE; a refusal shows inside the sheet and keeps the editor
   open. Cancel with changes asks "Discard your changes?".
 - **✎ Edit chore** opens the chore form (§8.5) in place of the sheet.
-- The chore's creator or an admin may change what done looks like (Q163); everyone else sees it read-only, without ✎ or ＋ Add an area.
+- The room's creator or an admin may change what done looks like (Q163); everyone else sees it read-only, without ✎ or ＋ Add an area.
 
 ### 8.15a Whose mess? — the banner and the Messes section (§7B.7)
 
@@ -5305,16 +5335,18 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `house_quiet` (§9.2b); spoken as "{my name} says: {text}" on every speaker and/or pushed to every member, me too, now (§9.3) |
 | POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 409 `no_recipients` (no founder yet) / 429 `rate_limited`, in that order |
 | GET | `/ops/pings?after=` | bearer `OPS_NOTIFY_TOKEN` (no session) | → `{ pings: [{ id, channel, title, text, at }] }`, the founder pings and FunHouse alerts of the last hour after `after`, oldest first, for the FunHouse poller (§9.4a, §9.4b; listed `funhouse` rows become `sent`); 503 / 401 as `/ops/notify` |
-| GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek, areaCount }` (`thisWeek`/`nextWeek` = member id or null; `areaCount` §7B.6) |
-| POST | `/chores` | member | `{ title, doneMeans?, days, timing, time, nudge?, people, steps, channels, renotifyMin? }` → chore (201) |
-| PATCH/DELETE | `/chores/{id}` | creator or owner | same fields, all optional; re-plans unstarted runs (§7B.3); DELETE also deletes its areas and their photos (§7B.6) |
+| GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek, areaCount, roomId }` (`thisWeek`/`nextWeek` = member id or null; `areaCount` §7B.6) |
+| POST | `/chores` | member | `{ title, doneMeans?, roomId?, days, timing, time, nudge?, people, steps, channels, renotifyMin? }` → chore (201); 400 an unknown room (§7B.6) |
+| PATCH/DELETE | `/chores/{id}` | creator or owner | same fields, all optional; re-plans unstarted runs (§7B.3); its room stays (§7B.6) |
 | GET | `/chores/today` | member | → `{ date, runs: Run[] }`; `Run = { id, choreId, title, doneMeans, timing, time, step, steps, assigneeId, personId, doneAt, doneBy, nextDueAt, ringing, areaCount }` (`personId` = the current step's person) |
 | POST | `/chore-runs/{id}/done` | member | advances one step (§7B.3) → run; 409 `already_done` when finished |
 | POST | `/chore-runs/{id}/undo` | member | → run; 409 `nothing_to_undo` at step 0 |
-| GET/POST | `/chores/{id}/areas` | GET member / POST the chore's creator or owner | GET → `ChoreArea[]` by position; POST `{ name, expectations? }` → area (201); 400 at 8 areas; 404 when the chore is gone (§7B.6) |
-| PATCH/DELETE | `/chore-areas/{id}` | the chore's creator or owner | PATCH `{ name?, expectations? }` → area; DELETE → 204 with its photos (§7B.6) |
-| POST | `/chore-areas/{id}/photos` | the chore's creator or owner | the raw image → area (201); 400 at 4 photos or a bad image (§7B.6) |
-| GET/DELETE | `/chore-area-photos/{id}` | GET member / DELETE the chore's creator or owner | GET → the image, `private, max-age=3600`; DELETE → 204 (§7B.6) |
+| GET/POST | `/rooms` | GET member / POST owner | GET → `Room[]` by position; POST `{ name }` → room (201); 400 at 30 rooms (§7B.6) |
+| PATCH/DELETE | `/rooms/{id}` | the room's creator or owner | PATCH `{ name }` → room; DELETE → 204 with its areas and photos, its chores' room cleared (§7B.6) |
+| GET/POST | `/rooms/{id}/areas` | GET member / POST the room's creator or owner | GET → `RoomArea[]` by position; POST `{ name, expectations? }` → area (201); 400 at 8 areas; 404 when the room is gone (§7B.6) |
+| PATCH/DELETE | `/room-areas/{id}` | the room's creator or owner | PATCH `{ name?, expectations? }` → area; DELETE → 204 with its photos (§7B.6) |
+| POST | `/room-areas/{id}/photos` | the room's creator or owner | the raw image → area (201); 400 at 4 photos or a bad image (§7B.6) |
+| GET/DELETE | `/room-area-photos/{id}` | GET member / DELETE the room's creator or owner | GET → the image, `private, max-age=3600`; DELETE → 204 (§7B.6) |
 | GET | `/messes` | member | → `{ messes: Mess[], balances: Balance[] }` — open and To talk about messes for everyone, owed ones for the pair and admins (§7B.7) |
 | POST | `/messes?choreId=&note=` | member | the raw photo → `Mess` (201); the first ask to everyone else at once; 400 no or bad photo, a long note; 404 an unknown chore (§7B.7) |
 | GET | `/messes/{id}/photo` | member | → the image, `private, max-age=3600`; 404 once deleted (§7B.7) |
@@ -5410,7 +5442,7 @@ Captured from v1.0-draft so nothing is lost:
 - Offline **editing** and conflict resolution. v1 offline = the cached app shell;
   actions need network, and buttons show disabled "offline".
 - Queued offline acks
-- Photos anywhere other than Things to do (§7C.3), list items (§7A.3), a chore's areas (§7B.6), a mess
+- Photos anywhere other than Things to do (§7C.3), list items (§7A.3), a room's areas (§7B.6), a mess
   report (§7B.7, kept at most 30 days), a bounty's picture and done photo (§7B.8, kept until paid or dropped) and a recipe's picture
   (§7E.2b, §8.12), the only seven attachments. A picture a show is looked up from (§7F.2) is read once and never stored, so it is not one. A recipe's video
   thumbnail (§7E.1) is hotlinked from YouTube — not stored, not in R2, not an attachment — so it

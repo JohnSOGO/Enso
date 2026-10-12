@@ -1,4 +1,4 @@
-/* SPEC §8.15 — a chore's What done looks like sheet and its area editor. Column boxes whose height comes from
+/* SPEC §8.15 — a room's What done looks like (room sheet, chore sheet) and its area editor. Column boxes whose height comes from
    content: children keep flex none / 1 1 auto, never basis 0 (§8 iPhone rules). */
 .doneMeans { margin-bottom: 14px; }
 .area { border-top: 1px solid var(--border); padding: 10px 0 12px; }
