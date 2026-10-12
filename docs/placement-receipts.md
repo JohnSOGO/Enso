@@ -7,6 +7,95 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.69.1: Require `place` on chore rules (placement-advisor)
+
+- **Ask:** Steward pass 20 item #2 (MojoSOGO, 2026-10-12, "BOTH"). Drop the `= null` default so the trailing `place: Place | null` is required on firstFireDue, planChoreRuns, advanceRun, undoRun and replanRun. Refactor only, no behavior change.
+- **Verdict:** src/shared/chores.ts (+ test/chores.test.ts) [EXISTING].
+- **Flow stage:** rules.
+- **Why:** all production callers already pass `place` (fire-rows.ts:54, routes/chores.ts:77/142/200; tick.ts reaches planning through fire-rows.ts; no frontend callers), so the change stays inside the owner and its tests and removes the trap of a caller forgetting it.
+- **Caps:** chores.ts unchanged in line count (253/300). No file enters the band.
+- **Sources read:** scripts/arch.ts; src/shared/chores.ts; repo-wide grep of call sites; SPEC.md §7B.3 signatures.
+
+## 2026-10-12 — Steward pass 20, whole tree (code-steward)
+
+- **Run:** after the v1.69.0 release (SPEC 3.22 §7B.3, chores before sunset, migration 0048). Also covers v1.63.0–v1.68.1.
+- **Verdict:** SOUND. Typecheck green, 847/847 tests, arch:audit quiet (chores.ts 253/300, EventForm 88%, Calendar 87%, routes/recipes 87%).
+- **Placement audit:** 12 receipts against 12 code commits, no placement mismatches. bd931e4 (FOUNDER_SQL to db.ts, 7-line refactor, no behavior change) has no receipt; accepted. Seven receipts (v1.63.1 to v1.69.0) were appended at the end of this file instead of the top.
+- **Top finding:** a docs tidy. Move those seven receipts to the top; add device checks for v1.58–v1.69 (rooms, a sunset chore ringing) to where-things-stand; add the clock-or-sunset choice to map row 165 (ChoreForm) and the `whenText` export to row 173 (ChoresToday).
+- **Handoffs:** 2 to worker (#1 the docs tidy; #2 make `place` required on firstFireDue, planChoreRuns, advanceRun, undoRun and replanRun, since its null default lets a new caller silently stop sunset fires). 0 to reorganizer now: the chore-input.ts seam (§7B.4 validation, about 70 lines) stays the first step of the next chores.ts feature. Items carried from pass 19 still wait for MojoSOGO's pick.
+- **Restraint:** no pre-emptive chores.ts split (84%, coherent); EventForm, Calendar and recipes ceilings untouched since pass 19; machines.ts churn was small changes inside its one owner; SUN_OFFSET_MAX repeated in the migration's CHECK (SQL cannot import it); whenText only formats, it decides nothing.
+
+## 2026-10-12 — v1.69.0: Chore time "before sunset" (placement-advisor)
+
+- **Ask:** SPEC §7B.3 / §4.2zu (migration 0048): a chore's time can be local sunset − N minutes (0–240) instead of a clock time; no place or no sunset that day → no time-based fire, still on Today. MojoSOGO: "an alarm chore that can be assigned to anyone to get the eggs 30 minutes before sundown".
+- **Verdict:** EXISTING owners: `src/shared/chores.ts` (place-aware `deadline`; trailing `place` on `firstFireDue`, `planChoreRuns`, `advanceRun`, `undoRun`, `replanRun`; `sunOffsetMin` in `parseChoreInput`, exported `SUN_OFFSET_MAX`) and `frontend/src/components/ChoresToday.tsx` (exported `whenText`, also used by Chores.tsx). Callers: `src/worker/fire-rows.ts` `choreRunInserts` passes `place`; `src/worker/tick.ts`; `src/worker/routes/chores.ts` loads `householdPlace` inside `stepRun` so `routes/alerts.ts` is untouched, and `choreView` emits `sunOffsetMin` so a PATCH keeps it. Form: `ChoreForm.tsx`.
+- **Flow stage:** rules (deadline), persist (route, tick, fire-rows), render (form, time text).
+- **Why:** run timing is chore planning; `sun.ts` is already a pure leaf. One nullable integer beats copying the event `start_sun` pair. UI words stay out of shared code.
+- **Caps:** chores.ts 253/300 (band 270). Next chores.ts feature: extract-first `parseChoreInput` and helpers into `src/shared/chore-input.ts`. No file newly in the band.
+- **Sources read:** scripts/arch.ts; docs/module-ownership.md; src/shared/chores.ts, sun.ts; src/worker/routes/chores.ts, fire-rows.ts, tick.ts; ChoreForm.tsx, ChoresToday.tsx, Chores.tsx.
+
+## 2026-10-12 — All chores: row opens the form, 📋 opens the sheet (placement-advisor)
+
+- **Ask:** In Chores → 📋 All chores, tapping a row opens ChoreForm instead of ChoreSheet, and the 📋 marker becomes its own button that opens ChoreSheet (shown when the chore has areas or a done means). SPEC §8.5/§8.15, patch fix.
+- **Verdict:** `frontend/src/components/Chores.tsx` (AllChoresSection) [EXISTING]
+- **Flow stage:** render
+- **Why:** A change to the list Chores.tsx already owns; `onEdit` and `onOpenAreas` are already props of AllChoresSection. 📋 visibility comes from server fields (`areaCount`, `doneMeans`). Rejected ChoresToday.tsx (its tap ticks done, deliberately) and a new component (nothing distinct to own). module-ownership.md row and the file header reworded in the same commit.
+- **Caps:** Chores.tsx about 111 → about 116 of 300 (no CEILINGS pin). No file enters the band.
+- **Sources read:** frontend/src/components/Chores.tsx, scripts/arch.ts, docs/module-ownership.md.
+
+## 2026-10-12 — Machine FunHouse ping only for the founder (placement-advisor)
+
+- **Ask:** SPEC §7D.3/§7D.7/§7D.8/§9.4b (MojoSOGO 2026-10-12: "for unknown owners for machines, do not ping funhouse; ping funhouse for MojoSOGO and announcements"). A machine or cooking-timer fire gets a FunHouse row only when its alert person is the founder. Nobody → Phone only. Someone else → Phone + House. Announce is unchanged.
+- **Verdict:** src/shared/machines.ts `machineAlert(quietUntil, alertId, founderAlerted)` + src/shared/cooking.ts `cookAlert(alertId, founderAlerted)` + src/worker/fire-rows.ts sourceOf (both the cook and fixed-machine branches) [EXISTING]. Reorganizer first: FOUNDER_SQL moves from src/worker/routes/members.ts to src/worker/db.ts [EXISTING row widened]; members.ts and routes/ops.ts re-import it from db.ts.
+- **Flow stage:** rules (the channel set, a pure boolean input) + persist/load (the founder lookup in sourceOf).
+- **Why:** machineAlert already owns the one "who does a machine fire reach" decision (§7D.7), so this is one more input, not a new owner. The founder lookup is I/O, so it stays in sourceOf, which already resolves the alert person. Rejected: importing FOUNDER_SQL from routes/members into fire-rows (members.ts builds a Hono app when it loads; fire-rows is "no Hono" and loaded by tick). db.ts already owns member-set SQL (activeMemberIds). tick and optins need no change because the funhouse row already follows cfg.channels.
+- **Caps:** machines.ts ~240/300, cooking.ts ~161/300, fire-rows.ts ~164/300, db.ts ~57/300, routes/members.ts ~72/300, routes/ops.ts 76/300. No pinned ceilings, nothing newly in the 90% band (270).
+- **Sources read:** scripts/arch.ts, docs/module-ownership.md (shared + worker rows), docs/placement-receipts.md, src/worker/fire-rows.ts, src/worker/db.ts, src/worker/routes/members.ts, src/shared/machines.ts, src/shared/cooking.ts, src/shared/optins.ts, line counts of routes/ops.ts.
+
+## 2026-10-12 — v1.67.0 delta: Rooms list in Household, Days off to Calendar (placement-advisor)
+
+- **Ask:** amendment to the v1.67.0 Rooms placement (SPEC §7B.6, §8.6, §7.3): the Rooms list lives in Settings → 🏠 Household (admins), SettingsHousehold rendering `<RoomsList/>` from Rooms.tsx. Days off moves out of Household into Settings → 📅 Calendar (renamed from "Calendar items"), admins only. The chore's 📋 sheet can edit sections through RoomSections, gated by the room's canChange.
+- **Verdict:** NEW row frontend/src/components/DaysOff.tsx. EXISTING: Settings.tsx (label + admin-gated DaysOff in the calendar body), SettingsHousehold.tsx (DaysOff out, RoomsList in), Rooms.tsx (RoomsList + useRooms; no Chores section), RoomSheet.tsx (RoomSections editor gated by the room's createdBy).
+- **Flow stage:** render.
+- **Why:** DaysOff is a household-wide admin setting (/settings), OptionalItems is one member's own prefs and opt-ins (/me, /events/{id}/optin); merging them would give OptionalItems two audiences and two endpoints, so DaysOff is its own leaf. Settings.tsx composes the two in one area body, within its row. Open point settled as ⚑ Q266: POST /rooms is admins only, matching the admin-only Household screen.
+- **Caps:** Settings.tsx ~63/99 (pinned), SettingsHousehold.tsx 53 → ~30, DaysOff.tsx ~30, OptionalItems.tsx 58. No file newly in the band, no re-pin.
+- **Sources read:** frontend/src/components/SettingsHousehold.tsx, OptionalItems.tsx, Settings.tsx; docs/module-ownership.md rows 151, 196, 201; scripts/arch.ts CEILINGS; plus the first v1.65.0 receipt's sources.
+
+## 2026-10-12 — v1.67.0: Rooms own the "what done looks like" areas (placement-advisor)
+
+- **Ask:** SPEC §7B.6 rewritten as "Rooms" for v1.67.0: a `rooms` table (rom_ ids, name 1–40, position); migration 0047 rebuilds chore_areas → room_areas and chore_area_photos → room_area_photos with the same ids, turns each chore that has areas into a room named after it, adds a nullable chores.room_id. ROOMS_MAX 30, ROOM_NAME_MAX 40, parseRoomInput, Room / RoomArea wire types. Routes /rooms, /rooms/{id}, /rooms/{id}/areas, /room-areas/{id}(/photos), /room-area-photos/{id}; deleting a room clears chores.room_id. A chore's roomId is validated and areaCount comes from its room.
+- **Verdict:** EXISTING (renamed): src/shared/rooms.ts, src/worker/routes/rooms.ts, frontend RoomSheet.tsx, RoomAreaForm.tsx. NEW rows: frontend/src/components/Rooms.tsx (list + ＋ Add room + useRooms) and frontend/src/components/ChoreSheet.tsx (the chore's 📋 sheet: Done means + RoomSections + ✎ Edit chore). NEW migration 0047 + its test.
+- **Flow stage:** rules (shared/rooms.ts), route + persist (routes/rooms.ts, routes/chores.ts), render (Rooms, RoomSheet, ChoreSheet, ChoreForm).
+- **Why:** areas change parent, so the existing area owners keep the concern under the new name; no new module per stage. One file each for rooms and areas in the route and in the rules: a room with its sections is one concern and stays under cap (routes/rooms.ts ~205; split off routes/room-areas.ts only past ~250). The chore's 📋 sheet is split out of RoomSheet so one component does not hold both a chore's sheet and a room's sheet. The room-existence check stays in routes/chores.ts through an export from routes/rooms.ts, keeping shared/chores.ts pure and away from the band. R2 prefix kept as `chore-areas/` (no R2 rewrite, photo-store.ts untouched).
+- **Caps:** routes/rooms.ts ~205, shared/rooms.ts ~60, routes/chores.ts ~196, shared/chores.ts ~246 (closest to the band), RoomSheet.tsx ~125, ChoreForm.tsx ~190, Chores.tsx ~116, against GLOBAL_FILE_CAP 300. No file newly in the band, no CEILINGS change.
+- **Sources read:** scripts/arch.ts; docs/module-ownership.md; docs/placement-receipts.md; src/shared/chore-areas.ts; src/worker/routes/chore-areas.ts; frontend ChoreAreas.tsx; line counts of the touched files; greps for areaCount, chore-areas and PhotoPrefix; SPEC.md §7B.6 and API rows.
+
+## 2026-10-12 — About tagline on two lines (placement-advisor)
+
+- **Ask:** In Settings → ℹ️ About, show the tagline as two lines ("Closing the loop." / "Peace of mind, every day.") instead of one run-on; the opening screen (frontend/index.html, §8.10) stays as is. SPEC §8.6 SM5, MojoSOGO 2026-10-12.
+- **Verdict:** `frontend/src/components/SettingsAbout.module.css` + `frontend/src/components/SettingsAbout.tsx` [EXISTING]
+- **Flow stage:** render
+- **Why:** the SettingsAbout row already owns the About panel and TAGLINE; stacking the halves is presentation only (`.tagline span` inline-block → block, and the `' '` separator dropped). TAGLINE is untouched, so SM5's index.html check (each half as `<span>…</span>`) still holds and the splash is left alone. Rejected: splitting TAGLINE or adding a second constant (a second copy, §0.5); editing index.html (out of scope by MojoSOGO's word).
+- **Caps:** SettingsAbout.tsx 18 → 18 lines, SettingsAbout.module.css 9 → 9, against GLOBAL_FILE_CAP 300. No file newly in the band.
+- **Sources read:** frontend/src/components/SettingsAbout.tsx; frontend/src/components/SettingsAbout.module.css; docs/module-ownership.md (row 204); scripts/arch.ts (WORKING_BUFFER, GLOBAL_FILE_CAP, WARN_AT); docs/placement-receipts.md; test/settings-about.test.ts.
+
+## 2026-10-12 — v1.63.2: 🎯 Point at it is founder-only (placement-advisor)
+
+- **Ask:** SPEC §8.16 (patch v1.63.2). The ◎ pick activator (bottom left and in modal headers), Alt+P and the Settings → 🙂 Me switch show only for the founder, using the same check as the 🎪 FunHouse tick (Q230, `useIsFounder()`). For the founder nothing changes: on by default, with an off switch per device.
+- **Verdict:** `frontend/src/components/PointAtButton.tsx` (`usePointAtOn` = founder && stored switch) + `frontend/src/components/SettingsMe.tsx` (switch rendered only for the founder) [EXISTING]
+- **Flow stage:** render
+- **Why:** All four surfaces (Modal ◎, PointAtLayer's floating ◎, the Alt+P listener and SettingsMe) already read the one `usePointAtOn()` gate, so gating it once covers them and PointAt.tsx/Modal.tsx are untouched. The founder check is reused from state.tsx rather than written again. PointAtButton gains a hook import from '../state' (not a component, no cycle), and every consumer renders inside AppProvider (Shell; Modal is not used on the sign-in, join or approve screens). The stored switch is left alone, so a founder's setting persists. Rejected: gating separately in PointAt.tsx, Modal.tsx and SettingsMe (three copies of one rule), and a server-side flag (the founder is already known on the client).
+- **Caps:** PointAtButton.tsx 31 → ~33/300; SettingsMe.tsx 37 → ~38/300. No file newly in the band.
+- **Sources read:** scripts/arch.ts; docs/placement-receipts.md; docs/module-ownership.md (rows 139, 197, 198); frontend/src/components/PointAtButton.tsx, PointAt.tsx, SettingsMe.tsx; frontend/src/state.tsx (useIsFounder); frontend/src/App.tsx (provider tree); grep of Modal/PointAt usages in frontend/src and test/.
+
+## 2026-10-12 — Clothes dryer finish reads "Unload Clothes Dryer" (placement-advisor)
+
+- **Ask:** v1.63.1 patch, SPEC §8.5/§7D.2. The dryer's finish button (Ringing-now bar and Machines card) reads "Unload Clothes Dryer" instead of "Fold & out". The dish washer's "Emptied" and the washer's "Move to clothes dryer" stay.
+- **Verdict:** src/shared/machines.ts [EXISTING]. Change the laundry branch of `finishLabel`; the `invalid_state` refusal no longer hard-codes the old label. Update test/machines.test.ts to match.
+- **Flow stage:** rules (wording), rendered unchanged by RingingBar.tsx and Machines.tsx.
+- **Why:** `finishLabel` already owns the finish wording and both screens import it, so one edit keeps them in step.
+- **Caps:** src/shared/machines.ts 238/300 → 238/300. No file newly in the warning band.
+
 ## 2026-10-12 — v1.66.0: Announce ignores Quiet the house (placement-advisor)
 
 - **Ask:** SPEC §9.2b / §9.3 / §9.4b — Announce always speaks on every speaker HA lists, even while the house is quiet (MojoSOGO 2026-10-12 "announcements are special").
@@ -1822,83 +1911,3 @@ REORG RECEIPT
   201. Day one: green, nothing in the warning band (highest 87 %).
 - **New owners:** `scripts/arch.ts`, `scripts/arch-types.ts`, `scripts/arch-audit.ts`
   (Tooling).
-
-## 2026-10-12 — Clothes dryer finish reads "Unload Clothes Dryer" (placement-advisor)
-
-- **Ask:** v1.63.1 patch, SPEC §8.5/§7D.2. The dryer's finish button (Ringing-now bar and Machines card) reads "Unload Clothes Dryer" instead of "Fold & out". The dish washer's "Emptied" and the washer's "Move to clothes dryer" stay.
-- **Verdict:** src/shared/machines.ts [EXISTING]. Change the laundry branch of `finishLabel`; the `invalid_state` refusal no longer hard-codes the old label. Update test/machines.test.ts to match.
-- **Flow stage:** rules (wording), rendered unchanged by RingingBar.tsx and Machines.tsx.
-- **Why:** `finishLabel` already owns the finish wording and both screens import it, so one edit keeps them in step.
-- **Caps:** src/shared/machines.ts 238/300 → 238/300. No file newly in the warning band.
-
-## 2026-10-12 — v1.63.2: 🎯 Point at it is founder-only (placement-advisor)
-
-- **Ask:** SPEC §8.16 (patch v1.63.2). The ◎ pick activator (bottom left and in modal headers), Alt+P and the Settings → 🙂 Me switch show only for the founder, using the same check as the 🎪 FunHouse tick (Q230, `useIsFounder()`). For the founder nothing changes: on by default, with an off switch per device.
-- **Verdict:** `frontend/src/components/PointAtButton.tsx` (`usePointAtOn` = founder && stored switch) + `frontend/src/components/SettingsMe.tsx` (switch rendered only for the founder) [EXISTING]
-- **Flow stage:** render
-- **Why:** All four surfaces (Modal ◎, PointAtLayer's floating ◎, the Alt+P listener and SettingsMe) already read the one `usePointAtOn()` gate, so gating it once covers them and PointAt.tsx/Modal.tsx are untouched. The founder check is reused from state.tsx rather than written again. PointAtButton gains a hook import from '../state' (not a component, no cycle), and every consumer renders inside AppProvider (Shell; Modal is not used on the sign-in, join or approve screens). The stored switch is left alone, so a founder's setting persists. Rejected: gating separately in PointAt.tsx, Modal.tsx and SettingsMe (three copies of one rule), and a server-side flag (the founder is already known on the client).
-- **Caps:** PointAtButton.tsx 31 → ~33/300; SettingsMe.tsx 37 → ~38/300. No file newly in the band.
-- **Sources read:** scripts/arch.ts; docs/placement-receipts.md; docs/module-ownership.md (rows 139, 197, 198); frontend/src/components/PointAtButton.tsx, PointAt.tsx, SettingsMe.tsx; frontend/src/state.tsx (useIsFounder); frontend/src/App.tsx (provider tree); grep of Modal/PointAt usages in frontend/src and test/.
-
-## 2026-10-12 — About tagline on two lines (placement-advisor)
-
-- **Ask:** In Settings → ℹ️ About, show the tagline as two lines ("Closing the loop." / "Peace of mind, every day.") instead of one run-on; the opening screen (frontend/index.html, §8.10) stays as is. SPEC §8.6 SM5, MojoSOGO 2026-10-12.
-- **Verdict:** `frontend/src/components/SettingsAbout.module.css` + `frontend/src/components/SettingsAbout.tsx` [EXISTING]
-- **Flow stage:** render
-- **Why:** the SettingsAbout row already owns the About panel and TAGLINE; stacking the halves is presentation only (`.tagline span` inline-block → block, and the `' '` separator dropped). TAGLINE is untouched, so SM5's index.html check (each half as `<span>…</span>`) still holds and the splash is left alone. Rejected: splitting TAGLINE or adding a second constant (a second copy, §0.5); editing index.html (out of scope by MojoSOGO's word).
-- **Caps:** SettingsAbout.tsx 18 → 18 lines, SettingsAbout.module.css 9 → 9, against GLOBAL_FILE_CAP 300. No file newly in the band.
-- **Sources read:** frontend/src/components/SettingsAbout.tsx; frontend/src/components/SettingsAbout.module.css; docs/module-ownership.md (row 204); scripts/arch.ts (WORKING_BUFFER, GLOBAL_FILE_CAP, WARN_AT); docs/placement-receipts.md; test/settings-about.test.ts.
-
-## 2026-10-12 — v1.67.0: Rooms own the "what done looks like" areas (placement-advisor)
-
-- **Ask:** SPEC §7B.6 rewritten as "Rooms" for v1.67.0: a `rooms` table (rom_ ids, name 1–40, position); migration 0047 rebuilds chore_areas → room_areas and chore_area_photos → room_area_photos with the same ids, turns each chore that has areas into a room named after it, adds a nullable chores.room_id. ROOMS_MAX 30, ROOM_NAME_MAX 40, parseRoomInput, Room / RoomArea wire types. Routes /rooms, /rooms/{id}, /rooms/{id}/areas, /room-areas/{id}(/photos), /room-area-photos/{id}; deleting a room clears chores.room_id. A chore's roomId is validated and areaCount comes from its room.
-- **Verdict:** EXISTING (renamed): src/shared/rooms.ts, src/worker/routes/rooms.ts, frontend RoomSheet.tsx, RoomAreaForm.tsx. NEW rows: frontend/src/components/Rooms.tsx (list + ＋ Add room + useRooms) and frontend/src/components/ChoreSheet.tsx (the chore's 📋 sheet: Done means + RoomSections + ✎ Edit chore). NEW migration 0047 + its test.
-- **Flow stage:** rules (shared/rooms.ts), route + persist (routes/rooms.ts, routes/chores.ts), render (Rooms, RoomSheet, ChoreSheet, ChoreForm).
-- **Why:** areas change parent, so the existing area owners keep the concern under the new name; no new module per stage. One file each for rooms and areas in the route and in the rules: a room with its sections is one concern and stays under cap (routes/rooms.ts ~205; split off routes/room-areas.ts only past ~250). The chore's 📋 sheet is split out of RoomSheet so one component does not hold both a chore's sheet and a room's sheet. The room-existence check stays in routes/chores.ts through an export from routes/rooms.ts, keeping shared/chores.ts pure and away from the band. R2 prefix kept as `chore-areas/` (no R2 rewrite, photo-store.ts untouched).
-- **Caps:** routes/rooms.ts ~205, shared/rooms.ts ~60, routes/chores.ts ~196, shared/chores.ts ~246 (closest to the band), RoomSheet.tsx ~125, ChoreForm.tsx ~190, Chores.tsx ~116, against GLOBAL_FILE_CAP 300. No file newly in the band, no CEILINGS change.
-- **Sources read:** scripts/arch.ts; docs/module-ownership.md; docs/placement-receipts.md; src/shared/chore-areas.ts; src/worker/routes/chore-areas.ts; frontend ChoreAreas.tsx; line counts of the touched files; greps for areaCount, chore-areas and PhotoPrefix; SPEC.md §7B.6 and API rows.
-
-## 2026-10-12 — v1.67.0 delta: Rooms list in Household, Days off to Calendar (placement-advisor)
-
-- **Ask:** amendment to the v1.67.0 Rooms placement (SPEC §7B.6, §8.6, §7.3): the Rooms list lives in Settings → 🏠 Household (admins), SettingsHousehold rendering `<RoomsList/>` from Rooms.tsx. Days off moves out of Household into Settings → 📅 Calendar (renamed from "Calendar items"), admins only. The chore's 📋 sheet can edit sections through RoomSections, gated by the room's canChange.
-- **Verdict:** NEW row frontend/src/components/DaysOff.tsx. EXISTING: Settings.tsx (label + admin-gated DaysOff in the calendar body), SettingsHousehold.tsx (DaysOff out, RoomsList in), Rooms.tsx (RoomsList + useRooms; no Chores section), RoomSheet.tsx (RoomSections editor gated by the room's createdBy).
-- **Flow stage:** render.
-- **Why:** DaysOff is a household-wide admin setting (/settings), OptionalItems is one member's own prefs and opt-ins (/me, /events/{id}/optin); merging them would give OptionalItems two audiences and two endpoints, so DaysOff is its own leaf. Settings.tsx composes the two in one area body, within its row. Open point settled as ⚑ Q266: POST /rooms is admins only, matching the admin-only Household screen.
-- **Caps:** Settings.tsx ~63/99 (pinned), SettingsHousehold.tsx 53 → ~30, DaysOff.tsx ~30, OptionalItems.tsx 58. No file newly in the band, no re-pin.
-- **Sources read:** frontend/src/components/SettingsHousehold.tsx, OptionalItems.tsx, Settings.tsx; docs/module-ownership.md rows 151, 196, 201; scripts/arch.ts CEILINGS; plus the first v1.65.0 receipt's sources.
-
-## 2026-10-12 — Machine FunHouse ping only for the founder (placement-advisor)
-
-- **Ask:** SPEC §7D.3/§7D.7/§7D.8/§9.4b (MojoSOGO 2026-10-12: "for unknown owners for machines, do not ping funhouse; ping funhouse for MojoSOGO and announcements"). A machine or cooking-timer fire gets a FunHouse row only when its alert person is the founder. Nobody → Phone only. Someone else → Phone + House. Announce is unchanged.
-- **Verdict:** src/shared/machines.ts `machineAlert(quietUntil, alertId, founderAlerted)` + src/shared/cooking.ts `cookAlert(alertId, founderAlerted)` + src/worker/fire-rows.ts sourceOf (both the cook and fixed-machine branches) [EXISTING]. Reorganizer first: FOUNDER_SQL moves from src/worker/routes/members.ts to src/worker/db.ts [EXISTING row widened]; members.ts and routes/ops.ts re-import it from db.ts.
-- **Flow stage:** rules (the channel set, a pure boolean input) + persist/load (the founder lookup in sourceOf).
-- **Why:** machineAlert already owns the one "who does a machine fire reach" decision (§7D.7), so this is one more input, not a new owner. The founder lookup is I/O, so it stays in sourceOf, which already resolves the alert person. Rejected: importing FOUNDER_SQL from routes/members into fire-rows (members.ts builds a Hono app when it loads; fire-rows is "no Hono" and loaded by tick). db.ts already owns member-set SQL (activeMemberIds). tick and optins need no change because the funhouse row already follows cfg.channels.
-- **Caps:** machines.ts ~240/300, cooking.ts ~161/300, fire-rows.ts ~164/300, db.ts ~57/300, routes/members.ts ~72/300, routes/ops.ts 76/300. No pinned ceilings, nothing newly in the 90% band (270).
-- **Sources read:** scripts/arch.ts, docs/module-ownership.md (shared + worker rows), docs/placement-receipts.md, src/worker/fire-rows.ts, src/worker/db.ts, src/worker/routes/members.ts, src/shared/machines.ts, src/shared/cooking.ts, src/shared/optins.ts, line counts of routes/ops.ts.
-
-## 2026-10-12 — All chores: row opens the form, 📋 opens the sheet (placement-advisor)
-
-- **Ask:** In Chores → 📋 All chores, tapping a row opens ChoreForm instead of ChoreSheet, and the 📋 marker becomes its own button that opens ChoreSheet (shown when the chore has areas or a done means). SPEC §8.5/§8.15, patch fix.
-- **Verdict:** `frontend/src/components/Chores.tsx` (AllChoresSection) [EXISTING]
-- **Flow stage:** render
-- **Why:** A change to the list Chores.tsx already owns; `onEdit` and `onOpenAreas` are already props of AllChoresSection. 📋 visibility comes from server fields (`areaCount`, `doneMeans`). Rejected ChoresToday.tsx (its tap ticks done, deliberately) and a new component (nothing distinct to own). module-ownership.md row and the file header reworded in the same commit.
-- **Caps:** Chores.tsx about 111 → about 116 of 300 (no CEILINGS pin). No file enters the band.
-- **Sources read:** frontend/src/components/Chores.tsx, scripts/arch.ts, docs/module-ownership.md.
-
-## 2026-10-12 — v1.69.0: Chore time "before sunset" (placement-advisor)
-
-- **Ask:** SPEC §7B.3 / §4.2zu (migration 0048): a chore's time can be local sunset − N minutes (0–240) instead of a clock time; no place or no sunset that day → no time-based fire, still on Today. MojoSOGO: "an alarm chore that can be assigned to anyone to get the eggs 30 minutes before sundown".
-- **Verdict:** EXISTING owners: `src/shared/chores.ts` (place-aware `deadline`; trailing `place` on `firstFireDue`, `planChoreRuns`, `advanceRun`, `undoRun`, `replanRun`; `sunOffsetMin` in `parseChoreInput`, exported `SUN_OFFSET_MAX`) and `frontend/src/components/ChoresToday.tsx` (exported `whenText`, also used by Chores.tsx). Callers: `src/worker/fire-rows.ts` `choreRunInserts` passes `place`; `src/worker/tick.ts`; `src/worker/routes/chores.ts` loads `householdPlace` inside `stepRun` so `routes/alerts.ts` is untouched, and `choreView` emits `sunOffsetMin` so a PATCH keeps it. Form: `ChoreForm.tsx`.
-- **Flow stage:** rules (deadline), persist (route, tick, fire-rows), render (form, time text).
-- **Why:** run timing is chore planning; `sun.ts` is already a pure leaf. One nullable integer beats copying the event `start_sun` pair. UI words stay out of shared code.
-- **Caps:** chores.ts 253/300 (band 270). Next chores.ts feature: extract-first `parseChoreInput` and helpers into `src/shared/chore-input.ts`. No file newly in the band.
-- **Sources read:** scripts/arch.ts; docs/module-ownership.md; src/shared/chores.ts, sun.ts; src/worker/routes/chores.ts, fire-rows.ts, tick.ts; ChoreForm.tsx, ChoresToday.tsx, Chores.tsx.
-
-## 2026-10-12 — Steward pass 20, whole tree (code-steward)
-
-- **Run:** after the v1.69.0 release (SPEC 3.22 §7B.3, chores before sunset, migration 0048). Also covers v1.63.0–v1.68.1.
-- **Verdict:** SOUND. Typecheck green, 847/847 tests, arch:audit quiet (chores.ts 253/300, EventForm 88%, Calendar 87%, routes/recipes 87%).
-- **Placement audit:** 12 receipts against 12 code commits, no placement mismatches. bd931e4 (FOUNDER_SQL to db.ts, 7-line refactor, no behavior change) has no receipt; accepted. Seven receipts (v1.63.1 to v1.69.0) were appended at the end of this file instead of the top.
-- **Top finding:** a docs tidy. Move those seven receipts to the top; add device checks for v1.58–v1.69 (rooms, a sunset chore ringing) to where-things-stand; add the clock-or-sunset choice to map row 165 (ChoreForm) and the `whenText` export to row 173 (ChoresToday).
-- **Handoffs:** 2 to worker (#1 the docs tidy; #2 make `place` required on firstFireDue, planChoreRuns, advanceRun, undoRun and replanRun, since its null default lets a new caller silently stop sunset fires). 0 to reorganizer now: the chore-input.ts seam (§7B.4 validation, about 70 lines) stays the first step of the next chores.ts feature. Items carried from pass 19 still wait for MojoSOGO's pick.
-- **Restraint:** no pre-emptive chores.ts split (84%, coherent); EventForm, Calendar and recipes ceilings untouched since pass 19; machines.ts churn was small changes inside its one owner; SUN_OFFSET_MAX repeated in the migration's CHECK (SQL cannot import it); whenText only formats, it decides nothing.

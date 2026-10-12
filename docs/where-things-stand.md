@@ -48,6 +48,11 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- Chores before sunset (v1.69.0, §7B.3, migration 0048): MojoSOGO made "Get the eggs" and said "Works" on 2026-10-12;
+  still owed is hearing it actually ring on a phone (and the speakers, if House is ticked) 30 min before that day's sunset.
+  Q270–Q271 are ⚑ defaults.
+- Rooms (v1.67.0, §7B.6, migration 0047): on the iPhone, Settings → 🏠 Household → Rooms shows Kitchen Cleaning with its 8
+  areas and photos; a chore's 📋 shows its room; All chores row opens the chore form (v1.68.1). Q266–Q268 are ⚑ defaults.
 - Bounties and Score (v1.57.0, §7B.8, §8.15b, migration 0044): an admin posts a bounty and a kid's phone gets the push; the kid
   taps I'll do it then Done with a camera photo (v1.59.0); the admin's phone gets "🪙 Waiting for OK" and OKs it; 🏅 Score shows it (BS1–BS3). Also (v1.60.0): an admin posts with a camera picture, the kid's card shows it, and it is gone once paid; an admin's own Done has no 📷 (BS4). Q249–Q255, Q260, Q261 are ⚑ defaults.
 - Cooking timers (v1.54.0, §7D.8): on the iPhone at 320 px, Alarms → 🍳 Cooking machines → ＋ Cooking timer, start an air fryer

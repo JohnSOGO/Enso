@@ -832,6 +832,10 @@ assigned to anyone to get the eggs 30 minutes before sundown"): the chore form's
 [30] min. Migration 0048 adds `chores.sun_offset_min`; the run's time is that day's sunset (household place, §7.7) minus
 it, for `at` rings and `by` nudges. Lists show `sunset −30`.
 
+**Chore rules always take the place** (v1.69.1, SPEC 3.23, §7B.3; steward pass 20 #2, MojoSOGO 2026-10-12 "BOTH"):
+`place` is a required argument of `firstFireDue`, `planChoreRuns`, `advanceRun`, `undoRun` and `replanRun`, so a new
+caller cannot leave it out and silently stop sunset chores ringing. No behavior change.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

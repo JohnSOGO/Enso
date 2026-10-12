@@ -60,64 +60,64 @@ describe('§7B.2 step person', () => {
 
 describe('§7B.3 planning', () => {
   it('one run per due date in the window; an `at` first fire at date + time', () => {
-    const p = planChoreRuns({ ...laundry, days: ['MO', 'TU'] }, TZ, '2026-10-05T07:00:00.000Z', '2026-10-06T19:00:00.000Z', [A]);
+    const p = planChoreRuns({ ...laundry, days: ['MO', 'TU'] }, TZ, '2026-10-05T07:00:00.000Z', '2026-10-06T19:00:00.000Z', [A], null);
     expect(p).toEqual([
       { date: '2026-10-05', assignee_id: A, firstDueAt: MON_0730 },
       { date: '2026-10-06', assignee_id: A, firstDueAt: '2026-10-06T14:30:00.000Z' },
     ]);
   });
   it('never before start_date', () => {
-    const p = planChoreRuns({ ...laundry, days: ['MO', 'TU'], start_date: '2026-10-06' }, TZ, '2026-10-05T07:00:00.000Z', '2026-10-06T19:00:00.000Z', [A]);
+    const p = planChoreRuns({ ...laundry, days: ['MO', 'TU'], start_date: '2026-10-06' }, TZ, '2026-10-05T07:00:00.000Z', '2026-10-06T19:00:00.000Z', [A], null);
     expect(p.map((r) => r.date)).toEqual(['2026-10-06']);
   });
   it('a first fire already past is not created (C9 rule); the run still is', () => {
-    const p = planChoreRuns(laundry, TZ, '2026-10-06T03:00:00.000Z' /* Mon 20:00 PDT */, '2026-10-07T15:00:00.000Z', [A]);
+    const p = planChoreRuns(laundry, TZ, '2026-10-06T03:00:00.000Z' /* Mon 20:00 PDT */, '2026-10-07T15:00:00.000Z', [A], null);
     expect(p).toEqual([{ date: '2026-10-05', assignee_id: A, firstDueAt: null }]);
   });
   it('`by` with nudge → fire at the deadline; nudge off → none (C7 rule)', () => {
     const from = '2026-10-06T07:00:00.000Z', to = '2026-10-07T07:00:00.000Z';
-    expect(planChoreRuns(trash, TZ, from, to, [A])[0].firstDueAt).toBe('2026-10-07T02:00:00.000Z');
-    expect(planChoreRuns({ ...trash, nudge: false }, TZ, from, to, [A])[0].firstDueAt).toBeNull();
+    expect(planChoreRuns(trash, TZ, from, to, [A], null)[0].firstDueAt).toBe('2026-10-07T02:00:00.000Z');
+    expect(planChoreRuns({ ...trash, nudge: false }, TZ, from, to, [A], null)[0].firstDueAt).toBeNull();
   });
 });
 
 describe('§7B.3 advance and undo', () => {
   it('done with a wait: the open fire closes done; a new fire rings after waitMin (C4 rule)', () => {
-    const r = advanceRun(laundry, run(), openFire(MON_0730), A, '2026-10-05T14:40:00.000Z', TZ);
+    const r = advanceRun(laundry, run(), openFire(MON_0730), A, '2026-10-05T14:40:00.000Z', TZ, null);
     if ('error' in r) throw new Error(r.error);
     expect(r.run.step).toBe(1);
     expect(r.closeFire).toMatchObject({ state: 'closed', close_reason: 'done', closed_by: A });
     expect(r.newFire).toMatchObject({ kind: 'chore', chore_run_id: 'run_1', due_at: '2026-10-05T15:40:00.000Z' });
   });
   it('done on the last step finishes the run; then already_done (C5 rule)', () => {
-    const r = advanceRun(laundry, run({ step: 2 }), null, B, '2026-10-05T17:00:00.000Z', TZ);
+    const r = advanceRun(laundry, run({ step: 2 }), null, B, '2026-10-05T17:00:00.000Z', TZ, null);
     if ('error' in r) throw new Error(r.error);
     expect(r.run).toMatchObject({ step: 3, done_at: '2026-10-05T17:00:00.000Z', done_by: B });
     expect(r.newFire).toBeUndefined();
-    expect(advanceRun(laundry, r.run, null, B, '2026-10-05T17:01:00.000Z', TZ)).toEqual({ error: 'already_done' });
+    expect(advanceRun(laundry, r.run, null, B, '2026-10-05T17:01:00.000Z', TZ, null)).toEqual({ error: 'already_done' });
   });
   it('done with no wait on an `at` chore: no fire, the next step is just current', () => {
     const c = { ...laundry, steps: [{ ...laundry.steps[0], waitMin: null }, laundry.steps[1]] };
-    const r = advanceRun(c, run(), null, A, MON_0730, TZ);
+    const r = advanceRun(c, run(), null, A, MON_0730, TZ, null);
     if ('error' in r) throw new Error(r.error);
     expect(r.newFire).toBeUndefined();
   });
   it('a `by` nudge still ahead is kept after a step with no wait (rule 4)', () => {
     const c = { ...trash, steps: [{ title: 'Bag it', waitMin: null, memberId: null }, { title: 'Out', waitMin: null, memberId: null }] };
-    const r = advanceRun(c, run({ date: '2026-10-06' }), openFire('2026-10-07T02:00:00.000Z'), A, '2026-10-07T00:00:00.000Z', TZ);
+    const r = advanceRun(c, run({ date: '2026-10-06' }), openFire('2026-10-07T02:00:00.000Z'), A, '2026-10-07T00:00:00.000Z', TZ, null);
     if ('error' in r) throw new Error(r.error);
     expect(r.newFire?.due_at).toBe('2026-10-07T02:00:00.000Z');
   });
   it('undo: step − 1, open fire removed, waits not re-armed (C8 rule); nothing_to_undo at 0', () => {
-    const r = undoRun(laundry, run({ step: 1 }), openFire('2026-10-05T15:40:00.000Z'), '2026-10-05T14:45:00.000Z', TZ);
+    const r = undoRun(laundry, run({ step: 1 }), openFire('2026-10-05T15:40:00.000Z'), '2026-10-05T14:45:00.000Z', TZ, null);
     if ('error' in r) throw new Error(r.error);
     expect(r.run.step).toBe(0);
     expect(r.closeFire?.close_reason).toBe('removed');
     expect(r.newFire).toBeUndefined();
-    expect(undoRun(laundry, run(), null, MON_0730, TZ)).toEqual({ error: 'nothing_to_undo' });
+    expect(undoRun(laundry, run(), null, MON_0730, TZ, null)).toEqual({ error: 'nothing_to_undo' });
   });
   it('undo of a finished run clears done_at/done_by; a `by` nudge still ahead comes back', () => {
-    const r = undoRun(trash, run({ date: '2026-10-06', step: 1, done_at: 'x', done_by: A }), null, '2026-10-07T00:00:00.000Z', TZ);
+    const r = undoRun(trash, run({ date: '2026-10-06', step: 1, done_at: 'x', done_by: A }), null, '2026-10-07T00:00:00.000Z', TZ, null);
     if ('error' in r) throw new Error(r.error);
     expect(r.run).toMatchObject({ step: 0, done_at: null, done_by: null });
     expect(r.newFire?.due_at).toBe('2026-10-07T02:00:00.000Z');
@@ -127,18 +127,18 @@ describe('§7B.3 advance and undo', () => {
 describe('§7B.3 edit re-plan', () => {
   const now = '2026-10-05T12:00:00.000Z'; // Mon 05:00 PDT
   it('an unstarted run of today gets the new assignee; its fire is replaced (C10 rule)', () => {
-    const r = replanRun({ ...laundry, people: [B] }, run(), openFire(MON_0730), TZ, now, [A, B]);
+    const r = replanRun({ ...laundry, people: [B] }, run(), openFire(MON_0730), TZ, now, [A, B], null);
     expect(r?.run.assignee_id).toBe(B);
     expect(r?.closeFire?.close_reason).toBe('removed');
     expect(r?.newFire?.due_at).toBe(MON_0730);
   });
   it('started runs and earlier days are left alone', () => {
-    expect(replanRun(laundry, run({ step: 1 }), null, TZ, now, [A])).toBeNull();
-    expect(replanRun(laundry, run({ date: '2026-10-04' }), null, TZ, now, [A])).toBeNull();
+    expect(replanRun(laundry, run({ step: 1 }), null, TZ, now, [A], null)).toBeNull();
+    expect(replanRun(laundry, run({ date: '2026-10-04' }), null, TZ, now, [A], null)).toBeNull();
   });
   it('a day no longer chosen gets no fire and leaves Today', () => {
     const c = { ...laundry, days: ['TU' as const] };
-    expect(replanRun(c, run(), openFire(MON_0730), TZ, now, [A])?.newFire).toBeUndefined();
+    expect(replanRun(c, run(), openFire(MON_0730), TZ, now, [A], null)?.newFire).toBeUndefined();
     expect(showsOnToday(c, run())).toBe(false);
     expect(showsOnToday(c, run({ step: 1 }))).toBe(true);
   });
