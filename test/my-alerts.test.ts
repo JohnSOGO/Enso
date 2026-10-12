@@ -1,10 +1,10 @@
-// M4u acceptance (SPEC §9.5, MA1–MA6, MA8–MA10) — My alerts: each member's own pushes, newest first, hidden one by one or
+// M4u acceptance (SPEC §9.5, MA1–MA6, MA8–MA11) — My alerts: each member's own pushes, newest first, hidden one by one or
 // all at once; the rows are kept. MA7 (alertId in the payload) is in push.test.ts, ops.test.ts and
 // phone-login-api.test.ts; MA-M in migration-0041.test.ts. Nobody here has a phone, so no push leaves the isolate.
 import { SELF, env } from 'cloudflare:test';
 import { expect, it } from 'vitest';
 import {
-  ALERT_HISTORY_MAX, ALERTS_PATH, PUSH_TITLE, alertIdFrom, alertSource, pushTitle,
+  ALERT_HISTORY_MAX, ALERTS_PATH, PUSH_TITLE, alertIdFrom, alertSource, isCleared, pushTitle,
 } from '../src/shared/alert-history';
 import { ANNOUNCE_TITLE } from '../src/shared/announce';
 import { BASE, member, owner, tickAt, type Client } from './helpers';
@@ -120,4 +120,29 @@ it('MA10: a mess ask\'s push carries its mess', async () => {
   expect(r.status).toBe(201);
   const m: any = await r.json();
   expect((await alertsOf(o)).find((x) => x.source === 'Whose mess?')).toMatchObject({ messId: m.id, fireId: null });
+});
+
+it('MA11: a handled fire\'s push and an answered mess ask clear themselves; a ping stays; rows are kept', async () => {
+  expect(isCleared({ fireState: 'closed', messAsksMe: null })).toBe(true);
+  expect(isCleared({ fireState: 'ringing', messAsksMe: null })).toBe(false);
+  expect(isCleared({ fireState: null, messAsksMe: false })).toBe(true);
+  expect(isCleared({ fireState: null, messAsksMe: true })).toBe(false);
+  const o = await owner();
+  const a = await member(o);
+  const ev = await o.post('/events', { title: 'Bins', startDate: '2026-11-21', startTime: '12:00', assignedTo: [a.id], reminder: { offsetMin: 0, channels: ['push'] } });
+  await tickAt(o, '2026-11-21T00:00:00Z');
+  const fire = await env.DB.prepare('SELECT id, due_at FROM fires WHERE event_id = ?').bind(ev.json.id).first<{ id: string; due_at: string }>();
+  await tickAt(o, fire!.due_at);
+  const r = await SELF.fetch(`${BASE}/messes`, { method: 'POST', body: new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3]), headers: { cookie: o.cookie, 'content-type': 'image/jpeg' } });
+  const m: any = await r.json();
+  const ping = await pushRow(a.id, 'hello', '🏛️ Ozymandias');
+  const before = await alertsOf(a.client);
+  expect(before.some((x) => x.fireId === fire!.id)).toBe(true);
+  expect(before.some((x) => x.messId === m.id)).toBe(true);
+  expect((await a.client.post(`/fires/${fire!.id}/actions`, { action: 'done' })).status).toBe(200);
+  expect((await a.client.post(`/messes/${m.id}/claim`)).status).toBe(200);
+  const after = await alertsOf(a.client);
+  expect(after.map((x) => x.id)).toEqual([ping]);
+  const kept = await env.DB.prepare(`SELECT COUNT(*) AS n FROM deliveries WHERE member_id = ? AND channel = 'push' AND dismissed_at IS NULL`).bind(a.id).first<{ n: number }>();
+  expect(kept!.n).toBe(3);
 });

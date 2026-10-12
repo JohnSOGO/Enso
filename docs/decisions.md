@@ -286,3 +286,4 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q281 | A day-sheet event whose creator is also assigned (§8.3) | ⚑ One chip: "→ name" with the creator's color border; no separate creator chip |
 | Q282 | When an event counts as Family (§7.1, §8.3) | ⚑ Assigned to every active (not disabled) member, and the household has two or more; then no creator chip either |
 | Q283 | What a My alerts card offers beyond a ringing fire (§9.5) | ⚑ A mess ask still asking me: That was me / Not me, else "Already answered."; bounty pushes (🪙) keep just Close until asked |
+| Q284 | Which alerts clear themselves from My alerts (§9.5) | ⚑ A fire's push once its fire is closed, and a mess ask once that mess no longer asks me; pings, announcements, bounty and sign-in pushes stay until hidden; a tapped push for a cleared alert opens the list with no card |
