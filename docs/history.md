@@ -832,6 +832,10 @@ assigned to anyone to get the eggs 30 minutes before sundown"): the chore form's
 [30] min. Migration 0048 adds `chores.sun_offset_min`; the run's time is that day's sunset (household place, §7.7) minus
 it, for `at` rings and `by` nudges. Lists show `sunset −30`.
 
+**Act on an alert from its card** (v1.70.0, SPEC 3.23, §9.5, Q272; MojoSOGO 2026-10-12: "Let me ack in a notification
+modal"): a My alerts card for a fire that is still ringing shows that fire's Ringing bar buttons (Away, Snooze, Ack /
+Done, the machine button), so a tapped push can be acked right in its modal. `GET /me/alerts` gains `fireId`.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

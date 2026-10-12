@@ -273,3 +273,4 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q269 | A machine alerting someone other than the founder (§7D.7) | ⚑ No FunHouse row: Phone + House only (the FunHouse is MojoSOGO's desk, Q230) |
 | Q270 | A sunset chore's alert text (§7B.3) | ⚑ The ordinary chore text ("Chore for A: Get the eggs"), no "sunset at h:mm" added |
 | Q271 | How a sunset chore shows its time (§8.5) | ⚑ `sunset −30` (or `sunset` at 0) where the clock time was; the form's Before sunset box starts at 30 min; `time` keeps the form's last clock value, so lists still sort by it |
+| Q272 | An alert card whose fire is no longer ringing (§9.5) | ⚑ It says "Already handled." and keeps only Delete and Close; a ping or announcement card has no act button (nothing to ack) |
