@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.23 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.24 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5264,8 +5264,8 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
   the path (a test pins it).
 
 **API** (`src/worker/routes/my-alerts.ts`, member):
-- `GET /me/alerts` → `{ alerts: MyAlert[] }`, `MyAlert = { id, title, message, source, kind, alertNumber, status,
-  detail, createdAt }` — `kind` and `alertNumber` only for a fire's push (else null).
+- `GET /me/alerts` → `{ alerts: MyAlert[] }`, `MyAlert = { id, title, message, source, kind, alertNumber, fireId,
+  status, detail, createdAt }` — `kind`, `alertNumber` and `fireId` only for a fire's push (else null).
 - `DELETE /me/alerts/{id}` → 204, sets `dismissed_at`; **404 `not_found`** when it isn't my push or is already
   hidden.
 - `DELETE /me/alerts` → `{ cleared }`, the number newly hidden (all of mine, not just the 200 shown).
@@ -5277,12 +5277,20 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 - One line per alert: the title, the message (one line, cut with …), the time; a red **❌** at the end hides it at
   once, no asking ⚑ Q224.
 - Tapping a line opens its **card** (a titled modal): the title, the whole message, when (date and time), From (the
-  source), the alert number (a fire's push), and how it went (sent / failed with the detail). **Delete** and
-  **Close** at the bottom.
+  source), the alert number (a fire's push), and how it went (sent / failed with the detail). **Close** at the
+  bottom; no Delete on the card (v1.70.0, MojoSOGO 2026-10-12: "Remove delete; too easy to make mistake"): the
+  list line's ❌ is the one way to hide an alert.
 - **Opened from a push:** a tap on a notification (no action button) opens `/settings/alerts?alert={id}`
   (§9.1). On start the app reads it, clears the address to `/`, shows Settings and opens that card — after
   signing in first, if needed ⚑ Q225. An id not in my list → the card says "This alert is no longer in your list."
 - A sign-in request's push still opens its approve page (§6.6); its line is in the list too.
+- **Act on it from the card** (v1.70.0, asked by MojoSOGO 2026-10-12: "Let me ack in a notification modal"): when the
+  card is a fire's push and that fire is still in the Ringing bar, the card shows the same one-tap buttons as its
+  Ringing bar row (§8.2: Away, Snooze 10m, Ack / Done, the machine button) under the details; one tap acts and
+  closes the card. Move to … opens the dryer chooser; once the load moves, the card stays and says "Already
+  handled." A fire no longer ringing shows "Already handled." instead ⚑ Q272. Other pushes (pings,
+  announcements) have nothing to act on: just Close. The buttons are the Ringing bar's own
+  (`frontend/src/components/FireActions.tsx`), one copy.
 
 **Acceptance (M4u — each row is a test):**
 
@@ -5296,6 +5304,7 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | MA6 | more than 200 of mine | the newest 200 |
 | MA7 | the push payload of a fire, an announcement, a ping; the test push | `alertId` = the delivery id; the test push's `null` |
 | MA8 | sw.js | contains `ALERTS_PATH` and builds `${ALERTS_PATH}?alert=` from `data.alertId` (v1.49.1, steward pass 12) |
+| MA9 | `GET /me/alerts` with a reminder's push and a ping | the reminder's `fireId` = its fire's id; the ping's `fireId` null |
 | MA-M | migration 0041 | §4.2zn's check |
 
 ---

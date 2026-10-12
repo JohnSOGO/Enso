@@ -836,6 +836,10 @@ it, for `at` rings and `by` nudges. Lists show `sunset −30`.
 `place` is a required argument of `firstFireDue`, `planChoreRuns`, `advanceRun`, `undoRun` and `replanRun`, so a new
 caller cannot leave it out and silently stop sunset chores ringing. No behavior change.
 
+**Act on an alert from its card** (v1.70.0, SPEC 3.24, §9.5, Q272; MojoSOGO 2026-10-12: "Let me ack in a notification
+modal"): a My alerts card for a fire that is still ringing shows that fire's Ringing bar buttons (Away, Snooze, Ack /
+Done, the machine button), so a tapped push can be acked right in its modal. The card has no Delete any more (the list's ❌ stays). `GET /me/alerts` gains `fireId`.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

@@ -1,4 +1,4 @@
-// M4u acceptance (SPEC §9.5, MA1–MA6, MA8) — My alerts: each member's own pushes, newest first, hidden one by one or
+// M4u acceptance (SPEC §9.5, MA1–MA6, MA8, MA9) — My alerts: each member's own pushes, newest first, hidden one by one or
 // all at once; the rows are kept. MA7 (alertId in the payload) is in push.test.ts, ops.test.ts and
 // phone-login-api.test.ts; MA-M in migration-0041.test.ts. Nobody here has a phone, so no push leaves the isolate.
 import { env } from 'cloudflare:test';
@@ -53,24 +53,24 @@ it('MA2: a ping shows in the founder\'s list, whole, and in nobody else\'s', asy
   expect(r.status).toBe(201);
   const id = r.json.deliveries[0].id;
   expect((await alertsOf(o)).find((x) => x.id === id)).toMatchObject({
-    title: '🏛️ Ozymandias', message: text, source: '🏛️ Ozymandias', kind: null, alertNumber: null, status: 'failed', detail: 'no_subscription',
+    title: '🏛️ Ozymandias', message: text, source: '🏛️ Ozymandias', kind: null, alertNumber: null, fireId: null, status: 'failed', detail: 'no_subscription',
   });
   expect(await alertsOf(a.client)).toEqual([]);
 });
 
-it('MA3: a reminder\'s push says Ensō / Reminder / alert 1; newest first', async () => {
+it('MA3 + MA9: a reminder\'s push says Ensō / Reminder / alert 1 and carries its fire; newest first', async () => {
   const o = await owner();
   const a = await member(o);
   const ev = await o.post('/events', { title: 'Bins', startDate: '2026-11-20', startTime: '12:00', assignedTo: [a.id], reminder: { offsetMin: 0, channels: ['push'] } });
   expect(ev.status).toBe(201);
   await tickAt(o, '2026-11-20T00:00:00Z');
-  const fire = await env.DB.prepare('SELECT due_at FROM fires WHERE event_id = ?').bind(ev.json.id).first<{ due_at: string }>();
+  const fire = await env.DB.prepare('SELECT id, due_at FROM fires WHERE event_id = ?').bind(ev.json.id).first<{ id: string; due_at: string }>();
   await tickAt(o, fire!.due_at);
   const later = await pushRow(a.id, 'Dinner');
   const list = await alertsOf(a.client);
   expect(list.map((x) => x.id)[0]).toBe(later);
-  expect(list[0]).toMatchObject({ title: ANNOUNCE_TITLE, source: 'Announcement', kind: null, alertNumber: null });
-  expect(list[1]).toMatchObject({ title: 'Ensō', message: 'Reminder: Bins', source: 'Reminder', kind: 'reminder', alertNumber: 1 });
+  expect(list[0]).toMatchObject({ title: ANNOUNCE_TITLE, source: 'Announcement', kind: null, alertNumber: null, fireId: null });
+  expect(list[1]).toMatchObject({ title: 'Ensō', message: 'Reminder: Bins', source: 'Reminder', kind: 'reminder', alertNumber: 1, fireId: fire!.id });
 });
 
 it('MA4 + MA5: ❌ hides one (only mine), Clear all hides the rest; rows are kept', async () => {
