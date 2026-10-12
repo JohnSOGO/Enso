@@ -818,6 +818,11 @@ from a chore to a room. Migration 0047 turned the Kitchen chore's areas into a K
 same R2 keys) and pointed the chore at it. Rooms are listed and added in Settings → 🏠 Household; a chore picks its
 room in its form; the chore's 📋 sheet shows its room's areas. Days off moved to Settings → 📅 Calendar (admins).
 
+**Machine FunHouse only for the founder** (v1.68.0, SPEC 3.20, §7D.7, §9.4b, Q231 changed, Q269; MojoSOGO 2026-10-12: "for
+unknown owners for machines, do not ping funhouse; ping funhouse for MojoSOGO and announcements"): a washing machine or
+cooking timer writes a `funhouse` row only when its alert person is the founder. Nobody → phones only; someone else →
+Phone + House. Announce unchanged. `FOUNDER_SQL` moved from routes/members.ts to db.ts so fire-rows.ts can read it.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

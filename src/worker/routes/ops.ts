@@ -6,11 +6,10 @@
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { OPS_NOTIFY_PER_HOUR, opsNotifyError, opsTitle, opsWindowStart } from '../../shared/ops';
-import { all, first, nowIso } from '../db';
+import { FOUNDER_SQL, all, first, nowIso } from '../db';
 import { opsPingsAfter, opsPingsSince, pushDelivery } from '../deliveries';
 import { body, fail } from '../http';
 import { sendPushDeliveries } from '../push';
-import { FOUNDER_SQL } from './members';
 
 export const ops = new Hono<AppEnv>();
 
