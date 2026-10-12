@@ -3,6 +3,7 @@ import { Modal } from './Modal';
 import { useApp } from '../state';
 import type { DayData, Occurrence } from './Calendar';
 import { weatherText } from '../../../src/shared/weather';
+import { participants } from '../participants';
 import s from './Lists.module.css';
 
 export function longDate(date: string) {
@@ -18,26 +19,31 @@ interface Props {
 }
 
 export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
-  const { memberById, me, clock } = useApp();
+  const { memberById, members, me, clock } = useApp();
   const items = data?.items ?? [];
   const allDay = items.filter((o) => o.allDay);
   const timed = items.filter((o) => !o.allDay);
 
-  const row = (o: DayData['items'][number]) => (
-    <li key={`${o.eventId}-${o.date}`}>
-      <button className={s.item} onClick={() => onOpenEvent(o)}>
-        <span className={s.when}>{o.allDay ? (o.continued ? 'cont.' : 'All day') : clock(o.startTime!)}</span>
-        <span className={s.bar} style={{ background: o.color }} />
-        <span className={s.what}>
-          <span className={s.title}>{o.emoji && `${o.emoji} `}{o.title}{o.hasReminder && <span aria-label="has reminder" title="Has a reminder"> 🔔</span>}{o.recurring && <span aria-label="repeats" title="Repeats"> 🔁</span>}</span>
-          <span className={s.meta}>
-            <span className="chip" style={{ borderColor: o.color }}>{o.creatorName}</span>
-            {o.assignedTo.map((id) => <span key={id} className="chip">→ {memberById(id)?.displayName ?? 'unknown member'}</span>)}
+  const row = (o: DayData['items'][number]) => {
+    const who = participants(o.assignedTo, members); // §8.3: each person once; everyone → one green Family chip
+    return (
+      <li key={`${o.eventId}-${o.date}`}>
+        <button className={s.item} onClick={() => onOpenEvent(o)}>
+          <span className={s.when}>{o.allDay ? (o.continued ? 'cont.' : 'All day') : clock(o.startTime!)}</span>
+          <span className={s.bar} style={{ background: o.color }} />
+          <span className={s.what}>
+            <span className={s.title}>{o.emoji && `${o.emoji} `}{o.title}{o.hasReminder && <span aria-label="has reminder" title="Has a reminder"> 🔔</span>}{o.recurring && <span aria-label="repeats" title="Repeats"> 🔁</span>}</span>
+            <span className={s.meta}>
+              {who.family ? <span className="chip" style={{ borderColor: 'var(--good)', background: 'var(--good)', color: '#0F172A', fontWeight: 600 }}>Family</span> : <>
+                {!who.ids.includes(o.createdBy) && <span className="chip" style={{ borderColor: o.color }}>{o.creatorName}</span>}
+                {who.ids.map((id) => <span key={id} className="chip" style={id === o.createdBy ? { borderColor: o.color } : undefined}>→ {memberById(id)?.displayName ?? 'unknown member'}</span>)}
+              </>}
+            </span>
           </span>
-        </span>
-      </button>
-    </li>
-  );
+        </button>
+      </li>
+    );
+  };
 
   return (
     <Modal title={longDate(date)} onClose={onClose} footer={<button className="primary" onClick={onAdd}>＋ Add event</button>}>

@@ -1,6 +1,7 @@
 // SPEC §7.1–7.2 — one calendar day cell: classes, stay tint, date line, weather, bar-lane gap, event marks.
 import { useApp } from '../state';
 import { dotSize, fitLines, LINE_GAP } from '../day-lines';
+import { participants } from '../participants';
 import type { DayData, Occurrence, Span } from './Calendar';
 import s from './DayCell.module.css';
 
@@ -21,7 +22,7 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
   date: string; data: DayData | undefined; stay: Span | undefined; lanes: number; barH: number; rowH: number; cellW: number;
   narrow: boolean; todayStr: string; onOpen: (date: string, data: DayData | undefined) => void;
 }) {
-  const { me, memberById, clock } = useApp();
+  const { me, members, memberById, clock } = useApp();
   const [y, m, d] = date.split('-').map(Number);
   const pub = me.showPublicHolidays ? data?.publicHolidays ?? [] : [];
   const market = me.showOptionsExpiration ? data?.marketDays ?? [] : [];
@@ -35,9 +36,13 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
   // §7.1 one line per single-day event: emoji, then a dot per participant; shrunk to fit, then +N.
   const room = rowH - DATE_LINE - (lanes > 0 ? lanes * (barH + 1) + 2 : 0);
   const fit = fitLines(room, single.length);
-  const marks = (o: Occurrence) => o.assignedTo.length
-    ? o.assignedTo.map((id) => memberById(id)?.color ?? o.color)
-    : o.emoji ? [] : [o.color]; // nobody assigned: the emoji alone (when the icon limit hid it), else the event's own dot
+  const marks = (o: Occurrence) => {
+    const who = participants(o.assignedTo, members); // §7.1: each person once; everyone → one green Family dot
+    if (who.family) return ['var(--good)'];
+    return who.ids.length
+      ? who.ids.map((id) => memberById(id)?.color ?? o.color)
+      : o.emoji ? [] : [o.color]; // nobody assigned: the emoji alone (when the icon limit hid it), else the event's own dot
+  };
   const cls = [
     s.cell,
     (y * 12 + m) % 2 ? s.toneB : s.toneA,

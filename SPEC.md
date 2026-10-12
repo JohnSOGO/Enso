@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.28 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.29 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1536,7 +1536,8 @@ approval (they just approved it), not after signup or setup. Push only, never ho
   - Under the date-number line, **each single-day event gets its own line**, in the order
     `/calendar` sends them (all-day first, then by start time).
   - A line is the event's **emoji** (§7.6), then **one dot per participant** (`assignedTo`)
-    in that member's color. An event with **nobody assigned and an emoji** shows that emoji
+    in that member's color, each person once; an event for **everyone** gets one green
+    (`--good`) Family dot instead (§8.3, Q282; "And one bubble on day of month cell"). An event with **nobody assigned and an emoji** shows that emoji
     **beside the date number** instead (§7.2) and gets no line (MojoSOGO 2026-10-12: "If assigned
     to no one put emoji next to day of month number"); if the two-icon limit hides it, it keeps
     a line with its emoji, so it is never unmarked. Nobody assigned and no emoji: one dot in the
@@ -3695,6 +3696,15 @@ It contains, in order:
 3. All-day events.
 4. Timed events in time order, each showing time, title, creator chip, assigned
    chips and 🔔 if it has a reminder.
+
+**Who it's for** (v1.73.0, MojoSOGO 2026-10-12: "One person mentioned twice; just mention once. If
+everyone; make one green bubble with words family"): each person shows **once**. A creator who
+is also assigned shows only as their "→ name" chip, with the creator's color border (Q281). When the
+event is assigned to **every active member** of a household of two or more, the chips are one green
+(`--good`) **Family** chip and nothing else (Q282). The calendar cell does the same with its dots
+(§7.1). The rule lives in `frontend/src/participants.ts`; **Acceptance** (`test/participants.test.ts`):
+FA1 duplicates shown once; FA2 every active member → Family (a disabled member is not needed); FA3 some
+members → not Family; FA4 a one-person household, or nobody assigned, is never Family.
 
 Tapping an event opens the event form. **＋ Add event** at the bottom pre-fills
 the date.

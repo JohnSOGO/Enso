@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.73.0: Each participant once; everyone shows as Family (placement-advisor)
+
+- **Ask:** In the day sheet and the calendar day cell, show each participant once (the creator once when also assigned, duplicate ids once). When assignedTo covers every active member (at least 2 active), show one green `var(--good)` "Family" chip or one green dot instead. SPEC 3.29 §7.1, §8.3, Q281–Q282.
+- **Verdict:** `frontend/src/participants.ts` [NEW row], drawn by `frontend/src/components/DaySheet.tsx` and `frontend/src/components/DayCell.tsx` [EXISTING].
+- **Flow stage:** render
+- **Why:** Two views must agree on who an event shows, so one pure helper owns the rule. Rejected `src/shared/` (the server decides nothing here), `day-lines.ts` (fit math only), and inline copies in both components (drift). Creator handling stays in DaySheet, the only view showing a creator.
+- **Caps:** participants.ts ~12/300 (new), DayCell.tsx ~95/300, DaySheet.tsx ~58/300. Nothing newly in the band.
+
 ## 2026-10-12 — v1.72.1: Unassigned event emoji as a day icon (placement-advisor)
 
 - **Ask:** In a calendar day cell, a single-day event with nobody assigned and an emoji shows that emoji as a day icon (after the holiday and 📈, two at most) and gets no line. If the cap hides it, it keeps its line. Unassigned events without an emoji and assigned events are unchanged. SPEC 3.28 §7.1/§7.2, Q273, Q277.
