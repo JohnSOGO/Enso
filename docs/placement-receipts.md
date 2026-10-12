@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.74.0: Answer a mess from its alert card (placement-advisor)
+
+- **Ask:** SPEC §9.5 "Answer a mess from the card" (v1.74.0, SPEC 3.34, MA10, Q283; MojoSOGO "let me respond directly from the modal"). An alert card for a mess that still asks me shows its photo and That was me / Not me, and closes after a successful answer; otherwise "Already answered."
+- **Verdict:** frontend/src/components/MyAlerts.tsx + src/worker/routes/my-alerts.ts (adds `messId`) [EXISTING]
+- **Flow stage:** render (plus route passthrough of an already-selected column)
+- **Why:** MyAlerts owns the card and already carries the fire's buttons there; the mess answer reuses the parts Messes.tsx exports for the banner (useMesses, useMessAction, MessPhoto, AnswerButtons). Who is asked stays the server's `m.asked`, filtered as MessBanner does. Close-on-success wraps `send` inside MyAlerts (`act(id, async () => { await send(); close(); })`). Rejected: reading useMessAction's `error` after `await act` (stale state; would change a shared hook); leaving the card open until it flips (contradicts the spec); a new hook or module (one wrapper line). Accepted cost: MyAlerts reads /messes on each refresh while mounted, as MessBanner does.
+- **Caps:** MyAlerts.tsx ~103 → ~110/300; my-alerts.ts 47/300; test/my-alerts.test.ts ~124/300; Messes.tsx untouched. Nothing newly in the band.
+- **Sources read:** scripts/arch.ts, docs/module-ownership.md (Messes, MessBanner, my-alerts rows), MyAlerts.tsx, Messes.tsx (1–62), MessBanner.tsx, routes/my-alerts.ts.
+
 ## 2026-10-12 — v1.73.4: MojoSOGO (founder) first, not the creator (placement-advisor verdict reused)
 
 - **Ask:** SPEC 3.33 §8.3: the member to put first is MojoSOGO (the founder), not the event's creator.

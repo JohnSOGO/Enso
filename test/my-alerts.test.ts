@@ -1,13 +1,13 @@
-// M4u acceptance (SPEC §9.5, MA1–MA6, MA8, MA9) — My alerts: each member's own pushes, newest first, hidden one by one or
+// M4u acceptance (SPEC §9.5, MA1–MA6, MA8–MA10) — My alerts: each member's own pushes, newest first, hidden one by one or
 // all at once; the rows are kept. MA7 (alertId in the payload) is in push.test.ts, ops.test.ts and
 // phone-login-api.test.ts; MA-M in migration-0041.test.ts. Nobody here has a phone, so no push leaves the isolate.
-import { env } from 'cloudflare:test';
+import { SELF, env } from 'cloudflare:test';
 import { expect, it } from 'vitest';
 import {
   ALERT_HISTORY_MAX, ALERTS_PATH, PUSH_TITLE, alertIdFrom, alertSource, pushTitle,
 } from '../src/shared/alert-history';
 import { ANNOUNCE_TITLE } from '../src/shared/announce';
-import { member, owner, tickAt, type Client } from './helpers';
+import { BASE, member, owner, tickAt, type Client } from './helpers';
 
 declare global {
   namespace Cloudflare {
@@ -53,7 +53,7 @@ it('MA2: a ping shows in the founder\'s list, whole, and in nobody else\'s', asy
   expect(r.status).toBe(201);
   const id = r.json.deliveries[0].id;
   expect((await alertsOf(o)).find((x) => x.id === id)).toMatchObject({
-    title: '🏛️ Ozymandias', message: text, source: '🏛️ Ozymandias', kind: null, alertNumber: null, fireId: null, status: 'failed', detail: 'no_subscription',
+    title: '🏛️ Ozymandias', message: text, source: '🏛️ Ozymandias', kind: null, alertNumber: null, fireId: null, messId: null, status: 'failed', detail: 'no_subscription',
   });
   expect(await alertsOf(a.client)).toEqual([]);
 });
@@ -111,4 +111,13 @@ it('MA6: only the newest ALERT_HISTORY_MAX are listed', async () => {
 it('MA8: the service worker opens ALERTS_PATH?alert={alertId}', () => {
   expect(env.SW_JS).toContain(`'${ALERTS_PATH}'`);
   expect(env.SW_JS).toContain('${ALERTS_PATH}?alert=${encodeURIComponent(data.alertId)}');
+});
+
+it('MA10: a mess ask\'s push carries its mess', async () => {
+  const o = await owner();
+  const a = await member(o);
+  const r = await SELF.fetch(`${BASE}/messes`, { method: 'POST', body: new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3]), headers: { cookie: a.client.cookie, 'content-type': 'image/jpeg' } });
+  expect(r.status).toBe(201);
+  const m: any = await r.json();
+  expect((await alertsOf(o)).find((x) => x.source === 'Whose mess?')).toMatchObject({ messId: m.id, fireId: null });
 });

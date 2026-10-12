@@ -285,3 +285,4 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q277 | Several unassigned emoji events for one free day-icon slot (§7.2) | ⚑ First in line order (all-day, then by start time); the rest keep their lines |
 | Q281 | A day-sheet event whose creator is also assigned (§8.3) | ⚑ One chip: "→ name" with the creator's color border; no separate creator chip |
 | Q282 | When an event counts as Family (§7.1, §8.3) | ⚑ Assigned to every active (not disabled) member, and the household has two or more; then no creator chip either |
+| Q283 | What a My alerts card offers beyond a ringing fire (§9.5) | ⚑ A mess ask still asking me: That was me / Not me, else "Already answered."; bounty pushes (🪙) keep just Close until asked |

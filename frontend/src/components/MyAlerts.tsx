@@ -1,6 +1,6 @@
 // SPEC §9.5 — Settings → 🔔 Alerts: every push I got, newest first; a red ❌ hides one, Clear all hides them all, a tap
 // opens its card; a card whose fire still rings carries that fire's buttons (FireActions), so a tapped push can be acked
-// right there. A tapped phone notification lands here on its card (useAlertLink). Titles and sources are the
+// right there, and a mess that still asks me carries That was me / Not me (Messes' own parts). A tapped phone notification lands here on its card (useAlertLink). Titles and sources are the
 // server's, shown as given.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { del, get } from '../api';
@@ -11,10 +11,11 @@ import { utcToLocal } from '../../../src/shared/time';
 import { useAction } from './useAction';
 import { Modal } from './Modal';
 import { FireActions } from './FireActions';
+import { AnswerButtons, MessPhoto, useMessAction, useMesses } from './Messes';
 import s from './Lists.module.css';
 
 interface MyAlert {
-  id: string; title: string; message: string; source: string; kind: AlertKind | null; alertNumber: number | null; fireId: string | null;
+  id: string; title: string; message: string; source: string; kind: AlertKind | null; alertNumber: number | null; fireId: string | null; messId: string | null;
   status: DeliveryStatus; detail: string | null; createdAt: string;
 }
 
@@ -31,11 +32,13 @@ export function useAlertLink(): [string | null, () => void] {
 const RED_X = { background: 'none', border: 0, padding: '0 6px', minHeight: 44, flex: 'none' } as const;
 
 export function MyAlerts({ openId, onOpened }: { openId: string | null; onOpened: () => void }) {
-  const { tz, today, version, ringing, clock } = useApp();
+  const { me, tz, today, version, ringing, clock } = useApp();
   const [alerts, setAlerts] = useState<MyAlert[] | null>(null);
   const [card, setCard] = useState<MyAlert | 'missing' | null>(null);
   const [actError, setActError] = useState<string | null>(null);
   const { run, busy, errorEl } = useAction();
+  const { data: messes } = useMesses();
+  const mess = useMessAction();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { get<{ alerts: MyAlert[] }>('/me/alerts').then((r) => setAlerts(r.alerts)).catch(() => setAlerts([])); }, [version]);
   useEffect(() => {
@@ -86,15 +89,19 @@ export function MyAlerts({ openId, onOpened }: { openId: string | null; onOpened
       {card && card !== 'missing' && (() => {
         const fire = card.fireId ? ringing.find((f) => f.id === card.fireId) : undefined;
         const close = () => { setCard(null); setActError(null); };
+        const ask = card.messId ? messes?.messes.find((m) => m.id === card.messId && m.asked.includes(me.id)) : undefined;
+        const answer: typeof mess.act = (id, send) => mess.act(id, async () => { await send(); close(); });
         return (
         <Modal title={card.title} onClose={close} footer={<button onClick={close}>Close</button>}>
-          {actError && <div role="alert" className="alert-error">{actError}</div>}
+          {(actError ?? mess.error) && <div role="alert" className="alert-error">{actError ?? mess.error}</div>}
           <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginBottom: 12 }}>{card.message}</p>
           <p className="muted">When: {when(card.createdAt, true)}</p>
           <p className="muted">From: {card.source}{card.alertNumber ? ` · alert ${card.alertNumber}` : ''}</p>
           <p className="muted">Phone: {card.status}{card.detail ? ` — ${card.detail}` : ''}</p>
           {fire ? <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 12 }}><FireActions fire={fire} onActed={close} onError={setActError} /></div>
-            : card.fireId && <p style={{ marginTop: 12 }}>Already handled.</p>}
+            : card.fireId ? <p style={{ marginTop: 12 }}>Already handled.</p>
+            : ask ? <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 12 }}><MessPhoto m={ask} /><AnswerButtons m={ask} busy={mess.busy === ask.id} act={answer} /></div>
+            : card.messId && messes && <p style={{ marginTop: 12 }}>Already answered.</p>}
         </Modal>
         );
       })()}
