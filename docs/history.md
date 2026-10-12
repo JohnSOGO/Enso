@@ -840,6 +840,11 @@ caller cannot leave it out and silently stop sunset chores ringing. No behavior 
 modal"): a My alerts card for a fire that is still ringing shows that fire's Ringing bar buttons (Away, Snooze, Ack /
 Done, the machine button), so a tapped push can be acked right in its modal. The card has no Delete any more (the list's ❌ stays). `GET /me/alerts` gains `fireId`.
 
+**Plan it fills the event's Address** (v1.70.1, SPEC 3.25, §7C.2; MojoSOGO 2026-10-12: "When I click plan it, address
+should copy in; look at pumpkin junction"): Plan it was written before events had their own Address (§7.9), so the
+thing's address only landed in the event's notes. Now it goes in the event's Address box (with Open in Maps) and
+leaves the notes; one longer than the box's 200 stays in the notes as before.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

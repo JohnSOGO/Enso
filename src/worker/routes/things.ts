@@ -4,7 +4,7 @@
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import {
-  CLOSED_VISIBLE_DAYS, canPlanOn, openOrder, parseThingInput, plannedEventNotes, thingFromRow, type ThingRow,
+  CLOSED_VISIBLE_DAYS, canPlanOn, openOrder, parseThingInput, plannedEventAddress, plannedEventNotes, thingFromRow, type ThingRow,
 } from '../../shared/things';
 import { addMinutes } from '../../shared/time';
 import { all, first, newId, nowIso } from '../db';
@@ -109,7 +109,7 @@ things.post('/things/:id/plan', requireMember, async (c) => {
   }
   // The event's fields go through the event form's own validation.
   const input = await parseEventInput(c.env.DB, {
-    title: t.title, notes: plannedEventNotes(t), startDate: b.date, startTime: b.time ?? null,
+    title: t.title, notes: plannedEventNotes(t), address: plannedEventAddress(t), startDate: b.date, startTime: b.time ?? null,
   });
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   const db = c.env.DB, now = nowIso(), eventId = newId('evt');
