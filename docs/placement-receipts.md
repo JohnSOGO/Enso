@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.71.0: Day cell event lines: emoji + participant dots, auto-fit (placement-advisor)
+
+- **Ask:** SPEC §7.1 "Event display in a cell" (SPEC 3.26, Q273–Q276). Each single-day event gets its own line under the date line: emoji, then one dot per assignedTo member in Member.color (nobody: the emoji alone, or the event-color dot), start time and title on screens ≥480 px. Line height shrinks 13 → 8 px to fit the room left after the date line and bar lanes, else `+N`. Dots shrink when crowded (≥3 px). Event emojis leave the date line (§7.2).
+- **Verdict:** Extract first (done: the reorganizer entry below). Then the feature in `frontend/src/components/DayCell.tsx` plus the pure `frontend/src/day-lines.ts` [NEW row], tested by `test/day-lines.test.ts`. Calendar.tsx only passes rowH and the cell width through.
+- **Flow stage:** render
+- **Why:** Calendar.tsx was 263/302 and already held scrolling, fetching, lanes and the cell. The cell is its own concern and the fit math is pure, so it gets a testable leaf (precedent: point-line.ts). Rejected: bless-and-raise on Calendar.tsx; `src/shared/` (presentation, the Worker never uses it); fit math inline in DayCell (untestable without a frontend harness).
+- **Caps:** Calendar.tsx 198, DayCell.tsx ~95, day-lines.ts ~30. All under 300, none in the band.
+
+## 2026-10-12 — Calendar day cell out of Calendar.tsx (reorganizer)
+
+- **Trigger:** the placement-advisor sent a per-day calendar change (v1.71.0 day lines) to Calendar.tsx, at 263 of 302 lines, with an extract-first verdict.
+- **Seam moved:** the per-day cell (derivation, icons, dots/chips, classes, aria-label, button, tint(), MONTHS, and the cell CSS including todayPulse and the narrow variants) from `frontend/src/components/Calendar.tsx` to `frontend/src/components/DayCell.tsx` + `DayCell.module.css` [NEW row]
+- **Room opened:** Calendar.tsx: 263 → 198 lines; CEILINGS pin removed (198 + 40 ≤ the global 300)
+- **Behavior:** preserved — same markup, classes, inline styles, aria-label and onOpen(date, data); `.narrow .cell` became `.cell.narrow` at the same specificity.
+- **Restraint:** only the cell moved. Week virtualization, chunk loading, weekSpans and the multi-day bars stay in Calendar.
+
 ## 2026-10-12 — v1.70.1: Plan it carries the thing's address into the event's Address field (placement-advisor)
 
 - **Ask:** SPEC §7C.2 Plan it (with §7.9 event address). POST /things/:id/plan sets the event's `address` from the
