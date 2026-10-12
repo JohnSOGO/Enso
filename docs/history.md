@@ -832,9 +832,13 @@ assigned to anyone to get the eggs 30 minutes before sundown"): the chore form's
 [30] min. Migration 0048 adds `chores.sun_offset_min`; the run's time is that day's sunset (household place, §7.7) minus
 it, for `at` rings and `by` nudges. Lists show `sunset −30`.
 
-**Act on an alert from its card** (v1.70.0, SPEC 3.23, §9.5, Q272; MojoSOGO 2026-10-12: "Let me ack in a notification
+**Chore rules always take the place** (v1.69.1, SPEC 3.23, §7B.3; steward pass 20 #2, MojoSOGO 2026-10-12 "BOTH"):
+`place` is a required argument of `firstFireDue`, `planChoreRuns`, `advanceRun`, `undoRun` and `replanRun`, so a new
+caller cannot leave it out and silently stop sunset chores ringing. No behavior change.
+
+**Act on an alert from its card** (v1.70.0, SPEC 3.24, §9.5, Q272; MojoSOGO 2026-10-12: "Let me ack in a notification
 modal"): a My alerts card for a fire that is still ringing shows that fire's Ringing bar buttons (Away, Snooze, Ack /
-Done, the machine button), so a tapped push can be acked right in its modal. `GET /me/alerts` gains `fireId`.
+Done, the machine button), so a tapped push can be acked right in its modal. The card has no Delete any more (the list's ❌ stays). `GET /me/alerts` gains `fireId`.
 
 Deviations from this spec, deliberately:
 
