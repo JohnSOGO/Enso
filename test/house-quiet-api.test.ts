@@ -76,17 +76,11 @@ it('HQ4: after quiet ended, the house row is written and spoken as before', asyn
   expect(ha.heard.length).toBeGreaterThan(0);
 });
 
-it('HQ5: announce while quiet — House only → 409 house_quiet, nothing written; Phone + House → push only', async () => {
+it('HQ5: announce while quiet is still spoken — House only → 201, a house row on every speaker', async () => {
   await quietUntil('2099-01-01T08:00:00.000Z');
   const only = await call(A, 'POST', '/announce', { text: 'Dinner', channels: ['house'] });
-  expect(only.status).toBe(409);
-  expect(only.json).toEqual({ error: 'house_quiet', message: 'The house is quiet until 00:00.' });
-  expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM deliveries').first<{ n: number }>())!.n).toBe(0);
-  const both = await call(A, 'POST', '/announce', { text: 'Dinner', channels: ['house', 'push'] });
-  expect(both.status).toBe(201);
-  expect(both.json.deliveries.length).toBeGreaterThan(0);
-  expect(both.json.deliveries.every((d: any) => d.channel === 'push')).toBe(true);
-  expect(ha.heard).toHaveLength(0);
+  expect(only.status).toBe(201);
+  expect(only.json.deliveries.map((d: any) => d.channel)).toEqual(['house']);
 });
 
 it("HQ6: a timer's start announcement while quiet → push rows only", async () => {

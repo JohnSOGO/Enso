@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.64.0: Announce ignores Quiet the house (placement-advisor)
+
+- **Ask:** SPEC §9.2b / §9.3 / §9.4b — Announce always speaks on every speaker HA lists, even while the house is quiet (MojoSOGO 2026-10-12 "announcements are special").
+- **Verdict:** `src/worker/routes/announce.ts` [EXISTING] — a deletion: the houseQuiet read, the 409 `house_quiet` branch and the `!quiet` speaker gate, plus the now-unused imports (houseQuiet, utcToLocal, householdTz).
+- **Flow stage:** persist (whether the route writes the house row).
+- **Why:** the quiet check is a persistence gate inside the route that owns POST /announce; removing it adds no code. src/shared/house-quiet.ts unchanged; src/worker/house-quiet.ts keeps three readers (tick, timer-starts, GET /house/quiet). Rejected: an "isAnnouncementExempt" helper (speculative — the exemption is the absence of a check). Spec (§9.2b, HQ5, §9.4b, API row), tests HQ5 / FH4 and map rows 81 / 94 changed in the same commit.
+- **Caps:** announce.ts 69 → ~63 lines against GLOBAL_FILE_CAP 300. Nothing enters the band.
+- **Sources read:** src/worker/routes/announce.ts; docs/module-ownership.md; scripts/arch.ts; SPEC.md §9.2b, §9.4b, §10; tests referencing house_quiet; frontend HouseQuiet.tsx (grep).
+
 ## 2026-10-12 — v1.63.0: Announce reaches every speaker and every member's phone (placement-advisor)
 
 - **Ask:** POST /announce speaks on every speaker HA lists via `allHouseSpeakers(env)` (null = the defaults), as machines do (§7D.3), instead of the union of members' ticked speakers; it pushes to every active member including the sender. SPEC §9.3, MojoSOGO 2026-10-12 "not hearing the announcement … on all devices".

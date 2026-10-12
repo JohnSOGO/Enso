@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.14 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.15 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4871,12 +4871,12 @@ household can quiet the speakers for a while; phones carry on exactly as before.
   Message: "Choose how long: 1h, 2h, 4h or today."
 
 **What is quiet** — household-wide ⚑ Q211. While quiet, **no `house` row is written** by any writer: an alert's
-house row (tick step 2), a timer's start announcement (§5.5a) and an announcement (§9.3). It is the same path as
+house row (tick step 2) and a timer's start announcement (§5.5a). **📢 Announce ignores quiet** and is spoken on
+every speaker (§9.3; MojoSOGO 2026-10-12: "announcements are special; they announce everywhere because it is a house
+important announcement"). It is the same path as
 "nobody ticked a speaker" (§9.2a, HS9): the fire still steps and every `push` row is written and sent unchanged.
 An alert that fires while quiet is **skipped on the speakers, not saved for later** ⚑ Q212; a reminder that
-repeats (a machine's, a renotify) is spoken again at its first alert after quiet ends. An announcement with
-**House only** while quiet → **409 `house_quiet`** "The house is quiet until {HH:MM}." (nothing would be
-said); with Phone too → 201, push rows only. A house row already queued when quiet starts is still spoken.
+repeats (a machine's, a renotify) is spoken again at its first alert after quiet ends. A house row already queued when quiet starts is still spoken.
 
 **API** (member — anyone who can use alerts ⚑ Q211):
 - `GET /house/quiet` → `{ until: string | null, byName: string | null }` (`until` from `quietState`; `byName`
@@ -4902,7 +4902,7 @@ said); with Phone too → 201, push rows only. A house row already queued when q
 | HQ2 | `PUT /house/quiet { for: '2h' }`, `GET`, `DELETE` | until = now + 2 h, `byName` the setter; GET the same; DELETE → nulls; bad `for` → 400; no session → 401 |
 | HQ3 | tick while quiet: a fire with Phone + House | the push row written and sent; no house row; zero HA calls; the fire steps |
 | HQ4 | tick after quiet ended (until in the past) | the house row is written and spoken as before |
-| HQ5 | `POST /announce` while quiet | House only → 409 `house_quiet`, nothing written; Phone + House → 201, push rows only |
+| HQ5 | `POST /announce` while quiet | House only → 201, one house row (Announce ignores quiet) |
 | HQ6 | a timer's start announcement while quiet | push rows only, no house row |
 | HQ-M | migration 0038 | settings row intact, both columns NULL |
 
@@ -5149,8 +5149,7 @@ would show (`pushTitle`, §9.5: "Ensō" for a fire, "📢 Announcement" otherwis
 
 **Which rules it follows — the phone's** ⚑ Q232 (the FunHouse sits on a desk, it is not a speaker in the house):
 - Away (§9.2c) → no FunHouse row, as no phone row.
-- Quiet the house (§9.2b) → still written. Announce with House alone while quiet is still 409 `house_quiet`;
-  House + FunHouse while quiet → the FunHouse row only.
+- Quiet the house (§9.2b) → still written. (Announce ignores quiet altogether, §9.2b.)
 - Phone first (§9.2d) → not delayed: alert 1 already reaches it.
 - An optional event (§7.5) → only when its audience is not empty (as House).
 
@@ -5170,7 +5169,7 @@ would show (`pushTitle`, §9.5: "Ensō" for a fire, "📢 Announcement" otherwis
 | FH1 | tick: a reminder with Phone + FunHouse, two members | two push rows and one `funhouse` row (`member_id` NULL, `title` "Ensō", the same message) |
 | FH2 | tick while quiet; on an away fire | quiet: the `funhouse` row written, no house row; away: no row at all |
 | FH3 | tick: a Phone + House + FunHouse reminder repeating every 5 min, alert 1 | push rows and the `funhouse` row, no house row |
-| FH4 | `POST /announce` FunHouse only; House + FunHouse while quiet | 201, one `funhouse` row titled "📢 Announcement"; 201, the `funhouse` row only |
+| FH4 | `POST /announce` FunHouse only; House + FunHouse while quiet | 201, one `funhouse` row titled "📢 Announcement"; 201, the `funhouse` and `house` rows |
 | FH5 | `GET /ops/pings` with a ping and a `funhouse` row | both, oldest first, `channel` `push` / `funhouse`; the `funhouse` row is now `sent` |
 | FH6 | `forFunhouse` / `funhouseNotice` on a `funhouse` row titled "Ensō" | true; `source` "Ensō" |
 | FH7 | a timer start announcement with FunHouse ticked | one `funhouse` row |
@@ -5302,7 +5301,7 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | DELETE | `/me/alerts/{id}` | member (my push) | → 204, hidden from my list; 404 `not_found` otherwise (§9.5) |
 | DELETE | `/me/alerts` | member | → `{ cleared }`, all of mine hidden (§9.5) |
 | GET / PUT / DELETE | `/house/quiet` | member | GET → `{ until, byName }`; PUT `{ for: '1h' \| '2h' \| '4h' \| 'today' }` → the same; DELETE turns quiet off; 400 `invalid_input` (§9.2b) |
-| POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `house_quiet` (§9.2b); spoken as "{my name} says: {text}" on every speaker and/or pushed to every member, me too, now (§9.3) |
+| POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; spoken (quiet or not, §9.2b) as "{my name} says: {text}" on every speaker and/or pushed to every member, me too, now (§9.3) |
 | POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 409 `no_recipients` (no founder yet) / 429 `rate_limited`, in that order |
 | GET | `/ops/pings?after=` | bearer `OPS_NOTIFY_TOKEN` (no session) | → `{ pings: [{ id, channel, title, text, at }] }`, the founder pings and FunHouse alerts of the last hour after `after`, oldest first, for the FunHouse poller (§9.4a, §9.4b; listed `funhouse` rows become `sent`); 503 / 401 as `/ops/notify` |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek, areaCount }` (`thisWeek`/`nextWeek` = member id or null; `areaCount` §7B.6) |
