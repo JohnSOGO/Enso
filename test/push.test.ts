@@ -215,7 +215,7 @@ describe('M5 Web Push (§9.1)', () => {
     expect(r.json.message).toMatch(/403.*bad jwt/);
   });
 
-  it('AN4 + AN5: an announcement by phone → a push row per other active member; the push names the sender, tagged by its delivery id', async () => {
+  it('AN4 + AN5: an announcement by phone → a push row per active member, the sender too; the push names the sender, tagged by its delivery id', async () => {
     const o = await owner();
     const withPhone = await member(o), without = await member(o), gone = await member(o);
     expect((await o.patch(`/members/${gone.id}`, { disabled: true })).status).toBe(200);
@@ -224,9 +224,8 @@ describe('M5 Web Push (§9.1)', () => {
     const r = await o.post('/announce', { text: ' Dinner is ready ', channels: ['push'] });
     expect(r.status).toBe(201);
     const byMember = Object.fromEntries(r.json.deliveries.map((d: any) => [d.memberId, d]));
-    // Every other active member (earlier tests in this file made some too) — not the sender, not the disabled one.
-    const others = (await env.DB.prepare('SELECT id FROM members WHERE disabled_at IS NULL AND id != ?').bind((await o.get('/me')).json.id)
-      .all<{ id: string }>()).results.map((m) => m.id);
+    // Every active member (earlier tests in this file made some too) — the sender too, not the disabled one.
+    const others = (await env.DB.prepare('SELECT id FROM members WHERE disabled_at IS NULL').all<{ id: string }>()).results.map((m) => m.id);
     expect(Object.keys(byMember).sort()).toEqual(others.sort());
     expect(others).toEqual(expect.arrayContaining([withPhone.id, without.id]));
     expect(others).not.toContain(gone.id);
@@ -234,7 +233,7 @@ describe('M5 Web Push (§9.1)', () => {
     expect(byMember[withPhone.id].status).toBe('sent');
     const row = await env.DB.prepare('SELECT status, detail, fire_id FROM deliveries WHERE id = ?').bind(byMember[without.id].id).first();
     expect(row).toEqual({ status: 'failed', detail: 'no_subscription', fire_id: null });
-    expect(to(ownPhone)).toEqual([]);
+    expect(to(ownPhone)).toHaveLength(1);
 
     const [req, ...more] = to(sub);
     expect(more).toEqual([]);

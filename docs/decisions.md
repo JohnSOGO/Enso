@@ -40,7 +40,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q34 | Take out trash | **Decided:** optional, every Sunday 18:00, rings at 18:00, 🗑️ |
 | Q30 | Reading photos | **Decided:** Claude reads them (`claude-opus-5-5`); ≤ 40 reads a day ⚑ |
 | Q35 | Where do the thing form's Open / Map / Call buttons sit, and which maps app? | ⚑ To the right of Link, Address, Phone; Apple Maps on iPhone/iPad, Google Maps elsewhere |
-| Q36 | Announcements (§9.3): defaults of the box, length, who is pushed | The box opens with every channel ticked (Phone, House, FunHouse) for every member — decided by MojoSOGO 2026-10-11 "ALL for announcement" (was ⚑ House only); so non-founders see 🎪 in this box; at most 200 characters; at least one of Phone / House; the sender gets no push of their own; push goes to every active member (optins `audience`), and one without a phone gets the honest `failed: no_subscription` row; the push is titled "📢 Announcement" with "{name} says: {text}" as its body |
+| Q36 | Announcements (§9.3): defaults of the box, length, who is pushed | The box opens with every channel ticked (Phone, House, FunHouse) for every member — decided by MojoSOGO 2026-10-11 "ALL for announcement" (was ⚑ House only); so non-founders see 🎪 in this box; at most 200 characters; at least one of Phone / House; the sender gets the push too, on all their devices (MojoSOGO 2026-10-12, was ⚑ no push of their own); push goes to every active member (optins `audience`), and one without a phone gets the honest `failed: no_subscription` row; the push is titled "📢 Announcement" with "{name} says: {text}" as its body |
 | Q37 | Voice PE timeout now that the Worker speaks (§9.2) | ⚑ 25 s (the relay used 30 s) so a call fits the Worker's ~30 s `waitUntil` budget; it normally takes ~8 s |
 | Q38 | House badge and Status wording (§8.1, §8.6) | ⚑ Badges "🔇 House failing" and "🔇 House not set up", whose explanations name Home Assistant and the Cloudflare tunnel; Status line "working" / "failing since …" + the error / "not set up" / "not tried yet" |
 | Q39 | House state before anything has been spoken (§9.2) | ⚑ `untried`: no badge, Status says "not tried yet" — a quiet house is not a failure until a delivery fails |
@@ -126,8 +126,8 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q124 | Names for the SogoAI pieces | ⚑ No renames: `CAPTIONS_TOKEN`, `HOME_CAPTIONS_URL` and the `captions-helper` files keep their names though they now carry `/identify` too |
 | Q125 | A person who hasn't chosen speakers (§9.2a) | ⚑ The default speakers (`ECHO_TARGETS` + `SATELLITE_ENTITY`, as before), so nothing changes until someone ticks |
 | Q126 | An alert for several people | ⚑ Spoken on every speaker any of them ticked (the union) |
-| Q127 | Announcements | ⚑ For every active member: everyone's ticked speakers together |
-| Q128 | Nobody it is for has a speaker ticked | ⚑ Not spoken at all; push still goes out. An announcement with House alone is 409 `no_speakers` |
+| Q127 | Announcements | Every speaker HA lists (as machines), whatever anyone ticked — MojoSOGO 2026-10-12 "not hearing the announcement button audio on all devices" (was ⚑ everyone's ticked speakers together) |
+| Q128 | Nobody it is for has a speaker ticked | ⚑ Not spoken at all; push still goes out. (Announcements no longer use the choices, Q127.) |
 | Q129 | Who sets a person's speakers | ⚑ Only that person, in Settings → Me; admins can't set anyone else's |
 | Q130 | Which Alexa entries are not speakers | **Decided by MojoSOGO 2026-10-04: tidy.** ⚑ Matched by name: `This Device` and any name containing `Alexa App` are hidden; everything else Alexa Media Player lists stays |
 

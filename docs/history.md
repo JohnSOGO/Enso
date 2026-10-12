@@ -476,6 +476,11 @@ dishwasher"): a done card (all three machines) shows 🪙 Bounty to admins, open
 `loadBountyTitle` prefilled. A plain one-off, not tied to the machine; no server change, no migration. LB1 green.
 Built as: the prefilled sheet asks to discard on Cancel only when something changed.
 
+**📢 Announce reaches every speaker and every phone** (v1.63.0, §9.3, Q36, Q127; MojoSOGO 2026-10-12 "I am not hearing
+the announement button audio on all devices and not getting notifications on all devices"): an announcement is spoken on
+every speaker Home Assistant lists (as machines, §7D.3), not just the ones members ticked, and pushed to every active
+member including the sender (their other devices). 409 `no_recipients` / `no_speakers` are gone from `/announce` (nothing
+can be empty now). Quiet the house still silences the speakers. **Still owed:** try it on the speakers and phones.
 **📢 Announce goes everywhere by default** (v1.61.0, §8.5, Q36; MojoSOGO 2026-10-11 "ALL for announcement", after
 Toasty's announcement reached only the speakers): the Announce box opens with 📱 Phone, 🔊 House and 🎪 FunHouse all
 ticked, for every member (was House only, plus FunHouse for the founder). The server is unchanged; the sender still gets

@@ -137,25 +137,22 @@ it('HS9: nobody it is for has a speaker → no house row; the push row is still 
   expect(ha.heard).toHaveLength(0);
 });
 
-it("HS10: an announcement is spoken on every active member's speakers; none at all → 409 no_speakers", async () => {
+it('HS10 (§9.3): an announcement is spoken on every speaker HA lists but Everywhere, whatever anyone ticked; HA unreadable → the defaults', async () => {
   await A.patch('/me', { houseSpeakers: [GAME] });
-  await B.patch('/me', { houseSpeakers: [SOGO] });
+  await B.patch('/me', { houseSpeakers: [] });
+  ha.answers.set(TEMPLATE_PATH, { status: 200, body: JSON.stringify([
+    { id: GAME, name: 'Game Room' }, { id: 'media_player.everywhere', name: 'Everywhere' }, { id: SOGO, name: 'Sogo' }, { id: PE, name: 'Office' },
+  ]) });
   const r = await call(A, 'POST', '/announce', { text: 'Dinner', channels: ['house'] });
   expect(r.status).toBe(201);
   const [row] = await houseRows();
-  expect(JSON.parse(row.speakers)).toEqual([GAME, SOGO]); // not the disabled member's Toasty
+  expect(JSON.parse(row.speakers)).toEqual([GAME, SOGO, PE]);
   expect(ha.heard.find((h) => h.path === ECHO_PATH)!.json.target).toEqual([GAME, SOGO]);
 
   await env.DB.prepare('DELETE FROM deliveries').run();
-  await A.patch('/me', { houseSpeakers: [] });
-  await B.patch('/me', { houseSpeakers: [] });
-  const none = await call(A, 'POST', '/announce', { text: 'Dinner', channels: ['house'] });
-  expect(none.status).toBe(409);
-  expect(none.json.error).toBe('no_speakers');
-  expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM deliveries').first<{ n: number }>())!.n).toBe(0);
-  const both = await call(A, 'POST', '/announce', { text: 'Dinner', channels: ['house', 'push'] });
-  expect(both.status).toBe(201);
-  expect(both.json.deliveries.map((d: any) => d.channel)).toEqual(['push']);
+  ha.answers.set(TEMPLATE_PATH, { status: 500, body: 'down' });
+  expect((await call(A, 'POST', '/announce', { text: 'Dinner', channels: ['house'] })).status).toBe(201);
+  expect((await houseRows())[0].speakers).toBeNull();
 });
 
 it('HS11 (§7D.3): a machine alert is spoken on every speaker HA lists but Everywhere, whatever anyone ticked; HA unreadable → the defaults', async () => {

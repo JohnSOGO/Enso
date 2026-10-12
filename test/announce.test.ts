@@ -22,13 +22,12 @@ it('AN1: announceError and announceMessage', () => {
   expect(announceMessage('Shelly', ' Dinner ')).toBe('Shelly says: Dinner');
 });
 
-it('AN6: Phone only with nobody else in the household → 409 no_recipients, nothing written', async () => {
+it('AN6: Phone only with nobody else in the household → 201, a push row to the sender', async () => {
   const o = await owner(); // the first test to sign anyone up in this file's database
   const r = await o.post('/announce', { text: 'Anyone?', channels: ['push'] });
-  expect(r.status).toBe(409);
-  expect(r.json).toMatchObject({ error: 'no_recipients' });
-  expect(r.json.message).toBeTruthy();
-  expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM deliveries').first<{ n: number }>())!.n).toBe(0);
+  expect(r.status).toBe(201);
+  expect(r.json.deliveries).toEqual([{ id: expect.any(String), channel: 'push', memberId: (await o.get('/me')).json.id, status: 'failed' }]);
+  await env.DB.prepare('DELETE FROM deliveries').run();
 });
 
 it('AN2 + AN3: House → one fire-less house delivery "Name says: text", answered queued, then spoken by the Worker → sent', async () => {
@@ -52,7 +51,7 @@ it('AN2 + AN3: House → one fire-less house delivery "Name says: text", answere
   expect(row).toMatchObject({ fire_id: null, member_id: null, alert_number: 1, channel: 'house', message: 'MojoSOGO says: Dinner is ready', status: 'sent', attempts: 1 });
   expect(ha.heard.map((h) => [h.path, h.json.message])).toEqual(expect.arrayContaining([
     [ECHO_PATH, 'MojoSOGO says: Dinner is ready'], [SATELLITE_PATH, 'MojoSOGO says: Dinner is ready']]));
-  expect(ha.heard).toHaveLength(2);
+  expect(ha.heard.filter((h) => h.path !== '/api/template')).toHaveLength(2);
 });
 
 it('AN6: refusals — blank, too long, no channels, an unknown channel → 400 with a message; no session → 401', async () => {
