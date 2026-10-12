@@ -1800,3 +1800,12 @@ REORG RECEIPT
 - **Flow stage:** rules (wording), rendered unchanged by RingingBar.tsx and Machines.tsx.
 - **Why:** `finishLabel` already owns the finish wording and both screens import it, so one edit keeps them in step.
 - **Caps:** src/shared/machines.ts 238/300 → 238/300. No file newly in the warning band.
+
+## 2026-10-12 — v1.63.2: 🎯 Point at it is founder-only (placement-advisor)
+
+- **Ask:** SPEC §8.16 (patch v1.63.2). The ◎ pick activator (bottom left and in modal headers), Alt+P and the Settings → 🙂 Me switch show only for the founder, using the same check as the 🎪 FunHouse tick (Q230, `useIsFounder()`). For the founder nothing changes: on by default, with an off switch per device.
+- **Verdict:** `frontend/src/components/PointAtButton.tsx` (`usePointAtOn` = founder && stored switch) + `frontend/src/components/SettingsMe.tsx` (switch rendered only for the founder) [EXISTING]
+- **Flow stage:** render
+- **Why:** All four surfaces (Modal ◎, PointAtLayer's floating ◎, the Alt+P listener and SettingsMe) already read the one `usePointAtOn()` gate, so gating it once covers them and PointAt.tsx/Modal.tsx are untouched. The founder check is reused from state.tsx rather than written again. PointAtButton gains a hook import from '../state' (not a component, no cycle), and every consumer renders inside AppProvider (Shell; Modal is not used on the sign-in, join or approve screens). The stored switch is left alone, so a founder's setting persists. Rejected: gating separately in PointAt.tsx, Modal.tsx and SettingsMe (three copies of one rule), and a server-side flag (the founder is already known on the client).
+- **Caps:** PointAtButton.tsx 31 → ~33/300; SettingsMe.tsx 37 → ~38/300. No file newly in the band.
+- **Sources read:** scripts/arch.ts; docs/placement-receipts.md; docs/module-ownership.md (rows 139, 197, 198); frontend/src/components/PointAtButton.tsx, PointAt.tsx, SettingsMe.tsx; frontend/src/state.tsx (useIsFounder); frontend/src/App.tsx (provider tree); grep of Modal/PointAt usages in frontend/src and test/.
