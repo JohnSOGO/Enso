@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.25 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.26 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1522,16 +1522,25 @@ approval (they just approved it), not after signup or setup. Push only, never ho
     week rows in the DOM.
 - **Today:** the date number gets an accent-colored circle, and the whole cell has a
   **pulsing accent border** (a steady border when the OS asks for reduced motion).
-- **Event display in a cell:**
-  - At ≥ 480px, up to 3 lines per cell, each a 1-line event title chip in the
-    creator's color, truncated with an ellipsis. Beyond 3, a `+N` badge.
-  - Below 480px, **colored dots only** (max 4, then `+`); titles appear in the day
-    sheet. At 320px a cell is about 44px wide, and titles do not fit.
-  - **An event with an emoji gets no dot** when its emoji shows beside the date (§7.6): the
-    emoji is its mark, so a household reminder like 🧹 street sweeping is not painted in its
-    creator's color as if it were that person's. Tapping the day opens the day sheet as
-    always. If the two-icon limit (§7.2) hides its emoji, it keeps its dot so it is never
-    unmarked. (Decided by MojoSOGO 2026-10-03.)
+- **Event display in a cell** (v1.71.0, MojoSOGO 2026-10-12: "second row; use emoji then dots
+  of those participating; next line for multiple appointments; auto scale if necessary"):
+  - Under the date-number line, **each single-day event gets its own line**, in the order
+    `/calendar` sends them (all-day first, then by start time).
+  - A line is the event's **emoji** (§7.6), then **one dot per participant** (`assignedTo`)
+    in that member's color. ⚑ An event with nobody assigned shows its emoji alone; with no
+    emoji either, one dot in the event's color, so it is never unmarked (Q273). A member who
+    can't be found gets the event's color.
+  - At ≥ 480px the start time and title follow the dots, truncated with an ellipsis.
+  - **Auto scale:** the lines share the room left under the date line and the multi-day
+    bars. Each line is 13px tall and shrinks to fit, down to 8px; emoji and dots shrink with
+    it. Dots also shrink (down to 3px) so a line's dots fit the cell's width. If the lines
+    still don't fit at 8px, as many as fit show and the last becomes `+N` (Q274).
+  - Tapping the day opens the day sheet as always; titles are there.
+  - **Acceptance** (`test/day-lines.test.ts`, the pure fit in `frontend/src/day-lines.ts`):
+    DL1 two lines in 40px → both at 13px; DL2 four lines in 40px → line height between 8 and
+    13px, all four show; DL3 ten lines in 40px → lines at 8px, the last is `+N` and shown + N
+    = 10; DL4 eight dots in a 44px cell → dot size shrinks so they fit, never below 3px;
+    DL5 no room at all → nothing shows but `+N` of all.
 - **Multi-day (all-day) events are grouped:** one continuous bar in the event's
   color spans the days, and those day cells get a faint tint of the same color so
   the stay reads as one block. The title is written **once**, at the start of the
@@ -1567,8 +1576,8 @@ the 5 carried-over "Fall break" days (deleted, not converted — his choice).
 
 **Day icons** — a day's icons sit **to the right of the date number, on the same line, at
 every width** (phones included; never on the line below — decided by MojoSOGO). Icons, in
-order: the public holiday's emoji, 📈 (§7.4), then the emoji of that day's events (§7.6).
-At most **two** show beside the number; the rest are in the day sheet. Each is shown only if
+order: the public holiday's emoji and 📈 (§7.4); at most **two**. Since v1.71.0 an event's emoji
+sits at the start of its own line under the number instead (§7.1, Q275). Each is shown only if
 it is on for the member (§7.5).
 
 - **Legend:** shown once, directly under the sticky month header: a yellow square
@@ -1690,9 +1699,9 @@ MojoSOGO 2026-10-03); then **each member decides for themselves** whether it is 
 An event may carry **one emoji** (`events.emoji`, optional; decided by MojoSOGO): street
 sweeping 🧹, taking out the trash 🗑️. It must be a single emoji (one grapheme of emoji
 presentation, ≤ 16 bytes) — anything else is 400 with a message. Where it shows:
-- beside the date number on each day the event occurs (§7.2 day icons) — on phones in place
-  of its dot (§7.1);
-- before the title in the day sheet, on wide-screen chips, and in Optional calendar items;
+- at the start of the event's line in each day cell where it occurs, before the
+  participant dots (§7.1);
+- before the title in the day sheet and in Optional calendar items;
 - in the Ringing bar and alert text it is **not** added (messages stay plain text).
 
 **Acceptance:** E1 an event with emoji 🧹 round-trips through POST/GET; E2 `"ab"`, `"🧹🧹"`

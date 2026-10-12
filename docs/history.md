@@ -845,6 +845,12 @@ should copy in; look at pumpkin junction"): Plan it was written before events ha
 thing's address only landed in the event's notes. Now it goes in the event's Address box (with Open in Maps) and
 leaves the notes; one longer than the box's 200 stays in the notes as before.
 
+**Calendar lines: emoji, then dots of who's in it** (v1.71.0, SPEC 3.26, §7.1, Q273–Q276; MojoSOGO 2026-10-12: "Calendar;
+second row; use emoji then dots of those participating; next line for multiple appointments; auto scale if necessary"):
+each single-day event gets its own line under the date number: its emoji, then one dot per assigned member in their
+color (title too on wide screens). Lines shrink to fit, then `+N`. Event emojis left the date line. The day cell moved
+out of Calendar.tsx into DayCell.tsx first (no behavior change).
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

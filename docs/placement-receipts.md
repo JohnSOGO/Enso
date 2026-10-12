@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.71.0: Day cell event lines: emoji + participant dots, auto-fit (placement-advisor)
+
+- **Ask:** SPEC §7.1 "Event display in a cell" (SPEC 3.26, Q273–Q276). Each single-day event gets its own line under the date line: emoji, then one dot per assignedTo member in Member.color (nobody: the emoji alone, or the event-color dot), start time and title on screens ≥480 px. Line height shrinks 13 → 8 px to fit the room left after the date line and bar lanes, else `+N`. Dots shrink when crowded (≥3 px). Event emojis leave the date line (§7.2).
+- **Verdict:** Extract first (done: the reorganizer entry below). Then the feature in `frontend/src/components/DayCell.tsx` plus the pure `frontend/src/day-lines.ts` [NEW row], tested by `test/day-lines.test.ts`. Calendar.tsx only passes rowH and the cell width through.
+- **Flow stage:** render
+- **Why:** Calendar.tsx was 263/302 and already held scrolling, fetching, lanes and the cell. The cell is its own concern and the fit math is pure, so it gets a testable leaf (precedent: point-line.ts). Rejected: bless-and-raise on Calendar.tsx; `src/shared/` (presentation, the Worker never uses it); fit math inline in DayCell (untestable without a frontend harness).
+- **Caps:** Calendar.tsx 198, DayCell.tsx ~95, day-lines.ts ~30. All under 300, none in the band.
+
 ## 2026-10-12 — Calendar day cell out of Calendar.tsx (reorganizer)
 
 - **Trigger:** the placement-advisor sent a per-day calendar change (v1.71.0 day lines) to Calendar.tsx, at 263 of 302 lines, with an extract-first verdict.

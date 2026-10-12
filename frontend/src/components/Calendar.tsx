@@ -151,7 +151,7 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
       const date = addDays(weekStart, i);
       cells.push(
         <DayCell key={date} date={date} data={dayData(date, w)} stay={spans.find((sp) => sp.start <= i && i <= sp.end)}
-          lanes={lanes} barH={barH} narrow={narrow} todayStr={todayStr} onOpen={onOpenDay} />,
+          lanes={lanes} barH={barH} rowH={rowH} cellW={size.w / 7} narrow={narrow} todayStr={todayStr} onOpen={onOpenDay} />,
       );
     }
     rows.push(
