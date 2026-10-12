@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.34 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.35 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4518,7 +4518,9 @@ change the room, so every chore in it shows the change ⚑ Q268:
 🧽 Sam cleaned up a mess (Kitchen): pans on the stove. Was it yours?  [photo]  [That was me] [Not me]
 ```
 
-- The photo is a small thumbnail (tap for full size). The two buttons are ≥ 44 px. Answering removes the row.
+- The photo is a small thumbnail (tap for full size). The two buttons are ≥ 44 px, stacked at the right: **Not me**
+  directly under **That was me** (v1.74.1, MojoSOGO 2026-10-12: "Put not me button under that was me button"); the
+  same stack wherever they show (the Messes section, the alert card, §9.5). Answering removes the row.
 - It is not red and makes no sound; it stays until I answer, even while the mess is on To talk about.
 
 **Messes** — a section of the 🧹 Chores tab, the 🧽 Messes button of its menu (§8.15):

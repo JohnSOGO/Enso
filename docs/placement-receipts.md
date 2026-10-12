@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.74.1: Mess answer pair stacked at the right (placement-advisor)
+
+- **Ask:** In every place the mess answer pair shows (banner, Messes section, MyAlerts card), Not me sits directly under That was me, stacked at the right, instead of wrapping left under the text (SPEC §8.15a, v1.74.1).
+- **Verdict:** frontend/src/components/Messes.tsx (AnswerButtons) + frontend/src/components/Messes.module.css (.answers) [EXISTING]
+- **Flow stage:** render
+- **Why:** AnswerButtons is the one shared home of the pair, so wrapping its buttons in a column `.answers` span fixes all three callers in one place. Rejected: styling each caller (three copies drift); a new component (overkill for one span and one rule). src/shared/messes.ts untouched.
+- **Caps:** Messes.tsx 147 → 147 of 300; Messes.module.css 23 → 25 of 300. Nothing enters the band.
+- **Sources read:** scripts/arch.ts, docs/module-ownership.md (Messes rows), Messes.tsx, Messes.module.css.
+
 ## 2026-10-12 — v1.74.0: Answer a mess from its alert card (placement-advisor)
 
 - **Ask:** SPEC §9.5 "Answer a mess from the card" (v1.74.0, SPEC 3.34, MA10, Q283; MojoSOGO "let me respond directly from the modal"). An alert card for a mess that still asks me shows its photo and That was me / Not me, and closes after a successful answer; otherwise "Already answered."

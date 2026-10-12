@@ -881,6 +881,9 @@ creator (the chip with the colored border), when taking part, comes first in the
 from tapping an alert, let me respond directly from the modal"): a Whose mess? card that still asks me shows the photo
 and That was me / Not me; one tap answers and closes it; else "Already answered." `GET /me/alerts` gains `messId`.
 
+**Not me under That was me** (v1.74.1, SPEC 3.35, §8.15a; MojoSOGO 2026-10-12): the mess answer pair is a stack at the
+right, Not me directly under That was me, in the banner, the Messes section and the alert card.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
