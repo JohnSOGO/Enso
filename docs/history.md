@@ -823,6 +823,10 @@ unknown owners for machines, do not ping funhouse; ping funhouse for MojoSOGO an
 cooking timer writes a `funhouse` row only when its alert person is the founder. Nobody → phones only; someone else →
 Phone + House. Announce unchanged. `FOUNDER_SQL` moved from routes/members.ts to db.ts so fire-rows.ts can read it.
 
+**A chore row opens the chore** (v1.68.1, SPEC 3.21, §8.5; MojoSOGO 2026-10-12: "clicking into a chore should open the
+chore details not the definition of the room"): in 📋 All chores a row tap opens the chore form; the 📋 after the title
+is its own button for What done looks like. Today unchanged (a tap ticks it, its 📋 opens the sheet).
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

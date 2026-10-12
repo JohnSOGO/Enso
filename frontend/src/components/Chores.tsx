@@ -1,5 +1,5 @@
 // SPEC §8.15 — the 🧹 Chores tab: a menu of ✅ Today (ChoresToday), 🪙 Bounties and 🏅 Score (§8.15b), 🧽 Messes (§8.15a)
-// and 📋 All chores (one line per chore, sorted by time, §8.5, 🪙 n when it has a bounty), the tapped one in a Modal. A row opens the chore's What done looks like sheet. Whose
+// and 📋 All chores (one line per chore, sorted by time, §8.5, 🪙 n when it has a bounty), the tapped one in a Modal. A row opens the chore form; its 📋 opens What done looks like. Whose
 // turn it is comes from the server (thisWeek / nextWeek); nothing is computed here. Holds which section is open.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Modal } from './Modal';
@@ -72,7 +72,7 @@ function AllChoresSection({ sorted, error, turn, onEdit, onOpenAreas }: {
         <h2 style={{ flex: 1, marginBottom: 0 }}>All chores</h2>
         <button onClick={() => onEdit(null)}>＋ Add</button>
       </div>
-      <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>Jobs on chosen days, taking turns. Tap one to see what done looks like.</p>
+      <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>Jobs on chosen days, taking turns. Tap one to see or change it; 📋 shows what done looks like.</p>
       {error && <div role="alert" className="alert-error">{error}</div>}
       {sorted === null && !error && <p className="muted">Loading…</p>}
       {sorted?.length === 0 && <p className="muted">No chores yet.</p>}
@@ -88,16 +88,19 @@ function AllChoresSection({ sorted, error, turn, onEdit, onOpenAreas }: {
           </thead>
           <tbody>
             {sorted.map((c) => (
-              <tr key={c.id} onClick={() => onOpenAreas(c)} style={{ cursor: 'pointer' }}>
+              <tr key={c.id} onClick={() => onEdit(c)} style={{ cursor: 'pointer' }}>
                 <td className={s.rigid}>{c.time} <span className="muted">{c.timing}</span></td>
                 <th scope="row" className={s.flexible}>
                   <button className="plain" style={{ textAlign: 'left', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                    title={`What done looks like: ${c.title}`} onClick={(e) => { e.stopPropagation(); onOpenAreas(c); }}>
+                    title={`Chore: ${c.title}`} onClick={(e) => { e.stopPropagation(); onEdit(c); }}>
                     {c.title}
                     {c.steps.length > 1 && <><sup aria-hidden> {c.steps.length}</sup><span className="visually-hidden">, {c.steps.length} steps</span></>}
-                    {c.areaCount > 0 && <><span aria-hidden> 📋</span><span className="visually-hidden">, {c.areaCount} areas</span></>}
                     {c.bounty && <> · 🪙 {c.bounty}</>}
                   </button>
+                  {(c.areaCount > 0 || c.doneMeans) && (
+                    <button className="plain" aria-label={`What done looks like: ${c.title}`} title={`What done looks like: ${c.title}`}
+                      onClick={(e) => { e.stopPropagation(); onOpenAreas(c); }}>📋</button>
+                  )}
                 </th>
                 <td className={s.rigid}>{daysText(c.days)}</td>
                 <td className={s.rigid}>{turn(c)}</td>
