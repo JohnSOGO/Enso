@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-12 — Calendar day cell out of Calendar.tsx (reorganizer)
+
+- **Trigger:** the placement-advisor sent a per-day calendar change (v1.71.0 day lines) to Calendar.tsx, at 263 of 302 lines, with an extract-first verdict.
+- **Seam moved:** the per-day cell (derivation, icons, dots/chips, classes, aria-label, button, tint(), MONTHS, and the cell CSS including todayPulse and the narrow variants) from `frontend/src/components/Calendar.tsx` to `frontend/src/components/DayCell.tsx` + `DayCell.module.css` [NEW row]
+- **Room opened:** Calendar.tsx: 263 → 198 lines; CEILINGS pin removed (198 + 40 ≤ the global 300)
+- **Behavior:** preserved — same markup, classes, inline styles, aria-label and onOpen(date, data); `.narrow .cell` became `.cell.narrow` at the same specificity.
+- **Restraint:** only the cell moved. Week virtualization, chunk loading, weekSpans and the multi-day bars stay in Calendar.
+
 ## 2026-10-12 — v1.70.1: Plan it carries the thing's address into the event's Address field (placement-advisor)
 
 - **Ask:** SPEC §7C.2 Plan it (with §7.9 event address). POST /things/:id/plan sets the event's `address` from the

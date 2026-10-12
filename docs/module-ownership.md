@@ -140,7 +140,8 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/theme.css` | Theme tokens (§8.7) and global base styles |
 | `frontend/src/css-modules.d.ts` | Type shim for `*.module.css` imports |
 | `frontend/src/build-stamp.d.ts` | Ambient type for `__ENSO_BUILD__`, the §8.10 build stamp Vite `define` injects from vite.config.ts buildStamp() |
-| `frontend/src/components/Calendar.tsx` | Continuous calendar view (§7.1–7.2) |
+| `frontend/src/components/Calendar.tsx` | Continuous calendar view (§7.1–7.2): the virtualized week rows, /calendar chunk loading, the multi-day bars; each day drawn by DayCell |
+| `frontend/src/components/DayCell.tsx` | One calendar day cell (§7.1–7.2): tone/today/past/holiday classes, the stay tint, the date-number line, weather, the gap for bar lanes, the event marks; the aria-label. Holds no state, fetches nothing |
 | `frontend/src/components/DaySheet.tsx` | Day sheet modal (§8.3) |
 | `frontend/src/components/EventForm.tsx` | Event form modal (§8.4); hosts EventFillBar (new and existing events, when the person can edit), AddressField and BringField |
 | `frontend/src/components/BringField.tsx` | The event form's Things to bring (§7.10, §8.4): one line per item with ✕, the Add something to bring box (Enter or ＋ Add; cleanBring on add; maxLength EVENT_BRING_ITEM_MAX; hidden at EVENT_BRING_MAX). value/onChange props; keeps only its add-box draft, holds no form state, never saves |
