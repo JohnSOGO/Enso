@@ -1,10 +1,11 @@
-// M4c acceptance — chores through the API and /dev/tick (SPEC §7B.5 C3–C12).
+// M4c acceptance — chores through the API and /dev/tick (SPEC §7B.5 C3–C12, C15).
 // Simulated ticks use September 2026 dates (before any chore's real start_date), so each test
 // backdates its chore's start_date. Done/undo use the real clock; their times are asserted relative to it.
 import { env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Client, member, owner, tickAt } from './helpers';
-import { addDays, localToUtc, utcToLocal } from '../src/shared/time';
+import { addDays, addMinutes, localToUtc, utcToLocal } from '../src/shared/time';
+import { sunsetUtc } from '../src/shared/sun';
 
 const TZ = 'America/Los_Angeles';
 let o: Client, A: string, A_NAME: string, B: string, bClient: Client;
@@ -202,6 +203,20 @@ describe('M4c chores — by, today, edits', () => {
     expect(JSON.stringify(cal)).not.toContain(ch.title);
     const alarms = (await o.get('/alarms')).json;
     expect(alarms.some((a: any) => a.id === ch.id || a.title === ch.title)).toBe(false);
+  });
+});
+
+describe('§7B.3 before sunset (C15, API)', () => {
+  it('a sunset chore keeps sunOffsetMin through an edit and rings at sunset − 30 on tick', async () => {
+    const ch = await createChore({ title: 'Get the eggs', days: ['MO'], timing: 'at', time: '18:00', sunOffsetMin: 30, people: [A], steps: [{ title: 'Get the eggs' }], channels: ['push'] }, '2026-09-06');
+    expect(ch.sunOffsetMin).toBe(30);
+    const edited = await o.patch(`/chores/${ch.id}`, { title: 'Get the eggs!' });
+    expect(edited.json).toMatchObject({ title: 'Get the eggs!', sunOffsetMin: 30 });
+    const due = addMinutes(sunsetUtc('2026-09-14', { lat: 33.2, lon: -117.29 })!, -30);
+    await tickAt(o, due);
+    const [fire] = await firesOf((await runOn(ch.id, '2026-09-14')).id);
+    expect(fire).toMatchObject({ state: 'ringing', due_at: due });
+    expect((await o.patch(`/chores/${ch.id}`, { sunOffsetMin: null })).json.sunOffsetMin).toBeNull();
   });
 });
 

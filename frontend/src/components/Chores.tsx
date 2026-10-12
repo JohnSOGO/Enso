@@ -5,7 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Modal } from './Modal';
 import { PickGrid } from './PickGrid';
 import { daysText } from './AlertFields';
-import { ChoresToday } from './ChoresToday';
+import { ChoresToday, whenText } from './ChoresToday';
 import { MessesSection } from './Messes';
 import { BountiesSection } from './Bounties';
 import { ScoreSection } from './Score';
@@ -17,7 +17,7 @@ import s from './Lists.module.css';
 
 /** A chore as GET /chores returns it (§10). */
 export interface Chore {
-  id: string; title: string; doneMeans: string | null; days: Weekday[]; timing: ChoreTiming; time: string;
+  id: string; title: string; doneMeans: string | null; days: Weekday[]; timing: ChoreTiming; time: string; sunOffsetMin: number | null;
   nudge: boolean; people: string[]; steps: ChoreStep[]; channels: Channel[]; renotifyMin: number | null;
   createdBy: string; thisWeek: string | null; nextWeek: string | null; areaCount: number; bounty: number | null; roomId: string | null;
 }
@@ -89,7 +89,7 @@ function AllChoresSection({ sorted, error, turn, onEdit, onOpenAreas }: {
           <tbody>
             {sorted.map((c) => (
               <tr key={c.id} onClick={() => onOpenAreas(c)} style={{ cursor: 'pointer' }}>
-                <td className={s.rigid}>{c.time} <span className="muted">{c.timing}</span></td>
+                <td className={s.rigid}>{whenText(c.time, c.sunOffsetMin)} <span className="muted">{c.timing}</span></td>
                 <th scope="row" className={s.flexible}>
                   <button className="plain" style={{ textAlign: 'left', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                     title={`What done looks like: ${c.title}`} onClick={(e) => { e.stopPropagation(); onOpenAreas(c); }}>

@@ -6,12 +6,16 @@ import {
   type Chore, type ChoreRun,
 } from '../src/shared/chores';
 import { newChoreFire, stepFire, type FireRow } from '../src/shared/engine';
+import { sunsetUtc } from '../src/shared/sun';
+import { addMinutes } from '../src/shared/time';
+
+const sunsetMinus = (date: string, min: number) => addMinutes(sunsetUtc(date, { lat: 33.2, lon: -117.29 })!, -min);
 
 const TZ = 'America/Los_Angeles';
 const A = 'mem_a', B = 'mem_b';
 
 const laundry: Chore = {
-  id: 'chr_1', title: 'Laundry', done_means: null, days: ['MO'], timing: 'at', time: '07:30', nudge: false,
+  id: 'chr_1', title: 'Laundry', done_means: null, days: ['MO'], timing: 'at', time: '07:30', sun_offset_min: null, nudge: false,
   people: [A], channels: ['push', 'house'], renotify_min: 15, max_alerts: 4, start_date: '2026-10-04',
   steps: [
     { title: 'Start washer', waitMin: 60, memberId: null },
@@ -159,7 +163,7 @@ describe('§7B.4 validation', () => {
   };
   it('normalizes a good body', () => {
     expect(parseChoreInput(ok, [A])).toEqual({
-      title: 'Laundry', done_means: null, days: ['MO', 'TH'], timing: 'at', time: '07:30', nudge: false, people: [A],
+      title: 'Laundry', done_means: null, days: ['MO', 'TH'], timing: 'at', time: '07:30', sun_offset_min: null, nudge: false, people: [A],
       steps: [{ title: 'Start washer', waitMin: 60, memberId: null }, { title: 'Fold', waitMin: null, memberId: null }],
       channels: ['push'], renotify_min: null, max_alerts: 4,
     });
@@ -179,6 +183,9 @@ describe('§7B.4 validation', () => {
     ['steps[0].memberId', { steps: [{ title: 'S', memberId: 'mem_gone' }] }],
     ['channels', { channels: [] }],
     ['renotifyMin', { renotifyMin: 0 }],
+    ['sunOffsetMin', { sunOffsetMin: -1 }],
+    ['sunOffsetMin', { sunOffsetMin: 241 }],
+    ['sunOffsetMin', { sunOffsetMin: '30' }],
   ])('rejects bad %s with a message naming it', (field, over) => {
     const r = parseChoreInput({ ...ok, ...over }, [A]);
     expect(typeof r).toBe('string');
@@ -188,5 +195,36 @@ describe('§7B.4 validation', () => {
     expect(parseChoreInput({ ...ok, timing: 'by', channels: [] }, [A])).toMatchObject({ channels: [], nudge: false });
     expect(parseChoreInput({ ...ok, timing: 'by', nudge: true, channels: [] }, [A])).toContain('channels');
     expect(parseChoreInput({ ...ok, nudge: true }, [A])).toMatchObject({ nudge: false });
+  });
+});
+
+describe('§7B.3 before sunset (C15–C18)', () => {
+  const OCEANSIDE = { lat: 33.2, lon: -117.29 };
+  const eggs: Chore = {
+    ...laundry, id: 'chr_3', title: 'Get the eggs', days: ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'], sun_offset_min: 30,
+    steps: [{ title: 'Get the eggs', waitMin: null, memberId: null }],
+  };
+  const dueOn = (c: Chore, date: string, place = OCEANSIDE as typeof OCEANSIDE | null) =>
+    planChoreRuns(c, TZ, `${date}T07:00:00.000Z`, `${date}T23:00:00.000Z`, [A], place).find((p) => p.date === date)?.firstDueAt;
+  it('C15 first fire = sunset − 30, across the DST change', () => {
+    expect(dueOn(eggs, '2026-10-31')).toBe(sunsetMinus('2026-10-31', 30));
+    expect(dueOn(eggs, '2026-11-01')).toBe(sunsetMinus('2026-11-01', 30));
+    expect(dueOn(eggs, '2026-10-31')!.slice(0, 15)).toBe('2026-11-01T00:2'); // about 17:28 PDT (sunset ~17:58)
+    expect(dueOn(eggs, '2026-11-01')!.slice(0, 15)).toBe('2026-11-02T00:2'); // about 16:27 PST (sunset ~16:57)
+  });
+  it('C16 no household place → the run is planned with no fire', () => {
+    expect(planChoreRuns(eggs, TZ, '2026-10-31T07:00:00.000Z', '2026-10-31T23:00:00.000Z', [A], null))
+      .toEqual([{ date: '2026-10-31', assignee_id: A, firstDueAt: null }]);
+  });
+  it('C17 a `by` sunset nudge is re-planned at that day\'s sunset after a step', () => {
+    const c: Chore = { ...eggs, timing: 'by', nudge: true, sun_offset_min: 0, steps: [{ title: 'A', waitMin: null, memberId: null }, { title: 'B', waitMin: null, memberId: null }] };
+    const r = advanceRun(c, run({ chore_id: c.id, date: '2026-10-31' }), null, A, '2026-10-31T20:00:00.000Z', TZ, OCEANSIDE);
+    expect('error' in r ? null : r.newFire?.due_at).toBe(sunsetMinus('2026-10-31', 0));
+  });
+  it('accepts sunOffsetMin 0–240 and keeps null for a clock time', () => {
+    const ok = { title: 'Eggs', days: ['MO'], timing: 'at', time: '18:00', people: [A], steps: [{ title: 'Eggs' }], channels: ['push'] };
+    expect(parseChoreInput({ ...ok, sunOffsetMin: 30 }, [A])).toMatchObject({ sun_offset_min: 30 });
+    expect(parseChoreInput({ ...ok, sunOffsetMin: 0 }, [A])).toMatchObject({ sun_offset_min: 0 });
+    expect(parseChoreInput(ok, [A])).toMatchObject({ sun_offset_min: null });
   });
 });

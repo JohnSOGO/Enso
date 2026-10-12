@@ -1,4 +1,4 @@
-// SPEC §8.5 — the chore form (modal): title, done means, room (§7B.6), days, at/by, time, people in turn
+// SPEC §8.5 — the chore form (modal): title, done means, room (§7B.6), days, at/by, clock time or minutes before sunset (§7B.3), people in turn
 // order, steps, channels, repeat alert. The server validates (§7B.4); its 400 shows in the dialog.
 import { useMemo, useState } from 'react';
 import { Modal } from './Modal';
@@ -7,7 +7,7 @@ import type { Chore } from './Chores';
 import { del, errorText, patch, post } from '../api';
 import { useApp, useIsFounder } from '../state';
 import { CHORE_TIMING, type ChoreTiming } from '../../../src/shared/vocab';
-import { DONE_MEANS_MAX, PEOPLE_MAX, STEPS_MAX, TITLE_MAX, WAIT_MAX } from '../../../src/shared/chores';
+import { DONE_MEANS_MAX, PEOPLE_MAX, STEPS_MAX, SUN_OFFSET_MAX, TITLE_MAX, WAIT_MAX } from '../../../src/shared/chores';
 import { canChange } from '../../../src/shared/roles';
 import { useRooms } from './Rooms';
 
@@ -26,6 +26,7 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
   const init = useMemo(() => ({
     title: chore?.title ?? '', doneMeans: chore?.doneMeans ?? '', roomId: chore?.roomId ?? '', days: chore?.days ?? [],
     timing: chore?.timing ?? CHORE_TIMING[0], time: chore?.time ?? '08:00', nudge: chore?.nudge ?? false,
+    sunset: chore?.sunOffsetMin != null, sunMin: String(chore?.sunOffsetMin ?? 30),
     people: chore?.people ?? [],
     steps: chore
       ? chore.steps.map((st): StepDraft => ({ title: st.title, wait: st.waitMin ? String(st.waitMin) : '', memberId: st.memberId }))
@@ -64,9 +65,11 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
     if (!f.people.length) throw new Error('Pick at least one person.');
     if (f.steps.some((st) => !st.title.trim())) throw new Error('Give every step a title.');
     if ((f.timing === 'at' || nudge) && !channels.length) throw new Error(pickOneWay('alert'));
+    if (f.sunset && !f.sunMin.trim()) throw new Error('Say how many minutes before sunset (0 = at sunset).');
     const last = f.steps.length - 1;
     const body = {
       title: f.title, doneMeans: f.doneMeans.trim() || null, roomId: f.roomId || null, days: f.days, timing: f.timing, time: f.time, nudge,
+      sunOffsetMin: f.sunset ? Number(f.sunMin) : null,
       people: f.people, channels, renotifyMin: f.renotify === 'off' ? null : Number(f.renotify),
       steps: f.steps.map((st, i) => ({ title: st.title, waitMin: i < last && st.wait ? Number(st.wait) : null, memberId: st.memberId })),
     };
@@ -112,9 +115,26 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
             </label>
           )}
         </div>
-        <label className="field"><span>Time</span>
-          <input type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} />
-        </label>
+        <div className="field" role="radiogroup" aria-label="Time">
+          <span className="muted" style={{ fontSize: '.8rem' }}>Time</span>
+          <div className="row wrap" style={{ marginTop: 4 }}>
+            <label className="chip" style={chip}>
+              <input type="radio" name="clock" checked={!f.sunset} onChange={() => setF({ ...f, sunset: false })} /> Clock
+            </label>
+            <label className="chip" style={chip}>
+              <input type="radio" name="clock" checked={f.sunset} onChange={() => setF({ ...f, sunset: true })} /> Before sunset
+            </label>
+          </div>
+          {f.sunset
+            ? (
+              <label className="row" style={{ marginTop: 6, fontSize: '.85rem' }}>
+                <input type="number" inputMode="numeric" min={0} max={SUN_OFFSET_MAX} value={f.sunMin} style={{ width: '5rem', flex: 'none' }}
+                  aria-label="Minutes before sunset" onChange={(e) => setF({ ...f, sunMin: e.target.value })} />
+                <span className="muted" style={{ flex: 'none' }}>min before sunset</span>
+              </label>
+            )
+            : <input type="time" aria-label="Clock time" style={{ marginTop: 6 }} value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} />}
+        </div>
 
         <div className="field" role="group" aria-label="People, in turn order">
           <span className="muted" style={{ fontSize: '.8rem' }}>People (tap in turn order)</span>

@@ -49,7 +49,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
   const chores = await all<ChoreRow>(db, 'SELECT * FROM chores WHERE deleted_at IS NULL');
   if (chores.length) {
     const active = await activeMemberIds(db);
-    for (const c of chores) inserts.push(...choreRunInserts(db, choreFromRow(c), tz, now, to, active));
+    for (const c of chores) inserts.push(...choreRunInserts(db, choreFromRow(c), tz, now, to, active, place));
   }
   // 1c. Plan thing reminders (§7C.2): only ideas, same window, INSERT OR IGNORE.
   const things = await all<ThingRow>(db,

@@ -818,6 +818,11 @@ from a chore to a room. Migration 0047 turned the Kitchen chore's areas into a K
 same R2 keys) and pointed the chore at it. Rooms are listed and added in Settings → 🏠 Household; a chore picks its
 room in its form; the chore's 📋 sheet shows its room's areas. Days off moved to Settings → 📅 Calendar (admins).
 
+**Chores before sunset** (v1.68.0, §7B.3, §4.2zu, §8.5, Q269–Q270; MojoSOGO 2026-10-12: "an alarm chore that can be
+assigned to anyone to get the eggs 30 minutes before sundown"): the chore form's Time is **Clock** or **Before sunset**
+[30] min. Migration 0048 adds `chores.sun_offset_min`; the run's time is that day's sunset (household place, §7.7) minus
+it, for `at` rings and `by` nudges. Lists show `sunset −30`.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

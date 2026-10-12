@@ -10,7 +10,7 @@ import s from './ChoresToday.module.css';
 
 /** One run as GET /chores/today returns it (§10). */
 export interface Run {
-  id: string; choreId: string; title: string; doneMeans: string | null; timing: ChoreTiming; time: string;
+  id: string; choreId: string; title: string; doneMeans: string | null; timing: ChoreTiming; time: string; sunOffsetMin: number | null;
   step: number; steps: ChoreStep[]; assigneeId: string | null; personId: string | null;
   doneAt: string | null; doneBy: string | null; nextDueAt: string | null; ringing: boolean; areaCount: number; bounty: number | null;
 }
@@ -22,6 +22,10 @@ const STORE_KEY = 'enso.today';
 function initialScope(): Scope {
   try { return localStorage.getItem(STORE_KEY) === 'everyone' ? 'everyone' : 'mine'; } catch { return 'mine'; }
 }
+
+/** A chore's time as shown (§8.5, ⚑ Q270): the clock time, or `sunset −30` / `sunset` for a sunset chore (§7B.3). */
+export const whenText = (time: string, sunOffsetMin: number | null): string =>
+  sunOffsetMin === null ? time : sunOffsetMin ? `sunset −${sunOffsetMin}` : 'sunset';
 
 export function ChoresToday({ onOpenAreas }: { onOpenAreas: (choreId: string) => void }) {
   const { me, version, refresh, localTime, memberById } = useApp();
@@ -51,7 +55,7 @@ export function ChoresToday({ onOpenAreas }: { onOpenAreas: (choreId: string) =>
   const when = (r: Run) => {
     if (r.ringing) return <span className="badge bad">ringing</span>;
     const waiting = r.step > 0 && r.steps[r.step - 1]?.waitMin && r.nextDueAt;
-    return waiting ? `rings ${localTime(r.nextDueAt!)}` : `${r.timing} ${r.time}`;
+    return waiting ? `rings ${localTime(r.nextDueAt!)}` : `${r.timing} ${whenText(r.time, r.sunOffsetMin)}`;
   };
   const chipFor = (id: string | null) => {
     const m = id ? memberById(id) : undefined;
