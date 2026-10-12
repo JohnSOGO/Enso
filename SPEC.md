@@ -5277,17 +5277,19 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 - One line per alert: the title, the message (one line, cut with …), the time; a red **❌** at the end hides it at
   once, no asking ⚑ Q224.
 - Tapping a line opens its **card** (a titled modal): the title, the whole message, when (date and time), From (the
-  source), the alert number (a fire's push), and how it went (sent / failed with the detail). **Delete** and
-  **Close** at the bottom.
+  source), the alert number (a fire's push), and how it went (sent / failed with the detail). **Close** at the
+  bottom; no Delete on the card (v1.70.0, MojoSOGO 2026-10-12: "Remove delete; too easy to make mistake"): the
+  list line's ❌ is the one way to hide an alert.
 - **Opened from a push:** a tap on a notification (no action button) opens `/settings/alerts?alert={id}`
   (§9.1). On start the app reads it, clears the address to `/`, shows Settings and opens that card — after
   signing in first, if needed ⚑ Q225. An id not in my list → the card says "This alert is no longer in your list."
 - A sign-in request's push still opens its approve page (§6.6); its line is in the list too.
 - **Act on it from the card** (v1.70.0, asked by MojoSOGO 2026-10-12: "Let me ack in a notification modal"): when the
   card is a fire's push and that fire is still in the Ringing bar, the card shows the same one-tap buttons as its
-  Ringing bar row (§8.2: Away, Snooze 10m, Ack / Done, the machine button) above Delete and Close; one tap acts and
-  closes the card. A fire no longer ringing shows "Already handled." instead ⚑ Q272. Other pushes (pings,
-  announcements) have nothing to act on: Delete and Close as before. The buttons are the Ringing bar's own
+  Ringing bar row (§8.2: Away, Snooze 10m, Ack / Done, the machine button) under the details; one tap acts and
+  closes the card. Move to … opens the dryer chooser; once the load moves, the card stays and says "Already
+  handled." A fire no longer ringing shows "Already handled." instead ⚑ Q272. Other pushes (pings,
+  announcements) have nothing to act on: just Close. The buttons are the Ringing bar's own
   (`frontend/src/components/FireActions.tsx`), one copy.
 
 **Acceptance (M4u — each row is a test):**

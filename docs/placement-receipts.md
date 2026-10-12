@@ -7,6 +7,23 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.70.0: Act on it from the My alerts card (placement-advisor)
+
+- **Ask:** SPEC §9.5, new part "Act on it from the card" (v1.70.0; MojoSOGO 2026-10-12 "Let me ack in a notification modal"). A My alerts card for a fire's push whose fire is still ringing shows the Ringing bar row's one-tap actions; acting closes the card; a fire no longer ringing → "Already handled." GET /me/alerts adds `fireId`. Later the same day: no Delete on the card ("too easy to make mistake").
+- **Verdict:** `frontend/src/components/FireActions.tsx` [NEW row, opened by the reorganizer first], then `src/worker/routes/my-alerts.ts` + `frontend/src/components/MyAlerts.tsx` [EXISTING], test in `test/my-alerts.test.ts`.
+- **Flow stage:** route (one more field in the list) + render (the actions on the card).
+- **Why:** one fire's actions are their own concern; exporting them from RingingBar.tsx would give its row a second concern. A new leaf used by both keeps one copy. "Still ringing" is a presence check on useApp().ringing, not a rule, so nothing in src/shared/. `fireId` follows `kind`'s hasFire test. Rejected: exporting from RingingBar.tsx (concern creep); a server-side "ringing" flag (duplicates /fires state, goes stale); FireActions rendering its own error (changes the bar's single error line). Move's chooser has one onClose, so the card stays open and shows "Already handled." once the load moves; Machines.tsx untouched.
+- **Caps:** all against GLOBAL_FILE_CAP 300. RingingBar.tsx 79 → 49; FireActions.tsx new, 48; MyAlerts.tsx 96 → ~105; my-alerts.ts 47 → 47. Nothing enters the band.
+- **Sources read:** scripts/arch.ts; docs/module-ownership.md; docs/placement-receipts.md; SPEC.md §9.5; RingingBar.tsx; MyAlerts.tsx; Machines.tsx (MachineChooser); state.tsx; routes/my-alerts.ts; test/my-alerts.test.ts.
+
+## 2026-10-12 — FireActions out of RingingBar (reorganizer)
+
+- **Trigger:** the My alerts card (§9.5) needs the Ringing bar's per-fire one-tap actions; the placement-advisor said extract first.
+- **Seam moved:** send/act, per-fire busy, machineButton, the `moving` state and the MachineChooser render, from `frontend/src/components/RingingBar.tsx` to `frontend/src/components/FireActions.tsx` [NEW row]. Commit 25ec354.
+- **Room opened:** RingingBar.tsx 79 → 49 lines; cap 300 global (never pinned).
+- **Behavior:** preserved — typecheck, npm test (847/847), arch:audit green. Same buttons, labels, order, request paths, error text in the bar's one error line, refresh() on success and failure. One small difference: the chooser now mounts in its fire's row, so it closes if that fire leaves the rendered list while open.
+- **Restraint:** only the action cluster moved; icon, sub line, away line, collapse and error line stay in the bar.
+
 ## 2026-10-12 — v1.66.0: Announce ignores Quiet the house (placement-advisor)
 
 - **Ask:** SPEC §9.2b / §9.3 / §9.4b — Announce always speaks on every speaker HA lists, even while the house is quiet (MojoSOGO 2026-10-12 "announcements are special").

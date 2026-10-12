@@ -1,5 +1,6 @@
 // SPEC §9.5 — Settings → 🔔 Alerts: every push I got, newest first; a red ❌ hides one, Clear all hides them all, a tap
-// opens its card. A tapped phone notification lands here on its card (useAlertLink). Titles and sources are the
+// opens its card; a card whose fire still rings carries that fire's buttons (FireActions), so a tapped push can be acked
+// right there. A tapped phone notification lands here on its card (useAlertLink). Titles and sources are the
 // server's, shown as given.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { del, get } from '../api';
@@ -9,10 +10,11 @@ import type { AlertKind, DeliveryStatus } from '../../../src/shared/vocab';
 import { utcToLocal } from '../../../src/shared/time';
 import { useAction } from './useAction';
 import { Modal } from './Modal';
+import { FireActions } from './FireActions';
 import s from './Lists.module.css';
 
 interface MyAlert {
-  id: string; title: string; message: string; source: string; kind: AlertKind | null; alertNumber: number | null;
+  id: string; title: string; message: string; source: string; kind: AlertKind | null; alertNumber: number | null; fireId: string | null;
   status: DeliveryStatus; detail: string | null; createdAt: string;
 }
 
@@ -29,9 +31,10 @@ export function useAlertLink(): [string | null, () => void] {
 const RED_X = { background: 'none', border: 0, padding: '0 6px', minHeight: 44, flex: 'none' } as const;
 
 export function MyAlerts({ openId, onOpened }: { openId: string | null; onOpened: () => void }) {
-  const { tz, today, version } = useApp();
+  const { tz, today, version, ringing } = useApp();
   const [alerts, setAlerts] = useState<MyAlert[] | null>(null);
   const [card, setCard] = useState<MyAlert | 'missing' | null>(null);
+  const [actError, setActError] = useState<string | null>(null);
   const { run, busy, errorEl } = useAction();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { get<{ alerts: MyAlert[] }>('/me/alerts').then((r) => setAlerts(r.alerts)).catch(() => setAlerts([])); }, [version]);
@@ -49,7 +52,6 @@ export function MyAlerts({ openId, onOpened }: { openId: string | null; onOpened
   const hide = (id: string) => run(async () => {
     await del(`/me/alerts/${encodeURIComponent(id)}`);
     setAlerts((a) => a && a.filter((x) => x.id !== id));
-    setCard(null);
   });
   const clearAll = () => {
     if (confirm('Clear all your alerts?')) run(async () => { await del('/me/alerts'); setAlerts([]); });
@@ -81,16 +83,21 @@ export function MyAlerts({ openId, onOpened }: { openId: string | null; onOpened
           <p>This alert is no longer in your list.</p>
         </Modal>
       )}
-      {card && card !== 'missing' && (
-        <Modal title={card.title} onClose={() => setCard(null)}
-          footer={<><button disabled={busy} onClick={() => hide(card.id)}>❌ Delete</button><button onClick={() => setCard(null)}>Close</button></>}>
-          {errorEl}
+      {card && card !== 'missing' && (() => {
+        const fire = card.fireId ? ringing.find((f) => f.id === card.fireId) : undefined;
+        const close = () => { setCard(null); setActError(null); };
+        return (
+        <Modal title={card.title} onClose={close} footer={<button onClick={close}>Close</button>}>
+          {actError && <div role="alert" className="alert-error">{actError}</div>}
           <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginBottom: 12 }}>{card.message}</p>
           <p className="muted">When: {when(card.createdAt, true)}</p>
           <p className="muted">From: {card.source}{card.alertNumber ? ` · alert ${card.alertNumber}` : ''}</p>
           <p className="muted">Phone: {card.status}{card.detail ? ` — ${card.detail}` : ''}</p>
+          {fire ? <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 12 }}><FireActions fire={fire} onActed={close} onError={setActError} /></div>
+            : card.fireId && <p style={{ marginTop: 12 }}>Already handled.</p>}
         </Modal>
-      )}
+        );
+      })()}
     </div>
   );
 }
