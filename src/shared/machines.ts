@@ -14,11 +14,12 @@ export const machineAlertConfig = (): AlertConfig =>
   ({ channels: [...MACHINE_CHANNELS], renotifyMin: MACHINE_RENOTIFY_MIN, maxAlerts: MACHINE_MAX_ALERTS });
 
 /**
- * §7D.3, §7D.5, §7D.7 — a machine fire's audience and alert, waiting for the alert hours: every phone and the FunHouse
- * (§9.4b), and every speaker only when the load has someone to alert (`alertId`, an active member); with nobody, no house.
+ * §7D.3, §7D.5, §7D.7 — a machine fire's audience and alert, waiting for the alert hours: every phone; every speaker only
+ * when the load has someone to alert (`alertId`, an active member); the FunHouse (§9.4b) only when that is the founder.
  */
-export const machineAlert = (quietUntil: string | null, alertId: string | null): { assignedTo: string[]; allSpeakers: boolean; cfg: AlertConfig } => {
-  const cfg: AlertConfig = { ...machineAlertConfig(), ...(alertId ? {} : { channels: ['push', 'funhouse'] }), ...(quietUntil ? { quietUntil } : {}) };
+export const machineAlert = (quietUntil: string | null, alertId: string | null, founderAlerted: boolean): { assignedTo: string[]; allSpeakers: boolean; cfg: AlertConfig } => {
+  const channels = MACHINE_CHANNELS.filter((c) => c === 'push' || (c === 'house' ? alertId !== null : founderAlerted));
+  const cfg: AlertConfig = { ...machineAlertConfig(), channels, ...(quietUntil ? { quietUntil } : {}) };
   return { assignedTo: [], allSpeakers: alertId !== null, cfg };
 };
 

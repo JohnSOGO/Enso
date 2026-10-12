@@ -8,7 +8,7 @@ import { cookAlert, cookMessage, isCookId, type CookRow } from '../shared/cookin
 import type { Channel, SunEvent } from '../shared/vocab';
 import { utcToLocal } from '../shared/time';
 import { sunsetUtc } from '../shared/sun';
-import { all, first, newId, parseJson, placeOf } from './db';
+import { FOUNDER_SQL, all, first, newId, parseJson, placeOf } from './db';
 import { onMemberIds } from './event-rows';
 
 interface SourceRow {
@@ -94,12 +94,15 @@ export async function sourceOf(
     // in the machine before this one is named at alert time; a fire restarted by Still loaded says what's next.
     const nameOf = async (id: string | null) => id === null ? null
       : (await first<{ display_name: string }>(db, 'SELECT display_name FROM members WHERE id = ? AND disabled_at IS NULL', id))?.display_name ?? null;
+    // §9.4b: the FunHouse rings only when the founder is the one alerted.
+    const founder = (await first<{ id: string }>(db, FOUNDER_SQL))?.id;
     if (isCookId(fire.machine_id)) {
       // §7D.8: a cooking timer rings at any hour, every 5 minutes, naming who is alerted; nobody active → phones only.
       const k = await first<CookRow>(db, 'SELECT * FROM machines WHERE id = ?', fire.machine_id);
       if (!k) return null;
       const alertName = await nameOf(k.alert_id);
-      return { title: cookMessage(k, alertName), ...cookAlert(alertName !== null ? k.alert_id : null) };
+      const to = alertName !== null ? k.alert_id : null;
+      return { title: cookMessage(k, alertName), ...cookAlert(to, to !== null && to === founder) };
     }
     if (!isMachineId(fire.machine_id)) return null;
     const rows = await all<MachineRow>(db, 'SELECT * FROM machines WHERE cook_kind IS NULL');
@@ -109,9 +112,10 @@ export async function sourceOf(
     const waiting = waitingLoad(rows, m.id, now);
     const st = (await first<Parameters<typeof machineHoursOf>[0] & { timezone: string }>(db, 'SELECT * FROM settings WHERE id = 1'))!;
     const quietUntil = machineQuietUntil(machineHoursOf(st), st.timezone, now);
+    const to = (await nameOf(m.alert_id)) !== null ? m.alert_id : null; // §7D.7: nobody active → phones only
     return {
       title: doneMessage(m.id, owner, waiting ? await nameOf(waiting.owner_id) : undefined, isStillLoaded(m, fire.due_at)),
-      ...machineAlert(quietUntil, (await nameOf(m.alert_id)) !== null ? m.alert_id : null), // §7D.7: nobody active → phones only
+      ...machineAlert(quietUntil, to, to !== null && to === founder),
     };
   }
   if (fire.kind === 'thing') {

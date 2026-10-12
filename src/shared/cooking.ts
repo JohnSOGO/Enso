@@ -42,8 +42,8 @@ export function cookMessage(r: Pick<CookRow, 'cook_kind' | 'name'>, alertName: s
 }
 
 /** §7D.8 — the §7D.7 audience, at any hour (no alert hours), every 5 minutes. */
-export function cookAlert(alertId: string | null): ReturnType<typeof machineAlert> {
-  const a = machineAlert(null, alertId);
+export function cookAlert(alertId: string | null, founderAlerted: boolean): ReturnType<typeof machineAlert> {
+  const a = machineAlert(null, alertId, founderAlerted);
   return { ...a, cfg: { ...a.cfg, renotifyMin: COOK_RENOTIFY_MIN } };
 }
 

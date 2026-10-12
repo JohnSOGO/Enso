@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.19 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.20 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -833,7 +833,7 @@ Asked by MojoSOGO 2026-10-11 (§7D.7).
 Schema: [`migrations/0040_machine_alert.sql`](migrations/0040_machine_alert.sql). The migration is the schema; it is not copied here.
 
 Notes on it:
-- §7D.7 — who is alerted when a machine's load is done; NULL = nobody (phones and the FunHouse, no speaker). Additive only.
+- §7D.7 — who is alerted when a machine's load is done; NULL = nobody (phones only: no speaker, no FunHouse). Additive only.
 
 **Migration check (AL-M):** machine rows and open fires survive 0040; a loaded machine's `alert_id` is its owner,
 a free or owner-unknown one NULL.
@@ -2809,7 +2809,7 @@ fold & out**. The weekly Laundry chore (§7B) is separate and unchanged. The **D
 ### 7D.3 When it's done — reminders
 
 - The fire is inserted by the route at start/move (as a timer's is); `tick` steps it like any
-  fire (§5.3) with `MACHINE_CHANNELS` = **Phone + House + 🎪 FunHouse** (§9.4b), `MACHINE_RENOTIFY_MIN` = **15**,
+  fire (§5.3) with `MACHINE_CHANNELS` = **Phone + House + 🎪 FunHouse** (§9.4b; the FunHouse only when the founder is alerted, §7D.7), `MACHINE_RENOTIFY_MIN` = **15**,
   `MACHINE_MAX_ALERTS` = **4**. After the 4th alert it stays ringing silently in the Ringing
   bar and the card stays **DONE — waiting**. Never `missed`.
 - Recipients (decided by MojoSOGO 2026-10-05: "always go to all devices"): **every active
@@ -2906,10 +2906,14 @@ remember who started the dish washer".
 no one is selected, then send a phone alert but not a house alert because you do not know who to send a house alert
 to." (The dish washer had just finished and every speaker in the house spoke with nobody responsible for it.)
 - Every load carries an **alert person**, `machines.alert_id` (§4.2zm): an active member, or **nobody** (NULL).
-- **Nobody** (or a person no longer active ⚑ Q219): the fire's channels are **Phone + FunHouse** — every active member's
-  phones as in §7D.3 and the FunHouse row (§9.4b), no house row at all, on every alert and Still loaded alike.
+- **Nobody** (or a person no longer active ⚑ Q219): the fire's channel is **Phone** only — every active member's
+  phones as in §7D.3, no house row and no FunHouse row, on every alert and Still loaded alike.
 - **Someone:** exactly as before — Phone + House, every speaker (§7D.3), with Quiet the house, Away and phone first
   (§9.2b–9.2d) on top ⚑ Q217. The message is unchanged (it names the owner, §7D.3).
+- **The FunHouse** (§9.4b) rings only when the person alerted is **the founder** (§6.3, MojoSOGO). MojoSOGO 2026-10-12:
+  "for unknown owners for machines, do not ping funhouse; ping funhouse for MojoSOGO and announcements". Someone else →
+  no FunHouse row ⚑ Q269 (the FunHouse is his desk, Q230). `machineAlert(quietUntil, alertId, founderAlerted)`;
+  sourceOf reads the founder (`FOUNDER_SQL`, db.ts).
 - **Start** `alertId`: absent → the owner (so an older app keeps today's behavior); `null` → nobody; a string must be
   an active member, else 400 "Alert when done must be an active member or nobody.". **Done now** on a free machine:
   absent → follows `ownerId` (so Owner unknown → nobody, MojoSOGO's v1.43.0 case); on a running machine it is ignored.
@@ -2921,11 +2925,11 @@ to." (The dish washer had just finished and every speaker in the house spoke wit
 
 | # | Setup / call | Expected |
 |---|---|---|
-| AL1 | `machineAlert(null, 'A')` / `machineAlert(q, null)` | Phone + House + FunHouse, every speaker / Phone + FunHouse, not every speaker, `quietUntil` q |
-| AL7 | start the dish washer for A alerting nobody, tick at done-at; again while A is away from the fire | one `funhouse` row titled "Ensō" with the done message; away: none |
+| AL1 | `machineAlert(null, 'A', true)` / `machineAlert(null, 'B', false)` / `machineAlert(q, null, false)` | Phone + House + FunHouse, every speaker / Phone + House, every speaker / Phone only, not every speaker, `quietUntil` q |
+| AL7 | (A = the founder) dish washer alerting nobody, then B, tick each at done-at; alerting A; the washer alerting A while A is away | no `funhouse` row, none; one `funhouse` row titled "Ensō" with the done message; away: none |
 | AL2 | `parseStart` / `parseDoneNow` with alertId absent, null, A, a stranger; Done now on a running machine | the owner / null / A / a message; null-owner Done now absent → null; running ignores it |
 | AL3 | start the dish washer for A with `alertId: null`, tick at done-at and 15 min later | push to every active member, **no** house delivery on either alert |
-| AL4 | Done now on a free washer naming nobody, ticks | phones (and the FunHouse), `Clothes washer finished; Owner unknown; Please cycle to dryer`, no house row |
+| AL4 | Done now on a free washer naming nobody, ticks | phones only, `Clothes washer finished; Owner unknown; Please cycle to dryer`, no house row |
 | AL5 | start the washer for A alerting B; move to the dryer; tick its done-at and the next | the dryer's `alert_id` is B; alert 1 phones (phone first), alert 2 adds the house row |
 | AL6 | start for A alerting B, then disable B; tick | phones (and the FunHouse), no house row |
 
@@ -2958,7 +2962,7 @@ each time something goes in, as many as they like at once, and it stays on the l
 | **Close** — the red ✕ | any state | `closed_at = now`; its open fire closes `removed`; gone from the list |
 
 - **Minutes:** a whole number 1–600 ⚑ Q240; anything else → 400 "Minutes must be a whole number from 1 to 600.".
-  **Alert when done** works as §7D.7: absent on Create → me; null → nobody (phones + FunHouse); a person → also every
+  **Alert when done** works as §7D.7: absent on Create → me; null → nobody (phones only); a person → also every
   speaker. Kind not in `COOK_KIND`, or a name over 40 characters → 400 with a message.
 - Refusals are 409 with a message: Off on a timer that isn't done → `not_done`; Stop on one that isn't running →
   `not_running`; Start again on one that isn't off → `busy`; any action on a closed or unknown timer → 404. Two taps at
@@ -2978,7 +2982,7 @@ each time something goes in, as many as they like at once, and it stays on the l
 | CK1 | `cookLabel` with and without a name; `cookMessage` with an alert person, without, with a name | "Oven 2" / "Air fryer"; the four texts above |
 | CK2 | `parseCreate` / `parseEdit`: minutes 0, 601, 2.5, 12; kind `grill`; a 41-character name; alertId absent / null / a stranger | 400 texts; 12 ok; kind and name texts; me / null / a message |
 | CK3 | Create an air fryer for 12 min, then tick at done-at | 201, running, one fire due in 12 min; alert 1 to every phone, alert 2 (5 min later) adds the house (phone first, §9.2d), `A, the air fryer is done` |
-| CK4 | Create with `alertId: null`; ticks at done-at and 5 min later | phones and the FunHouse on both alerts, no house row; never waits for the machine alert hours |
+| CK4 | Create with `alertId: null`; ticks at done-at and 5 min later | phones only on both alerts, no house or FunHouse row; never waits for the machine alert hours |
 | CK5 | Off on the done timer; Start again; Stop | off, fire closed `done`; running with a new fire; off, fire closed `removed` |
 | CK6 | Edit minutes 12 → 20 on a running timer started 10 min ago; then → 5 | done-at = start + 20, old fire `superseded`, a new one; done-at = now, done |
 | CK7 | ✕ on a running timer; then GET and any action on it | fire closed `removed`; not listed; 404 |
@@ -5176,8 +5180,8 @@ event reminders, rolling timers (and their start announcement, §5.5a), chores, 
 MojoSOGO's desk, so only **the founder** (§6.3) sees the tick, and a new alert of his opens with it
 **ticked** (the Announce box opens with it ticked for everyone, so everyone sees it there, §8.5 Q36); nobody else sees it unless the alert they open already has it ticked (Q230, decided by MojoSOGO 2026-10-11:
 "funhouse is really just for MojoSOGO … default off for others"). The server takes it from anyone. Validation already takes any `CHANNEL`; at least one of the three is still required. Machines
-(washing and cooking) ring it too, always, with or without someone to alert (Q231, MojoSOGO 2026-10-11: "I am not
-getting funhouse alerts on completion"); there is no tick on a machine.
+(washing and cooking) ring it only when the founder is the one alerted (§7D.7; Q231 as changed by MojoSOGO 2026-10-12:
+"ping funhouse for MojoSOGO and announcements"); nobody or someone else → no FunHouse row. There is no tick on a machine.
 
 **The row:** `channel` `funhouse`, `member_id` NULL, the same `message` as the alert's push, `title` = what the phone
 would show (`pushTitle`, §9.5: "Ensō" for a fire, "📢 Announcement" otherwise), `queued`. One per alert, like House.
