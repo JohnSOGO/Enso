@@ -1,7 +1,7 @@
 // SPEC §6.2, §6.3 — members and invites.
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
-import { all, first, newId, nowIso, randomBase32, run } from '../db';
+import { FOUNDER_SQL, all, first, newId, nowIso, randomBase32, run } from '../db';
 import { body, fail, str } from '../http';
 import { ROLE, isOneOf } from '../../shared/vocab';
 import { ADMIN_ROLE, isAdmin } from '../../shared/roles';
@@ -11,8 +11,6 @@ import { normalizeInviteCode } from '../../shared/invite-link';
 const INVITE_DAYS = 7;
 
 export const members = new Hono<AppEnv>();
-/** §6.3 — the founder is the member setup created: the earliest created_at. Derived, never stored. */
-export const FOUNDER_SQL = 'SELECT id FROM members ORDER BY created_at, id LIMIT 1';
 
 members.get('/members', requireMember, async (c) => {
   const isOwner = isAdmin(c.get('member'));
