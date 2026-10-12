@@ -6,14 +6,12 @@ import type { AppEnv } from '../env';
 import { announceError, announceMessage } from '../../shared/announce';
 import { audience } from '../../shared/optins';
 import type { Channel } from '../../shared/vocab';
-import { activeMemberIds, all, householdTz, nowIso } from '../db';
+import { activeMemberIds, all, nowIso } from '../db';
 import { funhouseDelivery, houseDelivery, pushDelivery } from '../deliveries';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
 import { sendPushDeliveries } from '../push';
 import { allHouseSpeakers, sendHouseDeliveries } from '../house';
-import { houseQuiet } from '../house-quiet';
-import { utcToLocal } from '../../shared/time';
 
 export const announce = new Hono<AppEnv>();
 
@@ -31,13 +29,8 @@ announce.post('/announce', requireMember, async (c) => {
   const pushIds: string[] = [];
   let houseId: string | null = null;
   const stmts: D1PreparedStatement[] = [];
-  // §9.2b: while the house is quiet nothing is spoken; House alone would send nothing, so say so.
-  const quiet = channels.includes('house') ? await houseQuiet(db, now) : null;
-  if (quiet && channels.length === 1) {
-    return fail(c, 409, 'house_quiet', `The house is quiet until ${utcToLocal(quiet.until, await householdTz(db)).time}.`);
-  }
-  // §9.3: every speaker HA lists, whatever anyone ticked (null = the defaults when HA can't say).
-  const speakers = channels.includes('house') && !quiet ? await allHouseSpeakers(c.env) : [];
+  // §9.3: every speaker HA lists, whatever anyone ticked, quiet or not (null = the defaults when HA can't say).
+  const speakers = channels.includes('house') ? await allHouseSpeakers(c.env) : [];
   if (speakers === null || speakers.length) {
     const d = houseDelivery(db, { message, speakers }, now);
     ids.push(houseId = d.id);
@@ -52,7 +45,7 @@ announce.post('/announce', requireMember, async (c) => {
       stmts.push(d.stmt);
     }
   }
-  if (channels.includes('funhouse')) { // §9.4b: the FunHouse, quiet or not
+  if (channels.includes('funhouse')) { // §9.4b: the FunHouse when ticked
     const d = funhouseDelivery(db, { message }, now);
     ids.push(d.id);
     stmts.push(d.stmt);

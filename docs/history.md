@@ -476,6 +476,9 @@ dishwasher"): a done card (all three machines) shows 🪙 Bounty to admins, open
 `loadBountyTitle` prefilled. A plain one-off, not tied to the machine; no server change, no migration. LB1 green.
 Built as: the prefilled sheet asks to discard on Cancel only when something changed.
 
+**📢 Announce ignores Quiet the house** (v1.66.0, §9.2b, §9.3, Q212; MojoSOGO 2026-10-12 "announcements are special;
+they announce everywhere because it is a house important announcement"): an announcement is spoken on every speaker
+even while the house is quiet; the 409 `house_quiet` is gone. Alerts and timer starts are still silenced by quiet.
 **📢 Announce reaches every speaker and every phone** (v1.63.0, §9.3, Q36, Q127; MojoSOGO 2026-10-12 "I am not hearing
 the announement button audio on all devices and not getting notifications on all devices"): an announcement is spoken on
 every speaker Home Assistant lists (as machines, §7D.3), not just the ones members ticked, and pushed to every active
