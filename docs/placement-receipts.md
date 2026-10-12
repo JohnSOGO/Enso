@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.73.1: Family pill on the day-cell event line (placement-advisor)
+
+- **Ask:** SPEC 3.30 §7.1: an event for everyone (participants().family) shows a small green var(--good) "Family" pill sized from the line height on the day cell's event line, replacing the single green dot.
+- **Verdict:** frontend/src/components/DayCell.tsx + DayCell.module.css (`.family`) [EXISTING]
+- **Flow stage:** render
+- **Why:** Presentation of a decision participants.ts already makes, inside the owner of the event line's marks. Rejected participants.ts (nothing to change), day-lines.ts (dot/line fitting only), a shared FamilyPill component (two call sites in different contexts).
+- **Caps:** DayCell.tsx ~96/300, DayCell.module.css ~56/300. Nothing newly in the band.
+
 ## 2026-10-12 — Steward pass 23, whole tree (code-steward)
 
 - **Run:** after the v1.73.0 release (SPEC 3.29 §7.1/§8.3: each person once, everyone → one green Family chip/dot; new pure `frontend/src/participants.ts`). Also covers v1.72.0 and v1.72.1.

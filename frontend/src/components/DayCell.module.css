@@ -50,4 +50,5 @@
 .line i { display: block; border-radius: 99px; flex: none; }
 .lEmoji { flex: none; margin-right: 1px; }
 .title { font-size: .9em; margin-left: 3px; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.family { flex: 0 1 auto; min-width: 0; overflow: hidden; background: var(--good); color: #0F172A; font-weight: 700; font-size: .62em; line-height: 1.15; padding: 0 .35em; border-radius: 99px; letter-spacing: -.2px; }
 .more { color: var(--text-dim); line-height: 1; flex: none; }

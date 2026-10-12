@@ -36,9 +36,10 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
   // §7.1 one line per single-day event: emoji, then a dot per participant; shrunk to fit, then +N.
   const room = rowH - DATE_LINE - (lanes > 0 ? lanes * (barH + 1) + 2 : 0);
   const fit = fitLines(room, single.length);
+  const isFamily = (o: Occurrence) => participants(o.assignedTo, members).family; // §7.1: everyone → a green Family pill
   const marks = (o: Occurrence) => {
-    const who = participants(o.assignedTo, members); // §7.1: each person once; everyone → one green Family dot
-    if (who.family) return ['var(--good)'];
+    const who = participants(o.assignedTo, members); // §7.1: each person once
+    if (who.family) return [];
     return who.ids.length
       ? who.ids.map((id) => memberById(id)?.color ?? o.color)
       : o.emoji ? [] : [o.color]; // nobody assigned: the emoji alone (when the icon limit hid it), else the event's own dot
@@ -82,6 +83,7 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
           return (
             <span key={k} className={s.line} style={{ height: fit.lineH, fontSize: fit.lineH }}>
               {o.emoji && <span className={s.lEmoji}>{o.emoji}</span>}
+              {isFamily(o) && <span className={s.family}>Family</span>}
               {dots.map((c, j) => <i key={j} style={{ width: size, height: size, background: c }} />)}
               {!narrow && <span className={s.title}>{o.startTime ? `${clock(o.startTime)} ` : ''}{o.title}</span>}
             </span>
