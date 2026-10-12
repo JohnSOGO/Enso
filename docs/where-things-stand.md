@@ -48,6 +48,9 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- Each person once / Family (v1.73.0, §7.1/§8.3): on the iPhone, an event for everyone shows one green Family chip in the day sheet and one green dot
+  on its calendar line; a creator who is also assigned shows once. Q281–Q282 are ⚑ defaults.
+- Unassigned emoji by the day number (v1.72.1, §7.2): on the iPhone, an event with nobody assigned shows its emoji beside the date, no line. Q277 is a ⚑ default.
 - 12/24-hour clock (v1.72.0, §8.17, migration 0049): on the iPhone, Settings → 🙂 Me → Clock → 24-hour; alarms, a machine's
   done time and My alerts change; switch back (CK4). Q277–Q280 are ⚑ defaults.
 - Calendar day lines (v1.71.0, §7.1, Q273–Q276): on the iPhone, a busy day shows one line per event (emoji, then a dot per

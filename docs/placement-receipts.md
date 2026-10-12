@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-12 — Steward pass 23, whole tree (code-steward)
+
+- **Run:** after the v1.73.0 release (SPEC 3.29 §7.1/§8.3: each person once, everyone → one green Family chip/dot; new pure `frontend/src/participants.ts`). Also covers v1.72.0 and v1.72.1.
+- **Verdict:** SOUND. Typecheck passed, 861/861 tests, arch:audit quiet. 3 receipts matched to 3 code commits, no mismatches.
+- **Top finding:** LOW. where-things-stand "Owed" had no device check for v1.72.1 or v1.73.0 (added in this commit).
+- **Handoffs:** 0 to reorganizer, 0 to placement-advisor.
+- **Restraint:** the inline Family chip style (one use), the 12-line participants.ts (single source two views share, tested), the pickers that only take `assignedTo` as input. Items from passes 19–21 still wait for MojoSOGO's pick.
+
 ## 2026-10-12 — v1.73.0: Each participant once; everyone shows as Family (placement-advisor)
 
 - **Ask:** In the day sheet and the calendar day cell, show each participant once (the creator once when also assigned, duplicate ids once). When assignedTo covers every active member (at least 2 active), show one green `var(--good)` "Family" chip or one green dot instead. SPEC 3.29 §7.1, §8.3, Q281–Q282.
