@@ -1875,3 +1875,12 @@ REORG RECEIPT
 - **Why:** machineAlert already owns the one "who does a machine fire reach" decision (§7D.7), so this is one more input, not a new owner. The founder lookup is I/O, so it stays in sourceOf, which already resolves the alert person. Rejected: importing FOUNDER_SQL from routes/members into fire-rows (members.ts builds a Hono app when it loads; fire-rows is "no Hono" and loaded by tick). db.ts already owns member-set SQL (activeMemberIds). tick and optins need no change because the funhouse row already follows cfg.channels.
 - **Caps:** machines.ts ~240/300, cooking.ts ~161/300, fire-rows.ts ~164/300, db.ts ~57/300, routes/members.ts ~72/300, routes/ops.ts 76/300. No pinned ceilings, nothing newly in the 90% band (270).
 - **Sources read:** scripts/arch.ts, docs/module-ownership.md (shared + worker rows), docs/placement-receipts.md, src/worker/fire-rows.ts, src/worker/db.ts, src/worker/routes/members.ts, src/shared/machines.ts, src/shared/cooking.ts, src/shared/optins.ts, line counts of routes/ops.ts.
+
+## 2026-10-12 — All chores: row opens the form, 📋 opens the sheet (placement-advisor)
+
+- **Ask:** In Chores → 📋 All chores, tapping a row opens ChoreForm instead of ChoreSheet, and the 📋 marker becomes its own button that opens ChoreSheet (shown when the chore has areas or a done means). SPEC §8.5/§8.15, patch fix.
+- **Verdict:** `frontend/src/components/Chores.tsx` (AllChoresSection) [EXISTING]
+- **Flow stage:** render
+- **Why:** A change to the list Chores.tsx already owns; `onEdit` and `onOpenAreas` are already props of AllChoresSection. 📋 visibility comes from server fields (`areaCount`, `doneMeans`). Rejected ChoresToday.tsx (its tap ticks done, deliberately) and a new component (nothing distinct to own). module-ownership.md row and the file header reworded in the same commit.
+- **Caps:** Chores.tsx about 111 → about 116 of 300 (no CEILINGS pin). No file enters the band.
+- **Sources read:** frontend/src/components/Chores.tsx, scripts/arch.ts, docs/module-ownership.md.
