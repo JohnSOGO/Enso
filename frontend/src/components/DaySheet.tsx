@@ -20,12 +20,13 @@ interface Props {
 
 export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
   const { memberById, members, me, clock } = useApp();
+  const founder = members.find((m) => m.isFounder)?.id; // §8.3: MojoSOGO first
   const items = data?.items ?? [];
   const allDay = items.filter((o) => o.allDay);
   const timed = items.filter((o) => !o.allDay);
 
   const row = (o: DayData['items'][number]) => {
-    const who = participants(o.assignedTo, members, o.createdBy); // §8.3: each person once; everyone → one green Family chip
+    const who = participants(o.assignedTo, members, founder); // §8.3: each person once; everyone → one green Family chip
     return (
       <li key={`${o.eventId}-${o.date}`}>
         <button className={s.item} onClick={() => onOpenEvent(o)}>

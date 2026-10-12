@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.73.4: MojoSOGO (founder) first, not the creator (placement-advisor verdict reused)
+
+- **Ask:** SPEC 3.33 §8.3: the member to put first is MojoSOGO (the founder), not the event's creator.
+- **Verdict:** same owners as v1.73.3: `participants.ts` keeps `first`; DaySheet.tsx and DayCell.tsx pass the founder's id from the members list.
+- **Flow stage:** render
+- **Why:** Only the argument changes; the rule's owner is unchanged.
+- **Caps:** unchanged. Nothing in the band.
+
 ## 2026-10-12 — v1.73.3: Creator first among participants (placement-advisor)
 
 - **Ask:** SPEC 3.32 §7.1/§8.3: when the event's creator is among the participants, they come first (day sheet chips and calendar-line dots); the rest keep assignedTo order.

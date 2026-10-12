@@ -23,6 +23,7 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
   narrow: boolean; todayStr: string; onOpen: (date: string, data: DayData | undefined) => void;
 }) {
   const { me, members, memberById, clock } = useApp();
+  const founder = members.find((m) => m.isFounder)?.id; // §7.1: MojoSOGO first
   const [y, m, d] = date.split('-').map(Number);
   const pub = me.showPublicHolidays ? data?.publicHolidays ?? [] : [];
   const market = me.showOptionsExpiration ? data?.marketDays ?? [] : [];
@@ -36,9 +37,9 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
   // §7.1 one line per single-day event: emoji, then a dot per participant; shrunk to fit, then +N.
   const room = rowH - DATE_LINE - (lanes > 0 ? lanes * (barH + 1) + 2 : 0);
   const fit = fitLines(room, single.length);
-  const isFamily = (o: Occurrence) => participants(o.assignedTo, members, o.createdBy).family; // §7.1: everyone → a green Family pill
+  const isFamily = (o: Occurrence) => participants(o.assignedTo, members, founder).family; // §7.1: everyone → a green Family pill
   const marks = (o: Occurrence) => {
-    const who = participants(o.assignedTo, members, o.createdBy); // §7.1: each person once
+    const who = participants(o.assignedTo, members, founder); // §7.1: each person once
     if (who.family) return [];
     return who.ids.length
       ? who.ids.map((id) => memberById(id)?.color ?? o.color)
