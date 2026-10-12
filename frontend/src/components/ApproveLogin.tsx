@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ApiError, errorText, get, post } from '../api';
 import { APPROVE_LOGIN_PATH } from '../../../src/shared/phone-login';
 import type { LoginView } from '../../../src/shared/vocab';
+import { clockText } from '../../../src/shared/time';
 
 const KEY = 'enso.approveLogin';
 
@@ -45,9 +46,10 @@ const refusalText = (e: unknown) => !(e instanceof ApiError) ? null
 const OVER: Record<Exclude<LoginView, 'pending'>, string> = { approved: SAID.approved, denied: SAID.answered, expired: SAID.expired };
 
 const card = { width: 'min(380px, 100%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 } as const;
-const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+/** §8.17: the request's time on this phone's clock, in my 12-/24-hour choice (outside AppProvider, so no household tz). */
+const at = (iso: string, clock24h: boolean) => clockText(new Date(iso).toTimeString().slice(0, 5), clock24h);
 
-export function ApproveLogin({ id, onDone }: { id: string; onDone: () => void }) {
+export function ApproveLogin({ id, clock24h, onDone }: { id: string; clock24h: boolean; onDone: () => void }) {
   const [view, setView] = useState<View>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -84,7 +86,7 @@ export function ApproveLogin({ id, onDone }: { id: string; onDone: () => void })
           <>
             <p style={{ fontWeight: 600, marginBottom: 6 }}>Signing in somewhere?</p>
             <p>{view.req.browser}</p>
-            <p className="muted" style={{ marginBottom: 14 }}>{view.req.place} · {clock(view.req.createdAt)}</p>
+            <p className="muted" style={{ marginBottom: 14 }}>{view.req.place} · {at(view.req.createdAt, clock24h)}</p>
             {error && <div role="alert" className="alert-error">{error}</div>}
             <p style={{ marginBottom: 8 }}>Tap the number shown on that screen:</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>

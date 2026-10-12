@@ -7,6 +7,23 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.72.0: §8.17 Clock: 12-hour or 24-hour (placement-advisor)
+
+- **Ask:** SPEC 3.27 §8.17 (+ §4.2zv, migration 0049 `member_prefs.clock_24h`): each member picks 12-hour or 24-hour in
+  Settings → Me; every shown time goes through `clockText(hhmm, clock24h)`; a sun reminder's push follows each member's
+  choice, house and FunHouse stay 12-hour (Q277–Q280, CK1–CK4).
+- **Verdict:** EXISTING owners, no new row, no reorganizer. `src/shared/time.ts` `clockText` (rule);
+  `src/shared/engine.ts` `alertMessage(..., clock24h = false)`, private `h12` removed; `src/worker/routes/auth.ts`
+  /me `clock24h` (boolean-prefs loop); `src/worker/tick.ts` one inline read of the 24-hour members per tick, the 24-hour
+  text on their push rows only (not in speaker-choices.ts: its concern is speakers); `frontend/src/state.tsx` `clock`,
+  `localTime` goes through it (Machines, Cooking, Bounties, Messes, Status change with no edits); SettingsMe.tsx the
+  choice; DaySheet, DayCell, RingingBar, Alarms, Timers, MyAlerts, HouseQuiet, MachineHours (private clock dropped),
+  ChoresToday/Chores (`whenText` takes the formatter), ApproveLogin call it. Left alone: PhoneSignIn, time pickers,
+  a recipe's Time.
+- **Deviation while building:** ApproveLogin renders outside AppProvider, so App.tsx passes it `me.clock24h` as a prop
+  and it formats the phone's own local time with `clockText` (one prop line in App.tsx).
+- **Caps:** tick.ts 125/148 (band 133), engine.ts under 270; nothing newly in the band (arch:audit quiet).
+
 ## 2026-10-12 — Steward pass 22, whole tree (code-steward)
 
 - **Run:** after the v1.71.0 release (SPEC 3.26 §7.1/§7.2: calendar day lines; DayCell.tsx extracted; new pure day-lines.ts). Also covers v1.70.1.

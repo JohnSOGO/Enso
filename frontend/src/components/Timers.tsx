@@ -28,7 +28,7 @@ export function minutesText(min: number) {
 
 /** The "Rolling timers" section of the Alarms tab (SPEC §8.5). */
 export function TimersSection({ onEdit }: { onEdit: (t: Timer | null) => void }) {
-  const { version, tz, today, refresh } = useApp();
+  const { version, tz, today, refresh, clock } = useApp();
   const [timers, setTimers] = useState<Timer[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, setNow] = useState(0);
@@ -54,7 +54,7 @@ export function TimersSection({ onEdit }: { onEdit: (t: Timer | null) => void })
     if (t.openFire.state === 'ringing') return `${Math.max(0, Math.round((Date.now() - Date.parse(t.openFire.due_at)) / 60_000))} min`;
     // The server's due time; the day is named when it isn't today (§8.5).
     const l = utcToLocal(t.openFire.due_at, tz);
-    return l.date === today() ? l.time : `${SHORT[WEEKDAY[weekdayOf(l.date)]]} ${l.time}`;
+    return l.date === today() ? clock(l.time) : `${SHORT[WEEKDAY[weekdayOf(l.date)]]} ${clock(l.time)}`;
   };
 
   return (

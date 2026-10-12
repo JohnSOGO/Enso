@@ -1,4 +1,4 @@
-// SPEC §8.6 — Settings → 🙂 Me: display name and color → PATCH /me; the 🎯 Point at it switch for this device, founder only (§8.16).
+// SPEC §8.6 — Settings → 🙂 Me: display name, color and the 12-/24-hour clock (§8.17) → PATCH /me; the 🎯 Point at it switch for this device, founder only (§8.16).
 import { useState } from 'react';
 import { patch } from '../api';
 import { useApp, useIsFounder } from '../state';
@@ -26,6 +26,14 @@ export function SettingsMe() {
           {MEMBER_PALETTE.map((c) => (
             <button key={c} aria-label={`Color ${c}`} title={c} disabled={busy} onClick={() => save({ color: c })}
               style={{ background: c, width: 34, height: 34, minHeight: 0, padding: 0, borderRadius: 99, outline: me.color === c ? '3px solid var(--text)' : 'none' }} />
+          ))}
+        </div>
+      </div>
+      <div className="field"><span className="muted" style={{ fontSize: '.8rem' }}>Clock</span>
+        <div className="row" style={{ marginTop: 4 }}>
+          {([[false, '12-hour (6:30pm)'], [true, '24-hour (18:30)']] as const).map(([h24, label]) => (
+            <label key={label} className="row"><input type="radio" name="clock" checked={me.clock24h === h24} disabled={busy}
+              onChange={() => save({ clock24h: h24 })} /> {label}</label>
           ))}
         </div>
       </div>

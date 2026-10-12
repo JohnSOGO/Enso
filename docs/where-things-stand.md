@@ -48,6 +48,8 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 12/24-hour clock (v1.72.0, §8.17, migration 0049): on the iPhone, Settings → 🙂 Me → Clock → 24-hour; alarms, a machine's
+  done time and My alerts change; switch back (CK4). Q277–Q280 are ⚑ defaults.
 - Calendar day lines (v1.71.0, §7.1, Q273–Q276): on the iPhone, a busy day shows one line per event (emoji, then a dot per
   person), shrinks, then `+N`; an event with nobody assigned shows just its emoji (or the event's dot); a wide screen adds time and title.
 - Ack in the alert card (v1.70.0, §9.5): on the iPhone, start a 1-min rolling timer, tap its push, see the card with Away / Ack, tap Ack (card closes); tap an old alert's push → "Already handled."; the card has no Delete. Q272 is a ⚑ default.

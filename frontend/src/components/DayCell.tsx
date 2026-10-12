@@ -21,7 +21,7 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
   date: string; data: DayData | undefined; stay: Span | undefined; lanes: number; barH: number; rowH: number; cellW: number;
   narrow: boolean; todayStr: string; onOpen: (date: string, data: DayData | undefined) => void;
 }) {
-  const { me, memberById } = useApp();
+  const { me, memberById, clock } = useApp();
   const [y, m, d] = date.split('-').map(Number);
   const pub = me.showPublicHolidays ? data?.publicHolidays ?? [] : [];
   const market = me.showOptionsExpiration ? data?.marketDays ?? [] : [];
@@ -75,7 +75,7 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
             <span key={k} className={s.line} style={{ height: fit.lineH, fontSize: fit.lineH }}>
               {o.emoji && <span className={s.lEmoji}>{o.emoji}</span>}
               {dots.map((c, j) => <i key={j} style={{ width: size, height: size, background: c }} />)}
-              {!narrow && <span className={s.title}>{o.startTime ? `${o.startTime} ` : ''}{o.title}</span>}
+              {!narrow && <span className={s.title}>{o.startTime ? `${clock(o.startTime)} ` : ''}{o.title}</span>}
             </span>
           );
         })}

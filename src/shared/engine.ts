@@ -1,6 +1,6 @@
 // SPEC §5 — the alert engine. Pure: no I/O, no clock. `now` is always a parameter.
 import type { Action, AlertKind, Channel, CloseReason, FireState, SunEvent, TimerCmd } from './vocab';
-import { addDays, addMinutes, localToUtc, ms, utcToLocal } from './time';
+import { addDays, addMinutes, clockText, localToUtc, ms, utcToLocal } from './time';
 import { occurrences, type Recurrence } from './recurrence';
 import { sunsetUtc, type Place } from './sun';
 import { bringText } from './bring';
@@ -229,19 +229,17 @@ export function applyTimerCmd(
 /** Who a chore alert names and which step it is on (§5.7). */
 export interface ChoreAlertText { personName: string | null; stepTitle: string; stepCount: number }
 
-/** "18:42" → "6:42": 12-hour, no am/pm (§7.7). */
-const h12 = (hhmm: string) => `${Number(hhmm.slice(0, 2)) % 12 || 12}:${hhmm.slice(3, 5)}`;
-
 /**
  * §5.7 — alert message text. `startsToday`: a thing's start reminder (§7C.2). `sunsetAt`: a sun
- * reminder's local sunset HH:MM, or null when it cannot be computed (§7.7); absent otherwise.
+ * reminder's local sunset HH:MM, or null when it cannot be computed (§7.7); absent otherwise. `clock24h`: the
+ * receiving member's clock (§8.17).
  */
 export function alertMessage(
   kind: AlertKind, title: string, alertNumber: number, chore?: ChoreAlertText, startsToday = false, sunsetAt?: string | null,
-  bring?: string[] | null,
+  bring?: string[] | null, clock24h = false,
 ): string {
   const base = kind === 'reminder'
-    ? (sunsetAt !== undefined ? `${title} — ${sunsetAt === null ? 'before sunset' : `sunset at ${h12(sunsetAt)}`}` : `Reminder: ${title}`)
+    ? (sunsetAt !== undefined ? `${title} — ${sunsetAt === null ? 'before sunset' : `sunset at ${clockText(sunsetAt, clock24h)}`}` : `Reminder: ${title}`)
       + (bring?.length ? ` — ${bringText(bring)}` : '')
     : kind === 'timer' ? `Timer: ${title}`
     : kind === 'thing' ? `To do: ${title}${startsToday ? ' — starts today' : ''}`

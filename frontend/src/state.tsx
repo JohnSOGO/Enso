@@ -2,7 +2,7 @@
 // Refreshed on a 30 s poll while visible (SPEC §10 "Freshness"), on focus/visibility, and after any write.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { get } from './api';
-import { utcToLocal } from '../../src/shared/time';
+import { clockText, utcToLocal } from '../../src/shared/time';
 import type { AlertKind, Channel, DeliveryStatus, HouseState, Role } from '../../src/shared/vocab';
 
 export interface Me {
@@ -10,6 +10,8 @@ export interface Me {
   showPublicHolidays: number; showOptionsExpiration: number;
   /** §9.2a: the house speakers this member chose; null = not chosen (the default speakers). */
   houseSpeakers: string[] | null;
+  /** §8.17: true = 24-hour clock, false = 12-hour. */
+  clock24h: boolean;
 }
 /** §6.3: role 'owner' reads Admin; the founder (isFounder) reads Owner and is protected. */
 export interface Member { id: string; displayName: string; color: string; role: Role; isFounder: boolean; email?: string; disabledAt: string | null; joinedAt: string }
@@ -43,6 +45,9 @@ interface Ctx {
   version: number;
   refresh: () => void;
   today: () => string;
+  /** §8.17: a local 'HH:MM' in my clock. */
+  clock: (hhmm: string) => string;
+  /** An instant's local time, in my clock. */
   localTime: (iso: string) => string;
   memberById: (id: string) => Member | undefined;
 }
@@ -99,7 +104,8 @@ export function AppProvider({ me, onMe, children }: { me: Me; onMe: (m: Me | nul
   const value = useMemo<Ctx>(() => ({
     me, members, tz: settings.timezone, householdName: settings.householdName, ringing, status, version, refresh,
     today: () => utcToLocal(new Date().toISOString(), settings.timezone).date,
-    localTime: (iso: string) => utcToLocal(iso, settings.timezone).time,
+    clock: (hhmm: string) => clockText(hhmm, me.clock24h),
+    localTime: (iso: string) => clockText(utcToLocal(iso, settings.timezone).time, me.clock24h),
     memberById: (id: string) => members.find((m) => m.id === id),
   }), [me, members, settings, ringing, status, version, refresh]);
 

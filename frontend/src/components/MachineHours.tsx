@@ -8,18 +8,17 @@ import type { DayHours, MachineHours } from '../../../src/shared/machine-hours';
 import { isAdmin } from '../../../src/shared/roles';
 
 const DAYS = [['weekday', 'Weekdays'], ['weekend', 'Weekends']] as const;
-const clock = (hhmm: string) => { const h = Number(hhmm.slice(0, 2)); return `${h % 12 || 12}:${hhmm.slice(3)}${h < 12 ? 'am' : 'pm'}`; };
-const text = (d: DayHours | null) => (d ? `${clock(d.from)}–${clock(d.to)}` : 'any time');
+const text = (d: DayHours | null, clock: (hhmm: string) => string) => (d ? `${clock(d.from)}–${clock(d.to)}` : 'any time');
 
 export function MachineHoursLine() {
-  const { me, version } = useApp();
+  const { me, version, clock } = useApp();
   const [hours, setHours] = useState<MachineHours | null>(null);
   const [editing, setEditing] = useState(false);
   useEffect(() => { get<MachineHours>('/machines/hours').then(setHours).catch(() => setHours(null)); }, [version]);
   if (!hours) return null;
   return (
     <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>
-      🔔 Alerts sound weekdays {text(hours.weekday)}, weekends {text(hours.weekend)}; outside those hours they wait.
+      🔔 Alerts sound weekdays {text(hours.weekday, clock)}, weekends {text(hours.weekend, clock)}; outside those hours they wait.
       {isAdmin(me) && <> <button onClick={() => setEditing(true)} style={{ marginLeft: 6 }}>Edit hours</button></>}
       {editing && <HoursForm hours={hours} onClose={() => setEditing(false)} onSaved={setHours} />}
     </p>

@@ -107,11 +107,12 @@ describe('G1–G2 planning a sun event', () => {
 });
 
 describe('§5.7 sun reminder text', () => {
-  it('"{title} — sunset at h:mm", 12-hour with no am/pm, alert suffix kept', () => {
-    expect(alertMessage('reminder', 'Put the goats away', 1, undefined, false, '18:42')).toBe('Put the goats away — sunset at 6:42');
-    expect(alertMessage('reminder', 'Put the goats away', 2, undefined, false, '18:42')).toBe('Put the goats away — sunset at 6:42 (alert 2)');
-    expect(alertMessage('reminder', 'X', 1, undefined, false, '12:05')).toBe('X — sunset at 12:05');
-    expect(alertMessage('reminder', 'X', 1, undefined, false, '00:30')).toBe('X — sunset at 12:30');
+  it('"{title} — sunset at {time}" in the member clock (§8.17), alert suffix kept', () => {
+    expect(alertMessage('reminder', 'Put the goats away', 1, undefined, false, '18:42')).toBe('Put the goats away — sunset at 6:42pm');
+    expect(alertMessage('reminder', 'Put the goats away', 2, undefined, false, '18:42')).toBe('Put the goats away — sunset at 6:42pm (alert 2)');
+    expect(alertMessage('reminder', 'Put the goats away', 1, undefined, false, '18:42', null, true)).toBe('Put the goats away — sunset at 18:42');
+    expect(alertMessage('reminder', 'X', 1, undefined, false, '12:05')).toBe('X — sunset at 12:05pm');
+    expect(alertMessage('reminder', 'X', 1, undefined, false, '00:30')).toBe('X — sunset at 12:30am');
   });
   it('sunset not computable → "{title} — before sunset"; not a sun event → unchanged', () => {
     expect(alertMessage('reminder', 'Put the goats away', 1, undefined, false, null)).toBe('Put the goats away — before sunset');

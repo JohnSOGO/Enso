@@ -851,6 +851,11 @@ each single-day event gets its own line under the date number: its emoji, then o
 color (title too on wide screens). Lines shrink to fit, then `+N`. Event emojis left the date line. The day cell moved
 out of Calendar.tsx into DayCell.tsx first (no behavior change).
 
+**12-hour or 24-hour clock** (v1.72.0, SPEC 3.27, §8.17, migration 0049, Q277–Q280; MojoSOGO 2026-10-12: "Settings me give
+option to show time as 24hr or 12 hr applies every where"): Settings → 🙂 Me → Clock. Every shown time now goes through
+one formatter, `clockText`; before, most screens showed 24-hour and a few (machine hours, sunset pushes, the approve
+card) 12-hour. Everyone starts on 12-hour. Time pickers stay the phone's own.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

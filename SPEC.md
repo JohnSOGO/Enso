@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.26 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.27 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -934,6 +934,15 @@ Schema: [`migrations/0048_chore_sun.sql`](migrations/0048_chore_sun.sql). The mi
 many minutes before local sunset (§7.7), and `time` is kept only as the form's last clock value. Additive only; it
 runs before the deploy. **Migration check (CS-M):** chores that exist before 0048 survive it with `sun_offset_min` NULL.
 
+### 4.2zv Schema change — `migrations/0049_clock_24h.sql`
+
+Asked by MojoSOGO 2026-10-12: "Settings me give option to show time as 24hr or 12 hr applies every where" (§8.17).
+
+Schema: [`migrations/0049_clock_24h.sql`](migrations/0049_clock_24h.sql). The migration is the schema; it is not copied here.
+
+`member_prefs.clock_24h` — 0 = this member sees 12-hour times (the default ⚑ Q277), 1 = 24-hour. Additive only; it runs
+before the deploy. **Migration check (CK-M):** members that exist before 0049 come through it on 12-hour.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1186,8 +1195,8 @@ For one alert of one fire:
     machine before it holds a done load (§7D.3). Built by `machines.ts` `doneMessage`;
     recipients are every active member, and the house row goes to every speaker
     (`machines.ts` `machineAlert`: nobody assigned, `allSpeakers`), waiting for the alert hours (§7D.5).
-  - sun-timed reminder (§7.7): `"{title} — sunset at {h:mm}"` — the occurrence's sunset in
-    the household tz, 12-hour with no am/pm ("18:42" → "6:42") ⚑ Q52; when that sunset cannot
+  - sun-timed reminder (§7.7): `"{title} — sunset at {time}"` (time per §8.17) — the occurrence's sunset in
+    the household tz, in the receiving member's clock (§8.17; was 12-hour with no am/pm, ⚑ Q52); when that sunset cannot
     be computed at alert time, `"{title} — before sunset"`. `alertMessage(kind, title, n,
     chore?, startsToday?, sunsetAt?)` takes it as a trailing `sunsetAt` (local `HH:MM`, or
     `null` = could not be computed; absent = not a sun event). No emoji in the text.
@@ -1710,7 +1719,7 @@ or 17 bytes → 400; E3 `/calendar` occurrences carry `emoji`.
 ### 7.7 Sun-timed alerts — `src/shared/sun.ts` (pure)
 
 Decided by MojoSOGO 2026-10-03: **the goat alert.** Every day, 30 minutes before local sunset,
-an alert says **"Put the goats away — sunset at 6:42"**. Each person opts in; it is off by
+an alert says **"Put the goats away — sunset at 6:42pm"**. Each person opts in; it is off by
 default (Shelly and John will opt in). Phone + House. It is **not on the calendar**: it is only
 findable in **Optional calendar items** (§7.5), where people turn it on.
 
@@ -1730,7 +1739,7 @@ audience is not empty), Done / Snooze, renotify, `missed`. What is new:
   time. Pure: no clock, no fetch; imports nothing but `time.ts`.
 - **Planning** (§5.1): start = `sunsetUtc(date, place)`; no place or no sunset → that
   occurrence is skipped (never 09:00).
-- **Text** (§5.7): `"{title} — sunset at {h:mm}"`; sunset not computable at alert time →
+- **Text** (§5.7): `"{title} — sunset at {time}"` (§8.17); sunset not computable at alert time →
   `"{title} — before sunset"`.
 - **Never on the calendar, by rule** ⚑ Q54: `/calendar` (and so the day sheet), and
   `GET/PATCH/DELETE /events/{id}` and `/events/{id}/exdates`, treat a `start_sun` event as absent
@@ -1753,7 +1762,7 @@ audience is not empty), Done / Snooze, renotify, `missed`. What is new:
 | G2 | the same event planned with `place = null` | `[]` — nothing at 09:00 |
 | G3 | `/calendar` for the month, as a member who has it on | no goat occurrences |
 | G4 | `GET /optional-events` | lists the goat item, `on: false` for a member who has not opted in |
-| G5 | one member opted in; tick at sunset − 30, then 15 min on | that member gets a push each time and the house one row from the second alert (§9.2d), all with the text `"Put the goats away — sunset at h:mm"` (that day's sunset) |
+| G5 | one member opted in; tick at sunset − 30, then 15 min on | that member gets a push each time and the house one row from the second alert (§9.2d), all with the text `"Put the goats away — sunset at h:mmpm"` (that day's sunset) |
 | G6 | nobody opted in; tick | the fire steps, no deliveries |
 | G7 | `GET /fires` carries `startSun: 'sunset'` for its fire; `GET /events/{id}` → 404 | |
 
@@ -3917,7 +3926,7 @@ Settings
 [ Log out ]
 ```
 
-- **🙂 Me:** name, color, and (founder only) **🎯 Point at it** on this device (§8.16).
+- **🙂 Me:** name, color, **Clock: 12-hour / 24-hour** (§8.17), and (founder only) **🎯 Point at it** on this device (§8.16).
 - **📅 Calendar** (named "Calendar items" before v1.67.0): **Optional calendar items** — Public holidays, 📈 options
   expiration, then one line per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); then,
   for admins only, **Days off** (§7.3) ⚑ Q267 (asked by MojoSOGO 2026-10-12: move Days off "into its own calendar section").
@@ -4650,6 +4659,34 @@ Dark by default. Colors are defined as tokens on `:root`:
 | `--holiday-public-cell` | `rgba(250, 204, 21, .16)` — a faint yellow tint over the dark cell, the same 16% strength as a multi-day event's tint; normal light text |
 | `--holiday-public-swatch` | `#FACC15` — the legend's public-holiday square |
 
+### 8.17 Clock: 12-hour or 24-hour — asked by MojoSOGO 2026-10-12
+
+"Settings me give option to show time as 24hr or 12 hr applies every where." Each member picks, for themselves, in
+Settings → 🙂 Me: **Clock** with two choices, **12-hour** (`6:30pm`) and **24-hour** (`18:30`); a tap saves at once
+(`PATCH /me { clock24h }`). New members and everyone already here start on 12-hour ⚑ Q277 (before this, most screens
+showed 24-hour, a few 12-hour; now they all agree).
+
+Every clock time Enso **shows** goes through one pure formatter, `clockText(hhmm, clock24h)` in `src/shared/time.ts`:
+12-hour is the hour without a leading zero, the minutes, then `am`/`pm` with no space ⚑ Q278 (`12:00am` midnight,
+`12:00pm` noon); 24-hour is `HH:MM` as stored. That covers the calendar's wide-screen lines and the day sheet, the
+Ringing bar, alarms (list and next ring), rolling timers, machines, cooking timers and machine hours, chores and
+Today's chores, bounties, messes, My alerts, House quiet, Status, and the approve-a-phone card. Times are still
+**stored and sent** as 24-hour `HH:MM` (§4.1).
+
+Not covered, deliberately: the time **pickers** (`<input type="time">`) are the phone's own control and follow the
+phone's setting ⚑ Q279; the sign-in screen's "Waiting… (until …)" has no member yet and follows the phone; a recipe's
+"Time" is free text.
+
+**Server text:** a push is built for the member it goes to, so the one time any alert text carries (a sun reminder's
+"sunset at …", §7.7) follows that member's choice. The speakers and the FunHouse are shared, so they say it 12-hour
+⚑ Q280.
+
+**Acceptance (CK1–CK4):** CK1 `clockText` (unit): `18:42` → `6:42pm` / `18:42`; `00:05` → `12:05am` / `00:05`;
+`12:00` → `12:00pm`; `09:30` → `9:30am` / `09:30`. CK2 `PATCH /me { clock24h: true }` saves and `GET /me` carries
+`clock24h: true`; a non-boolean → 400 and nothing saved. CK3 a sun reminder's alert to two members, one on 24-hour:
+their pushes read `sunset at 18:42` and `sunset at 6:42pm`; the house row reads `sunset at 6:42pm`. CK4 (manual, iPhone)
+switch Me → Clock to 24-hour and see the alarms list, a machine's done time and My alerts change; switch back.
+
 ---
 
 ## 9. Delivery
@@ -5339,7 +5376,7 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | POST | `/auth/phone-login/{id}/deny` | member (the requested one) | "This wasn't me" → `{ status: 'denied' }`; 404 / 409 as approve (§6.6) |
 | POST | `/auth/logout` | member | → 204; clears cookie |
 | GET | `/me` | member | → member + prefs |
-| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration?, houseSpeakers?: string[] \| null }` (§9.2a) |
+| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration?, houseSpeakers?: string[] \| null, clock24h?: boolean }` (§9.2a, §8.17) |
 | GET | `/house/speakers` | member | → `{ speakers: { id, name, kind }[], mine, defaults }` asked of Home Assistant live; 503 `house_not_configured`; 502 `house_unreachable` (§9.2a) |
 | GET | `/members` | member | → `{ id, email, displayName, color, role, isFounder, disabledAt }[]` (no hashes; `email` only for owners) |
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
