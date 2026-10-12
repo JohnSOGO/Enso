@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.35 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.36 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5316,6 +5316,11 @@ row with its whole message (§9.1); this shows each member their own, and a tap 
 nothing is deleted. Every kind of push is there: a fire's alert, an announcement, a timer start announcement, a
 founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push has no row and is not.
 
+**Handled ones clear themselves** (v1.75.0, MojoSOGO 2026-10-12: "Already answered? Auto clear"): a fire's push
+whose fire is `closed`, and a mess ask (`title` = the ask title, §7B.7) whose mess no longer asks me (`askedOf`), are
+left out of the list, derived on each read; no row changes, so Status and the ping limit still count them. Every
+other push stays until I hide it ⚑ Q284.
+
 **Rules** (`src/shared/alert-history.ts`, pure, imports vocab and announce only):
 - `PUSH_TITLE = "Ensō"` (moved from push.ts). `pushTitle({ hasFire, title })` → the title the phone showed: a fire's
   push → `PUSH_TITLE`; else `title ?? ANNOUNCE_TITLE`. push.ts sends it and the list shows it — one copy.
@@ -5345,24 +5350,27 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
   once, no asking ⚑ Q224.
 - Tapping a line opens its **card** (a titled modal): the title, the whole message, when (date and time), From (the
   source), the alert number (a fire's push), and how it went (sent / failed with the detail). **Close** at the
-  bottom; no Delete on the card (v1.70.0, MojoSOGO 2026-10-12: "Remove delete; too easy to make mistake"): the
-  list line's ❌ is the one way to hide an alert.
+  bottom; no Delete on the card (v1.70.0, MojoSOGO 2026-10-12: "Remove delete; too easy to make mistake").
+- **Ack** (v1.75.0, MojoSOGO 2026-10-12: "Let me ack this which will clear it. Ack on left; close on right"): a card
+  with nothing else to act on (a ping, an announcement, a notice, a fire not ringing) has **Ack** at the bottom left
+  and **Close** at the right. Ack hides the line (as its ❌, `DELETE /me/alerts/{id}`) and closes the card. A card
+  with a fire's or a mess's buttons has just Close: acting there clears it (below).
 - **Opened from a push:** a tap on a notification (no action button) opens `/settings/alerts?alert={id}`
   (§9.1). On start the app reads it, clears the address to `/`, shows Settings and opens that card — after
-  signing in first, if needed ⚑ Q225. An id not in my list → the card says "This alert is no longer in your list."
+  signing in first, if needed ⚑ Q225. An id not in my list (hidden, or handled and cleared) → no card, just the
+  list (v1.75.0). An open card closes by itself once its alert leaves the list (it was handled).
 - A sign-in request's push still opens its approve page (§6.6); its line is in the list too.
 - **Act on it from the card** (v1.70.0, asked by MojoSOGO 2026-10-12: "Let me ack in a notification modal"): when the
   card is a fire's push and that fire is still in the Ringing bar, the card shows the same one-tap buttons as its
   Ringing bar row (§8.2: Away, Snooze 10m, Ack / Done, the machine button) under the details; one tap acts and
-  closes the card. Move to … opens the dryer chooser; once the load moves, the card stays and says "Already
-  handled." A fire no longer ringing shows "Already handled." instead ⚑ Q272. Other pushes (pings,
+  closes the card. Move to … opens the dryer chooser; once the load moves, the fire closes and the card goes with
+  it. A fire not ringing but not closed (snoozed) shows just Close ⚑ Q272. Other pushes (pings,
   announcements) have nothing to act on: just Close. The buttons are the Ringing bar's own
   (`frontend/src/components/FireActions.tsx`), one copy.
 - **Answer a mess from the card** (v1.74.0, asked by MojoSOGO 2026-10-12: "On the modal that opens from tapping an
   alert, let me respond directly from the modal"): a Whose mess? push's card, while that mess still asks me
   (§7B.7, the banner's list), shows its photo and **That was me** / **Not me** (the banner's own buttons,
-  §8.15a); one tap answers and closes the card. Already answered, or no longer asking me → "Already answered."
-  ⚑ Q283. Bounty pushes (🪙) keep just Close for now ⚑ Q283.
+  §8.15a); one tap answers and closes the card, and the line clears ⚑ Q283. Bounty pushes (🪙) keep just Close for now ⚑ Q283.
 
 **Acceptance (M4u — each row is a test):**
 
@@ -5378,6 +5386,7 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | MA8 | sw.js | contains `ALERTS_PATH` and builds `${ALERTS_PATH}?alert=` from `data.alertId` (v1.49.1, steward pass 12) |
 | MA9 | `GET /me/alerts` with a reminder's push and a ping | the reminder's `fireId` = its fire's id; the ping's `fireId` null |
 | MA10 | `GET /me/alerts` with a mess ask's push and a ping | the ask's `messId` = the mess's id; the ping's `messId` null |
+| MA11 | a reminder's push, then Done; a mess ask, then That was me; a ping | the reminder's and the ask's lines leave my list, the ping stays; their `deliveries` rows unchanged (`dismissed_at` NULL) |
 | MA-M | migration 0041 | §4.2zn's check |
 
 ---

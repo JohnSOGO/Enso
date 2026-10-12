@@ -7,6 +7,30 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.75.0: My alerts card Ack (left) + Close (right) (placement-advisor)
+
+- **Ask:** A My alerts card with nothing else to act on gets Ack (bottom left, reuses hide() = DELETE /me/alerts/{id}, then closes) and Close (right) (SPEC §9.5 "Ack", v1.75.0; MojoSOGO "Let me ack this which will clear it. Ack on left; close on right").
+- **Verdict:** `frontend/src/components/MyAlerts.tsx` [EXISTING]; render stage. No new route, rule or vocab.
+- **Why/Caps:** ~113/300 (global cap), far below the band; a shared or route home rejected since nothing is decided, only captured.
+- **Sources read:** scripts/arch.ts, docs/module-ownership.md (MyAlerts row), MyAlerts.tsx.
+
+## 2026-10-12 — v1.75.0: Handled alerts clear themselves (placement-advisor)
+
+- **Ask:** SPEC §9.5 "Handled ones clear themselves" (v1.75.0, MA11, Q284; MojoSOGO "Already answered? Auto clear"). GET /me/alerts leaves out a fire's push whose fire is closed and a mess ask that no longer asks me (askedOf), derived on each read with no row writes. MyAlerts drops the "Already handled."/"Already answered." text; a card closes when its alert leaves the list; an opened-from-push id not in the list shows no card.
+- **Verdict:** src/shared/alert-history.ts (`isCleared({ fireState, messAsksMe })`) + src/worker/routes/my-alerts.ts (one SELECT gains `f.state`, a LEFT JOIN on messes and an EXISTS `denied_me`; activeMemberIds from db.ts, read once) + frontend/src/components/MyAlerts.tsx [EXISTING]
+- **Flow stage:** rules (alert-history) → route reads and filters → render
+- **Why:** alert-history already owns "which of my pushes are shown" (ALERT_HISTORY_MAX), so the cleared decision is a pure rule there, taking plain facts and keeping its vocab/announce-only imports. The route works out `messAsksMe` with MESS_ASK_TITLE and askedOf. Rejected: an inline flag in the route (hides a §9.5 rule in persistence); importing messes.ts into alert-history; reusing `deniedIdsOf` (one query per mess, up to 200); moving activeMemberIds (already in db.ts). The PWA re-derives nothing. A deleted mess counts as no longer asking. LIMIT stays in SQL, so the list can show fewer than 200 after clearing.
+- **Caps:** alert-history.ts 41 → 47/300; my-alerts.ts 47 → 56/300; MyAlerts.tsx 110 → ~105/300; test/my-alerts.test.ts → ~150/300. Nothing newly in the band.
+- **Sources read:** scripts/arch.ts, docs/module-ownership.md, SPEC.md §9.5, routes/my-alerts.ts, shared/alert-history.ts, worker/mess-asks.ts, shared/messes.ts, shared/vocab.ts, MyAlerts.tsx; grep for activeMemberIds/deniedIdsOf.
+
+## 2026-10-12 — Steward pass 24, whole tree (code-steward)
+
+- **Run:** after the v1.74.0 release (SPEC 3.34 §9.5: a mess ask's My alerts card answers That was me / Not me; /me/alerts adds `messId`, MA10). Also covers v1.74.1 (AnswerButtons stacked, §8.15a).
+- **Verdict:** SOUND. Typecheck passed, 863/863 tests, arch:audit quiet. 2 receipts matched to 2 code commits, no mismatches.
+- **Top finding:** LOW. where-things-stand had no device check for v1.74.0/v1.74.1; added with v1.75.0's in the next commit.
+- **Handoffs:** 0 to reorganizer, 1 to worker (the docs line, done), 0 to placement-advisor.
+- **Restraint:** `m.asked.includes(me.id)` in three views (a membership test on the server's list, not a rule); the extra /messes read while MyAlerts is mounted (accepted in the receipt). (The pass also said a failed answer closes the card; it doesn't: `send` throws before `close()`, so the card stays with the error.) Items from passes 19–21 still wait for MojoSOGO's pick.
+
 ## 2026-10-12 — v1.74.1: Mess answer pair stacked at the right (placement-advisor)
 
 - **Ask:** In every place the mess answer pair shows (banner, Messes section, MyAlerts card), Not me sits directly under That was me, stacked at the right, instead of wrapping left under the text (SPEC §8.15a, v1.74.1).

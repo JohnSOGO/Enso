@@ -1,10 +1,16 @@
 // SPEC §9.5 — My alerts: how a push I got is described back to me (its title and where it came from), how many
 // are shown, and the link a tapped notification opens. Pure; imports vocab and announce only.
 import { ANNOUNCE_TITLE } from './announce';
-import type { AlertKind } from './vocab';
+import type { AlertKind, FireState } from './vocab';
 
 /** The newest this many of my pushes are listed. ⚑ Q221 */
 export const ALERT_HISTORY_MAX = 200;
+
+/** A handled push leaves my list by itself (v1.75.0, ⚑ Q284): its fire is closed, or it is a mess ask that no longer
+ *  asks me. `messAsksMe` is null for any push that isn't a mess ask. */
+export function isCleared(r: { fireState: FireState | null; messAsksMe: boolean | null }): boolean {
+  return r.fireState === 'closed' || r.messAsksMe === false;
+}
 
 /** The title of a fire's push (§9.1). */
 export const PUSH_TITLE = 'Ensō';
