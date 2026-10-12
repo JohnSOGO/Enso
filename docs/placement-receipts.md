@@ -7,7 +7,7 @@ carry its result.
 
 ---
 
-## 2026-10-12 — v1.64.0: Announce ignores Quiet the house (placement-advisor)
+## 2026-10-12 — v1.65.0: Announce ignores Quiet the house (placement-advisor)
 
 - **Ask:** SPEC §9.2b / §9.3 / §9.4b — Announce always speaks on every speaker HA lists, even while the house is quiet (MojoSOGO 2026-10-12 "announcements are special").
 - **Verdict:** `src/worker/routes/announce.ts` [EXISTING] — a deletion: the houseQuiet read, the 409 `house_quiet` branch and the `!quiet` speaker gate, plus the now-unused imports (houseQuiet, utcToLocal, householdTz).
@@ -15,6 +15,16 @@ carry its result.
 - **Why:** the quiet check is a persistence gate inside the route that owns POST /announce; removing it adds no code. src/shared/house-quiet.ts unchanged; src/worker/house-quiet.ts keeps three readers (tick, timer-starts, GET /house/quiet). Rejected: an "isAnnouncementExempt" helper (speculative — the exemption is the absence of a check). Spec (§9.2b, HQ5, §9.4b, API row), tests HQ5 / FH4 and map rows 81 / 94 changed in the same commit.
 - **Caps:** announce.ts 69 → ~63 lines against GLOBAL_FILE_CAP 300. Nothing enters the band.
 - **Sources read:** src/worker/routes/announce.ts; docs/module-ownership.md; scripts/arch.ts; SPEC.md §9.2b, §9.4b, §10; tests referencing house_quiet; frontend HouseQuiet.tsx (grep).
+## 2026-10-12 — v1.64.0: Members tab as a grid of pills (placement-advisor)
+
+- **Ask:** SPEC §8.6 Settings → 👥 Members: lay the members table out again as a grid with one row of pills per member (name with colour dot, role Owner / Admin / Member or Disabled, a tappable Make / Remove admin pill with today's asks, a tappable Disable / Enable pill). Behaviour unchanged. It must fit a phone and scroll sideways when too narrow.
+- **Verdict:** `frontend/src/components/SettingsMembers.tsx` + new `frontend/src/components/SettingsMembers.module.css` [EXISTING; the CSS is covered by the `components/*.module.css` row]
+- **Flow stage:** render
+- **Why:** The SettingsMembers row owns this screen. The grid styles are specific to it, so they go in a same-named CSS module, not Lists.module.css (shared list tables and tick rows). The pill look reuses theme.css `.chip` / `.badge`. Logic, asks and visibility rules stay as they are; role checks stay in src/shared/roles. The Member pill and Disabled-in-place-of-role are ⚑ Q264–Q265, written into §8.6 first. Row 202 wording: "members table" → "members grid".
+- **Caps:** SettingsMembers.tsx 51 → ~58/300; SettingsMembers.module.css new, ~10/300. No file newly in the band.
+- **Sources read:** frontend/src/components/SettingsMembers.tsx; docs/module-ownership.md (rows 140, 202, 217, 218); scripts/arch.ts; docs/placement-receipts.md (head); frontend/src/theme.css (.chip/.badge); SPEC.md §8.6.
+
+---
 
 ## 2026-10-12 — v1.63.0: Announce reaches every speaker and every member's phone (placement-advisor)
 
@@ -1818,3 +1828,12 @@ REORG RECEIPT
 - **Why:** All four surfaces (Modal ◎, PointAtLayer's floating ◎, the Alt+P listener and SettingsMe) already read the one `usePointAtOn()` gate, so gating it once covers them and PointAt.tsx/Modal.tsx are untouched. The founder check is reused from state.tsx rather than written again. PointAtButton gains a hook import from '../state' (not a component, no cycle), and every consumer renders inside AppProvider (Shell; Modal is not used on the sign-in, join or approve screens). The stored switch is left alone, so a founder's setting persists. Rejected: gating separately in PointAt.tsx, Modal.tsx and SettingsMe (three copies of one rule), and a server-side flag (the founder is already known on the client).
 - **Caps:** PointAtButton.tsx 31 → ~33/300; SettingsMe.tsx 37 → ~38/300. No file newly in the band.
 - **Sources read:** scripts/arch.ts; docs/placement-receipts.md; docs/module-ownership.md (rows 139, 197, 198); frontend/src/components/PointAtButton.tsx, PointAt.tsx, SettingsMe.tsx; frontend/src/state.tsx (useIsFounder); frontend/src/App.tsx (provider tree); grep of Modal/PointAt usages in frontend/src and test/.
+
+## 2026-10-12 — About tagline on two lines (placement-advisor)
+
+- **Ask:** In Settings → ℹ️ About, show the tagline as two lines ("Closing the loop." / "Peace of mind, every day.") instead of one run-on; the opening screen (frontend/index.html, §8.10) stays as is. SPEC §8.6 SM5, MojoSOGO 2026-10-12.
+- **Verdict:** `frontend/src/components/SettingsAbout.module.css` + `frontend/src/components/SettingsAbout.tsx` [EXISTING]
+- **Flow stage:** render
+- **Why:** the SettingsAbout row already owns the About panel and TAGLINE; stacking the halves is presentation only (`.tagline span` inline-block → block, and the `' '` separator dropped). TAGLINE is untouched, so SM5's index.html check (each half as `<span>…</span>`) still holds and the splash is left alone. Rejected: splitting TAGLINE or adding a second constant (a second copy, §0.5); editing index.html (out of scope by MojoSOGO's word).
+- **Caps:** SettingsAbout.tsx 18 → 18 lines, SettingsAbout.module.css 9 → 9, against GLOBAL_FILE_CAP 300. No file newly in the band.
+- **Sources read:** frontend/src/components/SettingsAbout.tsx; frontend/src/components/SettingsAbout.module.css; docs/module-ownership.md (row 204); scripts/arch.ts (WORKING_BUFFER, GLOBAL_FILE_CAP, WARN_AT); docs/placement-receipts.md; test/settings-about.test.ts.
