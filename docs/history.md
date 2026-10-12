@@ -860,6 +860,11 @@ card) 12-hour. Everyone starts on 12-hour. Time pickers stay the phone's own.
 to no one put emoji next to day of month number"): an event with nobody assigned shows its emoji beside the date number
 and gets no line; if the two-icon limit hides it, it keeps its line.
 
+**Each person once; everyone is Family** (v1.73.0, SPEC 3.29, §7.1/§8.3, Q281–Q282; MojoSOGO 2026-10-12: "One person
+mentioned twice; just mention once. If everyone; make one green bubble with words family" and "And one bubble on day of
+month cell"): the day sheet shows each person once, and an event for everyone shows one green Family chip; the
+calendar line shows one green dot for it.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
