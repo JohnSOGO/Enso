@@ -7,6 +7,19 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.70.1: Plan it carries the thing's address into the event's Address field (placement-advisor)
+
+- **Ask:** SPEC §7C.2 Plan it (with §7.9 event address). POST /things/:id/plan sets the event's `address` from the
+  thing through a new pure `plannedEventAddress(t)` (the address when it is at most EVENT_ADDRESS_MAX, else null).
+  plannedEventNotes leaves out an address that was carried over. A patch fix.
+- **Verdict:** src/shared/things.ts (rule) + src/worker/routes/things.ts (one-line call site) [EXISTING]
+- **Flow stage:** rules (+ route passes the result through to persist)
+- **Why:** mapping a thing to an event is already owned by plannedEventNotes/canPlanOn in shared/things.ts, so the
+  new helper sits with them. In the route it would put a decision in the route; event-rows.ts knows nothing about
+  things. shared→shared import of alert-limits (imports nothing) makes no cycle.
+- **Caps:** src/shared/things.ts about 255/300 (band starts at 270, not entered); src/worker/routes/things.ts 124/300.
+- **Reorganizer:** none needed.
+
 ## 2026-10-12 — Steward pass 21, whole tree (code-steward)
 
 - **Run:** after the v1.70.0 release (SPEC 3.24 §9.5: act on a ringing alert from its My alerts card; FireActions.tsx extracted from RingingBar.tsx; /me/alerts adds fireId; no Delete on the card). Also covers v1.69.1.

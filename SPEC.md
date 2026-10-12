@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.24 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.25 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2646,12 +2646,13 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
   reminders — planned, done and let-go things never re-plan.
 - **Plan it** (decided by MojoSOGO): pick a date (inside the window when there is one ⚑ —
   outside it is refused with a message) and optionally a time → a normal **calendar event**
-  is created (title; notes = the thing's note + place + address + phone + cost + link,
-  one per line; `thing_id` set), the thing
+  is created (title; **address** = the thing's address, §7.9; notes = the thing's note + place +
+  phone + cost + link, one per line, plus the address only when it is too long for the event's
+  Address box; `thing_id` set), the thing
   becomes `planned` with `planned_event_id`, and its scheduled reminders close `removed`
   (the event has its own). The event form shows **"From Things to do"** with the photo.
 - `things.ts` owns: limits, window validation, `remindersFor(thing, tz)` → the reminder
-  dates/instants, `canPlanOn(thing, date)`, and `cleanPhotoReading(raw, today)` (§7C.4).
+  dates/instants, `canPlanOn(thing, date)`, `plannedEventAddress`, `plannedEventNotes`, and `cleanPhotoReading(raw, today)` (§7C.4).
 
 ### 7C.3 Photos — R2, private
 

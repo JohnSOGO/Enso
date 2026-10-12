@@ -1,7 +1,7 @@
 // SPEC §7C — the pure thing rules (src/shared/things.ts). D2 and D11 are rows of §7C.5.
 import { describe, expect, it } from 'vitest';
 import {
-  ADDRESS_MAX, COST_MAX, PHONE_MAX, TITLE_MAX, canPlanOn, cleanPhotoReading, isStartReminder, openOrder, parseThingInput, planThingFires, plannedEventNotes,
+  ADDRESS_MAX, COST_MAX, PHONE_MAX, TITLE_MAX, canPlanOn, cleanPhotoReading, isStartReminder, openOrder, parseThingInput, planThingFires, plannedEventAddress, plannedEventNotes,
   remindersFor, webLink, type ThingReminderSource,
 } from '../src/shared/things';
 import { localToUtc } from '../src/shared/time';
@@ -102,12 +102,20 @@ describe('Plan it and order (§7C.2, §10)', () => {
     expect(plannedEventNotes({
       note: 'Bring cash', place: 'Fairgrounds', address: '2260 Jimmy Durante Blvd', phone: '(619) 555-0134', cost: '$15 adults',
       url: 'https://fair.example',
-    })).toBe('Bring cash\nFairgrounds\n2260 Jimmy Durante Blvd\n(619) 555-0134\n$15 adults\nhttps://fair.example');
+    })).toBe('Bring cash\nFairgrounds\n(619) 555-0134\n$15 adults\nhttps://fair.example');
     expect(plannedEventNotes({ note: null, place: null, url: null, ...none })).toBeNull();
     expect(plannedEventNotes({ note: null, place: null, url: null, ...none, cost: 'Free' })).toBe('Free');
     const long = plannedEventNotes({ note: 'n'.repeat(2000), place: 'P', address: 'A', phone: '1', cost: 'C', url: 'https://u' })!;
     expect(long).toHaveLength(2000);
-    expect(long.endsWith('\nP\nA\n1\nC\nhttps://u')).toBe(true);
+    expect(long.endsWith('\nP\n1\nC\nhttps://u')).toBe(true);
+  });
+
+  it('plannedEventAddress: the address goes to the event\'s Address box; one too long for it stays in the notes', () => {
+    expect(plannedEventAddress({ address: ' 2260 Jimmy Durante Blvd ' })).toBe('2260 Jimmy Durante Blvd');
+    expect(plannedEventAddress({ address: null })).toBeNull();
+    const big = 'a'.repeat(250);
+    expect(plannedEventAddress({ address: big })).toBeNull();
+    expect(plannedEventNotes({ note: null, place: null, address: big, phone: null, cost: null, url: null })).toBe(big);
   });
 
   it('openOrder: soonest window end first; open-ended and any-time last', () => {

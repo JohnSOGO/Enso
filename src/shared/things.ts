@@ -3,6 +3,7 @@
 import { CHANNEL, THING_STATUS, isOneOf, type Channel, type ThingStatus } from './vocab';
 import { isDate, localToUtc, ms } from './time';
 import { newThingFire, type NewFire } from './engine';
+import { EVENT_ADDRESS_MAX } from './alert-limits';
 
 export const TITLE_MAX = 120;
 export const NOTE_MAX = 2000;
@@ -207,9 +208,15 @@ export function canPlanOn(t: Pick<ThingRow, 'window_start' | 'window_end'>, date
   return isDate(date) && (!t.window_start || date >= t.window_start) && (!t.window_end || date <= t.window_end);
 }
 
-/** The planned event's notes: note, then place, address, phone, cost, link (one per line); the note is cut so the rest fits. */
+/** The planned event's Address: the thing's address when it fits the event's box (§7.9), else null. */
+export function plannedEventAddress(t: Pick<ThingRow, 'address'>): string | null {
+  const a = t.address?.trim();
+  return a && a.length <= EVENT_ADDRESS_MAX ? a : null;
+}
+
+/** The planned event's notes: note, then place, address (only when too long for the Address box), phone, cost, link (one per line); the note is cut so the rest fits. */
 export function plannedEventNotes(t: Pick<ThingRow, 'note' | 'place' | 'address' | 'phone' | 'cost' | 'url'>, max = NOTE_MAX): string | null {
-  const tail = [t.place, t.address, t.phone, t.cost, t.url].filter((x): x is string => !!x).join('\n');
+  const tail = [t.place, plannedEventAddress(t) ? null : t.address, t.phone, t.cost, t.url].filter((x): x is string => !!x).join('\n');
   const room = max - (tail ? tail.length + 1 : 0);
   const note = t.note ? t.note.slice(0, Math.max(0, room)).trim() : '';
   return [note, tail].filter(Boolean).join('\n') || null;

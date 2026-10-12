@@ -183,7 +183,7 @@ describe('M4g things — Plan it (D6, D7)', () => {
     const ev = (await o.get(`/events/${p.json.eventId}`)).json;
     expect(ev).toMatchObject({
       title: 'Pumpkin patch', startDate: '2026-10-14', startTime: '10:00', thingId: t.id, reminder: null,
-      notes: 'Bring boots\nOld farm\n12 Farm Rd\n555-0101\n$5 a pumpkin\nhttps://patch.example',
+      address: '12 Farm Rd', notes: 'Bring boots\nOld farm\n555-0101\n$5 a pumpkin\nhttps://patch.example',
     });
     expect((await firesOf(t.id)).every((f) => f.state === 'closed' && f.close_reason === 'removed')).toBe(true);
 
