@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.69.1: Require `place` on chore rules (placement-advisor)
+
+- **Ask:** Steward pass 20 item #2 (MojoSOGO, 2026-10-12, "BOTH"). Drop the `= null` default so the trailing `place: Place | null` is required on firstFireDue, planChoreRuns, advanceRun, undoRun and replanRun. Refactor only, no behavior change.
+- **Verdict:** src/shared/chores.ts (+ test/chores.test.ts) [EXISTING].
+- **Flow stage:** rules.
+- **Why:** all production callers already pass `place` (fire-rows.ts:54, routes/chores.ts:77/142/200; tick.ts reaches planning through fire-rows.ts; no frontend callers), so the change stays inside the owner and its tests and removes the trap of a caller forgetting it.
+- **Caps:** chores.ts unchanged in line count (253/300). No file enters the band.
+- **Sources read:** scripts/arch.ts; src/shared/chores.ts; repo-wide grep of call sites; SPEC.md §7B.3 signatures.
+
 ## 2026-10-12 — Steward pass 20, whole tree (code-steward)
 
 - **Run:** after the v1.69.0 release (SPEC 3.22 §7B.3, chores before sunset, migration 0048). Also covers v1.63.0–v1.68.1.

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.22 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.23 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2198,7 +2198,7 @@ interface ChoreStep {
 
 ### 7B.3 Run rules — one open fire per run at most (`uq_chore_run_open`)
 
-**Planning** (`planChoreRuns(chore, tz, now, toUtc, activeIds)`, called by `tick`): one run
+**Planning** (`planChoreRuns(chore, tz, now, toUtc, activeIds, place)`, called by `tick`): one run
 per due date from today (household tz) to the local date of `toUtc` (36 h ahead), never
 before `start_date`. A run is planned once (`INSERT OR IGNORE` on `(chore_id, date)`);
 its first fire is planned only when the run row is newly inserted:
@@ -2218,7 +2218,7 @@ household place) in place of `date + time`, for `at` and `by` alike, for its fir
 no sunset that day → that run gets **no** time-based fire (it is still on Today; never a substitute time, as §7.7).
 Waits between steps are unchanged. The alert text is the ordinary chore text (§5.7) ⚑ Q270.
 
-**Done a step** (`advanceRun(chore, run, openFire, memberId, now, tz)` → `{ run, closeFire?, newFire? }`):
+**Done a step** (`advanceRun(chore, run, openFire, memberId, now, tz, place)` → `{ run, closeFire?, newFire? }`):
 1. The run's open fire, if any, closes `done` (`closed_by` = the member).
 2. `step + 1`. If that was the last step: `done_at = now`, `done_by` = member. Stop.
 3. Else, if the step just done has `waitMin` → new fire due `now + waitMin` (it rings
@@ -2227,7 +2227,7 @@ Waits between steps are unchanged. The alert text is the ordinary chore text (§
    at that deadline (the nudge is kept).
 5. Else no fire: the next step is simply current on the Today list.
 
-**Undo** (`undoRun(chore, run, openFire, now, tz)`): only when `step > 0`. `step − 1`, `done_at`/
+**Undo** (`undoRun(chore, run, openFire, now, tz, place)`): only when `step > 0`. `step − 1`, `done_at`/
 `done_by` cleared, the open fire (if any) closes `removed`, and a fire is re-planned
 by rule 4 alone (a `by` nudge still ahead). Waits are not re-armed.
 

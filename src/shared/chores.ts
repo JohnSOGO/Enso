@@ -104,7 +104,7 @@ function deadline(chore: Chore, date: string, tz: string, place: Place | null): 
 }
 
 /** A run's first fire: none for `by` without nudge, none when its time is already past or unknown. */
-export function firstFireDue(chore: Chore, date: string, tz: string, now: string, place: Place | null = null): string | null {
+export function firstFireDue(chore: Chore, date: string, tz: string, now: string, place: Place | null): string | null {
   if (chore.timing === 'by' && !chore.nudge) return null;
   const due = deadline(chore, date, tz, place);
   return due === null || ms(due) < ms(now) ? null : due;
@@ -113,7 +113,7 @@ export function firstFireDue(chore: Chore, date: string, tz: string, now: string
 export interface PlannedRun { date: string; assignee_id: string | null; firstDueAt: string | null }
 
 /** One run per due date from today (household tz) to the local date of `toUtc`, never before start_date. */
-export function planChoreRuns(chore: Chore, tz: string, now: string, toUtc: string, activeIds: readonly string[], place: Place | null = null): PlannedRun[] {
+export function planChoreRuns(chore: Chore, tz: string, now: string, toUtc: string, activeIds: readonly string[], place: Place | null): PlannedRun[] {
   const today = utcToLocal(now, tz).date;
   const last = utcToLocal(toUtc, tz).date;
   const out: PlannedRun[] = [];
@@ -134,7 +134,7 @@ function nudgeFire(chore: Chore, run: ChoreRun, now: string, tz: string, place: 
 
 /** Done a step (§7B.3 rules 1–5). */
 export function advanceRun(
-  chore: Chore, run: ChoreRun, openFire: FireRow | null, memberId: string, now: string, tz: string, place: Place | null = null,
+  chore: Chore, run: ChoreRun, openFire: FireRow | null, memberId: string, now: string, tz: string, place: Place | null,
 ): RunChange | { error: 'already_done' } {
   if (run.step >= chore.steps.length) return { error: 'already_done' };
   const closed = openFire ? closeFire(openFire, 'done', memberId, now) : undefined;
@@ -147,7 +147,7 @@ export function advanceRun(
 
 /** Undo the last step: the open fire closes `removed`; only a `by` nudge still ahead is re-planned (waits are not). */
 export function undoRun(
-  chore: Chore, run: ChoreRun, openFire: FireRow | null, now: string, tz: string, place: Place | null = null,
+  chore: Chore, run: ChoreRun, openFire: FireRow | null, now: string, tz: string, place: Place | null,
 ): RunChange | { error: 'nothing_to_undo' } {
   if (run.step <= 0) return { error: 'nothing_to_undo' };
   return {
@@ -163,7 +163,7 @@ export function undoRun(
  * chore's days gets no fire. Null = started, or from an earlier day: left alone.
  */
 export function replanRun(
-  chore: Chore, run: ChoreRun, openFire: FireRow | null, tz: string, now: string, activeIds: readonly string[], place: Place | null = null,
+  chore: Chore, run: ChoreRun, openFire: FireRow | null, tz: string, now: string, activeIds: readonly string[], place: Place | null,
 ): RunChange | null {
   if (run.step !== 0 || run.date < utcToLocal(now, tz).date) return null;
   const due = isDueOn(chore, run.date) ? firstFireDue(chore, run.date, tz, now, place) : null;
