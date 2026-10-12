@@ -18,7 +18,7 @@ members.get('/members', requireMember, async (c) => {
   const isOwner = isAdmin(c.get('member'));
   const founder = (await first<{ id: string }>(c.env.DB, FOUNDER_SQL))?.id;
   const rows = await all<Record<string, unknown>>(c.env.DB,
-    `SELECT id, email, display_name AS displayName, color, role, disabled_at AS disabledAt FROM members ORDER BY created_at`);
+    `SELECT id, email, display_name AS displayName, color, role, disabled_at AS disabledAt, created_at AS joinedAt FROM members ORDER BY created_at`);
   return c.json(rows.map((r) => ({ ...r, isFounder: r.id === founder, email: isOwner ? r.email : undefined })));
 });
 

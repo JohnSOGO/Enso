@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.16 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.17 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3862,9 +3862,10 @@ Settings
   line hides it, **Clear all** at the top. A tapped phone notification opens Settings with this area open, on its
   card.
 - **🏠 Household (admins):** name, timezone, days off (§7.3).
-- **👥 Members (admins):** a grid, one row of pills per member, in four columns (MojoSOGO 2026-10-12): **name**
+- **👥 Members (admins):** a grid, one row of pills per member, in five columns (MojoSOGO 2026-10-12): **name**
   (colour dot) · **role** (**Owner** / **Admin** / **Member** ⚑ Q264; **Disabled** in red instead while disabled
-  ⚑ Q265) · **Make admin** / **Remove admin** (asks first; never on the founder or a disabled member) ·
+  ⚑ Q265) · **joined {date}** (when the member was created, e.g. "joined Oct 4"; GET /members sends it to every
+  member, as it is not sensitive; MojoSOGO 2026-10-12 "I should see when active accounts joined") · **Make admin** / **Remove admin** (asks first; never on the founder or a disabled member) ·
   **Disable** / **Enable** (never on the founder). The last two are tappable pills. On a phone too narrow for a row,
   the grid scrolls sideways. An admin removing their own admin role is warned that they will lose these settings at
   once. Then **invites (§8.9)**.
@@ -4177,7 +4178,8 @@ Sam        expired
 ```
 
 - One line per invite, newest first: name · state — **waiting** (with its expiry,
-  amber), **joined** (with the date, green), **expired**, **revoked** (neutral). When the
+  amber), **joined** (with the date, green), **expired**, **revoked** (neutral). A revoked invite drops off the
+  list 24 hours after it was revoked (MojoSOGO 2026-10-12). When the
   member chose a different name it shows dimmed in the name column ("Kai → Kai B"), which
   truncates, so the row stays one line at 320 px. Only waiting invites have **Revoke**
   (asks first).
