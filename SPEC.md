@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.12 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.13 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2756,7 +2756,7 @@ fold & out**. The weekly Laundry chore (§7B) is separate and unchanged. The **D
 |---|---|---|
 | **Start** `{ ownerId, minutes, alertId? }` | the machine is free | owner, alert person (§7D.7), minutes, `started_at = now`, `done_at = now + minutes`, `started_by` = me; a new `machine` fire due at `done_at` |
 | **Move** `{ minutes }` (washer → dryer) | the washer is done **and** the dryer is free | washer free, its open fire closes `done` (`closed_by` = me); the dryer starts with the **washer's owner** and its own minutes; a new dryer fire |
-| **Finish** — *Fold & out* | the last machine (dryer) is done | dryer free; its open fire closes `done` — the load's loop ends |
+| **Finish** — *Unload Clothes Dryer* (MojoSOGO 2026-10-12) | the last machine (dryer) is done | dryer free; its open fire closes `done` — the load's loop ends |
 | **Done now** `{ ownerId?, alertId? }` ⚑ Q160 | free or running | the app catches up with the real machine: a **free** one gets `ownerId`'s load, or a load with **owner unknown** (`owner_id` NULL) when none is named — never assumed (MojoSOGO 2026-10-10) (`minutes` null, `started_at = done_at = now`, `started_by` = me); a **running** one keeps its load, `done_at = now`. Any open fire closes `superseded`; a new `machine` fire is due **now**. `ownerId` is optional; a named one must be an active member |
 | **Clear** | running or done | free; its open fire closes `removed`; nothing rings |
 | **Remind** — *Still loaded* ⚑ Q159 | done | the load stays; its open fire closes `superseded` (`closed_by` = me) and a new `machine` fire is due **now**, so the reminders run again from alert 1 (§7D.3) |
@@ -2769,8 +2769,8 @@ fold & out**. The weekly Laundry chore (§7B) is separate and unchanged. The **D
     "The clothes dryer still has Sam's load." ("…has a load." when its owner is not an active member).
     The washer stays DONE — waiting; nothing moves automatically.
   - move a washer that isn't done → `not_done` "The clothes washer isn't done yet."
-  - move from the dryer, or Fold & out on the washer → `invalid_state` with a message naming
-    what the machine does take.
+  - move from the dryer, or Unload Clothes Dryer on the washer → `invalid_state` with a message naming
+    what the machine does take ("Move this load to the clothes dryer first.").
   - clear a free machine → `already_free`.
   - Still loaded on a machine that isn't done → `not_done`.
   - Done now on a done machine → `busy`; on a free one naming someone who is not an active member → 400 `invalid_input`.
@@ -2836,7 +2836,7 @@ can edit them.
 | L6 | move to the dryer, 60 min | washer free, its fire closed `done` by me; dryer running for A with a new fire |
 | L7 | start the washer for B, then move it while the dryer is still full | 409 `busy` "The clothes dryer still has A's load."; the washer stays done; nothing moved |
 | L8 | tick the dryer's done-at while B's load waits in the washer | dryer message `A, your laundry in the clothes dryer is done — B's load is waiting` |
-| L9 | Fold & out on the done dryer | dryer free; its fire closed `done` |
+| L9 | Unload Clothes Dryer on the done dryer | dryer free; its fire closed `done` |
 | L10 | Clear a running machine | free; its fire closed `removed`; a later tick sends nothing |
 | L11 | two Start taps on one free machine at once | one 200, one 409; exactly one open fire |
 | L12 | minutes 20, an unknown owner, an unknown machine, `done` action on a machine fire | 400 / 400 / 404 / 409 `invalid_action`, each with a message |
@@ -2863,7 +2863,7 @@ Asked by MojoSOGO 2026-10-10: "add dish washer letting me have the same start an
 remember who started the dish washer".
 - One more `machines` row, `dishwasher` (§4.2zj), labelled **Dish washer** 🍽️ ⚑ Q204. Every §7D.2
   transition works on it except **Move**: it has no next machine, so its done load ends with
-  **Finish**, shown as **Emptied** (not Fold & out) ⚑ Q205. **Still loaded** works as on the
+  **Finish**, shown as **Emptied** (not Unload Clothes Dryer) ⚑ Q205. **Still loaded** works as on the
   laundry. Its alerts ring like any machine's (§7D.3), in the same alert hours (§7D.5) ⚑ Q206.
 - **Who started it:** the load's `owner_id` is the person who started the dish washer. Start and
   Done now ask *Who started it?* instead of *Whose load?* (Start preselects me; Done now
@@ -3602,8 +3602,8 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
 - Chore row: `🧹 Laundry — Move to dryer · Sam` with **[Done]** (no snooze)
 - Thing row: `📌 Fall fair · to do` with **[Snooze 10m] [Done]** ⚑ glyph
 - Machine row: `🧺 Clothes washer · Sam` with **[Move to clothes dryer]** — it opens the same
-  dryer-minutes chooser the Machines card uses (§8.5); `🧺 Clothes dryer · Sam` with **[Fold &
-  out]**; `🧺 Dish washer · Sam` (who started it, §7D.6) with **[Emptied]**. No Done:
+  dryer-minutes chooser the Machines card uses (§8.5); `🧺 Clothes dryer · Sam` with **[Unload
+  Clothes Dryer]**; `🧺 Dish washer · Sam` (who started it, §7D.6) with **[Emptied]**. No Done:
   a machine fire is closed only by the `/machines` routes (§7D.2), or `/cooking` (§7D.8). ⚑ Q40
 - Cooking timer row (§7D.8): `🍳 Air fryer · Sam` (its label, then who started it) with **[Off]**. The glyph is 🍳 for
   every kind ⚑ Q246.
@@ -3768,7 +3768,7 @@ Start a machine. When it's done, every phone hears; the speakers too when someon
 |---|---|---|---|
 | free | **[Start]** [Done now] | **[Start]** [Done now] | **[Start]** [Done now] |
 | running | [Done now] [Clear] | [Done now] [Clear] | [Done now] [Clear] |
-| done | **[Move to clothes dryer]** [Still loaded] [🪙 Bounty] [Clear] | **[Fold & out]** [Still loaded] [🪙 Bounty] [Clear] | **[Emptied]** [Still loaded] [🪙 Bounty] [Clear] |
+| done | **[Move to clothes dryer]** [Still loaded] [🪙 Bounty] [Clear] | **[Unload Clothes Dryer]** [Still loaded] [🪙 Bounty] [Clear] | **[Emptied]** [Still loaded] [🪙 Bounty] [Clear] |
 
 - **Alert hours** (§7D.5): one line under the intro. The Edit hours box says "Machine alerts outside these hours
   wait until they open." **Edit hours** (admins only) opens
@@ -3791,7 +3791,7 @@ Start a machine. When it's done, every phone hears; the speakers too when someon
   starts the machine at once and closes the box: **two taps** from the card (Start → 60). For
   **Move to dryer**, titled "Move Sam's load to the dryer" — only the minute chips.
 - Chips are at least 44 px tall; text is 16 px; nothing scrolls sideways at 320 px.
-- A refusal (§7D.2) renders inside the chooser, or above the cards for Clear / Fold & out,
+- A refusal (§7D.2) renders inside the chooser, or above the cards for Clear / Unload Clothes Dryer,
   with `role="alert"`. Clear asks once ("Clear the washer? Nothing will ring.").
 - Done-at is household local time; the cards re-read `/machines` on every app refresh.
 
@@ -5277,7 +5277,7 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | GET | `/machines` | member | → `Machine[]` in load order: `{ id, label, state: MachineState, ownerId, minutes, startedAt, doneAt, startedBy, next }` (`state` derived by the server, §7D.1; `next` = the next machine's id or null) |
 | POST | `/machines/{id}/start` | member | `{ ownerId, minutes, alertId? }` (§7D.7) → `Machine[]`; 409 `busy` when not free (§7D.2) |
 | POST | `/machines/{id}/move` | member | `{ minutes }` → `Machine[]`; 409 `busy` / `not_done` / `invalid_state` |
-| POST | `/machines/{id}/finish` | member | Fold & out → `Machine[]`; 409 `not_done` / `invalid_state` |
+| POST | `/machines/{id}/finish` | member | Unload Clothes Dryer → `Machine[]`; 409 `not_done` / `invalid_state` |
 | GET / PATCH | `/machines/hours` | GET member / PATCH owner | `MachineHours` `{ weekday, weekend }`, each `{ from, to }` or null → the saved hours; 400 `invalid_input` (§7D.5) |
 | POST | `/machines/{id}/done` | member | Done now `{ ownerId?, alertId? }` (required when free) → `Machine[]`; 409 `busy` when already done, 400 `invalid_input` (§7D.2) |
 | POST | `/machines/{id}/remind` | member | Still loaded → `Machine[]`; 409 `not_done` (§7D.2) |
