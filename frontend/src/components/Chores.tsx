@@ -66,6 +66,7 @@ function AllChoresSection({ sorted, error, turn, onEdit, onOpenAreas }: {
   sorted: Chore[] | null; error: string | null; turn: (c: Chore) => string;
   onEdit: (c: Chore | null) => void; onOpenAreas: (c: Chore) => void;
 }) {
+  const { clock } = useApp();
   return (
     <section className={s.section} aria-label="All chores">
       <div className="row" style={{ marginBottom: 6 }}>
@@ -89,7 +90,7 @@ function AllChoresSection({ sorted, error, turn, onEdit, onOpenAreas }: {
           <tbody>
             {sorted.map((c) => (
               <tr key={c.id} onClick={() => onEdit(c)} style={{ cursor: 'pointer' }}>
-                <td className={s.rigid}>{whenText(c.time, c.sunOffsetMin)} <span className="muted">{c.timing}</span></td>
+                <td className={s.rigid}>{whenText(c.time, c.sunOffsetMin, clock)} <span className="muted">{c.timing}</span></td>
                 <th scope="row" className={s.flexible}>
                   <button className="plain" style={{ textAlign: 'left', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                     title={`Chore: ${c.title}`} onClick={(e) => { e.stopPropagation(); onEdit(c); }}>

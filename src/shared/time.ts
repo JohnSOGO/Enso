@@ -117,3 +117,10 @@ export function isDate(s: unknown): s is string {
 export function isTime(s: unknown): s is string {
   return typeof s === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 }
+
+/** §8.17 — a stored 'HH:MM' as a member sees it: 24-hour as stored, or 12-hour `6:42pm` (⚑ Q278). */
+export function clockText(hhmm: string, clock24h: boolean): string {
+  if (clock24h) return hhmm.slice(0, 5);
+  const h = Number(hhmm.slice(0, 2));
+  return `${h % 12 || 12}:${hhmm.slice(3, 5)}${h < 12 ? 'am' : 'pm'}`;
+}

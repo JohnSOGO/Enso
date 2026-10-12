@@ -4,7 +4,7 @@ import { env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Client, member, owner, tickAt } from './helpers';
 import { sunsetUtc } from '../src/shared/sun';
-import { addMinutes, utcToLocal } from '../src/shared/time';
+import { addMinutes, clockText, utcToLocal } from '../src/shared/time';
 
 const OCEANSIDE = { lat: 33.2, lon: -117.29 };
 const GOAT = 'evt_goat0000000000000';
@@ -30,7 +30,7 @@ const fireOn = (date: string) =>
   env.DB.prepare('SELECT * FROM fires WHERE event_id = ? AND occurrence_date = ?').bind(GOAT, date).first<any>();
 const deliveriesOf = async (fireId: string) =>
   (await env.DB.prepare('SELECT channel, member_id, message FROM deliveries WHERE fire_id = ? ORDER BY channel').bind(fireId).all<any>()).results;
-const h12 = (hhmm: string) => `${Number(hhmm.slice(0, 2)) % 12 || 12}:${hhmm.slice(3)}`;
+const sunsetOn = (date: string) => utcToLocal(sunsetUtc(date, OCEANSIDE)!, 'America/Los_Angeles').time;
 
 describe('M4n the goat alert (G3–G7)', () => {
   it('the migration set the household place', async () => {
@@ -54,14 +54,14 @@ describe('M4n the goat alert (G3–G7)', () => {
     await tickAt(A, dueOn('2026-10-05'));
     const f = await fireOn('2026-10-05');
     expect(f).toMatchObject({ state: 'ringing', due_at: dueOn('2026-10-05') });
-    const text = `Put the goats away — sunset at ${h12(utcToLocal(sunsetUtc('2026-10-05', OCEANSIDE)!, 'America/Los_Angeles').time)}`;
-    expect(text).toMatch(/^Put the goats away — sunset at 6:\d\d$/);
+    const text = `Put the goats away — sunset at ${clockText(sunsetOn('2026-10-05'), false)}`;
+    expect(text).toMatch(/^Put the goats away — sunset at 6:\d\dpm$/);
     // §9.2d: it repeats, so its first alert is phone only; the house joins at the second, 15 min later.
     expect(await deliveriesOf(f.id)).toEqual([{ channel: 'push', member_id: bId, message: text }]);
     await tickAt(A, addMinutes(dueOn('2026-10-05'), 15));
     const after = await deliveriesOf(f.id);
     expect(after.map((d: any) => [d.channel, d.member_id])).toEqual([['house', null], ['push', bId], ['push', bId]]);
-    expect(after[0].message).toMatch(/^Put the goats away — sunset at 6:\d\d/);
+    expect(after[0].message).toMatch(/^Put the goats away — sunset at 6:\d\dpm/);
     expect(aId).not.toBe(bId);
   });
 
@@ -79,5 +79,21 @@ describe('M4n the goat alert (G3–G7)', () => {
     expect((await A.patch(`/events/${GOAT}`, { title: 'x' })).status).toBe(404);
     expect((await A.post(`/events/${GOAT}/exdates`, { date: '2026-10-06' })).status).toBe(404);
     expect((await A.del(`/events/${GOAT}`)).status).toBe(404);
+  });
+});
+
+describe('§8.17 the clock in a sun reminder (CK3)', () => {
+  it('CK3 each push in its member\'s clock; the house row 12-hour', async () => {
+    expect((await A.patch('/me', { clock24h: true })).json.clock24h).toBe(true);
+    expect((await A.put(`/events/${GOAT}/optin`, {})).status).toBe(204);
+    await tickAt(A, dueOn('2026-10-08'));
+    await tickAt(A, addMinutes(dueOn('2026-10-08'), 15));
+    const at = sunsetOn('2026-10-08');
+    const rows = await deliveriesOf((await fireOn('2026-10-08')).id);
+    const text = (who: string | null) => [...new Set(rows.filter((d: any) => d.member_id === who).map((d: any) => d.message.replace(/ \(alert \d\)$/, '')))];
+    expect(text(aId)).toEqual([`Put the goats away — sunset at ${at}`]);
+    expect(text(bId)).toEqual([`Put the goats away — sunset at ${clockText(at, false)}`]);
+    expect(text(null)).toEqual([`Put the goats away — sunset at ${clockText(at, false)}`]);
+    expect(at).toMatch(/^18:\d\d$/);
   });
 });

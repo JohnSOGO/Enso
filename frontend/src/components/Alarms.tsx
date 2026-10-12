@@ -23,7 +23,7 @@ export interface Alarm {
 }
 
 function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
-  const { version, tz } = useApp();
+  const { version, tz, clock } = useApp();
   const [alarms, setAlarms] = useState<Alarm[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -34,7 +34,7 @@ function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
     if (a.ringing) return <span className="badge bad">ringing</span>;
     if (!a.nextDueAt) return <span className="muted" title="Planned up to 36 hours ahead">later</span>;
     const l = utcToLocal(a.nextDueAt, tz);
-    return `${SHORT[WEEKDAY[weekdayOf(l.date)]]} ${l.time}`;
+    return `${SHORT[WEEKDAY[weekdayOf(l.date)]]} ${clock(l.time)}`;
   };
 
   return (
@@ -60,7 +60,7 @@ function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
           <tbody>
             {alarms.map((a) => (
               <tr key={a.id} onClick={() => onEdit(a)} style={{ cursor: 'pointer' }}>
-                <td className={s.rigid}>{a.time}</td>
+                <td className={s.rigid}>{clock(a.time)}</td>
                 <th scope="row" className={s.flexible}>
                   <button className="plain" style={{ textAlign: 'left', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                     title={`Edit ${a.title}`} onClick={(e) => { e.stopPropagation(); onEdit(a); }}>

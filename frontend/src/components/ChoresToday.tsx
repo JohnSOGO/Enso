@@ -23,12 +23,12 @@ function initialScope(): Scope {
   try { return localStorage.getItem(STORE_KEY) === 'everyone' ? 'everyone' : 'mine'; } catch { return 'mine'; }
 }
 
-/** A chore's time as shown (§8.5, ⚑ Q270): the clock time, or `sunset −30` / `sunset` for a sunset chore (§7B.3). */
-export const whenText = (time: string, sunOffsetMin: number | null): string =>
-  sunOffsetMin === null ? time : sunOffsetMin ? `sunset −${sunOffsetMin}` : 'sunset';
+/** A chore's time as shown (§8.5, ⚑ Q270): the clock time in my clock (§8.17), or `sunset −30` / `sunset` for a sunset chore (§7B.3). */
+export const whenText = (time: string, sunOffsetMin: number | null, clock: (hhmm: string) => string): string =>
+  sunOffsetMin === null ? clock(time) : sunOffsetMin ? `sunset −${sunOffsetMin}` : 'sunset';
 
 export function ChoresToday({ onOpenAreas }: { onOpenAreas: (choreId: string) => void }) {
-  const { me, version, refresh, localTime, memberById } = useApp();
+  const { me, version, refresh, localTime, memberById, clock } = useApp();
   const [scope, setScope] = useState<Scope>(initialScope);
   const [runs, setRuns] = useState<Run[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export function ChoresToday({ onOpenAreas }: { onOpenAreas: (choreId: string) =>
   const when = (r: Run) => {
     if (r.ringing) return <span className="badge bad">ringing</span>;
     const waiting = r.step > 0 && r.steps[r.step - 1]?.waitMin && r.nextDueAt;
-    return waiting ? `rings ${localTime(r.nextDueAt!)}` : `${r.timing} ${whenText(r.time, r.sunOffsetMin)}`;
+    return waiting ? `rings ${localTime(r.nextDueAt!)}` : `${r.timing} ${whenText(r.time, r.sunOffsetMin, clock)}`;
   };
   const chipFor = (id: string | null) => {
     const m = id ? memberById(id) : undefined;

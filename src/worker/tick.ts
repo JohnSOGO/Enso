@@ -65,6 +65,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
   const newDeliveryIds: string[] = [];
   let everySpeakerNow: Promise<string[] | null> | undefined; // asked of HA at most once a tick (§7D.3)
   const quiet = await houseQuiet(db, now); // §9.2b: while quiet, no house row at all
+  const on24h = new Set((await all<{ member_id: string }>(db, 'SELECT member_id FROM member_prefs WHERE clock_24h = 1')).map((r) => r.member_id)); // §8.17
   for (const fire of open) {
     const src = await sourceOf(db, fire, now);
     if (!src) continue;
@@ -75,6 +76,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
     if (alert) {
       summary.alerts++;
       const message = alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sunsetAt, src.bring);
+      const message24 = typeof src.sunsetAt === 'string' ? alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sunsetAt, src.bring, true) : message; // §8.17: a push in its member's clock
       const base = { fireId: next.id, alertNumber: next.alert_count };
       // §5.7, §7.5: who it is for. Nobody → the fire still steps, nothing is delivered.
       const aud = audience({
@@ -84,7 +86,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
       // §9.2c: someone away from this alert → no phone rings either.
       if (src.cfg.channels.includes('push') && !fire.away_by) {
         for (const memberId of aud.push) {
-          const d = pushDelivery(db, { ...base, memberId, message }, now);
+          const d = pushDelivery(db, { ...base, memberId, message: on24h.has(memberId) ? message24 : message }, now);
           newDeliveryIds.push(d.id);
           stmts.push(d.stmt);
         }

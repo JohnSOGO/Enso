@@ -31,7 +31,7 @@ export function useAlertLink(): [string | null, () => void] {
 const RED_X = { background: 'none', border: 0, padding: '0 6px', minHeight: 44, flex: 'none' } as const;
 
 export function MyAlerts({ openId, onOpened }: { openId: string | null; onOpened: () => void }) {
-  const { tz, today, version, ringing } = useApp();
+  const { tz, today, version, ringing, clock } = useApp();
   const [alerts, setAlerts] = useState<MyAlert[] | null>(null);
   const [card, setCard] = useState<MyAlert | 'missing' | null>(null);
   const [actError, setActError] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export function MyAlerts({ openId, onOpened }: { openId: string | null; onOpened
 
   const when = (iso: string, full = false) => {
     const l = utcToLocal(iso, tz);
-    return full || l.date !== today() ? `${l.date} ${l.time}` : l.time;
+    return full || l.date !== today() ? `${l.date} ${clock(l.time)}` : clock(l.time);
   };
   const hide = (id: string) => run(async () => {
     await del(`/me/alerts/${encodeURIComponent(id)}`);

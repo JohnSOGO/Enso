@@ -18,7 +18,7 @@ interface Props {
 }
 
 export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
-  const { memberById, me } = useApp();
+  const { memberById, me, clock } = useApp();
   const items = data?.items ?? [];
   const allDay = items.filter((o) => o.allDay);
   const timed = items.filter((o) => !o.allDay);
@@ -26,7 +26,7 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
   const row = (o: DayData['items'][number]) => (
     <li key={`${o.eventId}-${o.date}`}>
       <button className={s.item} onClick={() => onOpenEvent(o)}>
-        <span className={s.when}>{o.allDay ? (o.continued ? 'cont.' : 'All day') : o.startTime}</span>
+        <span className={s.when}>{o.allDay ? (o.continued ? 'cont.' : 'All day') : clock(o.startTime!)}</span>
         <span className={s.bar} style={{ background: o.color }} />
         <span className={s.what}>
           <span className={s.title}>{o.emoji && `${o.emoji} `}{o.title}{o.hasReminder && <span aria-label="has reminder" title="Has a reminder"> 🔔</span>}{o.recurring && <span aria-label="repeats" title="Repeats"> 🔁</span>}</span>

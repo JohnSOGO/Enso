@@ -160,7 +160,7 @@ export function App() {
       ? <JoinPage onJoined={(m) => { leaveJoin(); signedIn(m, { joined: true }); }} onSignIn={leaveJoin} />
       : <SignIn onSignedIn={signedIn} />;
   }
-  if (approveId) return <ApproveLogin id={approveId} onDone={() => { forgetApproveRequest(); setApproveId(null); }} />;
+  if (approveId) return <ApproveLogin id={approveId} clock24h={me.clock24h} onDone={() => { forgetApproveRequest(); setApproveId(null); }} />;
   return (
     <AppProvider me={me} onMe={onMe}>
       <Shell onLogout={() => { setJustJoined(false); setMe(null); }} justJoined={justJoined} openAlert={openAlert} onAlertOpened={onAlertOpened} />

@@ -278,3 +278,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q274 | Calendar lines that still don't fit at the smallest size (§7.1) | ⚑ As many as fit, the last becomes `+N` |
 | Q275 | Event emoji beside the date number once it leads its own line (§7.2) | ⚑ Moved: only the holiday and 📈 stay beside the number, so an emoji shows once |
 | Q276 | Wide-screen (≥ 480px) calendar lines (§7.1) | ⚑ Same emoji + dots, then the start time and title |
+| Q277 | 12-hour or 24-hour clock: whose choice, and the default (§8.17) | ⚑ Each member's own, in Settings → 🙂 Me; everyone starts on 12-hour |
+| Q278 | How a 12-hour time looks (§8.17) | ⚑ `6:30pm`: no leading zero, lower-case am/pm, no space (fits the calendar) |
+| Q279 | The time pickers (§8.17) | ⚑ Left as the phone's own control; they follow the phone's setting, not Enso's |
+| Q280 | Shared channels' clock (speakers, FunHouse) (§8.17) | ⚑ 12-hour; a phone push follows its member's choice |

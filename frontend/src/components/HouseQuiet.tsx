@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { del, errorText, get, put } from '../api';
 import { useApp } from '../state';
 import { quietState } from '../../../src/shared/house-quiet';
-import { utcToLocal } from '../../../src/shared/time';
 import { HOUSE_QUIET_FOR, type HouseQuietFor } from '../../../src/shared/vocab';
 
 interface Quiet { until: string | null; byName: string | null }
@@ -17,7 +16,7 @@ const left = (until: string, now: number) => {
 };
 
 export function HouseQuiet() {
-  const { tz, version } = useApp();
+  const { version, localTime } = useApp();
   const [q, setQ] = useState<Quiet>({ until: null, byName: null });
   const [choosing, setChoosing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -38,7 +37,7 @@ export function HouseQuiet() {
         <>
           <div className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
             <span style={{ flex: 1, minWidth: 0 }}>
-              🤫 House is quiet until {utcToLocal(until, tz).time} · {left(until, now)} left{q.byName && ` · set by ${q.byName}`}
+              🤫 House is quiet until {localTime(until)} · {left(until, now)} left{q.byName && ` · set by ${q.byName}`}
             </span>
             <button disabled={busy} onClick={() => run(() => del<Quiet>('/house/quiet'))}>Turn off now</button>
           </div>

@@ -10,7 +10,7 @@ const COLLAPSE_AFTER = 3;
 const ICON: Record<AlertKind, string> = { reminder: '🔔', timer: '⏱', chore: '🧹', thing: '📌', machine: '🧺' }; // thing, machine ⚑ (§8.2)
 
 export function RingingBar() {
-  const { ringing, memberById } = useApp();
+  const { ringing, memberById, clock } = useApp();
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (ringing.length === 0) return null;
@@ -19,7 +19,7 @@ export function RingingBar() {
   const minsAgo = (iso: string) => Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
   const person = (id: string | null | undefined) => (id ? memberById(id)?.displayName ?? 'unknown member' : 'anyone');
   const sub = (f: Fire) => {
-    if (f.kind === 'reminder') return f.startSun ? ' · sunset' : f.startTime ? ` · ${f.startTime}` : ' · all day'; // §7.7
+    if (f.kind === 'reminder') return f.startSun ? ' · sunset' : f.startTime ? ` · ${clock(f.startTime)}` : ' · all day'; // §7.7
     if (f.kind === 'machine' && !f.personId) return ' · owner unknown'; // §7D.2 Done now with nobody named
     if (f.kind === 'chore' || f.kind === 'machine') return ` · ${person(f.personId)}`;
     if (f.kind === 'thing') return ' · to do'; // ⚑ (§8.2)
