@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-12 — Steward pass 22, whole tree (code-steward)
+
+- **Run:** after the v1.71.0 release (SPEC 3.26 §7.1/§7.2: calendar day lines; DayCell.tsx extracted; new pure day-lines.ts). Also covers v1.70.1.
+- **Verdict:** SOUND. Typecheck green, 853/853 tests, arch:audit quiet (chores.ts and things.ts at 84% are the highest).
+- **Placement audit:** 3 receipts against 3 code commits (4dcd987, bb29a32, c2f17b2), no mismatches.
+- **Top finding:** where-things-stand had no v1.71.0 device check (added in this commit).
+- **Handoffs:** 0 to reorganizer, 0 to placement-advisor. Items carried from passes 19–21 still wait for MojoSOGO's pick.
+- **Restraint:** DayCell ↔ Calendar import loop is type-only; `isMultiDay` stays in DayCell; DATE_LINE is commented presentation; day-lines.ts is a pure tested leaf.
+
 ## 2026-10-12 — v1.71.0: Day cell event lines: emoji + participant dots, auto-fit (placement-advisor)
 
 - **Ask:** SPEC §7.1 "Event display in a cell" (SPEC 3.26, Q273–Q276). Each single-day event gets its own line under the date line: emoji, then one dot per assignedTo member in Member.color (nobody: the emoji alone, or the event-color dot), start time and title on screens ≥480 px. Line height shrinks 13 → 8 px to fit the room left after the date line and bar lanes, else `+N`. Dots shrink when crowded (≥3 px). Event emojis leave the date line (§7.2).
