@@ -788,6 +788,11 @@ phone + house reminder check are still to do. Local dev keeps its own database t
 local dev data). Admins (§6.3, A1–A7) are built; `Settings.tsx` is at 89 % of its ceiling after the
 members-list controls — the next addition there is a placement decision.
 
+**Dryer button reads "Unload Clothes Dryer"** (v1.63.1, §7D.2, §8.2, §8.5, Q40; MojoSOGO 2026-10-12 picked the
+Ringing-now "Fold & out" button: "Unload Clothes Dryer is a better label"): `finishLabel` now says it, so the Ringing bar
+and the Machines card change together. The refusal for finishing the washer reads "Move this load to the clothes dryer
+first." Washer (Move to clothes dryer) and dish washer (Emptied) unchanged.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

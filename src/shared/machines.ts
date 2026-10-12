@@ -33,7 +33,7 @@ export const isLaundry = (id: MachineId): boolean => LAUNDRY.includes(id);
 const MINUTES: Record<MachineId, readonly number[]> = { washer: [30, 60, 90, 120], dryer: [30, 45, 60, 90], dishwasher: [60, 90, 120, 150] };
 export const machineMinutes = (id: MachineId): readonly number[] => MINUTES[id];
 /** §8.5 — the button that ends a load in the last machine. */
-export const finishLabel = (id: MachineId): string => (isLaundry(id) ? 'Fold & out' : 'Emptied');
+export const finishLabel = (id: MachineId): string => (isLaundry(id) ? 'Unload Clothes Dryer' : 'Emptied');
 
 /** The machine a load moves on to (washer → dryer), or null for the last or a lone machine. */
 export function nextMachine(id: MachineId): MachineId | null {
@@ -97,7 +97,7 @@ export function moveMachine(
   };
 }
 
-/** Fold & out: a done load in the last machine ends its loop. */
+/** Finish (Unload Clothes Dryer): a done load in the last machine ends its loop. */
 export function finishMachine(row: MachineRow, openFire: FireRow | null, by: string, now: string): MachineResult {
   if (nextMachine(row.id) !== null) return { error: 'invalid_state', machine: row, why: 'not_last' };
   if (machineState(row, now) !== 'done') return { error: 'not_done', machine: row };
@@ -159,7 +159,7 @@ export function refusalText(r: MachineRefusal, names: ReadonlyMap<string, string
     case 'already_free': return `The ${lower(r.machine.id)} is already free.`;
     case 'invalid_state': return r.why === 'no_next'
       ? `${label} loads don't move on — use ${finishLabel(r.machine.id)}.`
-      : `Fold & out is for the ${lower(LAUNDRY[LAUNDRY.length - 1])} — move this load on first.`;
+      : `Move this load to the ${lower(LAUNDRY[LAUNDRY.length - 1])} first.`;
   }
 }
 

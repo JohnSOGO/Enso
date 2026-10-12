@@ -177,7 +177,7 @@ describe('L1–L2 the pure rules (machines.ts)', () => {
     expect(machineMinutes('washer')).toEqual([30, 60, 90, 120]);
     expect(machineMinutes('dryer')).toEqual([30, 45, 60, 90]);
     expect(machineMinutes('dishwasher')).toEqual([60, 90, 120, 150]);
-    expect([finishLabel('dryer'), finishLabel('dishwasher')]).toEqual(['Fold & out', 'Emptied']);
+    expect([finishLabel('dryer'), finishLabel('dishwasher')]).toEqual(['Unload Clothes Dryer', 'Emptied']);
     expect(refusalText({ error: 'invalid_state', machine: running('dishwasher', 'S', T), why: 'no_next' }, new Map()))
       .toBe("Dish washer loads don't move on — use Emptied.");
   });
@@ -301,7 +301,7 @@ describe('M4l /machines (L3–L12)', () => {
     expect(done.json.message).toBeTruthy();
   });
 
-  it('L6–L9 move to the dryer; a second load waits; the dryer names it; Fold & out ends the loop', async () => {
+  it('L6–L9 move to the dryer; a second load waits; the dryer names it; Unload Clothes Dryer ends the loop', async () => {
     await o.post('/machines/washer/start', { ownerId: A, minutes: 30 });
     await finishedAgo('washer', 5);
     const washerFire = await openFire('washer');
@@ -331,12 +331,12 @@ describe('M4l /machines (L3–L12)', () => {
     expect(msgs.length).toBeGreaterThan(0);
     expect(new Set(msgs)).toEqual(new Set([`${A_NAME}, your laundry in the clothes dryer is done — ${B_NAME}'s load is waiting`]));
 
-    // L9 — Fold & out on the done dryer.
+    // L9 — Unload Clothes Dryer on the done dryer.
     const fo = await o.post('/machines/dryer/finish');
     expect(fo.status, JSON.stringify(fo.json)).toBe(200);
     expect(fo.json.find((m: any) => m.id === 'dryer')).toMatchObject({ state: 'free', ownerId: null });
     expect((await firesOf('dryer')).find((f) => f.id === dryerFire.id)).toMatchObject({ state: 'closed', close_reason: 'done', closed_by: A });
-    // Fold & out is for the dryer only.
+    // Unload Clothes Dryer is for the dryer only.
     const wrong = await o.post('/machines/washer/finish');
     expect(wrong.status).toBe(409);
     expect(wrong.json).toMatchObject({ error: 'invalid_state' });

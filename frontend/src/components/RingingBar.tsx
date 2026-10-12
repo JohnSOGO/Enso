@@ -27,7 +27,7 @@ export function RingingBar() {
   }
   const act = (f: Fire, action: 'done' | 'snooze' | 'ack') => send(f, `/fires/${f.id}/actions`, { action });
 
-  /** §8.2: a machine fire is closed only by /machines (or /cooking) — Move to the next machine, Fold & out on the last, Off on a cooking timer. */
+  /** §8.2: a machine fire is closed only by /machines (or /cooking) — Move to the next machine, Unload Clothes Dryer on the last, Off on a cooking timer. */
   const machineButton = (f: Fire) => {
     if (isCookId(f.machineId)) return <button className="primary" disabled={busy === f.id} onClick={() => send(f, `/cooking/${f.machineId}/off`, {})}>Off</button>; // §7D.8
     if (!isMachineId(f.machineId)) return null;

@@ -1792,3 +1792,11 @@ REORG RECEIPT
   201. Day one: green, nothing in the warning band (highest 87 %).
 - **New owners:** `scripts/arch.ts`, `scripts/arch-types.ts`, `scripts/arch-audit.ts`
   (Tooling).
+
+## 2026-10-12 — Clothes dryer finish reads "Unload Clothes Dryer" (placement-advisor)
+
+- **Ask:** v1.63.1 patch, SPEC §8.5/§7D.2. The dryer's finish button (Ringing-now bar and Machines card) reads "Unload Clothes Dryer" instead of "Fold & out". The dish washer's "Emptied" and the washer's "Move to clothes dryer" stay.
+- **Verdict:** src/shared/machines.ts [EXISTING]. Change the laundry branch of `finishLabel`; the `invalid_state` refusal no longer hard-codes the old label. Update test/machines.test.ts to match.
+- **Flow stage:** rules (wording), rendered unchanged by RingingBar.tsx and Machines.tsx.
+- **Why:** `finishLabel` already owns the finish wording and both screens import it, so one edit keeps them in step.
+- **Caps:** src/shared/machines.ts 238/300 → 238/300. No file newly in the warning band.

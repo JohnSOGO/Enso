@@ -191,7 +191,7 @@ function stepOpen(fire: FireRow, cfg: AlertConfig, now: string): { fire: FireRow
 export function applyAction(
   fire: FireRow, action: Action, cfg: AlertConfig, memberId: string, now: string,
 ): { fire: FireRow; next?: NewFire } | { error: 'invalid_action' } {
-  // §7D.2: a machine fire is closed only by the /machines routes (move, Fold & out, Clear).
+  // §7D.2: a machine fire is closed only by the /machines routes (move, Unload Clothes Dryer, Clear).
   if (fire.kind === 'machine') return { error: 'invalid_action' };
   if (fire.kind === 'chore') {
     // The run's step advance is the route's job (advanceRun, §7B.3); the engine only closes this fire.
