@@ -1,5 +1,5 @@
 // SPEC §9.3 — POST /announce: a house announcement, now. A delivery with no fire: one `house` row the
-// Worker speaks right after answering (§9.2) on everyone's ticked speakers (§9.2a), one `push` row per other member, sent at once, and a `funhouse` row (§9.4b). The
+// Worker speaks right after answering (§9.2) on every speaker HA lists (§9.3), one `push` row per active member (the sender too), sent at once, and a `funhouse` row (§9.4b). The
 // sender's name comes from the session.
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
@@ -11,8 +11,7 @@ import { funhouseDelivery, houseDelivery, pushDelivery } from '../deliveries';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
 import { sendPushDeliveries } from '../push';
-import { sendHouseDeliveries } from '../house';
-import { deliverySpeakers } from '../speaker-choices';
+import { allHouseSpeakers, sendHouseDeliveries } from '../house';
 import { houseQuiet } from '../house-quiet';
 import { utcToLocal } from '../../shared/time';
 
@@ -37,8 +36,8 @@ announce.post('/announce', requireMember, async (c) => {
   if (quiet && channels.length === 1) {
     return fail(c, 409, 'house_quiet', `The house is quiet until ${utcToLocal(quiet.until, await householdTz(db)).time}.`);
   }
-  // §9.2a: for every active member, so on everyone's ticked speakers together; none ticked → not spoken.
-  const speakers = channels.includes('house') && !quiet ? await deliverySpeakers(db, await activeMemberIds(db)) : [];
+  // §9.3: every speaker HA lists, whatever anyone ticked (null = the defaults when HA can't say).
+  const speakers = channels.includes('house') && !quiet ? await allHouseSpeakers(c.env) : [];
   if (speakers === null || speakers.length) {
     const d = houseDelivery(db, { message, speakers }, now);
     ids.push(houseId = d.id);
@@ -46,7 +45,7 @@ announce.post('/announce', requireMember, async (c) => {
   }
   if (channels.includes('push')) {
     const aud = audience({ optional: false, assignedTo: [], activeIds: await activeMemberIds(db), onIds: [], channels });
-    for (const memberId of aud.push.filter((id) => id !== me.id)) {
+    for (const memberId of aud.push) {
       const d = pushDelivery(db, { memberId, message }, now);
       ids.push(d.id);
       pushIds.push(d.id);
@@ -58,9 +57,6 @@ announce.post('/announce', requireMember, async (c) => {
     ids.push(d.id);
     stmts.push(d.stmt);
   }
-  // Nothing would be sent — say why rather than succeed with nothing sent.
-  if (!stmts.length && channels.includes('house') && speakers?.length === 0) return fail(c, 409, 'no_speakers', 'Nobody has a house speaker ticked.');
-  if (!stmts.length) return fail(c, 409, 'no_recipients', 'There is nobody else to send a phone announcement to.');
   await db.batch(stmts);
   if (pushIds.length) await sendPushDeliveries(c.env, pushIds, now);
 

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.11 · **Date:** 2026-10-11 · **Owner:** MojoSOGO
+**Version:** 3.12 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4795,11 +4795,10 @@ for someone who is never in that room.
 
 **Who a house delivery is for** is the audience tick already computes (`audience(…).push`, §7.5: active
 members, narrowed to the assigned ones, and for an optional event to those who have it on). An
-**announcement** is for every active member ⚑ Q127 (it has no assignment). The writer reads those members'
+**announcement** does not use anyone's choice: it is spoken on **every speaker HA lists** (§9.3, Q127). The writer reads those members'
 `member_prefs.house_speakers` and stores `speakersFor(…)` on the row as JSON (NULL stays NULL).
 **`speakersFor` = `[]` → no house row is written**: nobody it is for wants it spoken ⚑ Q128. The fire still
-steps and push still goes out. For an announcement with House alone ticked, that is **409 `no_speakers`**
-"Nobody has a house speaker ticked." — nothing would be spoken, so it says so.
+steps and push still goes out.
 
 **`GET /house/speakers`** (member) — the list to tick from, asked of Home Assistant **live** (never stored):
 - House not configured (`houseConfigOf` null) → **503 `house_not_configured`**, before any fetch.
@@ -4850,7 +4849,7 @@ no longer lists is shown as such and fails visibly when spoken. `GET /me` carrie
 | HS7 | tick: a fire for A alone, A chose only Echos | the Voice PE is not called; detail has only `echo`; `sent` |
 | HS8 | tick: a fire for A and C, C has not chosen | `speakers` NULL; spoken on `ECHO_TARGETS` + `SATELLITE_ENTITY` (H2 unchanged) |
 | HS9 | tick: a fire for A alone, A chose `[]` | no house row; the push row still written; the fire steps |
-| HS10 | `POST /announce` House with A `[game_room]`, B `[sogo]`, C disabled `[toasty]`; with everyone `[]` | one house row on game_room + sogo (not toasty); everyone `[]` + House only → 409 `no_speakers`, nothing written; with Phone too → 201, push rows only |
+| HS10 | `POST /announce` House with A `[game_room]`, B `[]`; HA lists Game Room, Everywhere, Sogo, Office; then HA answers 500 | one house row on game_room + sogo + the Voice PE (not Everywhere), whatever was ticked; HA down → `speakers` NULL (the defaults) |
 | HS-M | migration 0024 | earlier rows intact, both columns NULL; `foreign_key_check` empty |
 
 ### 9.2b Quiet the house — `src/shared/house-quiet.ts` — asked by MojoSOGO 2026-10-10
@@ -4987,20 +4986,22 @@ acked, nothing is scheduled — **now only**.
 - The sender's name is the **session member's** `display_name` — never taken from the body.
 - One `db.batch`:
   - **House** ticked → one `house` delivery: `fire_id NULL`, `member_id NULL`,
-    `alert_number 1`, `message` = `announceMessage(…)`, `speakers` = the union of every active
-    member's choice (§9.2a), `queued`. The Worker speaks it exactly like a House alert (§9.2),
+    `alert_number 1`, `message` = `announceMessage(…)`, `speakers` = **every speaker HA lists**
+    (`allHouseSpeakers`, as machines, §7D.3; NULL = the defaults when HA can't say), whatever anyone ticked, `queued`
+    (Q127, MojoSOGO 2026-10-12: "not hearing the announcement button audio on all devices"). The Worker speaks it exactly like a House alert (§9.2),
     **right away**: after
     the 201 body is read, `c.executionCtx.waitUntil(sendHouseDeliveries(env, now, [houseId]))`
     — a drain restricted to that one row, so the speaker does not wait for the next tick.
   - **Phone** ticked → one `push` delivery per member of `audience(…).push` (§7.5 — with no
-    assignment, every active member) **except the sender** ⚑, same `message`, `queued`.
+    assignment, every active member) **the sender too**, so their other devices hear it (Q36, MojoSOGO
+    2026-10-12: "not getting notifications on all devices"), same `message`, `queued`.
 - Then the push deliveries are sent at once with `sendPushDeliveries` (§9.1): each ends `sent`
   or visibly `failed` (`no_subscription`, `push_not_configured`, a push-service error) — a
   member without a phone gets the honest failed row, as alerts do.
 - → **201** `{ deliveries: { id, channel, memberId, status }[] }`, read after sending push and
   **before** the house row is spoken (push rows final, the house row `queued`). Every row also shows in Settings → 📊 Status.
-- 400 `invalid_input` with `announceError`'s message. **409 `no_recipients`** when only Phone
-  is ticked and there is no other active member — nothing would be sent, so it says so.
+- 400 `invalid_input` with `announceError`'s message. (No `no_recipients` / `no_speakers`: the sender is always an
+  active member and House always has speakers, so something is always sent.)
 
 **The push:** `{ fireId: null, kind: null, tag: <delivery id>, title: "📢 Announcement", body:
 "Shelly says: Dinner is ready", actions: [] }`; tapping it opens the app.
@@ -5012,9 +5013,9 @@ acked, nothing is scheduled — **now only**.
 | AN1 | `announceError` / `announceMessage` | `"  hi "` ok; `""`, blanks, 201 chars, a non-string → message; channels `[]`, `["sms"]`, `["house","house"]`, not an array → message; `announceMessage("Shelly", " Dinner ")` = `"Shelly says: Dinner"` |
 | AN2 | `POST /announce { text: " Dinner is ready ", channels: ["house"] }` | 201; one `house` delivery: `fire_id` NULL, `member_id` NULL, `alert_number` 1, `"MojoSOGO says: Dinner is ready"`, `queued`; no push rows |
 | AN3 | the same, with the House settings present and a fake HA (§9.2), after `waitUntil` settles | the 201 still says `queued`; the row is then `sent`, and the fake HA heard `"MojoSOGO says: Dinner is ready"` on both surfaces |
-| AN4 | Phone, with the sender, a member with a phone, one without, one disabled | one push row each for the other two active members; the sender and the disabled member get none; with a phone → `sent`, without → `failed`, `no_subscription` |
+| AN4 | Phone, with the sender, a member with a phone, one without, one disabled | one push row each for the sender and the other two active members; the disabled member gets none; with a phone → `sent`, without → `failed`, `no_subscription` |
 | AN5 | the push to that phone | decrypts to the payload above with `tag` = the delivery id; no `topic` header |
-| AN6 | blank text, 201 chars, no channels, an unknown channel; no session; a `name` in the body; Phone only with nobody else | 400 with a message ×4; 401; the name in the body is ignored; 409 `no_recipients` |
+| AN6 | blank text, 201 chars, no channels, an unknown channel; no session; a `name` in the body; Phone only with nobody else | 400 with a message ×4; 401; the name in the body is ignored; 201 with one push row, to the sender |
 | AN7 | tag rules | a fire's push: `tag` = `fireId`; the test push: `tag` = `"enso-test"`; no push carries a `topic` header |
 | AN8 | migration 0012 | rows survive unchanged; `foreign_key_check` empty; a fire-less delivery is accepted (§4.2k) |
 
@@ -5297,7 +5298,7 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | DELETE | `/me/alerts/{id}` | member (my push) | → 204, hidden from my list; 404 `not_found` otherwise (§9.5) |
 | DELETE | `/me/alerts` | member | → `{ cleared }`, all of mine hidden (§9.5) |
 | GET / PUT / DELETE | `/house/quiet` | member | GET → `{ until, byName }`; PUT `{ for: '1h' \| '2h' \| '4h' \| 'today' }` → the same; DELETE turns quiet off; 400 `invalid_input` (§9.2b) |
-| POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `no_recipients` (§9.3); 409 `no_speakers` (§9.2a); 409 `house_quiet` (§9.2b); spoken as "{my name} says: {text}" and/or pushed to the other members, now (§9.3) |
+| POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; 409 `house_quiet` (§9.2b); spoken as "{my name} says: {text}" on every speaker and/or pushed to every member, me too, now (§9.3) |
 | POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 409 `no_recipients` (no founder yet) / 429 `rate_limited`, in that order |
 | GET | `/ops/pings?after=` | bearer `OPS_NOTIFY_TOKEN` (no session) | → `{ pings: [{ id, channel, title, text, at }] }`, the founder pings and FunHouse alerts of the last hour after `after`, oldest first, for the FunHouse poller (§9.4a, §9.4b; listed `funhouse` rows become `sent`); 503 / 401 as `/ops/notify` |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek, areaCount }` (`thisWeek`/`nextWeek` = member id or null; `areaCount` §7B.6) |

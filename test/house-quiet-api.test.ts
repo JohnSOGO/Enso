@@ -84,7 +84,8 @@ it('HQ5: announce while quiet — House only → 409 house_quiet, nothing writte
   expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM deliveries').first<{ n: number }>())!.n).toBe(0);
   const both = await call(A, 'POST', '/announce', { text: 'Dinner', channels: ['house', 'push'] });
   expect(both.status).toBe(201);
-  expect(both.json.deliveries.map((d: any) => d.channel)).toEqual(['push']);
+  expect(both.json.deliveries.length).toBeGreaterThan(0);
+  expect(both.json.deliveries.every((d: any) => d.channel === 'push')).toBe(true);
   expect(ha.heard).toHaveLength(0);
 });
 

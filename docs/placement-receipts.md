@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.63.0: Announce reaches every speaker and every member's phone (placement-advisor)
+
+- **Ask:** POST /announce speaks on every speaker HA lists via `allHouseSpeakers(env)` (null = the defaults), as machines do (§7D.3), instead of the union of members' ticked speakers; it pushes to every active member including the sender. SPEC §9.3, MojoSOGO 2026-10-12 "not hearing the announcement … on all devices".
+- **Verdict:** src/worker/routes/announce.ts [EXISTING]
+- **Flow stage:** route (who receives the announcement), reusing deliver (house.ts allHouseSpeakers)
+- **Why:** the announce.ts row already owns the announcement's speakers and push audience; the change swaps one existing helper for another (deliverySpeakers → allHouseSpeakers, already used by tick.ts for machines) and deletes a filter, so no new code, rule or module. Rejected: a shared "announce audience" rule in src/shared/ (nothing left to decide, classitis); widening speaker-choices.ts (owns the choices announcements stop using). The now-unreachable `no_recipients` / `no_speakers` branches were deleted rather than left with stale messages. Open product point: the sending phone gets its own push too (a push fans out to all of a member's subscriptions).
+- **Caps:** announce.ts 73 → 69 lines against GLOBAL_FILE_CAP 300. No file newly in the band.
+- **Sources read:** src/worker/routes/announce.ts; docs/module-ownership.md (rows 53, 80, 81, 94, 153); scripts/arch.ts; src/worker/house.ts allHouseSpeakers; src/worker/tick.ts:96; SPEC.md §9.3, §9.2a, API row; frontend Announce.tsx; tests referencing /announce.
+
 ## 2026-10-11 — Steward pass 19, whole tree (code-steward)
 
 - **Run:** after the v1.62.0 release (SPEC 3.11 §7D.9, 🪙 Bounty from a done machine load). Also covers v1.60.1–v1.61.0.
