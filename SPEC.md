@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.21 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.22 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3870,11 +3870,13 @@ Time      Chore            Days        This week
 
 - A sunset chore shows `sunset −30` (or `sunset`) in place of the clock time (`whenText` in `ChoresToday.tsx`, §7B.3), on All chores
   and on Today.
-- `at`/`by` after the time; a superscript step count when there is more than one step; 📋 after the
-  title when the chore's room has areas (§7B.6).
+- `at`/`by` after the time; a superscript step count when there is more than one step; a **📋** button after
+  the title when the chore has a Done means or its room has areas (§7B.6), opening its **What done looks like**
+  sheet (§8.15).
 - **This week** = whose turn it is now; when people take turns, `→` the next person.
-- Tapping a row opens the chore's **What done looks like** sheet (§8.15); its **✎ Edit chore** opens the
-  **chore form** (modal):
+- Tapping a row opens the **chore form** (modal; read-only for anyone who can't change it), not its room
+  (v1.68.1, MojoSOGO 2026-10-12: "clicking into a chore should open the chore details not the definition of the
+  room"). The sheet's **✎ Edit chore** opens the same form:
   - Title · **Done means…** (one line, e.g. "Bins at the curb, lids shut") · **Room** (No room, then the rooms, §7B.6)
   - Days (chips Sun…Sat, plus "Every day" / "Weekdays")
   - **When:** ( ) **At** a time — it rings · ( ) **By** a time — quiet; ☐ nudge then

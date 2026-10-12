@@ -823,7 +823,11 @@ unknown owners for machines, do not ping funhouse; ping funhouse for MojoSOGO an
 cooking timer writes a `funhouse` row only when its alert person is the founder. Nobody → phones only; someone else →
 Phone + House. Announce unchanged. `FOUNDER_SQL` moved from routes/members.ts to db.ts so fire-rows.ts can read it.
 
-**Chores before sunset** (v1.69.0, SPEC 3.21, §7B.3, §4.2zu, §8.5, Q270–Q271; MojoSOGO 2026-10-12: "an alarm chore that can be
+**A chore row opens the chore** (v1.68.1, SPEC 3.21, §8.5; MojoSOGO 2026-10-12: "clicking into a chore should open the
+chore details not the definition of the room"): in 📋 All chores a row tap opens the chore form; the 📋 after the title
+is its own button for What done looks like. Today unchanged (a tap ticks it, its 📋 opens the sheet).
+
+**Chores before sunset** (v1.69.0, SPEC 3.22, §7B.3, §4.2zu, §8.5, Q270–Q271; MojoSOGO 2026-10-12: "an alarm chore that can be
 assigned to anyone to get the eggs 30 minutes before sundown"): the chore form's Time is **Clock** or **Before sunset**
 [30] min. Migration 0048 adds `chores.sun_offset_min`; the run's time is that day's sunset (household place, §7.7) minus
 it, for `at` rings and `by` nudges. Lists show `sunset −30`.
