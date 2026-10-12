@@ -53,3 +53,6 @@ export async function householdPlace(db: D1Database): Promise<Place | null> {
 /** The ids of every member not disabled. */
 export const activeMemberIds = async (db: D1Database): Promise<string[]> =>
   (await all<{ id: string }>(db, 'SELECT id FROM members WHERE disabled_at IS NULL')).map((r) => r.id);
+
+/** §6.3 — the founder is the member setup created: the earliest created_at. Derived, never stored. */
+export const FOUNDER_SQL = 'SELECT id FROM members ORDER BY created_at, id LIMIT 1';

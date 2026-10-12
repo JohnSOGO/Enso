@@ -1867,7 +1867,16 @@ REORG RECEIPT
 - **Caps:** Settings.tsx ~63/99 (pinned), SettingsHousehold.tsx 53 → ~30, DaysOff.tsx ~30, OptionalItems.tsx 58. No file newly in the band, no re-pin.
 - **Sources read:** frontend/src/components/SettingsHousehold.tsx, OptionalItems.tsx, Settings.tsx; docs/module-ownership.md rows 151, 196, 201; scripts/arch.ts CEILINGS; plus the first v1.65.0 receipt's sources.
 
-## 2026-10-12 — v1.68.0: Chore time "before sunset" (placement-advisor)
+## 2026-10-12 — Machine FunHouse ping only for the founder (placement-advisor)
+
+- **Ask:** SPEC §7D.3/§7D.7/§7D.8/§9.4b (MojoSOGO 2026-10-12: "for unknown owners for machines, do not ping funhouse; ping funhouse for MojoSOGO and announcements"). A machine or cooking-timer fire gets a FunHouse row only when its alert person is the founder. Nobody → Phone only. Someone else → Phone + House. Announce is unchanged.
+- **Verdict:** src/shared/machines.ts `machineAlert(quietUntil, alertId, founderAlerted)` + src/shared/cooking.ts `cookAlert(alertId, founderAlerted)` + src/worker/fire-rows.ts sourceOf (both the cook and fixed-machine branches) [EXISTING]. Reorganizer first: FOUNDER_SQL moves from src/worker/routes/members.ts to src/worker/db.ts [EXISTING row widened]; members.ts and routes/ops.ts re-import it from db.ts.
+- **Flow stage:** rules (the channel set, a pure boolean input) + persist/load (the founder lookup in sourceOf).
+- **Why:** machineAlert already owns the one "who does a machine fire reach" decision (§7D.7), so this is one more input, not a new owner. The founder lookup is I/O, so it stays in sourceOf, which already resolves the alert person. Rejected: importing FOUNDER_SQL from routes/members into fire-rows (members.ts builds a Hono app when it loads; fire-rows is "no Hono" and loaded by tick). db.ts already owns member-set SQL (activeMemberIds). tick and optins need no change because the funhouse row already follows cfg.channels.
+- **Caps:** machines.ts ~240/300, cooking.ts ~161/300, fire-rows.ts ~164/300, db.ts ~57/300, routes/members.ts ~72/300, routes/ops.ts 76/300. No pinned ceilings, nothing newly in the 90% band (270).
+- **Sources read:** scripts/arch.ts, docs/module-ownership.md (shared + worker rows), docs/placement-receipts.md, src/worker/fire-rows.ts, src/worker/db.ts, src/worker/routes/members.ts, src/shared/machines.ts, src/shared/cooking.ts, src/shared/optins.ts, line counts of routes/ops.ts.
+
+## 2026-10-12 — v1.69.0: Chore time "before sunset" (placement-advisor)
 
 - **Ask:** SPEC §7B.3 / §4.2zu (migration 0048): a chore's time can be local sunset − N minutes (0–240) instead of a clock time; no place or no sunset that day → no time-based fire, still on Today. MojoSOGO: "an alarm chore that can be assigned to anyone to get the eggs 30 minutes before sundown".
 - **Verdict:** EXISTING owners: `src/shared/chores.ts` (place-aware `deadline`; trailing `place` on `firstFireDue`, `planChoreRuns`, `advanceRun`, `undoRun`, `replanRun`; `sunOffsetMin` in `parseChoreInput`, exported `SUN_OFFSET_MAX`) and `frontend/src/components/ChoresToday.tsx` (exported `whenText`, also used by Chores.tsx). Callers: `src/worker/fire-rows.ts` `choreRunInserts` passes `place`; `src/worker/tick.ts`; `src/worker/routes/chores.ts` loads `householdPlace` inside `stepRun` so `routes/alerts.ts` is untouched, and `choreView` emits `sunOffsetMin` so a PATCH keeps it. Form: `ChoreForm.tsx`.

@@ -9,10 +9,11 @@ import { addMinutes } from '../src/shared/time';
 const Q = '2026-10-11T17:30:00.000Z';
 
 describe('AL1–AL2 the pure rules', () => {
-  it('AL1 machineAlert: someone → Phone + House on every speaker; nobody → Phone + FunHouse', () => {
-    expect(machineAlert(null, 'mem_a')).toMatchObject({ allSpeakers: true, cfg: { channels: [...MACHINE_CHANNELS] } });
-    const none = machineAlert(Q, null);
-    expect(none).toMatchObject({ allSpeakers: false, cfg: { channels: ['push', 'funhouse'], quietUntil: Q } });
+  it('AL1 machineAlert: the founder → Phone + House + FunHouse; someone else → Phone + House; nobody → Phone only', () => {
+    expect(machineAlert(null, 'mem_a', true)).toMatchObject({ allSpeakers: true, cfg: { channels: [...MACHINE_CHANNELS] } });
+    expect(machineAlert(null, 'mem_b', false)).toMatchObject({ allSpeakers: true, cfg: { channels: ['push', 'house'] } });
+    const none = machineAlert(Q, null, false);
+    expect(none).toMatchObject({ allSpeakers: false, cfg: { channels: ['push'], quietUntil: Q } });
   });
 
   it('AL2 parseStart / parseDoneNow: absent → the owner, null → nobody, a member, a stranger refused', () => {
@@ -123,17 +124,24 @@ describe('AL3–AL6 /machines and tick', () => {
     expect(houses(d)).toEqual([]);
   });
 
-  it('AL7 a machine done rings the FunHouse too, with or without someone to alert; away stops it', async () => {
-    await o.post('/machines/dishwasher/start', { ownerId: A, minutes: 60, alertId: null });
+  it('AL7 the FunHouse rings only when the founder is alerted: not for nobody or someone else; away stops it', async () => {
+    const funhouse = async (fireId: string) => (await env.DB.prepare(`SELECT member_id, title, message FROM deliveries WHERE fire_id = ? AND channel = 'funhouse'`).bind(fireId).all<any>()).results;
+    for (const alertId of [null, B]) {
+      await o.post('/machines/dishwasher/start', { ownerId: A, minutes: 60, alertId });
+      const f = await openFire('dishwasher');
+      await tickAt(o, await doneNow('dishwasher'));
+      expect(await sent(f.id)).not.toEqual([]);
+      expect(await funhouse(f.id)).toEqual([]);
+      await o.post('/machines/dishwasher/clear');
+    }
+    await o.post('/machines/dishwasher/start', { ownerId: B, minutes: 60, alertId: A });
     const fire = await openFire('dishwasher');
     await tickAt(o, await doneNow('dishwasher'));
-    const fh = (await env.DB.prepare(`SELECT member_id, title, message FROM deliveries WHERE fire_id = ? AND channel = 'funhouse'`).bind(fire.id).all<any>()).results;
-    expect(fh).toEqual([{ member_id: null, title: 'Ensō', message: (await sent(fire.id))[0].message }]);
-    await o.post('/machines/dishwasher/clear');
+    expect(await funhouse(fire.id)).toEqual([{ member_id: null, title: 'Ensō', message: (await sent(fire.id))[0].message }]);
     await o.post('/machines/washer/start', { ownerId: A, minutes: 60, alertId: A });
     const w = await openFire('washer');
     await env.DB.prepare('UPDATE fires SET away_by = ? WHERE id = ?').bind(A, w.id).run();
     await tickAt(o, await doneNow('washer'));
-    expect((await sent(w.id)).filter((x) => x.channel === 'funhouse')).toEqual([]);
+    expect(await funhouse(w.id)).toEqual([]);
   });
 });

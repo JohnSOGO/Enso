@@ -232,7 +232,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q228 | Which founder pings the FunHouse poller shows (§9.4a) | ⚑ Titles starting 🤖 or 🧵 (Claude's); others, such as 🏛️ Ozymandias which reaches the FunHouse itself, are skipped |
 | Q229 | How a ping looks on the FunHouse (§9.4a) | ⚑ source "Claude", level `attention`, beep `look`, sig ⭕🔁🏠, text "title: text" |
 | Q230 | Who sees the 🎪 FunHouse tick (§9.4b) | **Decided by MojoSOGO 2026-10-11:** only the founder (on by default for his new alerts); others don't see it unless the alert already has it |
-| Q231 | Machines and the FunHouse (§9.4b) | Decided by MojoSOGO 2026-10-11 ("not getting funhouse alerts on completion"): every machine fire, washing and cooking, also goes to the FunHouse; Away still stops it |
+| Q231 | Machines and the FunHouse (§9.4b) | Decided by MojoSOGO 2026-10-11 ("not getting funhouse alerts on completion"): every machine fire, washing and cooking, also goes to the FunHouse; Away still stops it. Changed by MojoSOGO 2026-10-12 ("for unknown owners for machines, do not ping funhouse; ping funhouse for MojoSOGO and announcements"): only when the founder is the one alerted (§7D.7) |
 | Q232 | Which rules the FunHouse follows (§9.4b) | ⚑ The phone's: Away stops it, Quiet the house does not, phone first does not delay it |
 | Q233 | How an Ensō alert looks on the FunHouse (§9.4b) | ⚑ As a ping (Q229) with source "Ensō" |
 | Q234 | Where 🎯 Point at it is turned on (§8.16) | **Decided by MojoSOGO 2026-10-12:** founder only (same check as Q230), nobody else sees ◎ or the switch. ⚑ For him, on by default since v1.60.1 (like Ozymandias); a switch in Settings → 🙂 Me turns it off for this device only (kept in the browser) |
@@ -270,5 +270,6 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q266 | Rooms (§7B.6) | ⚑ Up to 30, names 1–40; only an admin adds a room (they are set up in Settings → 🏠 Household, admins only); the room's creator or an admin renames, deletes and edits its areas |
 | Q267 | Days off (§8.6) | ⚑ Moved from 🏠 Household to the 📅 Calendar area (renamed from "Calendar items"), shown to admins only under the optional items |
 | Q268 | Editing areas from a chore's sheet (§8.15) | ⚑ Allowed for the room's creator or an admin; the change is the room's, so every chore in that room shows it |
-| Q269 | A sunset chore's alert text (§7B.3) | ⚑ The ordinary chore text ("Chore for A: Get the eggs"), no "sunset at h:mm" added |
-| Q270 | How a sunset chore shows its time (§8.5) | ⚑ `sunset −30` (or `sunset` at 0) where the clock time was; the form's Before sunset box starts at 30 min; `time` keeps the form's last clock value, so lists still sort by it |
+| Q269 | A machine alerting someone other than the founder (§7D.7) | ⚑ No FunHouse row: Phone + House only (the FunHouse is MojoSOGO's desk, Q230) |
+| Q270 | A sunset chore's alert text (§7B.3) | ⚑ The ordinary chore text ("Chore for A: Get the eggs"), no "sunset at h:mm" added |
+| Q271 | How a sunset chore shows its time (§8.5) | ⚑ `sunset −30` (or `sunset` at 0) where the clock time was; the form's Before sunset box starts at 30 min; `time` keeps the form's last clock value, so lists still sort by it |
