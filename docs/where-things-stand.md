@@ -48,6 +48,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- Ack in the alert card (v1.70.0, §9.5): on the iPhone, start a 1-min rolling timer, tap its push, see the card with Away / Ack, tap Ack (card closes); tap an old alert's push → "Already handled."; the card has no Delete. Q272 is a ⚑ default.
 - Chores before sunset (v1.69.0, §7B.3, migration 0048): MojoSOGO made "Get the eggs" and said "Works" on 2026-10-12;
   still owed is hearing it actually ring on a phone (and the speakers, if House is ticked) 30 min before that day's sunset.
   Q270–Q271 are ⚑ defaults.

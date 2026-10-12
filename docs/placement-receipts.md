@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-12 — Steward pass 21, whole tree (code-steward)
+
+- **Run:** after the v1.70.0 release (SPEC 3.24 §9.5: act on a ringing alert from its My alerts card; FireActions.tsx extracted from RingingBar.tsx; /me/alerts adds fireId; no Delete on the card). Also covers v1.69.1.
+- **Verdict:** SOUND. Typecheck green, 847/847 tests, arch:audit quiet (nothing in the band; things.ts 82% is the highest).
+- **Placement audit:** 3 receipts against 4 code commits (adfe483, 25ec354, 291867a, e6bb1a7), no placement mismatches. The `fireId` route line and its test went into the spec commit 291867a, not the feature commit; accepted.
+- **Top finding:** where-things-stand had no v1.70.0 device check; a missing blank line before the v1.69.1 receipt. Both fixed in this commit.
+- **Handoffs:** 1 to worker (that doc tidy, done). 0 to reorganizer, 0 to placement-advisor. chore-input.ts stays the first step of the next chores feature; items carried from passes 19–20 still wait for MojoSOGO's pick.
+- **Restraint:** FireActions (48 lines) is a real leaf with two callers, not fragmentation. MyAlerts → FireActions → MachineChooser is the reuse the map describes. "Still ringing" is a presence check, not a shared rule. No frontend test harness, so the gap goes to a device check, not a test.
+
 ## 2026-10-12 — v1.70.0: Act on it from the My alerts card (placement-advisor)
 
 - **Ask:** SPEC §9.5, new part "Act on it from the card" (v1.70.0; MojoSOGO 2026-10-12 "Let me ack in a notification modal"). A My alerts card for a fire's push whose fire is still ringing shows the Ringing bar row's one-tap actions; acting closes the card; a fire no longer ringing → "Already handled." GET /me/alerts adds `fireId`. Later the same day: no Delete on the card ("too easy to make mistake").
@@ -23,6 +32,7 @@ carry its result.
 - **Room opened:** RingingBar.tsx 79 → 49 lines; cap 300 global (never pinned).
 - **Behavior:** preserved — typecheck, npm test (847/847), arch:audit green. Same buttons, labels, order, request paths, error text in the bar's one error line, refresh() on success and failure. One small difference: the chooser now mounts in its fire's row, so it closes if that fire leaves the rendered list while open.
 - **Restraint:** only the action cluster moved; icon, sub line, away line, collapse and error line stay in the bar.
+
 ## 2026-10-12 — v1.69.1: Require `place` on chore rules (placement-advisor)
 
 - **Ask:** Steward pass 20 item #2 (MojoSOGO, 2026-10-12, "BOTH"). Drop the `= null` default so the trailing `place: Place | null` is required on firstFireDue, planChoreRuns, advanceRun, undoRun and replanRun. Refactor only, no behavior change.
