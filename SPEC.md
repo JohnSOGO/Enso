@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.29 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.30 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1537,7 +1537,7 @@ approval (they just approved it), not after signup or setup. Push only, never ho
     `/calendar` sends them (all-day first, then by start time).
   - A line is the event's **emoji** (§7.6), then **one dot per participant** (`assignedTo`)
     in that member's color, each person once; an event for **everyone** gets one green
-    (`--good`) Family dot instead (§8.3, Q282; "And one bubble on day of month cell"). An event with **nobody assigned and an emoji** shows that emoji
+    (`--good`) pill with the word **Family** instead (v1.73.1: "Also in the calendar view; one bubble with family word"), at every width (§8.3, Q282; "And one bubble on day of month cell"). An event with **nobody assigned and an emoji** shows that emoji
     **beside the date number** instead (§7.2) and gets no line (MojoSOGO 2026-10-12: "If assigned
     to no one put emoji next to day of month number"); if the two-icon limit hides it, it keeps
     a line with its emoji, so it is never unmarked. Nobody assigned and no emoji: one dot in the

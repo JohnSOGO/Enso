@@ -865,6 +865,9 @@ mentioned twice; just mention once. If everyone; make one green bubble with word
 month cell"): the day sheet shows each person once, and an event for everyone shows one green Family chip; the
 calendar line shows one green dot for it.
 
+**Family bubble on the calendar** (v1.73.1, SPEC 3.30, §7.1; MojoSOGO 2026-10-12: "Also in the calendar view; one bubble with
+family word"): the calendar line for an event for everyone shows a green pill saying Family, not a green dot.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
