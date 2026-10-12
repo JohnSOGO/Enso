@@ -21,3 +21,5 @@
 .small img { display: block; width: 56px; height: 56px; object-fit: cover; border-radius: 6px; }
 .big { flex: 1 0 100%; padding: 0; }
 .big img { display: block; width: 100%; max-width: 480px; height: auto; border-radius: 8px; }
+.answers { display: flex; flex-direction: column; gap: 6px; flex: none; margin-left: auto; }
+.answers button { min-height: 44px; }

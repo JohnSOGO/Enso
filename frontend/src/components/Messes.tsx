@@ -52,12 +52,12 @@ export function MessPhoto({ m }: { m: Mess }) {
 /** "Kitchen: pans on the stove" — the chore and the note, whichever are set. */
 export const messWhat = (m: Mess) => [m.choreTitle, m.note].filter(Boolean).join(': ') || 'A mess';
 
-/** That was me / Not me — for a mess I am asked about. */
+/** That was me / Not me — for a mess I am asked about; Not me stacked under That was me, at the right (§8.15a). */
 export function AnswerButtons({ m, busy, act }: { m: Mess; busy: boolean; act: ReturnType<typeof useMessAction>['act'] }) {
-  return <>
+  return <span className={s.answers}>
     <button className="primary" disabled={busy} onClick={() => act(m.id, () => post(`/messes/${m.id}/claim`))}>That was me</button>
     <button disabled={busy} onClick={() => act(m.id, () => post(`/messes/${m.id}/deny`))}>Not me</button>
-  </>;
+  </span>;
 }
 
 function MessRow({ m, act, busy, owedView }: { m: Mess; act: ReturnType<typeof useMessAction>['act']; busy: boolean; owedView?: boolean }) {
