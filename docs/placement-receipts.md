@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.73.3: Creator first among participants (placement-advisor)
+
+- **Ask:** SPEC 3.32 §7.1/§8.3: when the event's creator is among the participants, they come first (day sheet chips and calendar-line dots); the rest keep assignedTo order.
+- **Verdict:** `frontend/src/participants.ts` [EXISTING] gains optional `first`; DaySheet.tsx and DayCell.tsx pass `o.createdBy`.
+- **Flow stage:** render
+- **Why:** Order is part of "who an event shows", which participants.ts owns so both views agree. Rejected sorting in each view (two copies drift).
+- **Caps:** participants.ts ~16/300; others unchanged. Nothing in the band.
+
 ## 2026-10-12 — v1.73.2: No arrows on day-sheet name chips (placement-advisor)
 
 - **Ask:** SPEC 3.31 §8.3: the day sheet's participant chips drop the "→ " prefix (a calendar event is not a rotation).

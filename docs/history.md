@@ -871,6 +871,9 @@ family word"): the calendar line for an event for everyone shows a green pill sa
 **No arrows on event name chips** (v1.73.2, SPEC 3.31, §8.3; MojoSOGO 2026-10-12: "This is a calendar event not rotation.
 Make sense to remove arrows?"): the day sheet's name chips read "Clover", not "→ Clover".
 
+**Creator first** (v1.73.3, SPEC 3.32, §8.3; MojoSOGO 2026-10-12: "Ok and sort with MojoSOGO color first"): the event's
+creator (the chip with the colored border), when taking part, comes first in the day sheet chips and the calendar dots.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
