@@ -476,7 +476,7 @@ dishwasher"): a done card (all three machines) shows 🪙 Bounty to admins, open
 `loadBountyTitle` prefilled. A plain one-off, not tied to the machine; no server change, no migration. LB1 green.
 Built as: the prefilled sheet asks to discard on Cancel only when something changed.
 
-**📢 Announce ignores Quiet the house** (v1.65.0, §9.2b, §9.3, Q212; MojoSOGO 2026-10-12 "announcements are special;
+**📢 Announce ignores Quiet the house** (v1.66.0, §9.2b, §9.3, Q212; MojoSOGO 2026-10-12 "announcements are special;
 they announce everywhere because it is a house important announcement"): an announcement is spoken on every speaker
 even while the house is quiet; the 409 `house_quiet` is gone. Alerts and timer starts are still silenced by quiet.
 **📢 Announce reaches every speaker and every phone** (v1.63.0, §9.3, Q36, Q127; MojoSOGO 2026-10-12 "I am not hearing
@@ -803,6 +803,10 @@ edit select circle should only be visible to mojosogo"): `usePointAtOn` is false
 **👥 Members as rows of pills** (v1.64.0, §8.6, Q264–Q265; MojoSOGO 2026-10-12: "each name and role and Admin status
 and Disable should all be pills in one row, rows and columns"): `SettingsMembers.tsx` draws a four-column grid of pills
 (own CSS module) instead of the table; asks, PATCH bodies and who sees which pill unchanged. Not yet checked on the iPhone.
+
+**Joined pill; old revoked invites hidden** (v1.65.0, SPEC 3.17, §8.6, §8.9; MojoSOGO 2026-10-12 "remove 'revoked' after 24 hours; so I
+should see when active accounts joined"): GET /members adds `joinedAt` (members.created_at); each Members row gets a
+"joined Oct 4" pill. `Invites.tsx` leaves out invites revoked more than 24 h ago; the server list is unchanged.
 
 **About tagline on two lines** (v1.64.1, §8.6 SM5; MojoSOGO 2026-10-12 picked the About popup: "Two lines"):
 "Closing the loop." sits over "Peace of mind, every day." in Settings → ℹ️ About. The opening screen (§8.10) unchanged.

@@ -12,7 +12,7 @@ export interface Me {
   houseSpeakers: string[] | null;
 }
 /** §6.3: role 'owner' reads Admin; the founder (isFounder) reads Owner and is protected. */
-export interface Member { id: string; displayName: string; color: string; role: Role; isFounder: boolean; email?: string; disabledAt: string | null }
+export interface Member { id: string; displayName: string; color: string; role: Role; isFounder: boolean; email?: string; disabledAt: string | null; joinedAt: string }
 export interface Fire {
   id: string; kind: AlertKind; dueAt: string; state: string; alertCount: number;
   occurrenceDate: string | null; eventId: string | null; timerId: string | null; title: string; startTime: string | null;

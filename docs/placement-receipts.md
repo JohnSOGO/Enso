@@ -7,7 +7,7 @@ carry its result.
 
 ---
 
-## 2026-10-12 — v1.65.0: Announce ignores Quiet the house (placement-advisor)
+## 2026-10-12 — v1.66.0: Announce ignores Quiet the house (placement-advisor)
 
 - **Ask:** SPEC §9.2b / §9.3 / §9.4b — Announce always speaks on every speaker HA lists, even while the house is quiet (MojoSOGO 2026-10-12 "announcements are special").
 - **Verdict:** `src/worker/routes/announce.ts` [EXISTING] — a deletion: the houseQuiet read, the 409 `house_quiet` branch and the `!quiet` speaker gate, plus the now-unused imports (houseQuiet, utcToLocal, householdTz).
@@ -15,6 +15,17 @@ carry its result.
 - **Why:** the quiet check is a persistence gate inside the route that owns POST /announce; removing it adds no code. src/shared/house-quiet.ts unchanged; src/worker/house-quiet.ts keeps three readers (tick, timer-starts, GET /house/quiet). Rejected: an "isAnnouncementExempt" helper (speculative — the exemption is the absence of a check). Spec (§9.2b, HQ5, §9.4b, API row), tests HQ5 / FH4 and map rows 81 / 94 changed in the same commit.
 - **Caps:** announce.ts 69 → ~63 lines against GLOBAL_FILE_CAP 300. Nothing enters the band.
 - **Sources read:** src/worker/routes/announce.ts; docs/module-ownership.md; scripts/arch.ts; SPEC.md §9.2b, §9.4b, §10; tests referencing house_quiet; frontend HouseQuiet.tsx (grep).
+## 2026-10-12 — v1.65.0: Members joined-date pill; revoked invites hidden after 24 h (placement-advisor)
+
+- **Ask:** MojoSOGO 2026-10-12, "same screen; remove 'revoked' after 24 hours; so I should see when active accounts joined". SPEC §8.6: each member row gets a "joined <date>" pill from members.created_at, as a 5th grid column. SPEC §8.9: a revoked invite is hidden from the Invites list once revoked more than 24 hours ago (filtered in the app; server unchanged).
+- **Verdict:** src/worker/routes/members.ts (GET /members selects `created_at AS joinedAt`), frontend/src/state.tsx (`Member.joinedAt: string`), frontend/src/components/SettingsMembers.tsx + SettingsMembers.module.css (pill and 5th column), frontend/src/components/Invites.tsx (24 h filter; `shortDate` exported for reuse) [EXISTING]
+- **Flow stage:** route (one more column in the list) + render (pill, filter)
+- **Why:** Every part already has an owner: members.ts the members list (row 86), state.tsx the Member type (row 139), SettingsMembers the grid (row 202), Invites the invite states (row 209). Presentation only, no shared rule needed. Rejected: filtering revoked invites on the server (history stays in D1); a second date formatter (Invites' `shortDate` is exported instead). The join date is visible to every member; not sensitive, and §8.6 says so.
+- **Caps:** members.ts ~73/300; state.tsx 107/300; SettingsMembers.tsx ~59/300; SettingsMembers.module.css 9/300; Invites.tsx ~76/300. No file newly in the band.
+- **Sources read:** docs/module-ownership.md (rows 80, 86, 139, 196, 202, 209); scripts/arch.ts; docs/placement-receipts.md (head); src/worker/routes/members.ts; frontend/src/state.tsx; SettingsMembers.tsx/.module.css; Invites.tsx; SPEC.md §8.9.
+
+---
+
 ## 2026-10-12 — v1.64.0: Members tab as a grid of pills (placement-advisor)
 
 - **Ask:** SPEC §8.6 Settings → 👥 Members: lay the members table out again as a grid with one row of pills per member (name with colour dot, role Owner / Admin / Member or Disabled, a tappable Make / Remove admin pill with today's asks, a tappable Disable / Enable pill). Behaviour unchanged. It must fit a phone and scroll sideways when too narrow.

@@ -1,10 +1,10 @@
-// SPEC §8.6, §6.3 — Settings → 👥 Members (admins): the members grid, one row of pills per member (name, role,
+// SPEC §8.6, §6.3 — Settings → 👥 Members (admins): the members grid, one row of pills per member (name, role, joined date,
 // Make / Remove admin with its asks, Disable / Enable); hosts Invites (§8.9).
 import { patch } from '../api';
 import { useApp } from '../state';
 import { ADMIN_ROLE, isAdmin } from '../../../src/shared/roles';
 import { useAction } from './useAction';
-import { Invites } from './Invites';
+import { Invites, shortDate } from './Invites';
 import s from './SettingsMembers.module.css';
 
 export function SettingsMembers() {
@@ -31,6 +31,7 @@ export function SettingsMembers() {
                 {m.disabledAt ? <span className="badge bad">Disabled</span>
                   : <span className="chip">{m.isFounder ? 'Owner' : isAdmin(m) ? 'Admin' : 'Member'}</span>}
               </span>
+              <span role="cell"><span className="chip">joined {shortDate(m.joinedAt)}</span></span>
               <span role="cell">
                 {!m.isFounder && !m.disabledAt && (
                   <button className={s.pill} disabled={busy} onClick={() => setAdmin(m.id, m.displayName, !isAdmin(m))}>
