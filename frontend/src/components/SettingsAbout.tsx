@@ -10,7 +10,7 @@ export function SettingsAbout() {
     <div className={s.about}>
       <img src="/icon.svg" alt="" className={s.logo} />
       <h2 className={s.name}>Ensō</h2>
-      <p className={s.tagline}>{TAGLINE.map((t, i) => <span key={t}>{i > 0 && ' '}{t}</span>)}</p>
+      <p className={s.tagline}>{TAGLINE.map((t) => <span key={t}>{t}</span>)}</p>
       <p className={s.build}>{__ENSO_BUILD__}</p>
       <p className={s.credit}>Developed by MojoSOGO · with Claude</p>
     </div>
