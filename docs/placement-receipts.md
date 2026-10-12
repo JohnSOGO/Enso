@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.64.0: Members tab as a grid of pills (placement-advisor)
+
+- **Ask:** SPEC §8.6 Settings → 👥 Members: lay the members table out again as a grid with one row of pills per member (name with colour dot, role Owner / Admin / Member or Disabled, a tappable Make / Remove admin pill with today's asks, a tappable Disable / Enable pill). Behaviour unchanged. It must fit a phone and scroll sideways when too narrow.
+- **Verdict:** `frontend/src/components/SettingsMembers.tsx` + new `frontend/src/components/SettingsMembers.module.css` [EXISTING; the CSS is covered by the `components/*.module.css` row]
+- **Flow stage:** render
+- **Why:** The SettingsMembers row owns this screen. The grid styles are specific to it, so they go in a same-named CSS module, not Lists.module.css (shared list tables and tick rows). The pill look reuses theme.css `.chip` / `.badge`. Logic, asks and visibility rules stay as they are; role checks stay in src/shared/roles. The Member pill and Disabled-in-place-of-role are ⚑ Q264–Q265, written into §8.6 first. Row 202 wording: "members table" → "members grid".
+- **Caps:** SettingsMembers.tsx 51 → ~58/300; SettingsMembers.module.css new, ~10/300. No file newly in the band.
+- **Sources read:** frontend/src/components/SettingsMembers.tsx; docs/module-ownership.md (rows 140, 202, 217, 218); scripts/arch.ts; docs/placement-receipts.md (head); frontend/src/theme.css (.chip/.badge); SPEC.md §8.6.
+
+---
+
 ## 2026-10-12 — v1.63.0: Announce reaches every speaker and every member's phone (placement-advisor)
 
 - **Ask:** POST /announce speaks on every speaker HA lists via `allHouseSpeakers(env)` (null = the defaults), as machines do (§7D.3), instead of the union of members' ticked speakers; it pushes to every active member including the sender. SPEC §9.3, MojoSOGO 2026-10-12 "not hearing the announcement … on all devices".
@@ -1810,20 +1821,29 @@ REORG RECEIPT
 - **Caps:** PointAtButton.tsx 31 → ~33/300; SettingsMe.tsx 37 → ~38/300. No file newly in the band.
 - **Sources read:** scripts/arch.ts; docs/placement-receipts.md; docs/module-ownership.md (rows 139, 197, 198); frontend/src/components/PointAtButton.tsx, PointAt.tsx, SettingsMe.tsx; frontend/src/state.tsx (useIsFounder); frontend/src/App.tsx (provider tree); grep of Modal/PointAt usages in frontend/src and test/.
 
-## 2026-10-12 — v1.64.0: Rooms own the "what done looks like" areas (placement-advisor)
+## 2026-10-12 — About tagline on two lines (placement-advisor)
 
-- **Ask:** SPEC §7B.6 rewritten as "Rooms" for v1.64.0: a `rooms` table (rom_ ids, name 1–40, position); migration 0047 rebuilds chore_areas → room_areas and chore_area_photos → room_area_photos with the same ids, turns each chore that has areas into a room named after it, adds a nullable chores.room_id. ROOMS_MAX 30, ROOM_NAME_MAX 40, parseRoomInput, Room / RoomArea wire types. Routes /rooms, /rooms/{id}, /rooms/{id}/areas, /room-areas/{id}(/photos), /room-area-photos/{id}; deleting a room clears chores.room_id. A chore's roomId is validated and areaCount comes from its room.
+- **Ask:** In Settings → ℹ️ About, show the tagline as two lines ("Closing the loop." / "Peace of mind, every day.") instead of one run-on; the opening screen (frontend/index.html, §8.10) stays as is. SPEC §8.6 SM5, MojoSOGO 2026-10-12.
+- **Verdict:** `frontend/src/components/SettingsAbout.module.css` + `frontend/src/components/SettingsAbout.tsx` [EXISTING]
+- **Flow stage:** render
+- **Why:** the SettingsAbout row already owns the About panel and TAGLINE; stacking the halves is presentation only (`.tagline span` inline-block → block, and the `' '` separator dropped). TAGLINE is untouched, so SM5's index.html check (each half as `<span>…</span>`) still holds and the splash is left alone. Rejected: splitting TAGLINE or adding a second constant (a second copy, §0.5); editing index.html (out of scope by MojoSOGO's word).
+- **Caps:** SettingsAbout.tsx 18 → 18 lines, SettingsAbout.module.css 9 → 9, against GLOBAL_FILE_CAP 300. No file newly in the band.
+- **Sources read:** frontend/src/components/SettingsAbout.tsx; frontend/src/components/SettingsAbout.module.css; docs/module-ownership.md (row 204); scripts/arch.ts (WORKING_BUFFER, GLOBAL_FILE_CAP, WARN_AT); docs/placement-receipts.md; test/settings-about.test.ts.
+
+## 2026-10-12 — v1.65.0: Rooms own the "what done looks like" areas (placement-advisor)
+
+- **Ask:** SPEC §7B.6 rewritten as "Rooms" for v1.65.0: a `rooms` table (rom_ ids, name 1–40, position); migration 0047 rebuilds chore_areas → room_areas and chore_area_photos → room_area_photos with the same ids, turns each chore that has areas into a room named after it, adds a nullable chores.room_id. ROOMS_MAX 30, ROOM_NAME_MAX 40, parseRoomInput, Room / RoomArea wire types. Routes /rooms, /rooms/{id}, /rooms/{id}/areas, /room-areas/{id}(/photos), /room-area-photos/{id}; deleting a room clears chores.room_id. A chore's roomId is validated and areaCount comes from its room.
 - **Verdict:** EXISTING (renamed): src/shared/rooms.ts, src/worker/routes/rooms.ts, frontend RoomSheet.tsx, RoomAreaForm.tsx. NEW rows: frontend/src/components/Rooms.tsx (list + ＋ Add room + useRooms) and frontend/src/components/ChoreSheet.tsx (the chore's 📋 sheet: Done means + RoomSections + ✎ Edit chore). NEW migration 0047 + its test.
 - **Flow stage:** rules (shared/rooms.ts), route + persist (routes/rooms.ts, routes/chores.ts), render (Rooms, RoomSheet, ChoreSheet, ChoreForm).
 - **Why:** areas change parent, so the existing area owners keep the concern under the new name; no new module per stage. One file each for rooms and areas in the route and in the rules: a room with its sections is one concern and stays under cap (routes/rooms.ts ~205; split off routes/room-areas.ts only past ~250). The chore's 📋 sheet is split out of RoomSheet so one component does not hold both a chore's sheet and a room's sheet. The room-existence check stays in routes/chores.ts through an export from routes/rooms.ts, keeping shared/chores.ts pure and away from the band. R2 prefix kept as `chore-areas/` (no R2 rewrite, photo-store.ts untouched).
 - **Caps:** routes/rooms.ts ~205, shared/rooms.ts ~60, routes/chores.ts ~196, shared/chores.ts ~246 (closest to the band), RoomSheet.tsx ~125, ChoreForm.tsx ~190, Chores.tsx ~116, against GLOBAL_FILE_CAP 300. No file newly in the band, no CEILINGS change.
 - **Sources read:** scripts/arch.ts; docs/module-ownership.md; docs/placement-receipts.md; src/shared/chore-areas.ts; src/worker/routes/chore-areas.ts; frontend ChoreAreas.tsx; line counts of the touched files; greps for areaCount, chore-areas and PhotoPrefix; SPEC.md §7B.6 and API rows.
 
-## 2026-10-12 — v1.64.0 delta: Rooms list in Household, Days off to Calendar (placement-advisor)
+## 2026-10-12 — v1.65.0 delta: Rooms list in Household, Days off to Calendar (placement-advisor)
 
-- **Ask:** amendment to the v1.64.0 Rooms placement (SPEC §7B.6, §8.6, §7.3): the Rooms list lives in Settings → 🏠 Household (admins), SettingsHousehold rendering `<RoomsList/>` from Rooms.tsx. Days off moves out of Household into Settings → 📅 Calendar (renamed from "Calendar items"), admins only. The chore's 📋 sheet can edit sections through RoomSections, gated by the room's canChange.
+- **Ask:** amendment to the v1.65.0 Rooms placement (SPEC §7B.6, §8.6, §7.3): the Rooms list lives in Settings → 🏠 Household (admins), SettingsHousehold rendering `<RoomsList/>` from Rooms.tsx. Days off moves out of Household into Settings → 📅 Calendar (renamed from "Calendar items"), admins only. The chore's 📋 sheet can edit sections through RoomSections, gated by the room's canChange.
 - **Verdict:** NEW row frontend/src/components/DaysOff.tsx. EXISTING: Settings.tsx (label + admin-gated DaysOff in the calendar body), SettingsHousehold.tsx (DaysOff out, RoomsList in), Rooms.tsx (RoomsList + useRooms; no Chores section), RoomSheet.tsx (RoomSections editor gated by the room's createdBy).
 - **Flow stage:** render.
-- **Why:** DaysOff is a household-wide admin setting (/settings), OptionalItems is one member's own prefs and opt-ins (/me, /events/{id}/optin); merging them would give OptionalItems two audiences and two endpoints, so DaysOff is its own leaf. Settings.tsx composes the two in one area body, within its row. Open point settled as ⚑ Q264: POST /rooms is admins only, matching the admin-only Household screen.
+- **Why:** DaysOff is a household-wide admin setting (/settings), OptionalItems is one member's own prefs and opt-ins (/me, /events/{id}/optin); merging them would give OptionalItems two audiences and two endpoints, so DaysOff is its own leaf. Settings.tsx composes the two in one area body, within its row. Open point settled as ⚑ Q266: POST /rooms is admins only, matching the admin-only Household screen.
 - **Caps:** Settings.tsx ~63/99 (pinned), SettingsHousehold.tsx 53 → ~30, DaysOff.tsx ~30, OptionalItems.tsx 58. No file newly in the band, no re-pin.
-- **Sources read:** frontend/src/components/SettingsHousehold.tsx, OptionalItems.tsx, Settings.tsx; docs/module-ownership.md rows 151, 196, 201; scripts/arch.ts CEILINGS; plus the first v1.64.0 receipt's sources.
+- **Sources read:** frontend/src/components/SettingsHousehold.tsx, OptionalItems.tsx, Settings.tsx; docs/module-ownership.md rows 151, 196, 201; scripts/arch.ts CEILINGS; plus the first v1.65.0 receipt's sources.

@@ -1,5 +1,5 @@
 // SPEC §8.6, §7B.6 — the household's rooms, in Settings → 🏠 Household: RoomsList (one line per room with its number of
-// areas, ＋ Add room for admins, ⚑ Q264; a tap opens RoomSheet) and useRooms (GET /rooms, also read by ChoreForm).
+// areas, ＋ Add room for admins, ⚑ Q266; a tap opens RoomSheet) and useRooms (GET /rooms, also read by ChoreForm).
 import { useEffect, useState } from 'react';
 import { RoomSheet } from './RoomSheet';
 import { errorText, get, post } from '../api';

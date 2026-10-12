@@ -1,5 +1,5 @@
 // SPEC §7B.6 — rooms and what done looks like: rooms, their sections (areas) and the sections' reference photos (R2,
-// private). Anyone may read them; an admin adds a room (⚑ Q264); the room's creator or an admin changes it (§6.3, Q163). The rules (limits,
+// private). Anyone may read them; an admin adds a room (⚑ Q266); the room's creator or an admin changes it (§6.3, Q163). The rules (limits,
 // validation, the wire types) are src/shared/rooms.ts.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';

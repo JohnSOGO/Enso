@@ -1,0 +1,9 @@
+/* §8.6 Settings → 👥 Members: one row of pills per member, four columns; scrolls sideways when too narrow. */
+.scroll { overflow-x: auto; margin-bottom: 18px; }
+.grid {
+  display: grid; grid-template-columns: minmax(7rem, 1fr) auto auto auto;
+  gap: 8px 6px; align-items: center; min-width: max-content;
+}
+.row { display: contents; }
+.name { overflow: hidden; text-overflow: ellipsis; max-width: 100%; justify-self: start; }
+.pill { border-radius: 99px; min-height: 32px; padding: 3px 12px; font-size: .82rem; white-space: nowrap; }

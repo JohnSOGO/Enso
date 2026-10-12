@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.15 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.17 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1357,7 +1357,7 @@ its form shows "Only the creator or an admin can change this …" and no Save, D
 | A8 | member K (not admin) PATCHes / DELETEs a thing, show, recipe and list item someone else made; PUTs / DELETEs their photos; Plans the thing; re-reads the recipe | each 403 `forbidden`; nothing changed |
 | A9 | K does the same to their own thing, show, recipe and list item | allowed as before |
 | A10 | K checks and unchecks someone else's list item (`{ checked }` only); marks someone else's show watched (`{ status }` only) | both 200 |
-| A11 | K adds, edits or deletes an area (or its photos) of a room an admin made | 403 `forbidden` (rooms are added by admins, ⚑ Q264) |
+| A11 | K adds, edits or deletes an area (or its photos) of a room an admin made | 403 `forbidden` (rooms are added by admins, ⚑ Q266) |
 | A12 | K acknowledges a ringing alarm someone else made; answers That was me / Not me on someone else's mess | 200 each, as before |
 
 ### 6.4 Login rate limit
@@ -2280,7 +2280,7 @@ may share a room. Areas say what done looks like every time; nothing here change
 
 **The rules** (pure; imports nothing):
 
-- `ROOMS_MAX` = 30, `ROOM_NAME_MAX` = 40 ⚑ Q264. `AREAS_MAX` = 8 per room, `AREA_NAME_MAX` = 40,
+- `ROOMS_MAX` = 30, `ROOM_NAME_MAX` = 40 ⚑ Q266. `AREAS_MAX` = 8 per room, `AREA_NAME_MAX` = 40,
   `EXPECTATIONS_MAX` = 12 per area, `EXPECTATION_MAX` = 120, `AREA_PHOTOS_MAX` = 4 per area ⚑ Q164.
 - `parseRoomInput(body)` → `{ name }` (trimmed, 1–`ROOM_NAME_MAX`) or a message naming the field.
 - `parseAreaInput(body, current?)` → `{ name, expectations }` or a message naming the field. `name` is trimmed,
@@ -2289,7 +2289,7 @@ may share a room. Areas say what done looks like every time; nothing here change
 - `Room` — `{ id, name, areaCount, createdBy, updatedAt }`. `RoomArea` — `{ id, roomId, name, expectations: string[],
   photos: string[], updatedAt }`; `photos` are photo ids, oldest first. A photo key is never on the wire.
 
-**Who:** an **admin** adds a room (rooms are set up in Settings → 🏠 Household, §8.6) ⚑ Q264. The room's creator or an
+**Who:** an **admin** adds a room (rooms are set up in Settings → 🏠 Household, §8.6) ⚑ Q266. The room's creator or an
 admin renames or deletes it and adds, changes or deletes its areas and their photos (§6.3, Q163) — anyone else gets
 403 `forbidden`. Anyone may read them, and anyone who may change a chore picks its room.
 
@@ -2329,7 +2329,7 @@ admin renames or deletes it and adds, changes or deletes its areas and their pho
 | CA8 | no session; a bad photo type | 401; 400 |
 | RM1 | add " Bathroom " and "Garage", rename one; names empty / blank / 41 chars | trimmed, in the order added, `createdBy` set, renamed; 400 naming `name` |
 | RM2 | a chore given a room; PATCH its title; PATCH another room; PATCH `roomId: null`; an unknown room on PATCH and POST | the room kept, changed, cleared; 400 naming `roomId` |
-| RM3 | a non-admin renames / deletes an admin's room, reads its areas, adds a room | 403, 403, 200, 403 (⚑ Q264) |
+| RM3 | a non-admin renames / deletes an admin's room, reads its areas, adds a room | 403, 403, 200, 403 (⚑ Q266) |
 | RM-M | migration check (§4.2zt) | see §4.2zt |
 
 ### 7B.7 Whose mess? — mess reports and who owes whom — `src/shared/messes.ts` (pure)
@@ -3879,9 +3879,9 @@ Settings
 ```
 
 - **🙂 Me:** name, color, and (founder only) **🎯 Point at it** on this device (§8.16).
-- **📅 Calendar** (named "Calendar items" before v1.64.0): **Optional calendar items** — Public holidays, 📈 options
+- **📅 Calendar** (named "Calendar items" before v1.65.0): **Optional calendar items** — Public holidays, 📈 options
   expiration, then one line per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); then,
-  for admins only, **Days off** (§7.3) ⚑ Q265 (asked by MojoSOGO 2026-10-12: move Days off "into its own calendar section").
+  for admins only, **Days off** (§7.3) ⚑ Q267 (asked by MojoSOGO 2026-10-12: move Days off "into its own calendar section").
 - **📱 Phone alerts:** this phone's state and Turn on / Turn off / Send a test (§9.1).
 - **🔊 Speakers:** **Speak my alerts on** (§9.2a).
 - **🔔 Alerts** (§9.5): every push this phone's member got, newest first — tap a line for its card, a red ❌ on each
@@ -3890,16 +3890,19 @@ Settings
 - **🏠 Household (admins):** name, timezone; then **Rooms** (§7B.6): one line per room (name · n areas), a
   name box with **＋ Add room**. A tap opens the room's sheet: **✎ Rename room**, its areas exactly as the chore's
   sheet shows them (§8.15, with ✎ / ＋ Add an area), **Delete room** (asks first; its chores stay, with no room).
-- **👥 Members (admins):** members list: one line per member — name · **Owner** / **Admin** chip (nothing for a
-  regular member) · **Make admin** / **Remove admin** (asks first; never on the founder) · **Disable** /
-  **Enable** (never on the founder). An admin removing their own admin role is warned
-  that they will lose these settings at once. Then **invites (§8.9)**.
+- **👥 Members (admins):** a grid, one row of pills per member, in four columns (MojoSOGO 2026-10-12): **name**
+  (colour dot) · **role** (**Owner** / **Admin** / **Member** ⚑ Q264; **Disabled** in red instead while disabled
+  ⚑ Q265) · **Make admin** / **Remove admin** (asks first; never on the founder or a disabled member) ·
+  **Disable** / **Enable** (never on the founder). The last two are tappable pills. On a phone too narrow for a row,
+  the grid scrolls sideways. An admin removing their own admin role is warned that they will lose these settings at
+  once. Then **invites (§8.9)**.
 - **📊 Status:** a **House announcements** line from `house` (§9.2) ⚑ (Q38): `ok` → "working"
   (good) with the last success time; `failing` → "failing since {lastFailedAt}" (bad) with
   `lastError` beneath; `not_configured` → "not set up" (bad); `untried` → "not tried yet"
   (neutral). Then the last 20 deliveries with their status badge.
 - **ℹ️ About** (asked by MojoSOGO 2026-10-11, last in the grid, for everyone ⚑ Q247): the opening screen's look
-  (§8.10) inside the modal: the ensō logo, **Ensō**, the tagline, and the build stamp as the revision; then
+  (§8.10) inside the modal: the ensō logo, **Ensō**, the tagline on two lines ("Closing the loop." over "Peace of mind, every day.", MojoSOGO
+  2026-10-12), and the build stamp as the revision; then
   **"Developed by MojoSOGO · with Claude"** ⚑ (Q248). Nothing to change, nothing fetched.
 - **Log out** sits under the grid, not inside an area ⚑ (Q227). No menu button is marked chosen.
 
@@ -4403,9 +4406,9 @@ their modal.
 **All chores** — the chore list and chore form of §8.5, under the heading "All chores" with **＋ Add**.
 
 **What done looks like** — a sheet (modal) titled with the chore's title, opened by a row of All chores or a
-Today row's 📋. Since v1.64.0 the areas are the chore's **room's** (§7B.6): under Done means comes "Room: Kitchen"
+Today row's 📋. Since v1.65.0 the areas are the chore's **room's** (§7B.6): under Done means comes "Room: Kitchen"
 and then the room's areas; a chore with no room says "No room yet. Pick one in ✎ Edit chore." Areas edited here
-change the room, so every chore in it shows the change ⚑ Q266:
+change the room, so every chore in it shows the change ⚑ Q268:
 
 ```
 ┌ Kitchen ─────────────────────────── ✕ ┐

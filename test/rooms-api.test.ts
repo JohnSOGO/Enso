@@ -184,6 +184,6 @@ describe('M4y rooms', () => {
     expect((await b.patch(`/rooms/${id}`, { name: 'Mine' })).status).toBe(403);
     expect((await raw(b, 'DELETE', `/rooms/${id}`)).status).toBe(403);
     expect((await b.get(`/rooms/${id}/areas`)).status).toBe(200);
-    expect((await b.post('/rooms', { name: 'Bedroom' })).status).toBe(403); // ⚑ Q264 admins add rooms
+    expect((await b.post('/rooms', { name: 'Bedroom' })).status).toBe(403); // ⚑ Q266 admins add rooms
   });
 });

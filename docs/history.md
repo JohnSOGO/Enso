@@ -797,7 +797,14 @@ first." Washer (Move to clothes dryer) and dish washer (Emptied) unchanged.
 edit select circle should only be visible to mojosogo"): `usePointAtOn` is false for everyone but the founder, so the
 ◎ (tab bar and modal headers), Alt+P and the Settings → 🙂 Me switch are gone for other members. His behavior unchanged.
 
-**Rooms** (v1.64.0, §7B.6, §4.2zt, §8.6, §8.15, Q264–Q266; MojoSOGO 2026-10-12: "define rooms as its own thing, then
+**👥 Members as rows of pills** (v1.64.0, §8.6, Q264–Q265; MojoSOGO 2026-10-12: "each name and role and Admin status
+and Disable should all be pills in one row, rows and columns"): `SettingsMembers.tsx` draws a four-column grid of pills
+(own CSS module) instead of the table; asks, PATCH bodies and who sees which pill unchanged. Not yet checked on the iPhone.
+
+**About tagline on two lines** (v1.64.1, §8.6 SM5; MojoSOGO 2026-10-12 picked the About popup: "Two lines"):
+"Closing the loop." sits over "Peace of mind, every day." in Settings → ℹ️ About. The opening screen (§8.10) unchanged.
+
+**Rooms** (v1.65.0, §7B.6, §4.2zt, §8.6, §8.15, Q266–Q268; MojoSOGO 2026-10-12: "define rooms as its own thing, then
 chores get assigned to the room … rooms get sections like kitchen already has … do not lose the kitchen we have",
 and "move Days off into its own calendar section; move room definitions here in Household"): what done looks like moved
 from a chore to a room. Migration 0047 turned the Kitchen chore's areas into a Kitchen room (same area and photo ids,
