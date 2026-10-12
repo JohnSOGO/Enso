@@ -42,6 +42,7 @@ export interface ChoreRow {
   nudge: number; people: string; steps: string; channels: string; renotify_min: number | null; max_alerts: number;
   start_date: string; created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
   bounty: number | null; // §7B.8 — never part of Chore: it plays no part in planning
+  room_id: string | null; // §7B.6 — the chore's room; never part of Chore either
 }
 
 /** One `chore_runs` row. `step` = steps.length once finished. */

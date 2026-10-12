@@ -267,3 +267,6 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q263 | A bounty from a done machine load (§7D.9, §8.5) | ⚑ 🪙 Bounty on every done card (washer, dryer, dish washer), admins only as every one-off (ADM); a plain one-off with a prefilled title, not tied to the machine: moving or finishing the load does not pay it |
 | Q264 | A regular member's role in Settings → 👥 Members (§8.6) | ⚑ A **Member** pill, so every row has the same four columns |
 | Q265 | A disabled member's row in Settings → 👥 Members (§8.6) | ⚑ The role pill reads **Disabled** (red) instead of the role; no admin pill, **Enable** in the last column |
+| Q266 | Rooms (§7B.6) | ⚑ Up to 30, names 1–40; only an admin adds a room (they are set up in Settings → 🏠 Household, admins only); the room's creator or an admin renames, deletes and edits its areas |
+| Q267 | Days off (§8.6) | ⚑ Moved from 🏠 Household to the 📅 Calendar area (renamed from "Calendar items"), shown to admins only under the optional items |
+| Q268 | Editing areas from a chore's sheet (§8.15) | ⚑ Allowed for the room's creator or an admin; the change is the room's, so every chore in that room shows it |

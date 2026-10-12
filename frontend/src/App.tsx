@@ -9,7 +9,7 @@ import { TimerForm, type Timer } from './components/Timers';
 import { Alarms, AlarmForm, type Alarm } from './components/Alarms';
 import { ChoresTab, type Chore } from './components/Chores';
 import { ChoreForm } from './components/ChoreForm';
-import { ChoreAreas } from './components/ChoreAreas';
+import { ChoreSheet } from './components/ChoreSheet';
 import { HouseholdLists } from './components/HouseholdLists';
 import { Recipes } from './components/Recipes';
 import { Settings } from './components/Settings';
@@ -110,7 +110,7 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
       {overlay?.kind === 'alarm' && <AlarmForm alarm={overlay.alarm} onClose={() => setOverlay(null)} />}
       {overlay?.kind === 'chore' && <ChoreForm chore={overlay.chore} onClose={() => setOverlay(null)} />}
       {overlay?.kind === 'areas' && (
-        <ChoreAreas chore={overlay.chore} onClose={() => setOverlay(null)} onEditChore={() => setOverlay({ kind: 'chore', chore: overlay.chore })} />
+        <ChoreSheet chore={overlay.chore} onClose={() => setOverlay(null)} onEditChore={() => setOverlay({ kind: 'chore', chore: overlay.chore })} />
       )}
       {overlay?.kind === 'explain' && (
         <Modal title={overlay.title} onClose={() => setOverlay(null)} footer={<button onClick={() => setOverlay(null)}>OK</button>}>

@@ -80,23 +80,18 @@ describe('§6.3 whose entry it is', () => {
     expect((await k.patch(`/shows/${e.show.id}`, {})).status).toBe(403); // an empty PATCH is not a tick
   });
 
-  it('A11 a chore\'s areas are its creator\'s or an admin\'s', async () => {
-    const chore = (await o.post('/chores', { title: 'Bath', days: ['MO'], timing: 'by', time: '19:00', people: [K], steps: [{ title: 'Bath' }] })).json.id;
-    const area = (await o.post(`/chores/${chore}/areas`, { name: 'Tub' })).json;
-    const photo = (await (await raw(o, 'POST', `/chore-areas/${area.id}/photos`, jpeg)).json() as any).photos[0];
-    expect((await k.get(`/chores/${chore}/areas`)).status).toBe(200);
-    expect((await raw(k, 'GET', `/chore-area-photos/${photo}`)).status).toBe(200);
-    expect((await k.post(`/chores/${chore}/areas`, { name: 'Sink' })).status).toBe(403);
-    expect((await k.patch(`/chore-areas/${area.id}`, { name: 'x' })).status).toBe(403);
-    expect((await raw(k, 'POST', `/chore-areas/${area.id}/photos`, jpeg)).status).toBe(403);
-    expect((await raw(k, 'DELETE', `/chore-area-photos/${photo}`)).status).toBe(403);
-    expect((await raw(k, 'DELETE', `/chore-areas/${area.id}`)).status).toBe(403);
-    expect((await o.get(`/chores/${chore}/areas`)).json).toMatchObject([{ name: 'Tub', photos: [photo] }]);
-
-    const own = (await k.post('/chores', { title: 'Room', days: ['MO'], timing: 'by', time: '19:00', people: [K], steps: [{ title: 'Room' }] })).json.id;
-    const mine = await k.post(`/chores/${own}/areas`, { name: 'Bed' });
-    expect(mine.status).toBe(201);
-    expect((await raw(k, 'DELETE', `/chore-areas/${mine.json.id}`)).status).toBe(204);
+  it('A11 a room\'s areas are its creator\'s or an admin\'s', async () => {
+    const chore = (await o.post('/rooms', { name: 'Bath' })).json.id;
+    const area = (await o.post(`/rooms/${chore}/areas`, { name: 'Tub' })).json;
+    const photo = (await (await raw(o, 'POST', `/room-areas/${area.id}/photos`, jpeg)).json() as any).photos[0];
+    expect((await k.get(`/rooms/${chore}/areas`)).status).toBe(200);
+    expect((await raw(k, 'GET', `/room-area-photos/${photo}`)).status).toBe(200);
+    expect((await k.post(`/rooms/${chore}/areas`, { name: 'Sink' })).status).toBe(403);
+    expect((await k.patch(`/room-areas/${area.id}`, { name: 'x' })).status).toBe(403);
+    expect((await raw(k, 'POST', `/room-areas/${area.id}/photos`, jpeg)).status).toBe(403);
+    expect((await raw(k, 'DELETE', `/room-area-photos/${photo}`)).status).toBe(403);
+    expect((await raw(k, 'DELETE', `/room-areas/${area.id}`)).status).toBe(403);
+    expect((await o.get(`/rooms/${chore}/areas`)).json).toMatchObject([{ name: 'Tub', photos: [photo] }]);
   });
 
   it('A12 a member acknowledges someone else\'s alarm and answers someone else\'s mess', async () => {

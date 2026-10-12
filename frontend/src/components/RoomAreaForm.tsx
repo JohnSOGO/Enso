@@ -1,4 +1,4 @@
-// SPEC §8.15 — the area editor inside a chore's What done looks like sheet: name, expectations (one per line),
+// SPEC §8.15 — the area editor inside a room's What done looks like sections: name, expectations (one per line),
 // photos (add up to AREA_PHOTOS_MAX, shrunk like a thing's photo; ✕ to remove). Save sends the area, then each new
 // photo, then each removal; a refusal shows here and keeps the editor open. The server validates (§7B.6).
 import { useEffect, useRef, useState } from 'react';
@@ -6,16 +6,16 @@ import { Grow } from './Grow';
 import { Thumb } from './PhotoField';
 import { shrinkPicked, usePhotoPick } from './usePhotoPick';
 import { apiUrl, del, errorText, patch, post, upload } from '../api';
-import { AREA_NAME_MAX, AREA_PHOTOS_MAX, type ChoreArea } from '../../../src/shared/chore-areas';
-import s from './ChoreAreas.module.css';
+import { AREA_NAME_MAX, AREA_PHOTOS_MAX, type RoomArea } from '../../../src/shared/rooms';
+import s from './RoomSheet.module.css';
 
-export const areaPhotoSrc = (photoId: string) => apiUrl(`/chore-area-photos/${photoId}`);
+export const areaPhotoSrc = (photoId: string) => apiUrl(`/room-area-photos/${photoId}`);
 
 /** A picked photo not yet saved, with its object URL for the thumbnail. */
 interface Pending { blob: Blob; url: string }
 
-export function ChoreAreaForm({ choreId, area, onDirty, onSaved, onCancel }: {
-  choreId: string; area: ChoreArea | null; onDirty: (dirty: boolean) => void; onSaved: () => void; onCancel: () => void;
+export function RoomAreaForm({ roomId, area, onDirty, onSaved, onCancel }: {
+  roomId: string; area: RoomArea | null; onDirty: (dirty: boolean) => void; onSaved: () => void; onCancel: () => void;
 }) {
   const [saved, setSaved] = useState(area);
   const [name, setName] = useState(area?.name ?? '');
@@ -48,15 +48,15 @@ export function ChoreAreaForm({ choreId, area, onDirty, onSaved, onCancel }: {
     setBusy('Saving…'); setError(null);
     try {
       const fields = { name, expectations: lines.split('\n') };
-      let a = saved ? await patch<ChoreArea>(`/chore-areas/${saved.id}`, fields) : await post<ChoreArea>(`/chores/${choreId}/areas`, fields);
+      let a = saved ? await patch<RoomArea>(`/room-areas/${saved.id}`, fields) : await post<RoomArea>(`/rooms/${roomId}/areas`, fields);
       setSaved(a); // a retry after a photo failure edits this area instead of adding another
       for (const p of pending) {
-        a = await upload<ChoreArea>('POST', `/chore-areas/${a.id}/photos`, p.blob);
+        a = await upload<RoomArea>('POST', `/room-areas/${a.id}/photos`, p.blob);
         setSaved(a);
         setPending((left) => left.filter((x) => x !== p));
       }
       for (const id of removed) {
-        await del(`/chore-area-photos/${id}`);
+        await del(`/room-area-photos/${id}`);
         setRemoved((left) => left.filter((x) => x !== id));
       }
       onSaved();
@@ -66,7 +66,7 @@ export function ChoreAreaForm({ choreId, area, onDirty, onSaved, onCancel }: {
   async function remove() {
     if (!saved || !confirm(`Delete the area "${saved.name}" and its photos?`)) return;
     setBusy('Deleting…'); setError(null);
-    try { await del(`/chore-areas/${saved.id}`); onSaved(); } catch (e) { setError(errorText(e)); setBusy(null); }
+    try { await del(`/room-areas/${saved.id}`); onSaved(); } catch (e) { setError(errorText(e)); setBusy(null); }
   }
 
   return (
