@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.21 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.22 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -922,6 +922,17 @@ title (`rom_` + the chore id's suffix, its creator and times kept) and points at
 its id, name, expectations, position and R2 key, so nothing in R2 moves. A chore without areas gets no room.
 **Migration check (RM-M):** the Kitchen chore's areas and photo come through unchanged under the Kitchen room; the old
 tables are gone; `PRAGMA foreign_key_check` is empty.
+
+### 4.2zu Schema change — `migrations/0048_chore_sun.sql`
+
+Asked by MojoSOGO 2026-10-12: "an alarm chore that can be assigned to anyone to get the eggs 30 minutes before
+sundown" (§7B.3, a chore timed by the sunset).
+
+Schema: [`migrations/0048_chore_sun.sql`](migrations/0048_chore_sun.sql). The migration is the schema; it is not copied here.
+
+`chores.sun_offset_min` — NULL = the chore's `time` is a clock time (as before); 0–240 = its time each day is that
+many minutes before local sunset (§7.7), and `time` is kept only as the form's last clock value. Additive only; it
+runs before the deploy. **Migration check (CS-M):** chores that exist before 0048 survive it with `sun_offset_min` NULL.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -2201,6 +2212,12 @@ its first fire is planned only when the run row is newly inserted:
 A first fire whose due time is already past when planned is **not** created (a chore
 added at 20:00 for 08:00 today appears on Today without ringing).
 
+**Before sunset** (§4.2zu; MojoSOGO 2026-10-12, "get the eggs 30 minutes before sundown"): a chore with
+`sun_offset_min` set has, on each date, the time **local sunset − `sun_offset_min`** (`sunsetUtc`, §7.7, with the
+household place) in place of `date + time`, for `at` and `by` alike, for its first fire and for a `by` nudge. No place, or
+no sunset that day → that run gets **no** time-based fire (it is still on Today; never a substitute time, as §7.7).
+Waits between steps are unchanged. The alert text is the ordinary chore text (§5.7) ⚑ Q270.
+
 **Done a step** (`advanceRun(chore, run, openFire, memberId, now, tz)` → `{ run, closeFire?, newFire? }`):
 1. The run's open fire, if any, closes `done` (`closed_by` = the member).
 2. `step + 1`. If that was the last step: `done_at = now`, `done_by` = member. Stop.
@@ -2246,7 +2263,7 @@ exists) and the runs stay (history).
 
 Title 1–60, `done_means` ≤ 200, `days` ≥ 1, `people` 1–8 active members, steps 1–6,
 step title 1–60, `waitMin` 1–720 or null, step `memberId` an active member or null,
-`time` `HH:MM`, at least one channel when timing is `at` or nudge is on. Every
+`time` `HH:MM`, `sunOffsetMin` 0–240 or null, at least one channel when timing is `at` or nudge is on. Every
 rejection is 400 `invalid_input` with a message naming the field.
 
 ### 7B.5 Acceptance (M4c — each row is a test)
@@ -2267,6 +2284,10 @@ rejection is 400 `invalid_input` with a message naming the field.
 | C12 | `/calendar` and `/alarms` | no chore appears in either |
 | C13 | migration check (§4.2e) | old fires and deliveries intact after 0006 |
 | C14 | delete a chore while a step wait is pending | that fire closes `removed`; nothing rings |
+| C15 | "Get the eggs", `at`, `sunOffsetMin` 30, every day, Oceanside; plan 2026-10-31 | first fire due that day's `sunsetUtc` − 30 min (about 17:28 PDT); 2026-11-01 → about 16:27 PST |
+| C16 | C15 with no household place | runs planned, no fire |
+| C17 | `by` with `sunOffsetMin` 0 and nudge; done a step before sunset | the nudge is re-planned at that day's sunset |
+| C18 | `sunOffsetMin` −1, 241 or "30" | 400 `invalid_input` naming `sunOffsetMin` |
 
 ### 7B.6 Rooms and what done looks like — `src/shared/rooms.ts` (pure)
 
@@ -3847,6 +3868,8 @@ Time      Chore            Days        This week
 19:00 by  🗑 Trash          Tue         Kai → Sam
 ```
 
+- A sunset chore shows `sunset −30` (or `sunset`) in place of the clock time (`whenText` in `ChoresToday.tsx`, §7B.3), on All chores
+  and on Today.
 - `at`/`by` after the time; a superscript step count when there is more than one step; a **📋** button after
   the title when the chore has a Done means or its room has areas (§7B.6), opening its **What done looks like**
   sheet (§8.15).
@@ -3857,7 +3880,7 @@ Time      Chore            Days        This week
   - Title · **Done means…** (one line, e.g. "Bins at the curb, lids shut") · **Room** (No room, then the rooms, §7B.6)
   - Days (chips Sun…Sat, plus "Every day" / "Weekdays")
   - **When:** ( ) **At** a time — it rings · ( ) **By** a time — quiet; ☐ nudge then
-  - Time
+  - Time: ( ) **Clock** [time] · ( ) **Before sunset** [30] min (§7B.3; 0 = at sunset)
   - **People:** member chips; the order you tap is the turn order. With two or more:
     "Takes turns, changing every Sunday."
   - **Steps:** one row per step — title · "then ring the next step after ___ min"
@@ -5345,10 +5368,10 @@ founder ping (Ozymandias, Claude), a sign-in notice, a mess ask. The test push h
 | POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; spoken (quiet or not, §9.2b) as "{my name} says: {text}" on every speaker and/or pushed to every member, me too, now (§9.3) |
 | POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 409 `no_recipients` (no founder yet) / 429 `rate_limited`, in that order |
 | GET | `/ops/pings?after=` | bearer `OPS_NOTIFY_TOKEN` (no session) | → `{ pings: [{ id, channel, title, text, at }] }`, the founder pings and FunHouse alerts of the last hour after `after`, oldest first, for the FunHouse poller (§9.4a, §9.4b; listed `funhouse` rows become `sent`); 503 / 401 as `/ops/notify` |
-| GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek, areaCount, roomId }` (`thisWeek`/`nextWeek` = member id or null; `areaCount` §7B.6) |
-| POST | `/chores` | member | `{ title, doneMeans?, roomId?, days, timing, time, nudge?, people, steps, channels, renotifyMin? }` → chore (201); 400 an unknown room (§7B.6) |
+| GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, sunOffsetMin, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek, areaCount, roomId }` (`thisWeek`/`nextWeek` = member id or null; `areaCount` §7B.6) |
+| POST | `/chores` | member | `{ title, doneMeans?, roomId?, days, timing, time, sunOffsetMin?, nudge?, people, steps, channels, renotifyMin? }` (`sunOffsetMin` null = clock time, §7B.3) → chore (201); 400 an unknown room (§7B.6) |
 | PATCH/DELETE | `/chores/{id}` | creator or owner | same fields, all optional; re-plans unstarted runs (§7B.3); its room stays (§7B.6) |
-| GET | `/chores/today` | member | → `{ date, runs: Run[] }`; `Run = { id, choreId, title, doneMeans, timing, time, step, steps, assigneeId, personId, doneAt, doneBy, nextDueAt, ringing, areaCount }` (`personId` = the current step's person) |
+| GET | `/chores/today` | member | → `{ date, runs: Run[] }`; `Run = { id, choreId, title, doneMeans, timing, time, sunOffsetMin, step, steps, assigneeId, personId, doneAt, doneBy, nextDueAt, ringing, areaCount }` (`personId` = the current step's person) |
 | POST | `/chore-runs/{id}/done` | member | advances one step (§7B.3) → run; 409 `already_done` when finished |
 | POST | `/chore-runs/{id}/undo` | member | → run; 409 `nothing_to_undo` at step 0 |
 | GET/POST | `/rooms` | GET member / POST owner | GET → `Room[]` by position; POST `{ name }` → room (201); 400 at 30 rooms (§7B.6) |

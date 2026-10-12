@@ -1884,3 +1884,12 @@ REORG RECEIPT
 - **Why:** A change to the list Chores.tsx already owns; `onEdit` and `onOpenAreas` are already props of AllChoresSection. 📋 visibility comes from server fields (`areaCount`, `doneMeans`). Rejected ChoresToday.tsx (its tap ticks done, deliberately) and a new component (nothing distinct to own). module-ownership.md row and the file header reworded in the same commit.
 - **Caps:** Chores.tsx about 111 → about 116 of 300 (no CEILINGS pin). No file enters the band.
 - **Sources read:** frontend/src/components/Chores.tsx, scripts/arch.ts, docs/module-ownership.md.
+
+## 2026-10-12 — v1.69.0: Chore time "before sunset" (placement-advisor)
+
+- **Ask:** SPEC §7B.3 / §4.2zu (migration 0048): a chore's time can be local sunset − N minutes (0–240) instead of a clock time; no place or no sunset that day → no time-based fire, still on Today. MojoSOGO: "an alarm chore that can be assigned to anyone to get the eggs 30 minutes before sundown".
+- **Verdict:** EXISTING owners: `src/shared/chores.ts` (place-aware `deadline`; trailing `place` on `firstFireDue`, `planChoreRuns`, `advanceRun`, `undoRun`, `replanRun`; `sunOffsetMin` in `parseChoreInput`, exported `SUN_OFFSET_MAX`) and `frontend/src/components/ChoresToday.tsx` (exported `whenText`, also used by Chores.tsx). Callers: `src/worker/fire-rows.ts` `choreRunInserts` passes `place`; `src/worker/tick.ts`; `src/worker/routes/chores.ts` loads `householdPlace` inside `stepRun` so `routes/alerts.ts` is untouched, and `choreView` emits `sunOffsetMin` so a PATCH keeps it. Form: `ChoreForm.tsx`.
+- **Flow stage:** rules (deadline), persist (route, tick, fire-rows), render (form, time text).
+- **Why:** run timing is chore planning; `sun.ts` is already a pure leaf. One nullable integer beats copying the event `start_sun` pair. UI words stay out of shared code.
+- **Caps:** chores.ts 253/300 (band 270). Next chores.ts feature: extract-first `parseChoreInput` and helpers into `src/shared/chore-input.ts`. No file newly in the band.
+- **Sources read:** scripts/arch.ts; docs/module-ownership.md; src/shared/chores.ts, sun.ts; src/worker/routes/chores.ts, fire-rows.ts, tick.ts; ChoreForm.tsx, ChoresToday.tsx, Chores.tsx.

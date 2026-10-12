@@ -7,7 +7,7 @@ import { machineHoursOf, machineQuietUntil } from '../shared/machine-hours';
 import { cookAlert, cookMessage, isCookId, type CookRow } from '../shared/cooking';
 import type { Channel, SunEvent } from '../shared/vocab';
 import { utcToLocal } from '../shared/time';
-import { sunsetUtc } from '../shared/sun';
+import { sunsetUtc, type Place } from '../shared/sun';
 import { FOUNDER_SQL, all, first, newId, parseJson, placeOf } from './db';
 import { onMemberIds } from './event-rows';
 
@@ -49,9 +49,9 @@ export async function loadChoreRun(db: D1Database, runId: string | null): Promis
  * §7B.3 planning for one chore: INSERT OR IGNORE each run; its first fire is inserted only when that
  * run row is the one just minted (it exists under the new id) — i.e. the run is newly inserted.
  */
-export function choreRunInserts(db: D1Database, chore: Chore, tz: string, now: string, toUtc: string, activeIds: string[]): D1PreparedStatement[] {
+export function choreRunInserts(db: D1Database, chore: Chore, tz: string, now: string, toUtc: string, activeIds: string[], place: Place | null): D1PreparedStatement[] {
   const stmts: D1PreparedStatement[] = [];
-  for (const p of planChoreRuns(chore, tz, now, toUtc, activeIds)) {
+  for (const p of planChoreRuns(chore, tz, now, toUtc, activeIds, place)) {
     const runId = newId('run');
     stmts.push(db.prepare(
       `INSERT OR IGNORE INTO chore_runs (id, chore_id, date, assignee_id, step, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?)`,

@@ -271,3 +271,5 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q267 | Days off (§8.6) | ⚑ Moved from 🏠 Household to the 📅 Calendar area (renamed from "Calendar items"), shown to admins only under the optional items |
 | Q268 | Editing areas from a chore's sheet (§8.15) | ⚑ Allowed for the room's creator or an admin; the change is the room's, so every chore in that room shows it |
 | Q269 | A machine alerting someone other than the founder (§7D.7) | ⚑ No FunHouse row: Phone + House only (the FunHouse is MojoSOGO's desk, Q230) |
+| Q270 | A sunset chore's alert text (§7B.3) | ⚑ The ordinary chore text ("Chore for A: Get the eggs"), no "sunset at h:mm" added |
+| Q271 | How a sunset chore shows its time (§8.5) | ⚑ `sunset −30` (or `sunset` at 0) where the clock time was; the form's Before sunset box starts at 30 min; `time` keeps the form's last clock value, so lists still sort by it |

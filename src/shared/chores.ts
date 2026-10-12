@@ -3,6 +3,7 @@
 import { CHANNEL, CHORE_TIMING, WEEKDAY, isOneOf, type Channel, type ChoreTiming, type Weekday } from './vocab';
 import { addDays, addMinutes, diffDays, isTime, localToUtc, ms, startOfWeek, utcToLocal, weekdayOf } from './time';
 import { closeFire, newChoreFire, type AlertConfig, type FireRow, type NewFire } from './engine';
+import { sunsetUtc, type Place } from './sun';
 
 export const TITLE_MAX = 60;
 export const DONE_MEANS_MAX = 200;
@@ -11,6 +12,7 @@ export const STEPS_MAX = 6;
 export const WAIT_MAX = 720;
 export const RENOTIFY_MAX = 240; // the timers' range
 export const DEFAULT_MAX_ALERTS = 4;
+export const SUN_OFFSET_MAX = 240; // minutes before sunset (§7B.3); migration 0048's CHECK repeats it
 
 /** §7B.2 — one step of a chore's loop. */
 export interface ChoreStep {
@@ -27,6 +29,7 @@ export interface Chore {
   days: Weekday[];
   timing: ChoreTiming;
   time: string;
+  sun_offset_min: number | null; // §7B.3 — N = local sunset − N min replaces `time`
   nudge: boolean;
   people: string[];
   steps: ChoreStep[];
@@ -39,7 +42,7 @@ export interface Chore {
 /** The `chores` row as D1 returns it (JSON columns as text). */
 export interface ChoreRow {
   id: string; title: string; done_means: string | null; days: string; timing: ChoreTiming; time: string;
-  nudge: number; people: string; steps: string; channels: string; renotify_min: number | null; max_alerts: number;
+  sun_offset_min: number | null; nudge: number; people: string; steps: string; channels: string; renotify_min: number | null; max_alerts: number;
   start_date: string; created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
   bounty: number | null; // §7B.8 — never part of Chore: it plays no part in planning
   room_id: string | null; // §7B.6 — the chore's room; never part of Chore either
@@ -58,7 +61,7 @@ export interface ChoreRun {
 
 export function choreFromRow(r: ChoreRow): Chore {
   return {
-    id: r.id, title: r.title, done_means: r.done_means, days: JSON.parse(r.days), timing: r.timing, time: r.time,
+    id: r.id, title: r.title, done_means: r.done_means, days: JSON.parse(r.days), timing: r.timing, time: r.time, sun_offset_min: r.sun_offset_min,
     nudge: r.nudge === 1, people: JSON.parse(r.people), steps: JSON.parse(r.steps), channels: JSON.parse(r.channels),
     renotify_min: r.renotify_min, max_alerts: r.max_alerts, start_date: r.start_date,
   };
@@ -93,24 +96,29 @@ export function stepPerson(chore: Chore, run: ChoreRun): string | null {
 
 // ---- §7B.3 runs ----
 
-const deadline = (chore: Chore, date: string, tz: string) => localToUtc(date, chore.time, tz);
+/** The run's time on `date`: `date + time`, or sunset − sun_offset_min; null when that sunset cannot be computed (§7B.3). */
+function deadline(chore: Chore, date: string, tz: string, place: Place | null): string | null {
+  if (chore.sun_offset_min === null) return localToUtc(date, chore.time, tz);
+  const sunset = place && sunsetUtc(date, place);
+  return sunset ? addMinutes(sunset, -chore.sun_offset_min) : null;
+}
 
-/** A run's first fire: none for `by` without nudge, none when its time is already past. */
-export function firstFireDue(chore: Chore, date: string, tz: string, now: string): string | null {
+/** A run's first fire: none for `by` without nudge, none when its time is already past or unknown. */
+export function firstFireDue(chore: Chore, date: string, tz: string, now: string, place: Place | null = null): string | null {
   if (chore.timing === 'by' && !chore.nudge) return null;
-  const due = deadline(chore, date, tz);
-  return ms(due) < ms(now) ? null : due;
+  const due = deadline(chore, date, tz, place);
+  return due === null || ms(due) < ms(now) ? null : due;
 }
 
 export interface PlannedRun { date: string; assignee_id: string | null; firstDueAt: string | null }
 
 /** One run per due date from today (household tz) to the local date of `toUtc`, never before start_date. */
-export function planChoreRuns(chore: Chore, tz: string, now: string, toUtc: string, activeIds: readonly string[]): PlannedRun[] {
+export function planChoreRuns(chore: Chore, tz: string, now: string, toUtc: string, activeIds: readonly string[], place: Place | null = null): PlannedRun[] {
   const today = utcToLocal(now, tz).date;
   const last = utcToLocal(toUtc, tz).date;
   const out: PlannedRun[] = [];
   for (let d = today > chore.start_date ? today : chore.start_date; d <= last; d = addDays(d, 1)) {
-    if (isDueOn(chore, d)) out.push({ date: d, assignee_id: assigneeFor(chore, d, activeIds), firstDueAt: firstFireDue(chore, d, tz, now) });
+    if (isDueOn(chore, d)) out.push({ date: d, assignee_id: assigneeFor(chore, d, activeIds), firstDueAt: firstFireDue(chore, d, tz, now, place) });
   }
   return out;
 }
@@ -118,34 +126,34 @@ export function planChoreRuns(chore: Chore, tz: string, now: string, toUtc: stri
 export interface RunChange { run: ChoreRun; closeFire?: FireRow; newFire?: NewFire }
 
 /** Rule 4: a `by` nudge still ahead gets a fire at the deadline. */
-function nudgeFire(chore: Chore, run: ChoreRun, now: string, tz: string): NewFire | undefined {
+function nudgeFire(chore: Chore, run: ChoreRun, now: string, tz: string, place: Place | null): NewFire | undefined {
   if (chore.timing !== 'by' || !chore.nudge) return undefined;
-  const due = deadline(chore, run.date, tz);
-  return ms(due) > ms(now) ? newChoreFire(run.id, due) : undefined;
+  const due = deadline(chore, run.date, tz, place);
+  return due !== null && ms(due) > ms(now) ? newChoreFire(run.id, due) : undefined;
 }
 
 /** Done a step (§7B.3 rules 1–5). */
 export function advanceRun(
-  chore: Chore, run: ChoreRun, openFire: FireRow | null, memberId: string, now: string, tz: string,
+  chore: Chore, run: ChoreRun, openFire: FireRow | null, memberId: string, now: string, tz: string, place: Place | null = null,
 ): RunChange | { error: 'already_done' } {
   if (run.step >= chore.steps.length) return { error: 'already_done' };
   const closed = openFire ? closeFire(openFire, 'done', memberId, now) : undefined;
   const next: ChoreRun = { ...run, step: run.step + 1 };
   if (next.step >= chore.steps.length) return { run: { ...next, done_at: now, done_by: memberId }, closeFire: closed };
   const wait = chore.steps[run.step].waitMin;
-  const newFire = wait ? newChoreFire(run.id, addMinutes(now, wait)) : nudgeFire(chore, run, now, tz);
+  const newFire = wait ? newChoreFire(run.id, addMinutes(now, wait)) : nudgeFire(chore, run, now, tz, place);
   return { run: next, closeFire: closed, newFire };
 }
 
 /** Undo the last step: the open fire closes `removed`; only a `by` nudge still ahead is re-planned (waits are not). */
 export function undoRun(
-  chore: Chore, run: ChoreRun, openFire: FireRow | null, now: string, tz: string,
+  chore: Chore, run: ChoreRun, openFire: FireRow | null, now: string, tz: string, place: Place | null = null,
 ): RunChange | { error: 'nothing_to_undo' } {
   if (run.step <= 0) return { error: 'nothing_to_undo' };
   return {
     run: { ...run, step: Math.min(run.step, chore.steps.length) - 1, done_at: null, done_by: null },
     closeFire: openFire ? closeFire(openFire, 'removed', null, now) : undefined,
-    newFire: nudgeFire(chore, run, now, tz),
+    newFire: nudgeFire(chore, run, now, tz, place),
   };
 }
 
@@ -155,10 +163,10 @@ export function undoRun(
  * chore's days gets no fire. Null = started, or from an earlier day: left alone.
  */
 export function replanRun(
-  chore: Chore, run: ChoreRun, openFire: FireRow | null, tz: string, now: string, activeIds: readonly string[],
+  chore: Chore, run: ChoreRun, openFire: FireRow | null, tz: string, now: string, activeIds: readonly string[], place: Place | null = null,
 ): RunChange | null {
   if (run.step !== 0 || run.date < utcToLocal(now, tz).date) return null;
-  const due = isDueOn(chore, run.date) ? firstFireDue(chore, run.date, tz, now) : null;
+  const due = isDueOn(chore, run.date) ? firstFireDue(chore, run.date, tz, now, place) : null;
   return {
     run: { ...run, assignee_id: assigneeFor(chore, run.date, activeIds) },
     closeFire: openFire ? closeFire(openFire, 'removed', null, now) : undefined,
@@ -217,6 +225,8 @@ export function parseChoreInput(b: Record<string, unknown>, activeIds: readonly 
   if (!isOneOf(CHORE_TIMING, b.timing)) return `timing must be one of: ${CHORE_TIMING.join(', ')}.`;
   const timing = b.timing;
   if (!isTime(b.time)) return 'time must be HH:MM.';
+  const sun_offset_min = empty(b.sunOffsetMin) ? null : intIn(b.sunOffsetMin, 0, SUN_OFFSET_MAX);
+  if (sun_offset_min === null && !empty(b.sunOffsetMin)) return `sunOffsetMin must be 0–${SUN_OFFSET_MAX} minutes before sunset, or empty for a clock time.`;
   if (!empty(b.nudge) && typeof b.nudge !== 'boolean') return 'nudge must be true or false.';
   const nudge = timing === 'by' && b.nudge === true;
   const people = b.people;
@@ -237,7 +247,7 @@ export function parseChoreInput(b: Record<string, unknown>, activeIds: readonly 
   const renotify_min = empty(b.renotifyMin) ? null : intIn(b.renotifyMin, 1, RENOTIFY_MAX);
   if (renotify_min === null && !empty(b.renotifyMin)) return `renotifyMin must be 1–${RENOTIFY_MAX} minutes, or empty to ring once.`;
   return {
-    title, done_means, days, timing, time: b.time, nudge, people: people as string[], steps, channels,
+    title, done_means, days, timing, time: b.time, sun_offset_min, nudge, people: people as string[], steps, channels,
     renotify_min, max_alerts: DEFAULT_MAX_ALERTS,
   };
 }
