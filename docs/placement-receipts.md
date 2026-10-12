@@ -1831,3 +1831,12 @@ REORG RECEIPT
 - **Why:** All four surfaces (Modal ◎, PointAtLayer's floating ◎, the Alt+P listener and SettingsMe) already read the one `usePointAtOn()` gate, so gating it once covers them and PointAt.tsx/Modal.tsx are untouched. The founder check is reused from state.tsx rather than written again. PointAtButton gains a hook import from '../state' (not a component, no cycle), and every consumer renders inside AppProvider (Shell; Modal is not used on the sign-in, join or approve screens). The stored switch is left alone, so a founder's setting persists. Rejected: gating separately in PointAt.tsx, Modal.tsx and SettingsMe (three copies of one rule), and a server-side flag (the founder is already known on the client).
 - **Caps:** PointAtButton.tsx 31 → ~33/300; SettingsMe.tsx 37 → ~38/300. No file newly in the band.
 - **Sources read:** scripts/arch.ts; docs/placement-receipts.md; docs/module-ownership.md (rows 139, 197, 198); frontend/src/components/PointAtButton.tsx, PointAt.tsx, SettingsMe.tsx; frontend/src/state.tsx (useIsFounder); frontend/src/App.tsx (provider tree); grep of Modal/PointAt usages in frontend/src and test/.
+
+## 2026-10-12 — About tagline on two lines (placement-advisor)
+
+- **Ask:** In Settings → ℹ️ About, show the tagline as two lines ("Closing the loop." / "Peace of mind, every day.") instead of one run-on; the opening screen (frontend/index.html, §8.10) stays as is. SPEC §8.6 SM5, MojoSOGO 2026-10-12.
+- **Verdict:** `frontend/src/components/SettingsAbout.module.css` + `frontend/src/components/SettingsAbout.tsx` [EXISTING]
+- **Flow stage:** render
+- **Why:** the SettingsAbout row already owns the About panel and TAGLINE; stacking the halves is presentation only (`.tagline span` inline-block → block, and the `' '` separator dropped). TAGLINE is untouched, so SM5's index.html check (each half as `<span>…</span>`) still holds and the splash is left alone. Rejected: splitting TAGLINE or adding a second constant (a second copy, §0.5); editing index.html (out of scope by MojoSOGO's word).
+- **Caps:** SettingsAbout.tsx 18 → 18 lines, SettingsAbout.module.css 9 → 9, against GLOBAL_FILE_CAP 300. No file newly in the band.
+- **Sources read:** frontend/src/components/SettingsAbout.tsx; frontend/src/components/SettingsAbout.module.css; docs/module-ownership.md (row 204); scripts/arch.ts (WORKING_BUFFER, GLOBAL_FILE_CAP, WARN_AT); docs/placement-receipts.md; test/settings-about.test.ts.
