@@ -5350,8 +5350,11 @@ other push stays until I hide it ⚑ Q284.
   once, no asking ⚑ Q224.
 - Tapping a line opens its **card** (a titled modal): the title, the whole message, when (date and time), From (the
   source), the alert number (a fire's push), and how it went (sent / failed with the detail). **Close** at the
-  bottom; no Delete on the card (v1.70.0, MojoSOGO 2026-10-12: "Remove delete; too easy to make mistake"): the
-  list line's ❌ is the one way to hide an alert.
+  bottom; no Delete on the card (v1.70.0, MojoSOGO 2026-10-12: "Remove delete; too easy to make mistake").
+- **Ack** (v1.75.0, MojoSOGO 2026-10-12: "Let me ack this which will clear it. Ack on left; close on right"): a card
+  with nothing else to act on (a ping, an announcement, a notice, a fire not ringing) has **Ack** at the bottom left
+  and **Close** at the right. Ack hides the line (as its ❌, `DELETE /me/alerts/{id}`) and closes the card. A card
+  with a fire's or a mess's buttons has just Close: acting there clears it (below).
 - **Opened from a push:** a tap on a notification (no action button) opens `/settings/alerts?alert={id}`
   (§9.1). On start the app reads it, clears the address to `/`, shows Settings and opens that card — after
   signing in first, if needed ⚑ Q225. An id not in my list (hidden, or handled and cleared) → no card, just the

@@ -887,7 +887,7 @@ right, Not me directly under That was me, in the banner, the Messes section and 
 **Handled alerts clear themselves** (v1.75.0, SPEC 3.36, §9.5, Q284; MojoSOGO 2026-10-12: "Already answered? Auto
 clear"): My alerts leaves out a fire's push once the fire is closed and a mess ask once it no longer asks me, derived
 on each read (rows kept). No more "Already handled." / "Already answered." cards; a tapped push for a cleared alert
-opens the list with no card.
+opens the list with no card. A card with nothing to act on has **Ack** (left: clears it, closes) and Close (right).
 
 Deviations from this spec, deliberately:
 

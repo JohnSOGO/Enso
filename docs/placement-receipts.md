@@ -7,6 +7,13 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.75.0: My alerts card Ack (left) + Close (right) (placement-advisor)
+
+- **Ask:** A My alerts card with nothing else to act on gets Ack (bottom left, reuses hide() = DELETE /me/alerts/{id}, then closes) and Close (right) (SPEC §9.5 "Ack", v1.75.0; MojoSOGO "Let me ack this which will clear it. Ack on left; close on right").
+- **Verdict:** `frontend/src/components/MyAlerts.tsx` [EXISTING]; render stage. No new route, rule or vocab.
+- **Why/Caps:** ~113/300 (global cap), far below the band; a shared or route home rejected since nothing is decided, only captured.
+- **Sources read:** scripts/arch.ts, docs/module-ownership.md (MyAlerts row), MyAlerts.tsx.
+
 ## 2026-10-12 — v1.75.0: Handled alerts clear themselves (placement-advisor)
 
 - **Ask:** SPEC §9.5 "Handled ones clear themselves" (v1.75.0, MA11, Q284; MojoSOGO "Already answered? Auto clear"). GET /me/alerts leaves out a fire's push whose fire is closed and a mess ask that no longer asks me (askedOf), derived on each read with no row writes. MyAlerts drops the "Already handled."/"Already answered." text; a card closes when its alert leaves the list; an opened-from-push id not in the list shows no card.

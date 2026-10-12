@@ -90,8 +90,11 @@ export function MyAlerts({ openId, onOpened }: { openId: string | null; onOpened
         const close = () => { setCard(null); setActError(null); };
         const ask = card.messId ? messes?.messes.find((m) => m.id === card.messId && m.asked.includes(me.id)) : undefined;
         const answer: typeof mess.act = (id, send) => mess.act(id, async () => { await send(); close(); });
+        const footer = fire || ask ? <button onClick={close}>Close</button>
+          : <><button className="primary" disabled={busy} onClick={() => { hide(card.id); close(); }}>Ack</button>
+              <button style={{ marginLeft: 'auto' }} onClick={close}>Close</button></>; // §9.5: Ack left clears it, Close right
         return (
-        <Modal title={card.title} onClose={close} footer={<button onClick={close}>Close</button>}>
+        <Modal title={card.title} onClose={close} footer={footer}>
           {(actError ?? mess.error) && <div role="alert" className="alert-error">{actError ?? mess.error}</div>}
           <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginBottom: 12 }}>{card.message}</p>
           <p className="muted">When: {when(card.createdAt, true)}</p>
