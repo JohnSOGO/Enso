@@ -801,6 +801,9 @@ edit select circle should only be visible to mojosogo"): `usePointAtOn` is false
 and Disable should all be pills in one row, rows and columns"): `SettingsMembers.tsx` draws a four-column grid of pills
 (own CSS module) instead of the table; asks, PATCH bodies and who sees which pill unchanged. Not yet checked on the iPhone.
 
+**About tagline on two lines** (v1.64.1, §8.6 SM5; MojoSOGO 2026-10-12 picked the About popup: "Two lines"):
+"Closing the loop." sits over "Peace of mind, every day." in Settings → ℹ️ About. The opening screen (§8.10) unchanged.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

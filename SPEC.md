@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.15 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.16 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3873,7 +3873,8 @@ Settings
   `lastError` beneath; `not_configured` → "not set up" (bad); `untried` → "not tried yet"
   (neutral). Then the last 20 deliveries with their status badge.
 - **ℹ️ About** (asked by MojoSOGO 2026-10-11, last in the grid, for everyone ⚑ Q247): the opening screen's look
-  (§8.10) inside the modal: the ensō logo, **Ensō**, the tagline, and the build stamp as the revision; then
+  (§8.10) inside the modal: the ensō logo, **Ensō**, the tagline on two lines ("Closing the loop." over "Peace of mind, every day.", MojoSOGO
+  2026-10-12), and the build stamp as the revision; then
   **"Developed by MojoSOGO · with Claude"** ⚑ (Q248). Nothing to change, nothing fetched.
 - **Log out** sits under the grid, not inside an area ⚑ (Q227). No menu button is marked chosen.
 

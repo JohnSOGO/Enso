@@ -5,5 +5,5 @@
 .logo { width: min(40vw, 160px); height: auto; margin-bottom: 8px; }
 .name { margin: 0; font-size: 2.4rem; font-weight: 300; letter-spacing: .04em; }
 .about .tagline { font-size: .95rem; color: #CBD5E1; font-weight: 300; margin-bottom: 6px; }
-.tagline span { display: inline-block; }
+.tagline span { display: block; }
 .about .build { font-size: .75rem; color: #64748B; font-variant-numeric: tabular-nums; }
