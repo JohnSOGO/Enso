@@ -1893,3 +1893,12 @@ REORG RECEIPT
 - **Why:** run timing is chore planning; `sun.ts` is already a pure leaf. One nullable integer beats copying the event `start_sun` pair. UI words stay out of shared code.
 - **Caps:** chores.ts 253/300 (band 270). Next chores.ts feature: extract-first `parseChoreInput` and helpers into `src/shared/chore-input.ts`. No file newly in the band.
 - **Sources read:** scripts/arch.ts; docs/module-ownership.md; src/shared/chores.ts, sun.ts; src/worker/routes/chores.ts, fire-rows.ts, tick.ts; ChoreForm.tsx, ChoresToday.tsx, Chores.tsx.
+
+## 2026-10-12 — Steward pass 20, whole tree (code-steward)
+
+- **Run:** after the v1.69.0 release (SPEC 3.22 §7B.3, chores before sunset, migration 0048). Also covers v1.63.0–v1.68.1.
+- **Verdict:** SOUND. Typecheck green, 847/847 tests, arch:audit quiet (chores.ts 253/300, EventForm 88%, Calendar 87%, routes/recipes 87%).
+- **Placement audit:** 12 receipts against 12 code commits, no placement mismatches. bd931e4 (FOUNDER_SQL to db.ts, 7-line refactor, no behavior change) has no receipt; accepted. Seven receipts (v1.63.1 to v1.69.0) were appended at the end of this file instead of the top.
+- **Top finding:** a docs tidy. Move those seven receipts to the top; add device checks for v1.58–v1.69 (rooms, a sunset chore ringing) to where-things-stand; add the clock-or-sunset choice to map row 165 (ChoreForm) and the `whenText` export to row 173 (ChoresToday).
+- **Handoffs:** 2 to worker (#1 the docs tidy; #2 make `place` required on firstFireDue, planChoreRuns, advanceRun, undoRun and replanRun, since its null default lets a new caller silently stop sunset fires). 0 to reorganizer now: the chore-input.ts seam (§7B.4 validation, about 70 lines) stays the first step of the next chores.ts feature. Items carried from pass 19 still wait for MojoSOGO's pick.
+- **Restraint:** no pre-emptive chores.ts split (84%, coherent); EventForm, Calendar and recipes ceilings untouched since pass 19; machines.ts churn was small changes inside its one owner; SUN_OFFSET_MAX repeated in the migration's CHECK (SQL cannot import it); whenText only formats, it decides nothing.
