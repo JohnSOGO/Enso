@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.30 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.31 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3699,7 +3699,8 @@ It contains, in order:
 
 **Who it's for** (v1.73.0, MojoSOGO 2026-10-12: "One person mentioned twice; just mention once. If
 everyone; make one green bubble with words family"): each person shows **once**. A creator who
-is also assigned shows only as their "→ name" chip, with the creator's color border (Q281). When the
+is also assigned shows only as their name chip, with the creator's color border (Q281). Name chips
+have no "→" (v1.73.2, MojoSOGO: "This is a calendar event not rotation"). When the
 event is assigned to **every active member** of a household of two or more, the chips are one green
 (`--good`) **Family** chip and nothing else (Q282). The calendar cell does the same with its dots
 (§7.1). The rule lives in `frontend/src/participants.ts`; **Acceptance** (`test/participants.test.ts`):
