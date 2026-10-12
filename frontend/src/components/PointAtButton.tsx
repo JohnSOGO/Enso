@@ -1,6 +1,7 @@
-// SPEC §8.16 ⚑ Q234 — 🎯 Point at it, this device's switch (localStorage, not the account), the toggle signal, and the
-// ◎ button (bottom left) that turns pick mode on and off. A leaf: Modal, SettingsMe and PointAt import it; it imports no component.
+// SPEC §8.16 Q234 — 🎯 Point at it, founder only, this device's switch (localStorage, not the account), the toggle signal,
+// and the ◎ button (bottom left) that turns pick mode on and off. A leaf: Modal, SettingsMe and PointAt import it; it imports no component.
 import { useSyncExternalStore } from 'react';
+import { useIsFounder } from '../state';
 
 const KEY = 'enso.pointAt';
 const listeners = new Set<() => void>();
@@ -10,7 +11,11 @@ const toggle = new EventTarget();
 const read = () => { try { return localStorage.getItem(KEY) !== '0'; } catch { return true; } };
 const subscribe = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };
 
-export const usePointAtOn = () => useSyncExternalStore(subscribe, read, () => true);
+/** On only for the founder (Q234, like the 🎪 tick Q230), and only while this device's switch is on. */
+export function usePointAtOn() {
+  const on = useSyncExternalStore(subscribe, read, () => true);
+  return useIsFounder() && on;
+}
 
 export function setPointAtOn(on: boolean) {
   try { if (on) localStorage.removeItem(KEY); else localStorage.setItem(KEY, '0'); } catch { /* storage may be blocked */ }

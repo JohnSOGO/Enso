@@ -793,6 +793,10 @@ Ringing-now "Fold & out" button: "Unload Clothes Dryer is a better label"): `fin
 and the Machines card change together. The refusal for finishing the washer reads "Move this load to the clothes dryer
 first." Washer (Move to clothes dryer) and dish washer (Emptied) unchanged.
 
+**◎ pick circle founder only** (v1.63.2, §8.16, Q234; MojoSOGO 2026-10-12: "I am the only editor so that highlight
+edit select circle should only be visible to mojosogo"): `usePointAtOn` is false for everyone but the founder, so the
+◎ (tab bar and modal headers), Alt+P and the Settings → 🙂 Me switch are gone for other members. His behavior unchanged.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

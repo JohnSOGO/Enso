@@ -1,7 +1,7 @@
-// SPEC §8.6 — Settings → 🙂 Me: display name and color → PATCH /me; the 🎯 Point at it switch for this device (§8.16).
+// SPEC §8.6 — Settings → 🙂 Me: display name and color → PATCH /me; the 🎯 Point at it switch for this device, founder only (§8.16).
 import { useState } from 'react';
 import { patch } from '../api';
-import { useApp } from '../state';
+import { useApp, useIsFounder } from '../state';
 import { MEMBER_PALETTE } from '../../../src/shared/vocab';
 import { useAction } from './useAction';
 import { setPointAtOn, usePointAtOn } from './PointAtButton';
@@ -11,6 +11,7 @@ export function SettingsMe() {
   const [name, setName] = useState(me.displayName);
   const { run, busy, errorEl } = useAction();
   const pointAt = usePointAtOn();
+  const founder = useIsFounder();
   const save = (body: object) => run(async () => { await patch('/me', body); refresh(); });
 
   return (
@@ -28,10 +29,10 @@ export function SettingsMe() {
           ))}
         </div>
       </div>
-      <label className="row" style={{ marginTop: 12 }}>
+      {founder && <label className="row" style={{ marginTop: 12 }}>
         <input type="checkbox" checked={pointAt} onChange={(e) => setPointAtOn(e.target.checked)} />
         <span>🎯 Point at it (this device): tap ◎ bottom left, then tap anything to copy where it is for Claude; tap ◎ again to stop</span>
-      </label>
+      </label>}
     </>
   );
 }

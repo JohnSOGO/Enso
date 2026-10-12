@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.13 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.14 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3853,7 +3853,7 @@ Settings
 [ Log out ]
 ```
 
-- **🙂 Me:** name, color, and **🎯 Point at it** on this device (§8.16).
+- **🙂 Me:** name, color, and (founder only) **🎯 Point at it** on this device (§8.16).
 - **📅 Calendar items:** **Optional calendar items** — Public holidays, 📈 options expiration, then one line
   per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5).
 - **📱 Phone alerts:** this phone's state and Turn on / Turn off / Send a test (§9.1).
@@ -4507,8 +4507,11 @@ so I don't have to over explain", without clashing with what a tap already does.
 Ozymandias dashboard's pick mode (MojoSOGO 2026-10-11: "look at ozymandias and do it like that"): a **pick mode** that
 stays on, where every tap is captured, swallowed, and copied as a few lines he pastes into a Claude thread.
 
-- **On by default** since v1.60.1, like Ozymandias's always-there ◎ (MojoSOGO 2026-10-11: "I don't see the faint circle"). Settings → 🙂 Me has a switch **🎯 Point at it** (its label says how: tap ◎ bottom left, tap anything, tap ◎ again to stop) that turns it off or on **for this device only**
-  (kept in the browser, not the account) ⚑ (Q234). Any member can turn it off.
+- **Founder only** since v1.63.2 (MojoSOGO 2026-10-12: "I am the only editor so that highlight edit select circle should
+  only be visible to mojosogo"), by the same founder check as the 🎪 FunHouse tick (Q230): every other member sees no ◎,
+  no switch, and Alt+P does nothing (Q234).
+- **On by default** for the founder since v1.60.1, like Ozymandias's always-there ◎ (MojoSOGO 2026-10-11: "I don't see the faint circle"). His Settings → 🙂 Me has a switch **🎯 Point at it** (its label says how: tap ◎ bottom left, tap anything, tap ◎ again to stop) that turns it off or on **for this device only**
+  (kept in the browser, not the account) ⚑ (Q234).
 - **While the switch is on**, a small faint round **◎** button sits in the bottom left corner just above the tab bar on
   every tab, and a **◎** sits in every modal's header beside ✕ ⚑ (Q235). Like Ozymandias's (MojoSOGO 2026-10-11: "I like
   the way ozymandias has the bottom left circle activator"), every ◎ turns amber while pick mode is on. Nothing else
@@ -4550,7 +4553,8 @@ stays on, where every tap is captured, swallowed, and copied as a few lines he p
 
 **Acceptance (PA1–PA4):** PA1 the text is built as above from its pieces (tab, modals, groups, thing, kind, selector,
 size, stamp), names are cut to their lengths, empty pieces are left out, and the selector stops at an id and adds
-`:nth-of-type` only where a sibling shares the tag; PA2 switch off, no ◎ shows anywhere and Alt+P does nothing;
+`:nth-of-type` only where a sibling shares the tag; PA2 switch off, or signed in as anyone but the founder, no ◎ shows anywhere, Alt+P does nothing, and a non-founder's
+🙂 Me has no switch;
 PA3 (manual, on the iPhone) on, tapping a tick box, a button, a text field and a select does none of their actions and
 each lands on the clipboard (paste into a Claude thread); tapping the bar or ◎ stops it and taps work normally after;
 PA4 (manual) a pick inside an open modal names the modal and the bar shows above it.
