@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-12 — v1.65.0: Members joined-date pill; revoked invites hidden after 24 h (placement-advisor)
+
+- **Ask:** MojoSOGO 2026-10-12, "same screen; remove 'revoked' after 24 hours; so I should see when active accounts joined". SPEC §8.6: each member row gets a "joined <date>" pill from members.created_at, as a 5th grid column. SPEC §8.9: a revoked invite is hidden from the Invites list once revoked more than 24 hours ago (filtered in the app; server unchanged).
+- **Verdict:** src/worker/routes/members.ts (GET /members selects `created_at AS joinedAt`), frontend/src/state.tsx (`Member.joinedAt: string`), frontend/src/components/SettingsMembers.tsx + SettingsMembers.module.css (pill and 5th column), frontend/src/components/Invites.tsx (24 h filter; `shortDate` exported for reuse) [EXISTING]
+- **Flow stage:** route (one more column in the list) + render (pill, filter)
+- **Why:** Every part already has an owner: members.ts the members list (row 86), state.tsx the Member type (row 139), SettingsMembers the grid (row 202), Invites the invite states (row 209). Presentation only, no shared rule needed. Rejected: filtering revoked invites on the server (history stays in D1); a second date formatter (Invites' `shortDate` is exported instead). The join date is visible to every member; not sensitive, and §8.6 says so.
+- **Caps:** members.ts ~73/300; state.tsx 107/300; SettingsMembers.tsx ~59/300; SettingsMembers.module.css 9/300; Invites.tsx ~76/300. No file newly in the band.
+- **Sources read:** docs/module-ownership.md (rows 80, 86, 139, 196, 202, 209); scripts/arch.ts; docs/placement-receipts.md (head); src/worker/routes/members.ts; frontend/src/state.tsx; SettingsMembers.tsx/.module.css; Invites.tsx; SPEC.md §8.9.
+
+---
+
 ## 2026-10-12 — v1.64.0: Members tab as a grid of pills (placement-advisor)
 
 - **Ask:** SPEC §8.6 Settings → 👥 Members: lay the members table out again as a grid with one row of pills per member (name with colour dot, role Owner / Admin / Member or Disabled, a tappable Make / Remove admin pill with today's asks, a tappable Disable / Enable pill). Behaviour unchanged. It must fit a phone and scroll sideways when too narrow.

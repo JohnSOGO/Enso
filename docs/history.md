@@ -801,6 +801,10 @@ edit select circle should only be visible to mojosogo"): `usePointAtOn` is false
 and Disable should all be pills in one row, rows and columns"): `SettingsMembers.tsx` draws a four-column grid of pills
 (own CSS module) instead of the table; asks, PATCH bodies and who sees which pill unchanged. Not yet checked on the iPhone.
 
+**Joined pill; old revoked invites hidden** (v1.65.0, §8.6, §8.9; MojoSOGO 2026-10-12 "remove 'revoked' after 24 hours; so I
+should see when active accounts joined"): GET /members adds `joinedAt` (members.created_at); each Members row gets a
+"joined Oct 4" pill. `Invites.tsx` leaves out invites revoked more than 24 h ago; the server list is unchanged.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

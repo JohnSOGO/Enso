@@ -1,7 +1,7 @@
-/* §8.6 Settings → 👥 Members: one row of pills per member, four columns; scrolls sideways when too narrow. */
+/* §8.6 Settings → 👥 Members: one row of pills per member, five columns; scrolls sideways when too narrow. */
 .scroll { overflow-x: auto; margin-bottom: 18px; }
 .grid {
-  display: grid; grid-template-columns: minmax(7rem, 1fr) auto auto auto;
+  display: grid; grid-template-columns: minmax(7rem, 1fr) auto auto auto auto;
   gap: 8px 6px; align-items: center; min-width: max-content;
 }
 .row { display: contents; }

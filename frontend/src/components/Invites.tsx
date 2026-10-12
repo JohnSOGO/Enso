@@ -5,9 +5,13 @@ import { useAction } from './useAction';
 import { InviteCard, untilDate } from './InviteCard';
 import s from './Lists.module.css';
 
+/** §8.9 — a revoked invite drops off the list a day after it was revoked (MojoSOGO 2026-10-12). */
+const REVOKED_SHOWN_MS = 24 * 3600_000;
+
 interface Invite { id: string; displayName: string; createdAt: string; expiresAt: string; usedAt: string | null; usedBy: string | null; revokedAt: string | null }
 
-const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+/** "Oct 4" — a joined date, as the invites list and the members grid (§8.6) show it. */
+export const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
 /** §8.9 — waiting (with expiry) · joined (with the date) · expired · revoked. */
 function stateOf(i: Invite, now: number): { text: string; mood: string; waiting: boolean } {
@@ -25,6 +29,7 @@ export function Invites() {
   const refresh = async () => setInvites(await get('/invites'));
   useEffect(() => { run(refresh); }, []);
   const now = Date.now();
+  const shown = invites.filter((i) => !i.revokedAt || now - Date.parse(i.revokedAt) < REVOKED_SHOWN_MS);
 
   const create = () => run(async () => {
     const name = inviteName.trim();
@@ -44,11 +49,11 @@ export function Invites() {
         <input aria-label="Name of person to invite" placeholder="Their name…" value={inviteName} maxLength={60} onChange={(e) => setInviteName(e.target.value)} />
         <button type="submit" className="primary" disabled={busy || !inviteName.trim()}>Invite</button>
       </form>
-      {invites.length > 0 && (
+      {shown.length > 0 && (
         <table className={s.table} style={{ marginTop: 8 }}>
           <thead><tr><th scope="col">Invite</th><th scope="col">State</th><th scope="col"><span className="visually-hidden">Revoke</span></th></tr></thead>
           <tbody>
-            {invites.map((i) => {
+            {shown.map((i) => {
               const st = stateOf(i, now);
               // The member's name when it differs rides in the flexible cell, so a long one truncates instead of widening the row.
               const joinedAs = i.usedBy && i.usedBy !== i.displayName ? i.usedBy : null;
