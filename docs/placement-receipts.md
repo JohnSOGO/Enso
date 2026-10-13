@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-13 — Steward pass 25, whole tree (code-steward)
+
+- **Run:** after the v1.75.0 release (SPEC §9.5: handled alerts clear themselves via `isCleared` in shared/alert-history.ts, with the route's LEFT JOIN on messes and EXISTS denial; Ack (left) / Close (right) footer on info-only cards in MyAlerts.tsx, Q284).
+- **Verdict:** SOUND. Typecheck passed, 864/864 tests, arch:audit quiet. 2 receipts matched to 2 code commits, no mismatches.
+- **Top finding:** LOW. decisions.md Q272 and Q283 were not marked superseded by Q284; where-things-stand still expected "Already handled." and had no Ack/Close device check. Fixed in this commit.
+- **Handoffs:** 0 to reorganizer, 1 to worker (the docs fix, done), 0 to placement-advisor.
+- **Restraint:** the inline `MINE` predicate in the GET (predates v1.75.0); asks identified by title plus mess_id (scoped in the receipt); the Ack footer flashing before /messes loads or showing for a snoozed fire (within the spec); a failed hide showing its error on the list. Items from passes 19–21 still wait for MojoSOGO's pick.
+
 ## 2026-10-12 — v1.75.0: My alerts card Ack (left) + Close (right) (placement-advisor)
 
 - **Ask:** A My alerts card with nothing else to act on gets Ack (bottom left, reuses hide() = DELETE /me/alerts/{id}, then closes) and Close (right) (SPEC §9.5 "Ack", v1.75.0; MojoSOGO "Let me ack this which will clear it. Ack on left; close on right").
