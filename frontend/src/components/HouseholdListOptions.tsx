@@ -1,5 +1,5 @@
-// SPEC §8.8 — Lists tab list management: the new-list form and the ⋯ list options (rename, emoji,
-// delete with its open-item count). Owns the `ListSummary` shape; HouseholdLists imports both
+// SPEC §8.8 — Lists tab list management: the new-list form and the ⋯ list options (rename, emoji, Every day and
+// Ping owners (§7A.4), delete with its open-item count). Owns the `ListSummary` shape; HouseholdLists imports both
 // from here, never the reverse. Who may open the options is canChange (§7A.1, shared/roles.ts), decided by
 // the caller; the server checks the same function.
 import { useState, type FormEvent } from 'react';
@@ -8,7 +8,9 @@ import { del, errorText, patch, post } from '../api';
 import { LIST_NAME_MAX, defaultListEmoji } from '../../../src/shared/lists';
 
 /** One row of GET /lists (§10). */
-export interface ListSummary { id: string; name: string; emoji: string | null; createdBy: string | null; openCount: number }
+export interface ListSummary {
+  id: string; name: string; emoji: string | null; createdBy: string | null; daily: boolean; pingOwners: boolean; openCount: number;
+}
 
 /** A list's Emoji field: one emoji, or empty for the default picked from the name (§7A.1 ⚑ Q157); the server checks it. */
 function EmojiField({ value, name, disabled, onChange }: { value: string; name: string; disabled: boolean; onChange: (v: string) => void }) {
@@ -60,15 +62,17 @@ export function NewListForm({ onClose, onCreated }: { onClose: () => void; onCre
   );
 }
 
-/** The ⋯ list options (§8.8): Rename, Emoji + Save; Delete list asks first and says how many open items go with it. */
+/** The ⋯ list options (§8.8): Rename, Emoji, Every day, Ping owners + Save; Delete list asks first and says how many open items go with it. */
 export function ListOptions({ list, onClose, onChanged, onDeleted }: {
   list: ListSummary; onClose: () => void; onChanged: () => void; onDeleted: () => void;
 }) {
   const [name, setName] = useState(list.name);
   const [emoji, setEmoji] = useState(list.emoji ?? '');
+  const [daily, setDaily] = useState(list.daily);
+  const [pingOwners, setPingOwners] = useState(list.pingOwners);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const dirty = name !== list.name || emojiOut(emoji) !== list.emoji;
+  const dirty = name !== list.name || emojiOut(emoji) !== list.emoji || daily !== list.daily || pingOwners !== list.pingOwners;
 
   async function act(fn: () => Promise<unknown>, after: () => void) {
     setBusy(true); setError(null);
@@ -78,7 +82,7 @@ export function ListOptions({ list, onClose, onChanged, onDeleted }: {
   const rename = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !dirty || busy) return;
-    act(() => patch(`/lists/${list.id}`, { name, emoji: emojiOut(emoji) }), () => { onChanged(); onClose(); });
+    act(() => patch(`/lists/${list.id}`, { name, emoji: emojiOut(emoji), daily, pingOwners }), () => { onChanged(); onClose(); });
   };
 
   const remove = () => {
@@ -98,6 +102,10 @@ export function ListOptions({ list, onClose, onChanged, onDeleted }: {
           <input value={name} maxLength={LIST_NAME_MAX} disabled={busy} enterKeyHint="done" onChange={(e) => setName(e.target.value)} />
         </label>
         <EmojiField value={emoji} name={name} disabled={busy} onChange={setEmoji} />
+        <label className="row"><input type="checkbox" checked={daily} disabled={busy} onChange={(e) => setDaily(e.target.checked)} />
+          Every day <span className="muted">— times, and a fresh box each day</span></label>
+        <label className="row"><input type="checkbox" checked={pingOwners} disabled={busy || !daily} onChange={(e) => setPingOwners(e.target.checked)} />
+          Ping owners <span className="muted">— at the time, if not ticked</span></label>
       </form>
       <div className="row wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
         <button className="danger" disabled={busy} onClick={remove}>Delete list</button>

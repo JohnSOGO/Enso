@@ -1,5 +1,5 @@
 // SPEC §8.8 — the list item form modal: the item's photo (§7A.3, PhotoField; saved on Save, after the fields), text,
-// note, Assigned to (one member or Nobody), Save / Cancel / Delete. Owns the `Item` shape; HouseholdLists imports
+// note, Time on an every day list (§7A.4), Assigned to (one member or Nobody), Save / Cancel / Delete. Owns the `Item` shape; HouseholdLists imports
 // both from here, never the reverse. Someone else's item is read-only (§6.3); ticking it stays on the list.
 import { useMemo, useState } from 'react';
 import { Modal } from './Modal';
@@ -11,7 +11,7 @@ import { canChange, cannotChangeText } from '../../../src/shared/roles';
 
 /** One item as GET /lists/{id} returns it (§10). */
 export interface Item {
-  id: string; listId: string; text: string; note: string | null; assigneeId: string | null;
+  id: string; listId: string; text: string; note: string | null; assigneeId: string | null; time: string | null;
   createdBy: string; createdAt: string; checkedAt: string | null; checkedBy: string | null;
   hasPhoto: boolean; updatedAt: string;
 }
@@ -22,11 +22,11 @@ const itemPhotoSrc = (i: Item) => apiUrl(`/list-items/${i.id}/photo?v=${encodeUR
 /** Member chips are tap targets (≥ 44 px), as in the chore form. */
 const chip = { padding: '4px 10px', minHeight: 44 } as const;
 
-/** Item form (§8.8): text, note, Assigned to, Save / Cancel / Delete. */
-export function ItemForm({ item, onClose, onSaved }: { item: Item; onClose: () => void; onSaved: () => void }) {
+/** Item form (§8.8): text, Time (every day lists only), note, Assigned to, Save / Cancel / Delete. */
+export function ItemForm({ item, daily, onClose, onSaved }: { item: Item; daily: boolean; onClose: () => void; onSaved: () => void }) {
   const { me, members } = useApp();
   const canEdit = canChange(item.createdBy, me);
-  const init = useMemo(() => ({ text: item.text, note: item.note ?? '', assigneeId: item.assigneeId }), [item]);
+  const init = useMemo(() => ({ text: item.text, time: item.time ?? '', note: item.note ?? '', assigneeId: item.assigneeId }), [item]);
   const [f, setF] = useState(init);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -40,7 +40,7 @@ export function ItemForm({ item, onClose, onSaved }: { item: Item; onClose: () =
     try { await fn(); onSaved(); onClose(); } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
   // assigneeId only when changed: an item assigned to a since-disabled member can still be edited.
-  const fields = () => ({ text: f.text, note: f.note, ...(f.assigneeId !== init.assigneeId ? { assigneeId: f.assigneeId } : {}) });
+  const fields = () => ({ text: f.text, note: f.note, ...(f.time !== init.time ? { time: f.time || null } : {}), ...(f.assigneeId !== init.assigneeId ? { assigneeId: f.assigneeId } : {}) });
   /** The fields, then the photo: PUT a new one, DELETE a removed one. */
   const save = () => run(async () => {
     await patch(`/list-items/${item.id}`, fields());
@@ -68,6 +68,9 @@ export function ItemForm({ item, onClose, onSaved }: { item: Item; onClose: () =
         <label className="field"><span>Text</span>
           <input value={f.text} maxLength={TEXT_MAX} onChange={(e) => setF({ ...f, text: e.target.value })} />
         </label>
+        {daily && <label className="field"><span>Time (empty = none)</span>
+          <input type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} />
+        </label>}
         <label className="field"><span>Note</span>
           <textarea rows={4} value={f.note} maxLength={NOTE_MAX} onChange={(e) => setF({ ...f, note: e.target.value })} />
         </label>

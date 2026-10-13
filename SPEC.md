@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.37 · **Date:** 2026-10-13 · **Owner:** MojoSOGO
+**Version:** 3.38 · **Date:** 2026-10-13 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -942,6 +942,17 @@ Schema: [`migrations/0049_clock_24h.sql`](migrations/0049_clock_24h.sql). The mi
 
 `member_prefs.clock_24h` — 0 = this member sees 12-hour times (the default ⚑ Q277), 1 = 24-hour. Additive only; it runs
 before the deploy. **Migration check (CK-M):** members that exist before 0049 come through it on 12-hour.
+
+### 4.2zw Schema change — `migrations/0050_daily_lists.sql`
+
+Asked by MojoSOGO 2026-10-13: "In reminders give option to ping owners. Time & Checkbox each day" (§7A.4).
+
+Schema: [`migrations/0050_daily_lists.sql`](migrations/0050_daily_lists.sql). The migration is the schema; it is not copied here.
+
+`lists.daily` / `lists.ping_owners` — 0 or 1, both 0 by default. `list_items.time` — `HH:MM` or NULL.
+`deliveries.list_item_id` marks a list ping (§7A.4) so the founder-ping predicate (§9.4) leaves it out and "pinged
+today" is read from the rows. Additive only; it runs before the deploy. **Migration check (DL-M):** lists, items and
+deliveries that exist before 0050 survive it with `daily` 0, `ping_owners` 0, `time` NULL and `list_item_id` NULL.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -2052,8 +2063,8 @@ is done in JS with `itemKey` — never with SQLite `lower()`/`NOCASE`, which fol
   (§7A.3) is deleted from R2 and its key cleared in the same UPDATE.
 - Any member may add an item to any list and check or uncheck any item. Editing, assigning, deleting or
   changing the photo of an item is its creator or an admin (§6.3, decided by MojoSOGO 2026-10-07).
-- Lists never ring, push or speak. They are things to look at, not alerts — being
-  assigned an item notifies nobody.
+- Lists never ring or speak, and push only a daily list's **Ping owners** (§7A.4) — being assigned an item
+  notifies nobody otherwise.
 
 ### 7A.2 Acceptance (M4b + M4e — each row is an API test)
 
@@ -2189,6 +2200,52 @@ One log line per request (the outcome, never the token, never the image).
 | SN14 | `identify` over a fake LM Studio: a good answer; a timeout; a non-2xx; `IDENTIFY_MODEL` unset | one POST with the model, the prompt + " /no_think", the image as a data URL, temperature 0 → `ok`; `failed` "LM Studio error: …"; `failed` "LM Studio HTTP …"; `off`, nothing called |
 | SN15 | every report `identify` produces (found by **calling** it over fake LM Studio answers) through `handle()` and the wire into `identifyFromHome` | each accepted: the text for `ok`, the reason for a failure |
 | SN-M | migration check (§4.2v) | rows written before 0023 survive with `photo_key` NULL; `foreign_key_check` empty |
+
+### 7A.4 Every day lists — a time and a fresh box each day, and Ping owners
+
+Asked by MojoSOGO 2026-10-13 (from the 🛒 Lists tab): "In reminders give option to ping owners. Time & Checkbox
+each day." Read as ⚑ Q287: a list he keeps as reminders can be made an **Every day** list, and such a list can
+**Ping owners**.
+
+**The rules** — `src/shared/lists.ts` (pure):
+
+- **Every day** (`daily`) is a list setting, changed where its name is (creator or admin, §7A.1). On an every day
+  list a tick counts **for today only** (the household's day, §2): an item whose `checked_at` falls before today's
+  local midnight is open again, with nothing written. `todaysItems(items, dayStart)` gives the items as they stand
+  today (an older `checked_at` read as NULL); the add rules (§7A.1), the visible lists and the open count all use it.
+  A list that is not every day is unchanged.
+- **Time:** any item may have a `time` (`HH:MM`, `isTime`) or none; it is shown and used only on an every day list.
+- **Order** on an every day list ⚑ Q290: open items with a time first, earliest first, then the rest newest first;
+  Done holds today's ticks only, newest first.
+- **Ping owners** (`ping_owners`) is a second list setting beside it ⚑ Q288; it works only while the list is every
+  day. Each item with a time that is **not ticked today** pings at its time: one push to its **owner** (the
+  assignee) — or, with no owner or a disabled one, to every active member — **once a day**, phone only (no house, no FunHouse, no
+  repeats). `pingDue(time, localNow)` decides: the local time is at or past `time` and less than
+  `PING_LATE_MIN` (60) minutes past it ⚑ Q289, so a time set or a deploy late in the day never sends old pings.
+- **The push** ⚑ Q291: `title` = the list's emoji and name (`📋 Reminders`), `message` = the item's text,
+  `list_item_id` set. Tapping it opens My alerts (§9.5), whose source line is that title. Like a mess ask it never
+  counts toward the `/ops/notify` limit nor reaches the FunHouse (§9.4).
+
+**Tick** — `src/worker/list-pings.ts`, called from `tick` (§5.6) each minute: for each item with a time on a
+non-deleted every day list with Ping owners, not ticked since today's local midnight and with no `list_item_id`
+delivery since then, when `pingDue` → write the pushes and send them. No fire is made; nothing rings.
+
+**Acceptance (M4ah — each row is a test; fakes only):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| DL1 | PATCH `/lists/{id} { name, daily: true, pingOwners: true }` / `{ name, daily: "yes" }` | 200, `daily` and `pingOwners` true in `GET /lists` and `GET /lists/{id}` / 400 `invalid_input` |
+| DL2 | an item `{ time: "08:00" }` / `{ time: "8am" }` / PATCH `{ time: null }` | `time` "08:00" / 400 `invalid_input` / `time` null |
+| DL3 | every day list: an item ticked yesterday (local) | in `open`, not `checked`; `openCount` counts it; adding its text → `existing` |
+| DL4 | every day list: an item ticked today | in `checked`; adding its text → `reopened` |
+| DL5 | a list that is not every day, an item ticked yesterday | still in `checked` (§7A.1 unchanged) |
+| DL6 | every day list order: untimed A (newest), 18:00 B, 07:30 C | open = C, B, A |
+| DL7 | tick at 08:00 local: Ping owners on, item 08:00 owned by M, not ticked | one push to M, title "📋 Reminders", message the text, `list_item_id` set; no house or FunHouse row |
+| DL8 | the same tick again at 08:05 | no new row |
+| DL9 | item with no owner, two active members | one push each |
+| DL10 | item ticked today / Ping owners off / list not every day / 09:01 local for 08:00 | no row |
+| DL11 | a list ping and `/ops/notify` | the ping is not counted toward the hourly limit and is not in `GET /ops/pings` |
+| DL-M | migration check (§4.2zw) | as §4.2zw; `foreign_key_check` empty |
 
 ---
 
@@ -4014,7 +4071,8 @@ picker is a **popup of buttons** (a titled "Lists" modal):
 - **＋ New list…** opens the **new list** form (Name, Emoji — optional, placeholder shows the default for the
   name typed — Create; errors inside the dialog); after creating, that list opens.
 - **⋯** (accessible name "List options") next to the list button opens **Rename**, **Emoji** (empty = the
-  default from the name) and **Delete list** for the chosen list, shown only to those allowed (§7A.1) and never
+  default from the name), **☐ Every day** and **☐ Ping owners** (§7A.4; Ping owners is greyed while Every day
+  is off) and **Delete list** for the chosen list, shown only to those allowed (§7A.1) and never
   for Things to do or Movies & shows. Delete asks first and says how many open items go with it.
 - The choice is remembered per device (by list id), written only when someone picks. If
   the remembered list no longer exists — including the old toggle's `shopping`/`wishlist`
@@ -4066,6 +4124,10 @@ every 30 s while visible (§10 Freshness).
   DELETEd. A photo-only change counts as a change. The image URL carries `?v={updatedAt}` so a replaced
   photo is never shown stale from the private cache.
 - The item form has no Mark done / Not done: ticking is the row's tap, everywhere.
+- **An every day list** (§7A.4) ⚑ Q290: the item form adds a **Time** box (the phone's time picker, empty = none)
+  under Text, and each open row shows its time (`clockText`, §8.17) before the text; rows go by time. The
+  ticks clear themselves at midnight, so each morning every box is empty again. With **Ping owners** on, a row
+  with a time shows 🔔 after it.
 - **Done** is collapsed by default and dim, newest first. Tapping a done row puts it back
   on the list; its ✎ still opens the form. A done row shows who ticked it and when (in
   place of the assignee chip, so it stays one line):
@@ -5188,7 +5250,8 @@ announcement, §9.3) that carries its own title (§4.2u). No session, no house r
 5. **Hourly limit:** the push deliveries with no fire, a non-NULL `title` and **no `notice`** created at or after
    `opsWindowStart(now)` are counted; at `OPS_NOTIFY_PER_HOUR` or more → **429 `rate_limited`**, and no
    row is written. Announcements (title NULL), sign-in notices (§6.6, `notice` set), a mess's asks (§7B.7,
-   `mess_id` set) and bounty pushes (§7B.8, `bounty_id` or `earning_id` set) never count.
+   `mess_id` set), bounty pushes (§7B.8, `bounty_id` or `earning_id` set) and list pings (§7A.4,
+   `list_item_id` set) never count.
 6. One delivery: `id` = `newId('dlv')`, `fire_id` NULL, `alert_number` 1, `channel` `push`, `member_id` =
    the founder, `message` = the trimmed text, `title` = `opsTitle(title)`, `queued`.
 7. Sent at once with `sendPushDeliveries` (§9.1); then **201 `{ deliveries: [{ id, status, detail }] }`**.
@@ -5511,12 +5574,12 @@ other push stays until I hide it ⚑ Q284.
 | POST | `/recipes/from-link` | member | `{ url }` → recipe (201): any link, its kind detected (§7E.6); a YouTube video as from-video; a page: 400 / 409 `duplicate` (+ `recipeId`) / 429 / 503 `recipe_reading_off` / 422 `recipe_refused` / 502 `recipe_reading_failed`, in the §7E.6 order |
 | POST | `/recipes/from-video` | member | the same handler as from-link (kept for older apps). For a video: `{ url }` → recipe (201); 400 / 409 `duplicate` (+ `recipeId`) / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed`, in the §7E.2 order |
 | POST | `/recipes/{id}/transcript` | creator or owner | `{ screenshots?: { type, data }[] (≤ 4, base64), text? (≤ PASTED_MAX) }`, at least one → recipe (200), re-read from the pasted transcript; 404 / 400 `invalid_input` / 429 / 503 `recipe_reading_off` / 404 `video_unavailable` / 502 `youtube_failed` / 422 `recipe_refused` / 502 `recipe_reading_failed` / 422 `no_recipe` (nothing changed), in the §7E.2b order |
-| GET | `/lists` | member | → `{ id, name, emoji, createdBy, openCount }[]`, by name (§7A); `emoji` null = the default |
+| GET | `/lists` | member | → `{ id, name, emoji, createdBy, daily, pingOwners, openCount }[]`, by name (§7A); `emoji` null = the default; an every day list counts today's ticks only (§7A.4) |
 | POST | `/lists` | member | `{ name, emoji? }` → list (201); 409 `duplicate`; 400 at `LISTS_MAX` or a bad emoji |
-| PATCH/DELETE | `/lists/{id}` | creator or admin (seeded lists: admin) | PATCH `{ name, emoji? }` (absent = unchanged, null = the default) → list; DELETE → 204 (and its items' photos, §7A.3) |
-| GET | `/lists/{id}` | member | → `{ list: { id, name, emoji, createdBy }, open: Item[], checked: Item[] }` (§7A.1); `Item = { id, listId, text, note, assigneeId, createdBy, createdAt, checkedAt, checkedBy, hasPhoto, updatedAt }` |
-| POST | `/lists/{id}/items` | member | `{ text, note?, assigneeId? }` → `{ item, result: "added" \| "existing" \| "reopened" }`, 201 when added, else 200 |
-| PATCH | `/list-items/{id}` | creator or owner, except a PATCH of only `checked` (any member, §6.3) | `{ text?, note?, assigneeId?, checked?: boolean }` → item; 409 `duplicate` on a key clash |
+| PATCH/DELETE | `/lists/{id}` | creator or admin (seeded lists: admin) | PATCH `{ name, emoji?, daily?: boolean, pingOwners?: boolean }` (absent = unchanged, emoji null = the default) → list; DELETE → 204 (and its items' photos, §7A.3) |
+| GET | `/lists/{id}` | member | → `{ list: { id, name, emoji, createdBy, daily, pingOwners }, open: Item[], checked: Item[] }` (§7A.1, §7A.4); `Item = { id, listId, text, note, assigneeId, time, createdBy, createdAt, checkedAt, checkedBy, hasPhoto, updatedAt }` |
+| POST | `/lists/{id}/items` | member | `{ text, note?, assigneeId?, time? }` → `{ item, result: "added" \| "existing" \| "reopened" }`, 201 when added, else 200 |
+| PATCH | `/list-items/{id}` | creator or owner, except a PATCH of only `checked` (any member, §6.3) | `{ text?, note?, assigneeId?, time?: "HH:MM" \| null, checked?: boolean }` → item; 409 `duplicate` on a key clash |
 | DELETE | `/list-items/{id}` | creator or owner | → 204 (and its photo, §7A.3) |
 | POST | `/list-items/read-photo` | member | raw image body → `{ name, via: "sogoai" \| "claude" }` (`ItemReading`); nothing stored; 400 / 429 / 503 `photo_reading_off` / 422 `photo_refused` / 502 `photo_reading_failed` / 422 `item_unknown`, in the §7A.3 order |
 | PUT/GET/DELETE | `/list-items/{id}/photo` | GET member / PUT, DELETE creator or owner | PUT raw image body (≤ 4 MB) → 204 (replaces); GET → the image (`private, max-age=3600`); DELETE → 204; 404 when the item is gone, and GET also when it has no photo (§7A.3) |

@@ -219,9 +219,9 @@ describe('M4b + M4e lists API (§7A.2)', () => {
     await add('Milk');
     const all = await lists();
     expect(all.map((l) => l.name)).toEqual(['Hardware store', 'Shopping', 'Wish list']);
-    expect(all.find((l) => l.id === r.json.id)).toEqual({ id: r.json.id, name: 'Hardware store', emoji: null, createdBy: me, openCount: 0 });
+    expect(all.find((l) => l.id === r.json.id)).toEqual({ id: r.json.id, name: 'Hardware store', emoji: null, createdBy: me, daily: false, pingOwners: false, openCount: 0 });
     expect(all.find((l) => l.id === SHOPPING_LIST_ID)?.openCount).toBe(1);
-    expect((await o.get(`/lists/${r.json.id}`)).json).toEqual({ list: { id: r.json.id, name: 'Hardware store', emoji: null, createdBy: me }, open: [], checked: [] });
+    expect((await o.get(`/lists/${r.json.id}`)).json).toEqual({ list: { id: r.json.id, name: 'Hardware store', emoji: null, createdBy: me, daily: false, pingOwners: false }, open: [], checked: [] });
   });
 
   it('L14 POST /lists { name: " hardware  STORE " } → 409 duplicate', async () => {

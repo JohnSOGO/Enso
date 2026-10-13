@@ -7,6 +7,15 @@ carry its result.
 
 ---
 
+## 2026-10-13 — v3.38 §7A.4 Every day lists and Ping owners (placement-advisor)
+
+- **Ask:** MojoSOGO 2026-10-13 "In reminders give option to ping owners. Time & Checkbox each day" → every day lists: a tick lasts for today only; items may have a time and go by it; with Ping owners on, a once-a-day push to the item's owner (or every active member) at its time. Phone only, never a founder ping (SPEC §7A.4, §4.2zw migration 0050, §8.8, §10 /lists rows, §9.4 step 5; ⚑ Q287–Q291; v1.77.0).
+- **Verdict:** EXISTING `src/shared/lists.ts` (todaysItems, dailyOrder, pingDue, PING_LATE_MIN, listPingTitle) and `src/shared/time.ts` (dayStartUtc, one home for the route's and the tick's midnight); `migrations/0050_daily_lists.sql` + test/migration-0050.test.ts; EXISTING `src/worker/routes/lists.ts` (validation, views, GET/openCount/resolveAdd through todaysItems, openCount counted in TS); NEW row `src/worker/list-pings.ts` (listPingTick, tick step 3f); EXISTING `src/worker/tick.ts` (one call), `src/worker/deliveries.ts` (listItemId; FOUNDER_PING adds `list_item_id IS NULL`), `src/shared/alert-history.ts` (comment only); EXISTING `HouseholdListOptions.tsx`, `HouseholdListItemForm.tsx`, `HouseholdLists.tsx` (renders the server's order, no local comparator).
+- **Flow stage:** rules (lists.ts, time.ts) → route → persist and deliver (list-pings.ts, deliveries.ts) → render.
+- **Why:** shared rules so route, tick and PWA ask the same functions; the ping sweep is its own owner beside timer-starts.ts and mess-asks.ts; the founder-ping exclusion stays in the one predicate. Rejected: sorting in ListPanel, the midnight rule in SQL, moving ListPanel out first (seam for later: `frontend/src/components/ListPanel.tsx`).
+- **Spec gaps settled by the builder:** a disabled owner counts as none (folded into Q288); overlapping ticks accepted (cron once a minute).
+- **Caps after:** routes/lists.ts **270/300 — newly in the warning band**, the next agent's job (seam named: item handlers → `routes/list-items.ts`); tick.ts 128/148; HouseholdLists.tsx 237/300; nothing else near the band.
+
 ## 2026-10-13 — Forecast high with heat band on the day cell (placement-advisor)
 
 - **Ask:** Show the day's forecast high in °F to the left of the weather emoji on the calendar cell, colored cold (<60) blue, nice (60–84) text color, hot (>=85) red (SPEC §7.11 addition, v1.76.0).
