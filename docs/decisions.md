@@ -287,3 +287,5 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q282 | When an event counts as Family (§7.1, §8.3) | ⚑ Assigned to every active (not disabled) member, and the household has two or more; then no creator chip either |
 | Q283 | What a My alerts card offers beyond a ringing fire (§9.5) | ⚑ A mess ask still asking me: That was me / Not me, else "Already answered."; bounty pushes (🪙) keep just Close until asked **Superseded by Q284 (v1.75.0)** |
 | Q284 | Which alerts clear themselves from My alerts (§9.5) | ⚑ A fire's push once its fire is closed, and a mess ask once that mess no longer asks me; pings, announcements, bounty and sign-in pushes stay until hidden; a tapped push for a cleared alert opens the list with no card |
+| Q285 | Where the forecast high shows (§7.11) | ⚑ Left of the weather emoji as a bare number (no °), same size, on phones too |
+| Q286 | Heat band thresholds for the high (§7.11) | ⚑ Cold (blue) below 60 °F, nice (white) 60–84, hot (red) 85 and up |

@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-13 — Forecast high with heat band on the day cell (placement-advisor)
+
+- **Ask:** Show the day's forecast high in °F to the left of the weather emoji on the calendar cell, colored cold (<60) blue, nice (60–84) text color, hot (>=85) red (SPEC §7.11 addition, v1.76.0).
+- **Verdict:** `src/shared/weather.ts` (heatOf + COLD_BELOW / HOT_FROM) + `frontend/src/components/DayCell.tsx` / `DayCell.module.css` (number inside `.wx`, band classes) [EXISTING]
+- **Flow stage:** rules (heatOf) + render (DayCell)
+- **Why:** The band is a decision, so it goes in shared next to weatherOf/weatherText and the PWA asks it rather than re-comparing thresholds. DayCell already draws `.wx`. vocab.ts was rejected because the band is a local TS union that is never stored or sent. A DayCell-local helper was rejected because it would hide a rule in the render layer. No schema or wire change, since `weather.high` is already on /calendar. The phone (`.narrow`) display is a ⚑ DEFAULT (Q285).
+- **Caps:** weather.ts ~71/300, DayCell.tsx ~99/300, DayCell.module.css ~58/300. No CEILINGS touched and nothing newly in the band.
+- **Sources read:** scripts/arch.ts, docs/module-ownership.md (weather.ts, DayCell rows), src/shared/weather.ts, frontend/src/components/DayCell.tsx, frontend/src/components/DayCell.module.css, docs/placement-receipts.md (grep), SPEC.md (grep; §7.11 has no heat-band text yet)
+
+---
+
 ## 2026-10-13 — Steward pass 25, whole tree (code-steward)
 
 - **Run:** after the v1.75.0 release (SPEC §9.5: handled alerts clear themselves via `isCleared` in shared/alert-history.ts, with the route's LEFT JOIN on messes and EXISTS denial; Ack (left) / Close (right) footer on info-only cards in MyAlerts.tsx, Q284).

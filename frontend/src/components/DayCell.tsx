@@ -2,6 +2,7 @@
 import { useApp } from '../state';
 import { dotSize, fitLines, LINE_GAP } from '../day-lines';
 import { participants } from '../participants';
+import { heatOf } from '../../../src/shared/weather';
 import type { DayData, Occurrence, Span } from './Calendar';
 import s from './DayCell.module.css';
 
@@ -75,7 +76,11 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
           <span className={s.hEmoji} aria-hidden title={[...pub.map((h) => h.name), ...market.map((m) => m.name), ...iconed.map((o) => o.title)].join(', ')}>{icons.map((x) => x.emoji).join('')}</span>
         )}
       </span>
-      {data?.weather && <span className={s.wx} aria-hidden title={data.weather.words}>{data.weather.emoji}</span>}
+      {data?.weather && ( // §7.11: the high in its heat band, then the emoji
+        <span className={s.wx} aria-hidden title={data.weather.words}>
+          <span className={s[heatOf(data.weather.high)]}>{data.weather.high}</span>{data.weather.emoji}
+        </span>
+      )}
       {lanes > 0 && <span aria-hidden style={{ height: lanes * (barH + 1), flex: 'none' }} />}
       <span className={s.lines} style={{ gap: LINE_GAP }}>
         {single.slice(0, fit.shown).map((o, k) => {
