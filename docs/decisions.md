@@ -273,7 +273,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q269 | A machine alerting someone other than the founder (§7D.7) | ⚑ No FunHouse row: Phone + House only (the FunHouse is MojoSOGO's desk, Q230) |
 | Q270 | A sunset chore's alert text (§7B.3) | ⚑ The ordinary chore text ("Chore for A: Get the eggs"), no "sunset at h:mm" added |
 | Q271 | How a sunset chore shows its time (§8.5) | ⚑ `sunset −30` (or `sunset` at 0) where the clock time was; the form's Before sunset box starts at 30 min; `time` keeps the form's last clock value, so lists still sort by it |
-| Q272 | An alert card whose fire is no longer ringing (§9.5) | ⚑ It says "Already handled." and keeps only Delete and Close; a ping or announcement card has no act button (nothing to ack) |
+| Q272 | An alert card whose fire is no longer ringing (§9.5) | ⚑ It says "Already handled." and keeps only Delete and Close; a ping or announcement card has no act button (nothing to ack) **Superseded by Q284 (v1.75.0)** |
 | Q273 | A calendar line for an event with nobody assigned (§7.1) | **Decided by MojoSOGO 2026-10-12 (v1.72.1):** its emoji goes beside the date number, no line; with no emoji, one dot in the event's color |
 | Q274 | Calendar lines that still don't fit at the smallest size (§7.1) | ⚑ As many as fit, the last becomes `+N` |
 | Q275 | Event emoji beside the date number once it leads its own line (§7.2) | ⚑ Moved: only the holiday and 📈 stay beside the number, so an emoji shows once |
@@ -285,5 +285,5 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q277 | Several unassigned emoji events for one free day-icon slot (§7.2) | ⚑ First in line order (all-day, then by start time); the rest keep their lines |
 | Q281 | A day-sheet event whose creator is also assigned (§8.3) | ⚑ One chip: "→ name" with the creator's color border; no separate creator chip |
 | Q282 | When an event counts as Family (§7.1, §8.3) | ⚑ Assigned to every active (not disabled) member, and the household has two or more; then no creator chip either |
-| Q283 | What a My alerts card offers beyond a ringing fire (§9.5) | ⚑ A mess ask still asking me: That was me / Not me, else "Already answered."; bounty pushes (🪙) keep just Close until asked |
+| Q283 | What a My alerts card offers beyond a ringing fire (§9.5) | ⚑ A mess ask still asking me: That was me / Not me, else "Already answered."; bounty pushes (🪙) keep just Close until asked **Superseded by Q284 (v1.75.0)** |
 | Q284 | Which alerts clear themselves from My alerts (§9.5) | ⚑ A fire's push once its fire is closed, and a mess ask once that mess no longer asks me; pings, announcements, bounty and sign-in pushes stay until hidden; a tapped push for a cleared alert opens the list with no card |

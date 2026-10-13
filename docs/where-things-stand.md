@@ -48,7 +48,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
-- Alert cards (v1.74.0–v1.75.0, §9.5, §8.15a): on the iPhone, tap a Whose mess? push → the card shows the photo and That was me with Not me under it, at the right; answer → the card closes and the line is gone from Settings → Alerts. Same for a ringing alert's Ack. Q283–Q284 are ⚑ defaults.
+- Alert cards (v1.74.0–v1.75.0, §9.5, §8.15a): on the iPhone, tap a Whose mess? push → the card shows the photo and That was me with Not me under it, at the right; answer → the card closes and the line is gone from Settings → Alerts. Same for a ringing alert's Ack. Tap a ping's push → Ack (left) clears it, Close (right) just closes. Q283–Q284 are ⚑ defaults.
 - Each person once / Family (v1.73.0, §7.1/§8.3): on the iPhone, an event for everyone shows one green Family chip in the day sheet and one green dot
   on its calendar line; a creator who is also assigned shows once. Q281–Q282 are ⚑ defaults.
 - Unassigned emoji by the day number (v1.72.1, §7.2): on the iPhone, an event with nobody assigned shows its emoji beside the date, no line. Q277 is a ⚑ default.
@@ -56,7 +56,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
   done time and My alerts change; switch back (CK4). Q277–Q280 are ⚑ defaults.
 - Calendar day lines (v1.71.0, §7.1, Q273–Q276): on the iPhone, a busy day shows one line per event (emoji, then a dot per
   person), shrinks, then `+N`; an event with nobody assigned shows just its emoji (or the event's dot); a wide screen adds time and title.
-- Ack in the alert card (v1.70.0, §9.5): on the iPhone, start a 1-min rolling timer, tap its push, see the card with Away / Ack, tap Ack (card closes); tap an old alert's push → "Already handled."; the card has no Delete. Q272 is a ⚑ default.
+- Ack in the alert card (v1.70.0, §9.5): on the iPhone, start a 1-min rolling timer, tap its push, see the card with Away / Ack, tap Ack (card closes); tap an old alert's push → the list opens with no card; the card has no Delete. Q272 is a ⚑ default.
 - Chores before sunset (v1.69.0, §7B.3, migration 0048): MojoSOGO made "Get the eggs" and said "Works" on 2026-10-12;
   still owed is hearing it actually ring on a phone (and the speakers, if House is ticked) 30 min before that day's sunset.
   Q270–Q271 are ⚑ defaults.
