@@ -1,5 +1,5 @@
 // SPEC §7.11 — weather on the calendar: the WMO weather-code table, the Open-Meteo forecast address and answer,
-// when the once-a-day refresh is due, and the day-sheet words. Pure: `now` and the zone are parameters.
+// when the once-a-day refresh is due, the high's heat band, and the day-sheet words. Pure: `now` and the zone are parameters.
 import type { Place } from './sun';
 import { ms, utcToLocal } from './time';
 
@@ -60,6 +60,12 @@ export function weatherDue(s: { triedAt: string | null; fetchedAt: string | null
   if (s.fetchedAt && utcToLocal(s.fetchedAt, tz).date === today) return false;
   return !s.triedAt || ms(now) - ms(s.triedAt) >= WEATHER_RETRY_MIN * 60_000;
 }
+
+/** The high's color band on the day cell (§7.11): cold below COLD_BELOW, hot from HOT_FROM, nice between. */
+export const COLD_BELOW = 60;
+export const HOT_FROM = 85;
+export type Heat = 'cold' | 'nice' | 'hot';
+export const heatOf = (highF: number): Heat => highF < COLD_BELOW ? 'cold' : highF >= HOT_FROM ? 'hot' : 'nice';
 
 /** "☀️ Clear · high 72° · low 58°" (the day sheet). */
 export const weatherText = (w: WeatherDay) => `${w.emoji} ${w.words} · high ${w.high}° · low ${w.low}°`;

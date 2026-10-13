@@ -889,6 +889,10 @@ clear"): My alerts leaves out a fire's push once the fire is closed and a mess a
 on each read (rows kept). No more "Already handled." / "Already answered." cards; a tapped push for a cleared alert
 opens the list with no card. A card with nothing to act on has **Ack** (left: clears it, closes) and Close (right).
 
+**High beside the weather** (v1.76.0, SPEC 3.37, §7.11, Q285–Q286; MojoSOGO 2026-10-13: "left of weather emoji post
+the days high temperature; blue if cold; white nice; red hot; two digits"): the day cell shows the forecast high left
+of the emoji, colored by `heatOf` (cold <60 blue, nice 60–84 white, hot ≥85 red).
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

@@ -1,9 +1,9 @@
-// SPEC §7.11 WX1–WX6 — weather on the calendar: the pure rules, the once-a-day refresh against a fake forecast at
+// SPEC §7.11 WX1–WX7 — weather on the calendar: the pure rules, the once-a-day refresh against a fake forecast at
 // https://weather.test (a fetch to any other host fails the test), and /calendar carrying the days.
 import { env } from 'cloudflare:test';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Client, owner } from './helpers';
-import { forecastUrl, parseForecast, weatherDue, weatherOf, weatherText } from '../src/shared/weather';
+import { forecastUrl, heatOf, parseForecast, weatherDue, weatherOf, weatherText } from '../src/shared/weather';
 import { weatherTick } from '../src/worker/weather-days';
 import type { Env } from '../src/worker/env';
 
@@ -16,6 +16,10 @@ const answer = (from: string, codes = [0, 2, 3, 45, 61, 71, 95]) => ({
 });
 
 describe('WX1–WX3 the rules', () => {
+  it('WX7 heatOf', () => {
+    expect([59, 60, 84, 85].map(heatOf)).toEqual(['cold', 'nice', 'nice', 'hot']);
+  });
+
   it('WX1 weatherOf', () => {
     expect(weatherOf(0)).toEqual({ emoji: '☀️', words: 'Clear' });
     expect([2, 3, 45, 61, 80, 71, 95].map((c) => weatherOf(c)!.emoji)).toEqual(['⛅', '☁️', '🌫️', '🌧️', '🌧️', '🌨️', '⛈️']);

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.36 · **Date:** 2026-10-12 · **Owner:** MojoSOGO
+**Version:** 3.37 · **Date:** 2026-10-13 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1974,6 +1974,11 @@ reading)` (pure, `event-reading.ts`) ⚑ Q196:
   where the date line is already full), apart from the two day icons
   (§7.2) so it never pushes a holiday or event emoji out ⚑ Q202. Everyone sees it; there is no switch ⚑ Q203. The cell's
   accessible label adds the words ("Clear, high 72°, low 58°").
+- **The high beside it** (asked by MojoSOGO 2026-10-13: "left of weather emoji post the days high temperature; blue if
+  cold; white nice; red hot; two digits"): just left of the emoji, the day's high as a bare number (`72`, no °), in the
+  emoji's size, phones too ⚑ Q285. Its color is `heatOf(high)` (pure): **cold** below `COLD_BELOW` = 60 → blue,
+  **nice** 60–84 → white (the text color), **hot** from `HOT_FROM` = 85 → red ⚑ Q286. The cell never compares
+  temperatures itself.
 - **In the day sheet** (§8.3): the first line, above any holiday, is `weatherText` (pure): "☀️ Clear · high 72° · low 58°".
 
 **Acceptance (each row a test):**
@@ -1986,6 +1991,7 @@ reading)` (pure, `event-reading.ts`) ⚑ Q196:
 | WX4 | tick with `WEATHER_URL` set and the fake answering 7 days; tick again a minute later; GET `/calendar` for the week | one request to `/v1/forecast` with the place, `fahrenheit` and the time zone; the second tick asks nothing; `weather` has the 7 days with emoji, words, high, low |
 | WX5 | the next local day's first tick; the fake answers 500, then 200 an hour later | old rows kept after the 500 and asked again only after 60 min; the 200 replaces them, yesterday's row gone |
 | WX6 | tick with `WEATHER_URL` empty, or no place | no request; `/calendar` `weather` is `[]` |
+| WX7 | `heatOf` of 59, 60, 84, 85 | cold, nice, nice, hot |
 
 ## 7A. Lists
 
