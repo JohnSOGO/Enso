@@ -289,3 +289,8 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q284 | Which alerts clear themselves from My alerts (§9.5) | ⚑ A fire's push once its fire is closed, and a mess ask once that mess no longer asks me; pings, announcements, bounty and sign-in pushes stay until hidden; a tapped push for a cleared alert opens the list with no card |
 | Q285 | Where the forecast high shows (§7.11) | ⚑ Left of the weather emoji as a bare number (no °), same size, on phones too |
 | Q286 | Heat band thresholds for the high (§7.11) | ⚑ Cold (blue) below 60 °F, nice (white) 60–84, hot (red) 85 and up |
+| Q287 | "In reminders give option to ping owners. Time & Checkbox each day" (§7A.4) | ⚑ Read as a list setting **Every day** (each item may have a time; its box is for today only and is empty again each morning) plus **Ping owners** |
+| Q288 | Whom Ping owners pushes, and how (§7A.4) | ⚑ The item's assignee, else every active member; phone only, once a day, no repeats, only while the item is not ticked today |
+| Q289 | A ping whose time has long passed (§7A.4) | ⚑ Sent only within 60 min after the time (`PING_LATE_MIN`), so a time set or a deploy late in the day sends no old pings |
+| Q290 | Order on an every day list (§7A.4, §8.8) | ⚑ Timed items first, earliest first, then the rest newest first; the time shows before the text, 🔔 after it when Ping owners is on |
+| Q291 | A list ping's words (§7A.4) | ⚑ Title = the list's emoji and name ("📋 Reminders"), text = the item's text |

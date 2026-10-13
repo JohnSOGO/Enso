@@ -111,7 +111,7 @@ export function HouseholdLists({ pickRequest }: { pickRequest: number }) {
 
 /** One list's body: add box, open rows, Done, and the item form. */
 function ListPanel({ list, onItemsChanged }: { list: ListSummary; onItemsChanged: () => void }) {
-  const { me, version, tz, memberById } = useApp();
+  const { me, version, tz, memberById, clock } = useApp();
   const [data, setData] = useState<ListData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState('');
@@ -194,7 +194,9 @@ function ListPanel({ list, onItemsChanged }: { list: ListSummary; onItemsChanged
         aria-label={done ? `Put ${i.text} back on the list` : `Tick ${i.text}`}
         onClick={() => setChecked(i, !done)}>
         <span aria-hidden className={ls.box}>{done ? '☑' : '☐'}</span>
+        {list.daily && i.time && <span className="muted">{clock(i.time)}</span>}
         <span className={`${ls.title} ${s.text}`}>{i.text}</span>
+        {list.daily && list.pingOwners && i.time && <span className={s.glyph} aria-hidden title="Pings its owner">🔔</span>}
         {i.note && <span className={s.glyph} aria-hidden title="Has a note">📝</span>}
         {i.hasPhoto && <span className={s.glyph} aria-hidden title="Has a photo">📷</span>}
         {done ? <span className={`muted ${s.whoWhen}`}>{whoWhen(i)}</span> : assigneeChip(i)}
@@ -229,7 +231,7 @@ function ListPanel({ list, onItemsChanged }: { list: ListSummary; onItemsChanged
         </>
       )}
 
-      {editing && <ItemForm item={editing} onClose={() => { setEditing(null); setSaid(null); }} onSaved={changed} />}
+      {editing && <ItemForm item={editing} daily={list.daily} onClose={() => { setEditing(null); setSaid(null); }} onSaved={changed} />}
     </>
   );
 }

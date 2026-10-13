@@ -32,7 +32,7 @@ export interface SourceFacts {
 }
 
 /** Where a push came from, in the order §9.5 gives (the ping branch matches opsPingsSince, §9.4, except that a bounty
- *  push, §7B.8, also takes the title branch). */
+ *  push, §7B.8, and a list ping, §7A.4, also take the title branch). */
 export function alertSource(r: SourceFacts): string {
   if (r.hasFire && r.kind) return r.kind === 'reminder' && r.isAlarm ? 'Alarm' : KIND_SOURCE[r.kind]; // ⚑ Q222
   if (r.notice) return 'Sign-in';

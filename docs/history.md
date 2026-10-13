@@ -893,6 +893,11 @@ opens the list with no card. A card with nothing to act on has **Ack** (left: cl
 the days high temperature; blue if cold; white nice; red hot; two digits"): the day cell shows the forecast high left
 of the emoji, colored by `heatOf` (cold <60 blue, nice 60–84 white, hot ≥85 red).
 
+**Every day lists + Ping owners** (v1.77.0, SPEC 3.38, §7A.4, Q287–Q291; MojoSOGO 2026-10-13: "In reminders give option to
+ping owners. Time & Checkbox each day"): ⋯ List options gains ☐ Every day (items get a time, rows go by time, every box
+is empty again each morning) and ☐ Ping owners (at an item's time, if not ticked, one phone push to its owner, else to
+everyone). Migration 0050. Owed: routes/lists.ts is at 270/300, in the warning band (next agent's job).
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

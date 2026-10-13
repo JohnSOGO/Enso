@@ -89,3 +89,30 @@ export function visibleItems<T extends KeyedItem & { updated_at: string }>(items
     .sort((a, b) => b.checked_at!.localeCompare(a.checked_at!));
   return { open, checked };
 }
+
+// ── §7A.4 Every day lists ─────────────────────────────────────────────
+
+/** A ping more than this many minutes past its time is not sent (⚑ Q289). */
+export const PING_LATE_MIN = 60;
+
+/** Items as they stand today on an every day list: a tick from before `dayStart` (today's local midnight, UTC) reads
+ *  as open. Nothing is written. */
+export function todaysItems<T extends { checked_at: string | null }>(items: readonly T[], dayStart: string): T[] {
+  return items.map((i) => (i.checked_at !== null && i.checked_at < dayStart ? { ...i, checked_at: null } : i));
+}
+
+/** Open items on an every day list (⚑ Q290): timed first, earliest first, then the rest in the order given. */
+export function dailyOrder<T extends { time: string | null }>(items: readonly T[]): T[] {
+  const timed = items.filter((i) => i.time !== null).sort((a, b) => a.time!.localeCompare(b.time!));
+  return [...timed, ...items.filter((i) => i.time === null)];
+}
+
+/** Whether an item at `time` pings now, the household's local `HH:MM` being `localNow`: at or past it, under PING_LATE_MIN. */
+export function pingDue(time: string, localNow: string): boolean {
+  const min = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const late = min(localNow) - min(time);
+  return late >= 0 && late < PING_LATE_MIN;
+}
+
+/** A list ping's title (⚑ Q291): the list's emoji and name. */
+export const listPingTitle = (l: { name: string; emoji: string | null }): string => `${listEmoji(l)} ${l.name}`;

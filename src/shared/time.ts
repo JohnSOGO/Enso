@@ -69,6 +69,9 @@ export function localToUtc(date: string, time: string, tz: string): string {
   return iso(t);
 }
 
+/** Today's local midnight in `tz`, as a UTC instant (§7A.4: where an every day list's ticks start). */
+export const dayStartUtc = (now: string, tz: string): string => localToUtc(utcToLocal(now, tz).date, '00:00', tz);
+
 export function utcToLocal(isoString: string, tz: string): { date: string; time: string } {
   const w = new Date(wallMs(ms(isoString), tz)).toISOString();
   return { date: w.slice(0, 10), time: w.slice(11, 16) };
