@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-14 — Steward pass 26, whole tree (code-steward)
+
+- **Run:** after the v1.77.0 release (SPEC 3.38 §7A.4 every day lists + Ping owners, migration 0050); also covers v1.76.0 (weather.ts heatOf + DayCell).
+- **Verdict:** MINOR DRIFT. Typecheck green, 881/881. arch:audit: only routes/lists.ts in the band (270/300). 2 receipts matched to 2 code commits.
+- **Top finding:** MED, routes/lists.ts in the band. Extract, not bless: item handlers (POST /lists/:id/items, PATCH/DELETE /list-items/:id), loadItem, ITEM_GONE and the item validators → `src/worker/routes/list-items.ts`, before the next §7A change.
+- **Handoffs:** 1 to reorganizer (the list-items extract), 1 docs (where-things-stand device checks for v1.76/v1.77). Both wait for MojoSOGO's pick.
+- **Restraint:** the repeated `list.daily ? todaysItems` line; pingDue not crossing midnight (Q289); the inline owner fallback (Q288); ListPanel staying in HouseholdLists.tsx; the files at 80–86% did not grow.
+
 ## 2026-10-13 — v3.38 §7A.4 Every day lists and Ping owners (placement-advisor)
 
 - **Ask:** MojoSOGO 2026-10-13 "In reminders give option to ping owners. Time & Checkbox each day" → every day lists: a tick lasts for today only; items may have a time and go by it; with Ping owners on, a once-a-day push to the item's owner (or every active member) at its time. Phone only, never a founder ping (SPEC §7A.4, §4.2zw migration 0050, §8.8, §10 /lists rows, §9.4 step 5; ⚑ Q287–Q291; v1.77.0).
