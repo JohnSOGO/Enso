@@ -240,5 +240,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `scripts/arch.ts` | Architecture caps, layering bans, source scan (§2.5) |
 | `scripts/arch-types.ts` | Shapes of the scan, Node-free so the workerd test can import them |
 | `scripts/arch-audit.ts` | `npm run arch:audit` headroom report |
+| `scripts/pending-migrations.ts` | The deploy gate's verdict (§10.1): `deployGate(wranglerListOutput)` → clear only when the text says "No migrations to apply", else refuse with the message (names the pending files, `npm run db:migrate:remote`, the dropping-migration bypass). Pure and Node-free, imports nothing, so the workerd test can import it |
+| `scripts/predeploy.ts` | `predeploy` (npm runs it before `deploy`, §10.1): runs `wrangler d1 migrations list enso --remote` once, hands its output to `deployGate`, prints the message and exits non-zero on refuse. Decides nothing itself |
 | `scripts/draw-enso.mjs` | Draws the Ensō mark into `frontend/public/icon.svg` (§8.10) — our own drawing, regenerated, never hand-edited |
 | `scripts/seed-dev.mjs` | Local dev seed data (`npm run seed:dev`) |

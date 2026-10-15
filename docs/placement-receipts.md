@@ -7,6 +7,16 @@ carry its result.
 
 ---
 
+## 2026-10-15 — Deploy refuses while a D1 migration is pending (placement-advisor)
+
+- **Ask:** MojoSOGO picked "GRD": `npm run deploy` must refuse while the remote D1 `enso` has a pending migration (v1.77.0 went out 2026-10-14 without 0050; every delivery insert failed all day). SPEC §10.1 `predeploy` row, §2.2 layout, DG1–DG3.
+- **Verdict:** NEW `scripts/pending-migrations.ts` (deployGate: the pure, fail-closed verdict and the refusal text) and NEW `scripts/predeploy.ts` (one spawnSync of wrangler with `shell: true` for Windows, print, exit code), a `predeploy` line in package.json, `test/pending-migrations.test.ts`.
+- **Flow stage:** release tooling (`scripts/`); the decision in the pure file, process I/O in the runner.
+- **Why:** tests run inside workerd, which cannot load `node:child_process`, so the parser sits apart (the `scripts/arch-types.ts` precedent). Rejected: one combined file (untestable); adding to arch.ts / arch-audit.ts (a second concern); changing the `deploy` string (npm's pre-hook gates it). Fail closed: only the exact "No migrations to apply" clears. README has no deploy section, so the routine is recorded in docs/where-things-stand.md step 2 only (CLAUDE.md's "deploy steps are in README.md" is stale; a doc fix).
+- **Caps:** both new files under 30/300; no existing source file grows; no CEILINGS change.
+
+---
+
 ## 2026-10-15 — A timer's day ending ends Away (placement-advisor)
 
 - **Ask:** A rolling timer fire with Away tapped stays away forever: Rule 0 reuses the same fire row into the next window, so away_by carries over and tick writes no push or house rows ("Stairs and pushups", 10-13 → silent on 10-14). Fix: when Rule 0 carries a timer fire to the next window, clear away_by/away_at; migration 0051 clears the open timer fires already stuck (SPEC §9.2c Q214, §5.3 Rule 0, acceptance AW5).

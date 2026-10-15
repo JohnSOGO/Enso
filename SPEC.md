@@ -250,7 +250,9 @@ Enso/
 │   ├── dev-seed.json, seed-dev.mjs   # `npm run seed:dev`
 │   ├── arch.ts             # §2.5 caps, layering bans, source scan — their ONE home
 │   ├── arch-types.ts       # the scan's shapes (Node-free, so the test can import them)
-│   └── arch-audit.ts       # `npm run arch:audit` headroom report
+│   ├── arch-audit.ts       # `npm run arch:audit` headroom report
+│   ├── pending-migrations.ts # the deploy gate's verdict (§10.1), Node-free
+│   └── predeploy.ts        # `predeploy`: asks wrangler, applies the verdict
 ├── docs/
 │   ├── module-ownership.md # the map: which file owns which concern (§2.5)
 │   ├── modularity.md       # the flow doctrine, ceilings, warning band, verdicts
@@ -5619,8 +5621,11 @@ arrives. That is plenty for one household.
 | `db:migrate:local` | `wrangler d1 migrations apply enso --local` |
 | `db:migrate:remote` | `wrangler d1 migrations apply enso --remote` |
 | `build` | `vite build` → `frontend/dist` |
+| `predeploy` | `tsx scripts/predeploy.ts` — npm runs it before `deploy`. **Deploy refuses while a migration is pending** (MojoSOGO 2026-10-15, "GRD", after v1.77.0 went live without migration 0050 and no alert went out all day): it runs `wrangler d1 migrations list enso --remote` and lets the deploy go only when that says "No migrations to apply". Anything else (a pending list, an error, text it doesn't know) refuses, names the pending files and says to run `npm run db:migrate:remote` first. A dropping migration that must go after the deploy skips the gate on purpose: `npm run build`, then `npx wrangler deploy`. |
 | `deploy` | `npm run build && wrangler deploy` |
 | `arch:audit` | `tsx scripts/arch-audit.ts` — size vs cap for every source file, warning band marked (§2.5) |
+
+**Acceptance (DG — each row is a test of `deployGate` in `scripts/pending-migrations.ts`):** DG1 wrangler's "✅ No migrations to apply!" → clear. DG2 a listing that names `0051_timer_away_day.sql` → refuse, and the message names it and `npm run db:migrate:remote`. DG3 an error text, or empty text → refuse.
 
 `wrangler.toml` essentials:
 
