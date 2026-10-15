@@ -898,6 +898,10 @@ ping owners. Time & Checkbox each day"): ⋯ List options gains ☐ Every day (i
 is empty again each morning) and ☐ Ping owners (at an item's time, if not ticked, one phone push to its owner, else to
 everyone). Migration 0050. Owed: routes/lists.ts is at 270/300, in the warning band (next agent's job).
 
+**Event reminder every hour** (v1.78.0, SPEC 3.39, §8.4, Q292; MojoSOGO 2026-10-15: "Saturday reminder starting at
+9:00am … repeat hourly until she ACKs"): the event form's repeat select gains Every hour, which rings up to 12 times
+(`HOURLY_MAX_ALERTS`). No backend change; the API already took `renotifyMin` 60 and `maxAlerts` up to 20.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

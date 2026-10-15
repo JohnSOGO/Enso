@@ -6,7 +6,7 @@ import { ChannelChecks, channelsOf, flagsOf, pickOneWay, type ChannelFlags } fro
 export interface ReminderValue extends ChannelFlags { remind: string; renotify: string }
 
 /** A stored event reminder, as the API returns and accepts it. */
-export interface Reminder { offsetMin: number; channels: Channel[]; renotifyMin: number | null }
+export interface Reminder { offsetMin: number; channels: Channel[]; renotifyMin: number | null; maxAlerts?: number }
 
 const REMIND_OPTIONS: [string, string][] = [
   ['none', 'None'], ['0', 'At start'], ['5', '5 min before'], ['15', '15 min before'],
@@ -14,7 +14,9 @@ const REMIND_OPTIONS: [string, string][] = [
 ];
 /** §8.4 ⚑ — 780 min before the all-day start of 09:00. Offered for all-day events; a timed one keeping it says what it is. */
 const EVENING_BEFORE = '780';
-const RENOTIFY_OPTIONS: [string, string][] = [['off', 'Off'], ['5', 'Every 5 min'], ['10', 'Every 10 min'], ['15', 'Every 15 min'], ['30', 'Every 30 min']];
+const RENOTIFY_OPTIONS: [string, string][] = [['off', 'Off'], ['5', 'Every 5 min'], ['10', 'Every 10 min'], ['15', 'Every 15 min'], ['30', 'Every 30 min'], ['60', 'Every hour']];
+/** ⚑ Q292 — Every hour rings up to 12 times (9 am → 8 pm), then waits silently for Done. */
+const HOURLY_MAX_ALERTS = 12;
 
 /** The Reminder section a stored reminder (or none) shows as. */
 export function reminderOf(reminder: Reminder | null | undefined, founder = false): ReminderValue {
@@ -34,6 +36,7 @@ export function toReminder(v: ReminderValue): Reminder | null {
   const channels = channelsOf(v);
   return v.remind === 'none' ? null : {
     offsetMin: Number(v.remind), channels, renotifyMin: v.renotify === 'off' ? null : Number(v.renotify),
+    ...(v.renotify === '60' ? { maxAlerts: HOURLY_MAX_ALERTS } : {}),
   };
 }
 
