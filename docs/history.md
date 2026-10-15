@@ -902,6 +902,16 @@ everyone). Migration 0050. Owed: routes/lists.ts is at 270/300, in the warning b
 9:00am … repeat hourly until she ACKs"): the event form's repeat select gains Every hour, which rings up to 12 times
 (`HOURLY_MAX_ALERTS`). No backend change; the API already took `renotifyMin` 60 and `maxAlerts` up to 20.
 
+**Away ends with a timer's day** (v1.78.1, SPEC 3.40, §9.2c, §5.3 Rule 0, migration 0051; MojoSOGO 2026-10-14: "I didn't
+see pushup/stairs reminders today"): "Stairs and pushups" rang on 10-13 and sent nothing on 10-14. Rule 0 keeps the
+same fire row overnight, so an Away tapped on it stayed for every later day and no push was written. Rule 0 now
+reports `dayEnded` and tick clears Away; 0051 clears the fire already stuck.
+
+**Deploy refuses while a migration is pending** (v1.78.1, SPEC 3.40 §10.1, DG1–DG3; MojoSOGO 2026-10-15 "GRD"): v1.77.0 was
+deployed 2026-10-14 05:56 PDT without migration 0050; every delivery insert failed ("no such column: list_item_id"), so
+no alert, chore, reminder or ops ping went out until MojoSOGO applied it at 19:52. The PC's safety check had refused
+`npm run db:migrate:remote` but not the deploy. `predeploy` now runs `wrangler d1 migrations list` and fails closed.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

@@ -147,7 +147,8 @@ export function planReminderFires(ev: ReminderEvent, tz: string, fromUtc: string
 }
 
 /** §5.3 — advance one open fire to `now`. */
-export function stepFire(fire: FireRow, cfg: AlertConfig, now: string): { fire: FireRow; alert: boolean } {
+/** `dayEnded`: Rule 0 carried a timer fire to its next window — the day is over, and so is any Away on it (§9.2c). */
+export function stepFire(fire: FireRow, cfg: AlertConfig, now: string): { fire: FireRow; alert: boolean; dayEnded?: true } {
   const r = stepOpen(fire, cfg, now);
   // Rule 0b (§5.3, §7D.5): an alert in quiet hours waits for them to end — the snooze shape, alerts counted afresh.
   if (r.alert && cfg.quietUntil) {
@@ -156,7 +157,7 @@ export function stepFire(fire: FireRow, cfg: AlertConfig, now: string): { fire: 
   return r;
 }
 
-function stepOpen(fire: FireRow, cfg: AlertConfig, now: string): { fire: FireRow; alert: boolean } {
+function stepOpen(fire: FireRow, cfg: AlertConfig, now: string): { fire: FireRow; alert: boolean; dayEnded?: true } {
   const t = ms(now);
   // Rule 0 (§5.3): a timer never rings outside its window — the snooze shape, no close, no alert.
   if (
@@ -165,7 +166,7 @@ function stepOpen(fire: FireRow, cfg: AlertConfig, now: string): { fire: FireRow
   ) {
     return {
       fire: { ...fire, state: 'scheduled', due_at: nextTimerDue(now, cfg.intervalMin, cfg.window), alert_count: 0, last_alerted_at: null },
-      alert: false,
+      alert: false, dayEnded: true,
     };
   }
   if (fire.state === 'scheduled') {

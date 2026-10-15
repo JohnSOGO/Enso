@@ -42,6 +42,9 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 1. Merge the topic branch to `main`, then run `npm run typecheck && npm test && npm run arch:audit`. A test-run crash
    with exit -1073740791 is a known flake; rerun it.
 2. Additive migration: `CI=1 npm run db:migrate:remote`, **then** `npm run deploy`. Dropping migrations go after the deploy.
+   Since v1.78.1 `npm run deploy` refuses while a migration is pending (SPEC §10.1); for a dropping migration that must
+   go after the deploy, run `npm run build` then `npx wrangler deploy`. If the PC's safety check blocks the migrate,
+   hand MojoSOGO the one-line command at once: v1.77.0 went out without 0050 and no alert sent for a day.
 3. Check the live stamp: `curl -s https://enso.sogodojo.com/ | grep -oE "v1\.[0-9.]+ · [0-9a-f]+"`.
 4. If `home/` or anything it bundles changed (`src/worker/youtube-captions.ts`, `src/shared/item-reading.ts` and what it
    imports, among them `src/shared/photos.ts`, the photo-size cap): rebuild, copy it to SogoAI (`ssh sogoai`), and restart the "Enso captions helper" task (README).

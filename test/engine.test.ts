@@ -318,6 +318,8 @@ describe('timer with an active time range (TW) — LA, 08:00–21:00, interval 6
   it('TW4 ringing at 21:00 → scheduled, due next day 09:00, alert_count 0, no alert', () => {
     const r = stepFire(ringingSince(L('20:00'), 4, L('20:45')), cfg, L('21:00'));
     expect(r.alert).toBe(false);
+    expect(r.dayEnded).toBe(true); // §9.2c: ends Away too
+    expect(stepFire(ringingSince(L('20:00'), 1, L('20:00')), cfg, L('20:30')).dayEnded).toBeUndefined();
     expect(r.fire).toMatchObject({ state: 'scheduled', due_at: L('09:00', '2026-10-07'), alert_count: 0, last_alerted_at: null, close_reason: null });
   });
 

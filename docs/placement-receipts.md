@@ -7,6 +7,26 @@ carry its result.
 
 ---
 
+## 2026-10-15 — Deploy refuses while a D1 migration is pending (placement-advisor)
+
+- **Ask:** MojoSOGO picked "GRD": `npm run deploy` must refuse while the remote D1 `enso` has a pending migration (v1.77.0 went out 2026-10-14 without 0050; every delivery insert failed all day). SPEC §10.1 `predeploy` row, §2.2 layout, DG1–DG3.
+- **Verdict:** NEW `scripts/pending-migrations.ts` (deployGate: the pure, fail-closed verdict and the refusal text) and NEW `scripts/predeploy.ts` (one spawnSync of wrangler with `shell: true` for Windows, print, exit code), a `predeploy` line in package.json, `test/pending-migrations.test.ts`.
+- **Flow stage:** release tooling (`scripts/`); the decision in the pure file, process I/O in the runner.
+- **Why:** tests run inside workerd, which cannot load `node:child_process`, so the parser sits apart (the `scripts/arch-types.ts` precedent). Rejected: one combined file (untestable); adding to arch.ts / arch-audit.ts (a second concern); changing the `deploy` string (npm's pre-hook gates it). Fail closed: only the exact "No migrations to apply" clears. README has no deploy section, so the routine is recorded in docs/where-things-stand.md step 2 only (CLAUDE.md's "deploy steps are in README.md" is stale; a doc fix).
+- **Caps:** both new files under 30/300; no existing source file grows; no CEILINGS change.
+
+---
+
+## 2026-10-15 — A timer's day ending ends Away (placement-advisor)
+
+- **Ask:** A rolling timer fire with Away tapped stays away forever: Rule 0 reuses the same fire row into the next window, so away_by carries over and tick writes no push or house rows ("Stairs and pushups", 10-13 → silent on 10-14). Fix: when Rule 0 carries a timer fire to the next window, clear away_by/away_at; migration 0051 clears the open timer fires already stuck (SPEC §9.2c Q214, §5.3 Rule 0, acceptance AW5).
+- **Verdict:** EXISTING `src/shared/engine.ts` (Rule 0's result gains `dayEnded: true`; stepFire's return type widens and FireRow is unchanged), EXISTING `src/worker/tick.ts` (step 2: on `dayEnded`, `UPDATE fires SET away_by = NULL, away_at = NULL` in the same batch), new `migrations/0051_*.sql` + `test/migration-0051.test.ts` (data repair: scheduled timer fires with away_by set).
+- **Flow stage:** rules (engine Rule 0 says the day ended) → persist (tick writes the clear; migration repairs live rows).
+- **Why:** The decision belongs to the rule that makes it, and that rule is pure, so it returns a flag rather than knowing about Away. Rejected: tick working out the rollover itself (a rule in orchestration); a separate `rolledToNextWindow(fire, next)` predicate (a second copy of Rule 0's conditions that can drift); widening FireRow or `updateFire` in fire-rows.ts (pulls Away into the engine, or adds a flag parameter for one caller). The inline UPDATE follows tick's existing superseded UPDATE. SPEC.md's copy of the stepFire signature updated.
+- **Caps:** engine.ts ~258/300; tick.ts ~130/148 (band at 133). Neither enters the band, and no CEILINGS change.
+
+---
+
 ## 2026-10-15 — Event reminder "Every hour" repeat, up to 12 alerts (placement-advisor)
 
 - **Ask:** MojoSOGO "Saturday reminder 9:00am for Shelly, repeat hourly until she ACKs" → §8.4 Event form, Reminder section: Repeat alert every gains "Every hour", which saves `renotifyMin` 60 with `maxAlerts = HOURLY_MAX_ALERTS` (12, ⚑ Q292). Every other choice sends no maxAlerts (API default 4). No backend change.

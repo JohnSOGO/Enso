@@ -70,10 +70,12 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
   for (const fire of open) {
     const src = await sourceOf(db, fire, now);
     if (!src) continue;
-    const { fire: next, alert } = stepFire(fire, src.cfg, now);
+    const { fire: next, alert, dayEnded } = stepFire(fire, src.cfg, now);
     if (next === fire) continue;
     summary.stepped++;
     const stmts = [updateFire(db, next)];
+    // §9.2c: a timer's day ending ends Away too, so tomorrow rings.
+    if (dayEnded && fire.away_by) stmts.push(db.prepare('UPDATE fires SET away_by = NULL, away_at = NULL WHERE id = ?').bind(fire.id));
     if (alert) {
       summary.alerts++;
       const message = alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sunsetAt, src.bring);
