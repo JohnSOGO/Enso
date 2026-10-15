@@ -898,7 +898,11 @@ ping owners. Time & Checkbox each day"): ⋯ List options gains ☐ Every day (i
 is empty again each morning) and ☐ Ping owners (at an item's time, if not ticked, one phone push to its owner, else to
 everyone). Migration 0050. Owed: routes/lists.ts is at 270/300, in the warning band (next agent's job).
 
-**Away ends with a timer's day** (v1.77.1, SPEC 3.39, §9.2c, §5.3 Rule 0, migration 0051; MojoSOGO 2026-10-14: "I didn't
+**Event reminder every hour** (v1.78.0, SPEC 3.39, §8.4, Q292; MojoSOGO 2026-10-15: "Saturday reminder starting at
+9:00am … repeat hourly until she ACKs"): the event form's repeat select gains Every hour, which rings up to 12 times
+(`HOURLY_MAX_ALERTS`). No backend change; the API already took `renotifyMin` 60 and `maxAlerts` up to 20.
+
+**Away ends with a timer's day** (v1.78.1, SPEC 3.40, §9.2c, §5.3 Rule 0, migration 0051; MojoSOGO 2026-10-14: "I didn't
 see pushup/stairs reminders today"): "Stairs and pushups" rang on 10-13 and sent nothing on 10-14. Rule 0 keeps the
 same fire row overnight, so an Away tapped on it stayed for every later day and no push was written. Rule 0 now
 reports `dayEnded` and tick clears Away; 0051 clears the fire already stuck.

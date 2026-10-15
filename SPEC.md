@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.39 · **Date:** 2026-10-15 · **Owner:** MojoSOGO
+**Version:** 3.40 · **Date:** 2026-10-15 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3811,7 +3811,12 @@ Fields:
   - None / At start / 5 / 15 / 30 / 60 min before / 1 day before / for all-day events
     **The evening before (8 pm)** (= 780 min before the all-day start of 09:00) ⚑
   - Channels: ☐ Phone ☐ House
-  - Repeat alert every: Off / 5 / 10 / 15 / 30 min
+  - Repeat alert every: Off / 5 / 10 / 15 / 30 min / **Every hour**. Every hour also saves `maxAlerts` =
+    `HOURLY_MAX_ALERTS` (12 ⚑ Q292), so an hourly reminder keeps ringing about 12 hours until someone taps
+    **Done**; every other choice leaves `maxAlerts` to the API default (4). (MojoSOGO 2026-10-15: "Saturday
+    reminder 9:00am … repeat hourly until she ACKs".)
+    **RH1:** `toReminder` with Every hour → `renotifyMin` 60, `maxAlerts` 12; with Every 30 min → no `maxAlerts`;
+    `reminderOf` a stored 60 → Every hour.
 
 Actions:
 
@@ -5131,7 +5136,7 @@ point in reminding anyone; it stays open in the Ringing bar, silent.
 - It lasts **for that fire only**, until it is closed (done, acked, cleared, moved) ⚑ Q214. A fire that
   replaces it (a timer's next countdown after Ack, a machine's Still loaded, a chore's next step, a reminder's
   next occurrence) starts without it, so the speakers speak again. Snooze keeps the same fire, so it stays away.
-  **A timer's day ending ends it too** (MojoSOGO 2026-10-14, v1.77.1): when Rule 0 (§5.3) carries a timer fire to
+  **A timer's day ending ends it too** (MojoSOGO 2026-10-14, v1.78.1): when Rule 0 (§5.3) carries a timer fire to
   its next window, `away_by` and `away_at` are cleared, so the next day rings. Before this, one Away silenced a
   timer for good.
 - `GET /fires` carries `awayBy` (member id or null) on every fire.
