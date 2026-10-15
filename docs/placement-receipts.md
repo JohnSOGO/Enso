@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-15 — Event reminder "Every hour" repeat, up to 12 alerts (placement-advisor)
+
+- **Ask:** MojoSOGO "Saturday reminder 9:00am for Shelly, repeat hourly until she ACKs" → §8.4 Event form, Reminder section: Repeat alert every gains "Every hour", which saves `renotifyMin` 60 with `maxAlerts = HOURLY_MAX_ALERTS` (12, ⚑ Q292). Every other choice sends no maxAlerts (API default 4). No backend change.
+- **Verdict:** EXISTING `frontend/src/components/ReminderFields.tsx` (RENOTIFY_OPTIONS + '60'; `HOURLY_MAX_ALERTS` const; `Reminder.maxAlerts?`; `toReminder` sets it only for '60').
+- **Flow stage:** render (capture intent). The route (event-rows.ts) already validates `maxAlerts` 1–20 and returns it on GET.
+- **Why:** the row already owns the repeat select and the reminder ⇄ form mapping. The 12 is a form default, not vocabulary or a rule, so vocab.ts and src/shared/ were rejected. AlertFields.tsx RENOTIFY was rejected because alarms, timers and chores are outside this spec. Omitting maxAlerts on PATCH resets an hourly event to 4 on the server, which is the behavior the spec wants. EventForm.tsx is unchanged.
+- **Caps:** ReminderFields.tsx about 71/300. No CEILINGS change and nothing newly in the band.
+
 ## 2026-10-14 — Steward pass 26, whole tree (code-steward)
 
 - **Run:** after the v1.77.0 release (SPEC 3.38 §7A.4 every day lists + Ping owners, migration 0050); also covers v1.76.0 (weather.ts heatOf + DayCell).

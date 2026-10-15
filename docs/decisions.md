@@ -294,3 +294,4 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q289 | A ping whose time has long passed (§7A.4) | ⚑ Sent only within 60 min after the time (`PING_LATE_MIN`), so a time set or a deploy late in the day sends no old pings |
 | Q290 | Order on an every day list (§7A.4, §8.8) | ⚑ Timed items first, earliest first, then the rest newest first; the time shows before the text, 🔔 after it when Ping owners is on |
 | Q291 | A list ping's words (§7A.4) | ⚑ Title = the list's emoji and name ("📋 Reminders"), text = the item's text |
+| Q292 | How long an hourly event reminder repeats (§8.4) | ⚑ 12 alerts (`HOURLY_MAX_ALERTS`): 9 am rings through 8 pm, then it stays in the Ringing bar silently until Done |

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.38 · **Date:** 2026-10-13 · **Owner:** MojoSOGO
+**Version:** 3.39 · **Date:** 2026-10-15 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3804,7 +3804,12 @@ Fields:
   - None / At start / 5 / 15 / 30 / 60 min before / 1 day before / for all-day events
     **The evening before (8 pm)** (= 780 min before the all-day start of 09:00) ⚑
   - Channels: ☐ Phone ☐ House
-  - Repeat alert every: Off / 5 / 10 / 15 / 30 min
+  - Repeat alert every: Off / 5 / 10 / 15 / 30 min / **Every hour**. Every hour also saves `maxAlerts` =
+    `HOURLY_MAX_ALERTS` (12 ⚑ Q292), so an hourly reminder keeps ringing about 12 hours until someone taps
+    **Done**; every other choice leaves `maxAlerts` to the API default (4). (MojoSOGO 2026-10-15: "Saturday
+    reminder 9:00am … repeat hourly until she ACKs".)
+    **RH1:** `toReminder` with Every hour → `renotifyMin` 60, `maxAlerts` 12; with Every 30 min → no `maxAlerts`;
+    `reminderOf` a stored 60 → Every hour.
 
 Actions:
 
