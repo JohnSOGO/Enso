@@ -12,6 +12,7 @@ import { alerts } from './routes/alerts';
 import { alarms } from './routes/alarms';
 import { household } from './routes/household';
 import { lists } from './routes/lists';
+import { listItems } from './routes/list-items';
 import { itemPhotos } from './routes/item-photos';
 import { chores } from './routes/chores';
 import { rooms } from './routes/rooms';
@@ -56,6 +57,7 @@ api.route('/', alarms);
 api.route('/', household);
 api.route('/', itemPhotos); // §7A.3 /list-items/read-photo and /list-items/{id}/photo
 api.route('/', lists);
+api.route('/', listItems); // §7A POST /lists/{id}/items, /list-items/{id}
 api.route('/', chores);
 api.route('/', rooms); // §7B.6 rooms and what done looks like
 api.route('/', messes); // §7B.7 whose mess?
