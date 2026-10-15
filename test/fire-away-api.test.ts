@@ -1,4 +1,4 @@
-// SPEC §9.2c AW1–AW4 — "I'm away" on one alert: its speakers stop, it stays open, it stays open, silent.
+// SPEC §9.2c AW1–AW5 — "I'm away" on one alert: its speakers stop, it stays open, it stays open, silent.
 import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test';
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import worker from '../src/worker/index';
@@ -69,6 +69,23 @@ it('AW3: a timer that is away, then Ack → the next countdown is not away', asy
   const next = (await env.DB.prepare(`SELECT id, away_by FROM fires WHERE timer_id = ? AND state != 'closed'`).bind(t.json.id).first<any>())!;
   expect(next.id).not.toBe(f.id);
   expect(next.away_by).toBeNull();
+  await A.post(`/timers/${t.json.id}/commands`, { cmd: 'stop' });
+});
+
+it('AW5: a timer away at its window close → the next day it rings again', async () => {
+  const t = await A.post('/timers', { title: 'Stairs', intervalMin: 60, channels: ['push'], renotifyMin: 10, activeFrom: '06:30', activeTo: '13:30' });
+  expect(t.status, JSON.stringify(t.json)).toBe(201);
+  await A.post(`/timers/${t.json.id}/commands`, { cmd: 'start' });
+  const f = (await env.DB.prepare(`SELECT id FROM fires WHERE timer_id = ? AND state != 'closed'`).bind(t.json.id).first<any>())!;
+  // Ringing since 12:00 PST (20:00Z), alert 2 at 12:10; then Away.
+  await env.DB.prepare(`UPDATE fires SET state = 'ringing', due_at = ?, alert_count = 2, last_alerted_at = ? WHERE id = ?`)
+    .bind('2026-11-20T20:00:00.000Z', '2026-11-20T20:10:00.000Z', f.id).run();
+  expect((await call(A, 'POST', `/fires/${f.id}/away`)).status).toBe(200);
+  await tick('2026-11-20T21:31:00.000Z'); // 13:31 PST: the window closed
+  const rolled = (await env.DB.prepare('SELECT state, due_at, away_by, away_at FROM fires WHERE id = ?').bind(f.id).first<any>())!;
+  expect(rolled).toEqual({ state: 'scheduled', due_at: '2026-11-21T15:30:00.000Z', away_by: null, away_at: null });
+  await tick('2026-11-21T15:30:30.000Z'); // 07:30 PST the next day
+  expect(await rowsOf(f.id, 1)).toEqual(['push', 'push']); // both members
   await A.post(`/timers/${t.json.id}/commands`, { cmd: 'stop' });
 });
 

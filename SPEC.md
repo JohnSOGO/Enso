@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.38 · **Date:** 2026-10-13 · **Owner:** MojoSOGO
+**Version:** 3.39 · **Date:** 2026-10-15 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -954,6 +954,13 @@ Schema: [`migrations/0050_daily_lists.sql`](migrations/0050_daily_lists.sql). Th
 today" is read from the rows. Additive only; it runs before the deploy. **Migration check (DL-M):** lists, items and
 deliveries that exist before 0050 survive it with `daily` 0, `ping_owners` 0, `time` NULL and `list_item_id` NULL.
 
+### 4.2zx Data change — `migrations/0051_timer_away_day.sql`
+
+MojoSOGO 2026-10-14: "I didn't see pushup/stairs reminders today." Away on a timer fire (§9.2c) used to ride Rule 0
+(§5.3) into every later day. The code fix ends it when the day ends; this migration clears the open `scheduled` timer
+fires already carrying it, which Rule 0 will not touch again. Data only, no schema change: [`migrations/0051_timer_away_day.sql`](migrations/0051_timer_away_day.sql).
+**Migration check (TA-M):** a scheduled timer fire loses `away_by`/`away_at`; a ringing timer fire and any other kind keep them.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1004,7 +1011,7 @@ interface Recurrence {
 planReminderFires(event: EventRow, tz: string, fromUtc: string, toUtc: string, place: Place | null = null): NewFire[]
 
 // Advance one open fire to `now`. Returns the new fire row and any alerts to send.
-stepFire(fire: FireRow, cfg: AlertConfig, now: string): { fire: FireRow; alert: boolean }
+stepFire(fire: FireRow, cfg: AlertConfig, now: string): { fire: FireRow; alert: boolean; dayEnded?: true }
 
 // A human acted on a fire. Returns the updated fire, plus the next fire for timers.
 applyAction(fire: FireRow, action: Action, cfg: AlertConfig, memberId: string, now: string):
@@ -1055,7 +1062,7 @@ export const SNOOZE_MIN         = 10;    // ⚑ DEFAULT
 
 | # | Fire state | Condition | Result |
 |---|------------|-----------|--------|
-| 0 | kind `timer` with a window | `ringing` and `now` outside the window, **or** `scheduled`, `now ≥ due_at` and `now` outside the window | `scheduled`, `due_at = nextTimerDue(now, intervalMin, window)` (= the next window opening + interval), `alert_count = 0`, `last_alerted_at = null`, **no alert** |
+| 0 | kind `timer` with a window | `ringing` and `now` outside the window, **or** `scheduled`, `now ≥ due_at` and `now` outside the window | `scheduled`, `due_at = nextTimerDue(now, intervalMin, window)` (= the next window opening + interval), `alert_count = 0`, `last_alerted_at = null`, **no alert**, `dayEnded` (it also ends Away, §9.2c) |
 | 1 | `scheduled` | `now < due_at` | no change |
 | 2 | `scheduled`, kind `reminder` | `now − due_at > MISSED_AFTER_MIN` (strictly — exactly 60 min still rings) | `closed`, reason `missed`, **no alert** |
 | 3 | `scheduled` | `now ≥ due_at` | `ringing`, `alert_count = 1`, `last_alerted_at = now`, **alert** |
@@ -5124,6 +5131,9 @@ point in reminding anyone; it stays open in the Ringing bar, silent.
 - It lasts **for that fire only**, until it is closed (done, acked, cleared, moved) ⚑ Q214. A fire that
   replaces it (a timer's next countdown after Ack, a machine's Still loaded, a chore's next step, a reminder's
   next occurrence) starts without it, so the speakers speak again. Snooze keeps the same fire, so it stays away.
+  **A timer's day ending ends it too** (MojoSOGO 2026-10-14, v1.77.1): when Rule 0 (§5.3) carries a timer fire to
+  its next window, `away_by` and `away_at` are cleared, so the next day rings. Before this, one Away silenced a
+  timer for good.
 - `GET /fires` carries `awayBy` (member id or null) on every fire.
 
 **The screen** (Ringing bar, §8.2): every row that is not away gets an **Away** button (before the row's main
@@ -5137,6 +5147,7 @@ button). An away row shows `· away ({name})` after its sub line, and no Away bu
 | AW2 | the reminder's next renotify after Away | no delivery row at all (no push, no house), zero HA calls; the alert count still steps |
 | AW3 | a timer that is away, then Ack | the next countdown fire has `away_by` NULL (its alerts follow §9.2d like any fire) |
 | AW4 | Away on a ringing machine fire | 200; its next reminder writes no delivery row |
+| AW5 | a timer 06:30–13:30 ringing and away; tick at 13:31, then at the next day's 07:30 | after 13:31: `scheduled`, due next day 07:30, `away_by`/`away_at` NULL; at 07:30: one `push` row for alert 1 |
 | AW-M | migration 0039 | fires and deliveries intact; both columns NULL |
 
 ### 9.2d Phone first, then the house — asked by MojoSOGO 2026-10-10
