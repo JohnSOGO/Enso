@@ -1,7 +1,7 @@
 // SPEC §7A.3 — snap an item: naming a photographed list item (SogoAI's local model first, the Claude API only when
 // SogoAI gives no name) and a list item's photo in R2 (private: only through this API, to signed-in members). The
 // read stores nothing: its name is cleaned by src/shared/item-reading.ts and only offered in the add box. The photo's
-// key is never on the wire. Deleting an item or a list deletes its photos in routes/lists.ts.
+// key is never on the wire. Deleting an item or a list deletes its photos in routes/list-items.ts and routes/lists.ts.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { READS_PER_DAY } from '../../shared/things';
@@ -14,7 +14,7 @@ import { homeCaptionsConfigOf, identifyFromHome } from '../home-captions';
 import { readItemPhoto } from '../photo-reader';
 import { spendPhotoRead } from '../photo-reads';
 import { replacePhoto, servePhoto } from '../photo-store';
-import { ITEM_GONE, loadItem } from './lists';
+import { ITEM_GONE, loadItem } from './list-items';
 
 const NO_PHOTO = 'This item has no photo.';
 

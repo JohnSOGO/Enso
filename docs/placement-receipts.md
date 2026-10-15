@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-15 — List item CRUD out of routes/lists.ts (reorganizer)
+
+- **Trigger:** steward pass 26 flagged `src/worker/routes/lists.ts` at 270/300 (warning band, list CRUD and item CRUD in one file); MojoSOGO approved "SPLIT" on 2026-10-15.
+- **Seam moved:** the item handlers (`POST /lists/{id}/items`, `PATCH` / `DELETE /list-items/{id}`), loadItem, ITEM_GONE, assigneeParam, timeParam and TEXT/NOTE/TIME messages from `src/worker/routes/lists.ts` to `src/worker/routes/list-items.ts` [NEW row]. Mounted in index.ts directly after `lists`; item-photos.ts now imports loadItem / ITEM_GONE from list-items.ts.
+- **Dependency:** one way, list-items.ts → lists.ts (ItemRow, itemView, loadItems, currentItems, listParam). GET /lists/{id} needs itemView and currentItems too, and an item belongs to a list, so the list file is the base and nothing in lists.ts imports from list-items.ts.
+- **Room opened:** lists.ts: 270 → 162 lines; list-items.ts 120; no CEILINGS pin existed, none added (both well under the global 300).
+- **Behavior:** preserved. typecheck, npm test (123 files / 887 tests) and arch:audit are green, and nothing is in the warning band. Handler bodies, SQL, messages and status codes moved verbatim. Route registration order is unchanged: item-photos comes first, so `/list-items/read-photo` and `/list-items/{id}/photo` are still matched before `/list-items/{id}`, and the new routes don't overlap any method or path in lists.ts.
+- **Restraint:** only the item writes moved. The item row, itemView and currentItems stay with GET /lists/{id}, which reads them. No helper was split out into a third file.
+
+---
+
 ## 2026-10-15 — Deploy refuses while a D1 migration is pending (placement-advisor)
 
 - **Ask:** MojoSOGO picked "GRD": `npm run deploy` must refuse while the remote D1 `enso` has a pending migration (v1.77.0 went out 2026-10-14 without 0050; every delivery insert failed all day). SPEC §10.1 `predeploy` row, §2.2 layout, DG1–DG3.

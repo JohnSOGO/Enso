@@ -912,6 +912,9 @@ deployed 2026-10-14 05:56 PDT without migration 0050; every delivery insert fail
 no alert, chore, reminder or ops ping went out until MojoSOGO applied it at 19:52. The PC's safety check had refused
 `npm run db:migrate:remote` but not the deploy. `predeploy` now runs `wrangler d1 migrations list` and fails closed.
 
+**List item routes split out** (v1.78.2, refactor, no behavior change; steward pass 26, MojoSOGO 2026-10-15 "Split"):
+the item handlers moved from `routes/lists.ts` (270 → 162 lines) to a new `routes/list-items.ts`.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
