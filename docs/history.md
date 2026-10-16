@@ -919,6 +919,11 @@ the item handlers moved from `routes/lists.ts` (270 → 162 lines) to a new `rou
 the time reminders are sent within a time range"): a 🎲 Random time tick with From / To; the planner picks a stable time
 in the window per occurrence by hash (`src/shared/random-time.ts`), so nothing extra is stored beyond the fire's due time.
 
+**Only the people going open an event** (v1.80.0, SPEC 3.42, §6.3, §8.3, Q296–Q297; MojoSOGO 2026-10-16: "only people
+that are invited to the event can open and look at the details"): `GET /events/{id}` is 403 for a member who is not
+assigned, not the creator and not an admin (unless nobody is assigned); the day sheet shows their row with 🔒 and it
+doesn't open. Rule in `src/shared/event-access.ts`. No migration.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

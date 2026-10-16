@@ -6,6 +6,7 @@
   background: var(--surface-2); border-radius: 10px; padding: 8px 10px; min-height: 48px;
 }
 .item:focus-visible { outline: 2px solid var(--accent); }
+.locked { cursor: default; } /* §8.3: a day-sheet row the viewer can't open */
 
 .when { width: 3.4rem; flex: none; font-variant-numeric: tabular-nums; color: var(--text-dim); font-size: .85rem; padding-top: 1px; }
 .bar { width: 4px; border-radius: 4px; flex: none; }

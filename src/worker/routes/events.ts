@@ -9,7 +9,8 @@ import { isOnFor } from '../../shared/optins';
 import { all, first, newId, nowIso, parseJson } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
-import { canChange } from '../../shared/roles';
+import { canChange, isAdmin } from '../../shared/roles';
+import { canOpenEvent, cannotOpenText } from '../../shared/event-access';
 import { eventView, insertEventStatement, onEventIds, optInStatement, parseEventInput, removeFutureFires, type EventRow } from '../event-rows';
 import { daysOff } from './household';
 import { weatherBetween } from '../weather-days';
@@ -64,7 +65,9 @@ events.post('/events', requireMember, async (c) => {
 events.get('/events/:id', requireMember, async (c) => {
   const e = await first<EventRow>(c.env.DB, 'SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND is_alarm = 0 AND start_sun IS NULL', c.req.param('id'));
   if (!e) return fail(c, 404, 'not_found', 'That event no longer exists.');
-  return c.json({ ...eventView(e), on: (await onEventIds(c.env.DB, c.get('member').id)).has(e.id) });
+  const view = eventView(e), me = c.get('member');
+  if (!canOpenEvent(view, { id: me.id, admin: isAdmin(me) })) return fail(c, 403, 'forbidden', cannotOpenText); // §6.3
+  return c.json({ ...view, on: (await onEventIds(c.env.DB, me.id)).has(e.id) });
 });
 
 events.patch('/events/:id', requireMember, async (c) => {
