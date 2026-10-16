@@ -7,6 +7,49 @@ carry its result.
 
 ---
 
+## 2026-10-16 — Steward pass 28, since pass 27 (code-steward)
+
+- **Run:** post-release, v1.80.0 (event-access.ts canOpenEvent, GET /events/:id 403 guard, DaySheet locked row).
+- **Verdict:** SOUND. Typecheck green, 899/899, arch:audit quiet; 1 code commit, 1 matching receipt. canOpenEvent is the single source for server and PWA; /calendar and /optional-events send only summary fields.
+- **Top finding:** tick.ts 131/148 (carried over): move step 1 into `reminderInserts` in src/worker/fire-rows.ts.
+- **Handoffs:** 1 to reorganizer (tick move), 3 to worker (receipt order, now fixed here; owed phone checks v1.76–v1.80 in where-things-stand.md; updateEventStatement with the next event-column change), 0 to placement-advisor.
+- **Restraint:** event-access.ts stays its own small owner rather than joining roles.ts; engine.ts 88% with no split point yet.
+
+---
+
+## 2026-10-16 — Only an event's people open its details (placement-advisor)
+
+- **Ask:** MojoSOGO: someone not on an event sees only its name and who's going; only the people on it open the details.
+  Rule: nobody assigned, assigned, the creator, or an admin. GET /events/{id} refuses everyone else with 403; the day-sheet
+  row is not tappable for them and shows 🔒; /calendar summary unchanged (v1.80.0, SPEC §6.3, §8.3, §10).
+- **Verdict:** NEW `src/shared/event-access.ts` (canOpenEvent + cannotOpenText; pure, imports nothing). EXISTING
+  `src/worker/routes/events.ts` (GET guard), `frontend/src/components/DaySheet.tsx` (locked row), `Lists.module.css` (`.locked`).
+  No new wire field.
+- **Why:** a rule both Worker and PWA need → shared, one copy; no `canOpen` on /calendar since occurrences already carry
+  assignedTo and createdBy (§0.5). Rejected roles.ts (its header keeps feature rules out), optins.ts (whether an event
+  exists, not its details), participants.ts (frontend-only). Takes `admin: isAdmin(m)` like the roles doctrine; canChange ⇒
+  canOpenEvent pinned by a pure test. DaySheet is the only PWA opener of an event.
+- **Caps:** routes/events.ts 118 → 121/147 (band 133 not entered); DaySheet.tsx 61 → 66/300; event-access.ts ~11/300.
+  No CEILINGS change.
+
+---
+
+## 2026-10-16 — Event reminder Random time window (placement-advisor)
+
+- **Ask:** An event reminder can have a Random time window (`remind_random_from` / `remind_random_to`, migration 0052);
+  the due time is a deterministic hash pick of (event id, occurrence date) inside [from, to) on the local date of
+  `start − offset`. Wire `reminder.randomFrom` / `randomTo`; UI a Random time tick with From / To (SPEC §8.4, §5.1, §4.2zy; v1.79.0).
+- **Verdict:** NEW row `src/shared/random-time.ts` (randomWindowError, randomTimeIn). EXISTING `src/shared/engine.ts`
+  (ReminderEvent + planReminderFires), `src/worker/event-rows.ts`, `src/worker/routes/events.ts` (PATCH columns),
+  `src/worker/tick.ts` (select), `frontend/src/components/ReminderFields.tsx`; `migrations/0052` + its test.
+- **Why:** the pick and the window check are rules, so shared and pure; route and form ask the same check. Rejected:
+  inlining in engine.ts (258/300 → ~273, into the band); validation only in event-rows (the form would repeat it);
+  picking in tick.ts (a rule in orchestration, tick at 130/148). Alarms and Plan it untouched (NULL columns).
+- **Caps:** engine.ts ~263/300; event-rows.ts ~155/300; random-time.ts ~25/300; ReminderFields.tsx ~90/300;
+  routes/events.ts ≤117/147; tick.ts ≤132/148. Nothing newly in the band.
+
+---
+
 ## 2026-10-15 — List item CRUD out of routes/lists.ts (reorganizer)
 
 - **Trigger:** steward pass 26 flagged `src/worker/routes/lists.ts` at 270/300 (warning band, list CRUD and item CRUD in one file); MojoSOGO approved "SPLIT" on 2026-10-15.
@@ -2165,32 +2208,3 @@ REORG RECEIPT
   201. Day one: green, nothing in the warning band (highest 87 %).
 - **New owners:** `scripts/arch.ts`, `scripts/arch-types.ts`, `scripts/arch-audit.ts`
   (Tooling).
-
-## 2026-10-16 — Event reminder Random time window (placement-advisor)
-
-- **Ask:** An event reminder can have a Random time window (`remind_random_from` / `remind_random_to`, migration 0052);
-  the due time is a deterministic hash pick of (event id, occurrence date) inside [from, to) on the local date of
-  `start − offset`. Wire `reminder.randomFrom` / `randomTo`; UI a Random time tick with From / To (SPEC §8.4, §5.1, §4.2zy; v1.79.0).
-- **Verdict:** NEW row `src/shared/random-time.ts` (randomWindowError, randomTimeIn). EXISTING `src/shared/engine.ts`
-  (ReminderEvent + planReminderFires), `src/worker/event-rows.ts`, `src/worker/routes/events.ts` (PATCH columns),
-  `src/worker/tick.ts` (select), `frontend/src/components/ReminderFields.tsx`; `migrations/0052` + its test.
-- **Why:** the pick and the window check are rules, so shared and pure; route and form ask the same check. Rejected:
-  inlining in engine.ts (258/300 → ~273, into the band); validation only in event-rows (the form would repeat it);
-  picking in tick.ts (a rule in orchestration, tick at 130/148). Alarms and Plan it untouched (NULL columns).
-- **Caps:** engine.ts ~263/300; event-rows.ts ~155/300; random-time.ts ~25/300; ReminderFields.tsx ~90/300;
-  routes/events.ts ≤117/147; tick.ts ≤132/148. Nothing newly in the band.
-
-## 2026-10-16 — Only an event's people open its details (placement-advisor)
-
-- **Ask:** MojoSOGO: someone not on an event sees only its name and who's going; only the people on it open the details.
-  Rule: nobody assigned, assigned, the creator, or an admin. GET /events/{id} refuses everyone else with 403; the day-sheet
-  row is not tappable for them and shows 🔒; /calendar summary unchanged (v1.80.0, SPEC §6.3, §8.3, §10).
-- **Verdict:** NEW `src/shared/event-access.ts` (canOpenEvent + cannotOpenText; pure, imports nothing). EXISTING
-  `src/worker/routes/events.ts` (GET guard), `frontend/src/components/DaySheet.tsx` (locked row), `Lists.module.css` (`.locked`).
-  No new wire field.
-- **Why:** a rule both Worker and PWA need → shared, one copy; no `canOpen` on /calendar since occurrences already carry
-  assignedTo and createdBy (§0.5). Rejected roles.ts (its header keeps feature rules out), optins.ts (whether an event
-  exists, not its details), participants.ts (frontend-only). Takes `admin: isAdmin(m)` like the roles doctrine; canChange ⇒
-  canOpenEvent pinned by a pure test. DaySheet is the only PWA opener of an event.
-- **Caps:** routes/events.ts 118 → 121/147 (band 133 not entered); DaySheet.tsx 61 → 66/300; event-access.ts ~11/300.
-  No CEILINGS change.
