@@ -4,6 +4,7 @@ import { addDays, addMinutes, clockText, localToUtc, ms, utcToLocal } from './ti
 import { occurrences, type Recurrence } from './recurrence';
 import { sunsetUtc, type Place } from './sun';
 import { bringText } from './bring';
+import { randomTimeIn } from './random-time';
 
 export const MATERIALIZE_AHEAD_H = 36;
 export const MISSED_AFTER_MIN = 60;
@@ -89,6 +90,9 @@ export interface ReminderEvent {
   recurrence: Recurrence | null;
   exdates: string[];
   remind_offset_min: number | null;
+  /** §8.4 Random time: the local window the alert time is picked in (both or neither). */
+  remind_random_from?: string | null;
+  remind_random_to?: string | null;
   /** §7.7: the start is that day's sunset at the household place. */
   start_sun?: SunEvent | null;
 }
@@ -133,12 +137,16 @@ export function closeFire<T extends NewFire>(fire: T, reason: CloseReason, membe
 export function planReminderFires(ev: ReminderEvent, tz: string, fromUtc: string, toUtc: string, place: Place | null = null): NewFire[] {
   if (ev.remind_offset_min === null) return [];
   const fromDate = addDays(utcToLocal(fromUtc, tz).date, -1);
-  const toDate = addDays(utcToLocal(toUtc, tz).date, 2); // offsets are ≤ 1 day, so due ≤ start
+  const toDate = addDays(utcToLocal(toUtc, tz).date, 2); // offsets are ≤ 1 day, so due falls on the start's day or the one before
   const out: NewFire[] = [];
   for (const date of occurrences(ev, fromDate, toDate)) {
     const start = ev.start_sun ? place && sunsetUtc(date, place) : localToUtc(date, ev.start_time ?? ALL_DAY_REMIND_TIME, tz);
     if (!start) continue; // §7.7: never a substitute time
-    const due = addMinutes(start, -ev.remind_offset_min);
+    let due = addMinutes(start, -ev.remind_offset_min);
+    // §8.4 Random time: keep the day of `start − offset`, pick the time in the window. A sun start ignores it (§7.7).
+    if (ev.remind_random_from && ev.remind_random_to && !ev.start_sun) {
+      due = localToUtc(utcToLocal(due, tz).date, randomTimeIn(`${ev.id}|${date}`, ev.remind_random_from, ev.remind_random_to), tz);
+    }
     if (ms(due) >= ms(fromUtc) && ms(due) < ms(toUtc)) {
       out.push({ kind: 'reminder', event_id: ev.id, occurrence_date: date, timer_id: null, chore_run_id: null, thing_id: null, machine_id: null, due_at: due, ...blankFire() });
     }

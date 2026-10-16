@@ -2165,3 +2165,17 @@ REORG RECEIPT
   201. Day one: green, nothing in the warning band (highest 87 %).
 - **New owners:** `scripts/arch.ts`, `scripts/arch-types.ts`, `scripts/arch-audit.ts`
   (Tooling).
+
+## 2026-10-16 — Event reminder Random time window (placement-advisor)
+
+- **Ask:** An event reminder can have a Random time window (`remind_random_from` / `remind_random_to`, migration 0052);
+  the due time is a deterministic hash pick of (event id, occurrence date) inside [from, to) on the local date of
+  `start − offset`. Wire `reminder.randomFrom` / `randomTo`; UI a Random time tick with From / To (SPEC §8.4, §5.1, §4.2zy; v1.79.0).
+- **Verdict:** NEW row `src/shared/random-time.ts` (randomWindowError, randomTimeIn). EXISTING `src/shared/engine.ts`
+  (ReminderEvent + planReminderFires), `src/worker/event-rows.ts`, `src/worker/routes/events.ts` (PATCH columns),
+  `src/worker/tick.ts` (select), `frontend/src/components/ReminderFields.tsx`; `migrations/0052` + its test.
+- **Why:** the pick and the window check are rules, so shared and pure; route and form ask the same check. Rejected:
+  inlining in engine.ts (258/300 → ~273, into the band); validation only in event-rows (the form would repeat it);
+  picking in tick.ts (a rule in orchestration, tick at 130/148). Alarms and Plan it untouched (NULL columns).
+- **Caps:** engine.ts ~263/300; event-rows.ts ~155/300; random-time.ts ~25/300; ReminderFields.tsx ~90/300;
+  routes/events.ts ≤117/147; tick.ts ≤132/148. Nothing newly in the band.

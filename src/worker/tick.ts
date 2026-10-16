@@ -33,15 +33,16 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
   // 1. Materialize reminder fires for the next 36 h.
   const evs = await all<{
     id: string; start_date: string; start_time: string | null; recurrence: string | null; exdates: string; remind_offset_min: number;
-    start_sun: SunEvent | null;
+    start_sun: SunEvent | null; remind_random_from: string | null; remind_random_to: string | null;
   }>(db,
-    `SELECT id, start_date, start_time, recurrence, exdates, remind_offset_min, start_sun FROM events
+    `SELECT id, start_date, start_time, recurrence, exdates, remind_offset_min, start_sun, remind_random_from, remind_random_to FROM events
       WHERE deleted_at IS NULL AND remind_offset_min IS NOT NULL`);
   const to = addMinutes(now, MATERIALIZE_AHEAD_H * 60);
   const inserts: D1PreparedStatement[] = [];
   for (const e of evs) {
     const planned = planReminderFires({
       id: e.id, start_date: e.start_date, start_time: e.start_time, remind_offset_min: e.remind_offset_min, start_sun: e.start_sun,
+      remind_random_from: e.remind_random_from, remind_random_to: e.remind_random_to,
       recurrence: parseJson<Recurrence | null>(e.recurrence, null), exdates: parseJson<string[]>(e.exdates, []),
     }, tz, now, to, place);
     for (const f of planned) inserts.push(insertFire(db, f, true));

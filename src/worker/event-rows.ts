@@ -7,6 +7,7 @@ import { recurrenceError, type Recurrence } from '../shared/recurrence';
 import { emojiError } from '../shared/emoji';
 import { ALERT_TITLE_MAX, EVENT_ADDRESS_MAX, EVENT_BRING_ITEM_MAX, EVENT_BRING_MAX } from '../shared/alert-limits';
 import { cleanBring } from '../shared/bring';
+import { randomWindowError } from '../shared/random-time';
 import { all, parseJson } from './db';
 import { intIn, optStr, str } from './http';
 
@@ -17,6 +18,8 @@ export interface EventRow {
   start_date: string; start_time: string | null; end_date: string; end_time: string | null;
   recurrence: string | null; exdates: string; assigned_to: string;
   remind_offset_min: number | null; remind_channels: string | null; renotify_min: number | null; max_alerts: number;
+  /** §8.4 Random time window (local HH:MM), both or neither. */
+  remind_random_from: string | null; remind_random_to: string | null;
   created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
   is_alarm: number; thing_id: string | null; optional: number; emoji: string | null;
   /** §7.7 — set only by coordinator SQL; the event routes never show such a row. */
@@ -36,6 +39,7 @@ export function eventView(e: EventRow) {
       channels: parseJson<Channel[]>(e.remind_channels, []),
       renotifyMin: e.renotify_min,
       maxAlerts: e.max_alerts,
+      randomFrom: e.remind_random_from, randomTo: e.remind_random_to,
     },
     createdBy: e.created_by, updatedAt: e.updated_at, thingId: e.thing_id, optional: e.optional === 1, emoji: e.emoji,
   };
@@ -81,8 +85,8 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
     const known = new Set((await all<{ id: string }>(db, 'SELECT id FROM members WHERE disabled_at IS NULL')).map((r) => r.id));
     if (!assigned.every((x) => known.has(x))) return 'assignedTo contains an unknown member.';
   }
-  let remind: Pick<EventRow, 'remind_offset_min' | 'remind_channels' | 'renotify_min' | 'max_alerts'> =
-    { remind_offset_min: null, remind_channels: null, renotify_min: null, max_alerts: 4 };
+  let remind: Pick<EventRow, 'remind_offset_min' | 'remind_channels' | 'renotify_min' | 'max_alerts' | 'remind_random_from' | 'remind_random_to'> =
+    { remind_offset_min: null, remind_channels: null, renotify_min: null, max_alerts: 4, remind_random_from: null, remind_random_to: null };
   if (b.reminder !== null && b.reminder !== undefined) {
     const r = b.reminder as Record<string, unknown>;
     const offset = intIn(r.offsetMin, 0, 1440);
@@ -95,7 +99,12 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
     if (renotify === null && r.renotifyMin !== null && r.renotifyMin !== undefined) return 'Repeat-alert interval must be 1–240 minutes.';
     const maxAlerts = r.maxAlerts === undefined ? 4 : intIn(r.maxAlerts, 1, 20);
     if (maxAlerts === null) return 'maxAlerts must be 1–20.';
-    remind = { remind_offset_min: offset, remind_channels: JSON.stringify([...new Set(channels)]), renotify_min: renotify, max_alerts: maxAlerts };
+    const randomErr = randomWindowError(r.randomFrom, r.randomTo);
+    if (randomErr) return randomErr;
+    remind = {
+      remind_offset_min: offset, remind_channels: JSON.stringify([...new Set(channels)]), renotify_min: renotify, max_alerts: maxAlerts,
+      remind_random_from: (r.randomFrom as string | null | undefined) ?? null, remind_random_to: (r.randomTo as string | null | undefined) ?? null,
+    };
   }
   return {
     title, notes: notes ?? null, address: address?.trim() || null, bring: bring.length ? JSON.stringify(bring) : null, start_date: b.startDate, start_time: startTime, end_date: endDate as string, end_time: endTime,
@@ -115,10 +124,12 @@ export function removeFutureFires(db: D1Database, eventId: string, now: string):
 export function insertEventStatement(db: D1Database, id: string, input: EventInput, memberId: string, now: string, thingId: string | null = null): D1PreparedStatement {
   return db.prepare(
     `INSERT INTO events (id, title, notes, address, bring, start_date, start_time, end_date, end_time, recurrence, assigned_to,
-       remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at, thing_id, optional, emoji)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at, thing_id, optional, emoji,
+       remind_random_from, remind_random_to)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(id, input.title, input.notes, input.address, input.bring, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
-    input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, memberId, now, now, thingId, input.optional, input.emoji);
+    input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, memberId, now, now, thingId, input.optional, input.emoji,
+    input.remind_random_from, input.remind_random_to);
 }
 
 /** §7.5 — the ids of the events this member has turned on (their on-set). */
