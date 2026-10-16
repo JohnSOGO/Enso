@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.40 · **Date:** 2026-10-15 · **Owner:** MojoSOGO
+**Version:** 3.41 · **Date:** 2026-10-16 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -963,6 +963,17 @@ MojoSOGO 2026-10-14: "I didn't see pushup/stairs reminders today." Away on a tim
 fires already carrying it, which Rule 0 will not touch again. Data only, no schema change: [`migrations/0051_timer_away_day.sql`](migrations/0051_timer_away_day.sql).
 **Migration check (TA-M):** a scheduled timer fire loses `away_by`/`away_at`; a ringing timer fire and any other kind keep them.
 
+### 4.2zy Schema change — `migrations/0052_reminder_random_time.sql`
+
+Asked by MojoSOGO 2026-10-16: "In reminders I want an option to randomize the time reminders are sent within a time
+range" (§8.4 Random time).
+
+Schema: [`migrations/0052_reminder_random_time.sql`](migrations/0052_reminder_random_time.sql). The migration is the schema; it is not copied here.
+
+`events.remind_random_from` / `remind_random_to` — local `HH:MM`, both set (from before to) or both NULL (a plain
+reminder). Additive only; it runs before the deploy. **Migration check (RT-M):** events that exist before 0052 come
+through it with both NULL.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1036,6 +1047,12 @@ nextTimerDue(base: string, intervalMin: number, win?: TimerWindow): string
 then it is `sunsetUtc(date, place)`. An occurrence whose sunset cannot be computed (no place,
 or the sun does not set that day) is **skipped** — never planned at 09:00 or any other
 substitute time. `due = start − remind_offset_min` as for every reminder.
+
+**`planReminderFires` and Random time (§8.4):** when the event has a Random time window, the due day is still the
+local date of `start − remind_offset_min`, but the time on that day is `randomTimeIn(eventId|occurrenceDate, from,
+to)` (`src/shared/random-time.ts`): a hash of the key, so planning twice gives the same time (R12), and an edit that
+keeps the window re-plans the same time. The window wins over the start time: the alert may come after the start
+⚑ Q294. A sun-timed event (§7.7) ignores the window.
 
 `AlertConfig` = `{ channels, renotifyMin, maxAlerts, intervalMin?, window? }`, taken from
 the event or timer row (`window` only for a timer that has one).
@@ -3819,6 +3836,16 @@ Fields:
     reminder 9:00am … repeat hourly until she ACKs".)
     **RH1:** `toReminder` with Every hour → `renotifyMin` 60, `maxAlerts` 12; with Every 30 min → no `maxAlerts`;
     `reminderOf` a stored 60 → Every hour.
+  - **☐ 🎲 Random time** with **From / To** time boxes (new tick: 09:00 → 17:00 ⚑ Q293). (MojoSOGO 2026-10-16:
+    "randomize the time reminders are sent within a time range … I keep forgetting [a car repair] and time received is
+    inconvenient".) Ticked, each occurrence's reminder rings once at a time picked in [From, To) on the reminder's day
+    (§5.1), a different time each day; the repeat and channels work as before. From must be before To (no overnight
+    window ⚑ Q295); the API refuses anything else with 400 (`reminder.randomFrom` / `randomTo`, both or neither).
+    **RT1:** `randomTimeIn` stays in [from, to) and is the same for the same key; `randomWindowError` takes both or neither,
+    HH:MM, from < to. **RT2:** a daily 08:00 event with 09:00–17:00 plans one fire a day inside the window on its own date,
+    not all at one time; 1 day before / the evening before land on the day before; no window → the plain time.
+    **RT3:** POST stores and returns the window, a title-only PATCH keeps it, a reminder without it clears it, a bad one
+    → 400. **RT4:** tick plans the fire inside the window. **RT5:** the form's tick ⇄ `randomFrom` / `randomTo`.
 
 Actions:
 

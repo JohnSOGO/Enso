@@ -295,3 +295,6 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q290 | Order on an every day list (§7A.4, §8.8) | ⚑ Timed items first, earliest first, then the rest newest first; the time shows before the text, 🔔 after it when Ping owners is on |
 | Q291 | A list ping's words (§7A.4) | ⚑ Title = the list's emoji and name ("📋 Reminders"), text = the item's text |
 | Q292 | How long an hourly event reminder repeats (§8.4) | ⚑ 12 alerts (`HOURLY_MAX_ALERTS`): 9 am rings through 8 pm, then it stays in the Ringing bar silently until Done |
+| Q293 | A new Random time window (§8.4) | ⚑ 09:00 → 17:00 |
+| Q294 | A Random time later than the event's start (§5.1) | ⚑ Allowed: the window wins; the day stays the day of start − offset |
+| Q295 | An overnight Random time window (§8.4) | ⚑ Not offered: From must be before To |

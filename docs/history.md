@@ -915,6 +915,10 @@ no alert, chore, reminder or ops ping went out until MojoSOGO applied it at 19:5
 **List item routes split out** (v1.78.2, refactor, no behavior change; steward pass 26, MojoSOGO 2026-10-15 "Split"):
 the item handlers moved from `routes/lists.ts` (270 → 162 lines) to a new `routes/list-items.ts`.
 
+**Random time on a reminder** (v1.79.0, SPEC 3.41, §8.4, §5.1, migration 0052, Q293–Q295; MojoSOGO 2026-10-16: "randomize
+the time reminders are sent within a time range"): a 🎲 Random time tick with From / To; the planner picks a stable time
+in the window per occurrence by hash (`src/shared/random-time.ts`), so nothing extra is stored beyond the fire's due time.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
