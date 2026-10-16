@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.41 · **Date:** 2026-10-16 · **Owner:** MojoSOGO
+**Version:** 3.42 · **Date:** 2026-10-16 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1388,6 +1388,18 @@ item** (a PATCH whose only field is `checked`), **marking any show watched or wa
 field is `status`), adding an item to any list, the machines (§7D), answering a mess (§7B.7), and one's own
 recipe emoji, optional-event switch, speakers and phone. A member who can't change an entry sees it read-only:
 its form shows "Only the creator or an admin can change this …" and no Save, Delete, photo or Plan it buttons.
+
+**Who opens an event** (v1.80.0, MojoSOGO 2026-10-16: "when the three adults are going out, the kids should not be
+able to open the event and look at the details … only people that are invited to the event can open and look at the
+details"). Everyone still sees an event's **summary** in `/calendar` and the day sheet (title, time, emoji, who's
+going, 🔔 / 🔁). Its **details** (`GET /events/{id}`: notes, address, things to bring, reminder) open only for: anyone
+when **nobody is assigned** (everyone's event), the members **assigned**, its **creator**, and **admins** (⚑ Q296:
+admins may already change any event). The rule is `canOpenEvent` (`shared/event-access.ts`); anyone else gets 403
+`forbidden`, "Only the people going can open this event." Whoever may change an event may open it. Optional-event
+switches (§7.5) are unchanged. **Acceptance** (`test/event-access.test.ts`, `test/event-access-api.test.ts`): EO1 nobody
+assigned, assigned, creator or admin → may open; EO2 anyone else → may not; EO3 canChange ⇒ canOpenEvent; EO4 a member
+not going → 403 on `GET /events/{id}`, the event still in their `/calendar` with title, time and assignees; EO5 the
+assignee, the creator and an admin → 200; EO6 nobody assigned → 200 for any member.
 
 **Rules for changing people** (`PATCH /members/{id}`, owner only):
 - **The founder is protected:** their role cannot be changed and they cannot be disabled.
@@ -3798,7 +3810,8 @@ event is assigned to **every active member** of a household of two or more, the 
 FA1 duplicates shown once; FA2 every active member → Family (a disabled member is not needed); FA3 some
 members → not Family; FA4 a one-person household, or nobody assigned, is never Family; FA5 the founder, when assigned, is first.
 
-Tapping an event opens the event form. **＋ Add event** at the bottom pre-fills
+Tapping an event opens the event form. A row the member may not open (§6.3 "Who opens an event") looks the same
+with a 🔒 after the title and does nothing when tapped (⚑ Q297). **＋ Add event** at the bottom pre-fills
 the date.
 
 ### 8.4 Event form (modal)
@@ -5537,7 +5550,7 @@ other push stays until I hide it ⚑ Q284.
 | POST | `/events` | member | event fields → event |
 | POST | `/events/read-photo` | member | raw image body → `{ title, startDate, endDate, startTime, endTime, location, notes }` (each nullable); 503 / 502 / 422 / 429 per §7.8 |
 | POST | `/events/read-text` | member | `{ text }` → the same reading as read-photo; 400 / 503 / 502 / 422 / 429 per §7.9 |
-| GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6). A sun-timed event (§7.7) is 404 here and on `/exdates` |
+| GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes; GET only for who may open it, else 403 (§6.3) (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6). A sun-timed event (§7.7) is 404 here and on `/exdates` |
 | POST | `/events/{id}/exdates` | creator or owner | `{ date }` |
 | GET/POST | `/timers` | member | → `Timer[]` / POST `{ title, intervalMin, channels, renotifyMin?, maxAlerts?, assignedTo?, activeFrom?, activeTo?, announceStart? }` → timer (201). `Timer = { id, title, intervalMin, channels, renotifyMin, maxAlerts, assignedTo, running, createdBy, activeFrom, activeTo, announceStart, openFire }`; `announceStart` (default false) needs a window, else 400 (§5.5a); `activeFrom`/`activeTo` are `"HH:MM"` or both `null` (no window). 400 `invalid_input` when only one is set, either is not `HH:MM`, or `timerWindowError` refuses them (§5.1) |
 | PATCH/DELETE | `/timers/{id}` | creator or owner | PATCH: the POST fields, all optional, merged over the timer; `activeFrom: null, activeTo: null` clears the window. A PATCH never re-plans the open fire (rule 0 defers it when it comes due) |

@@ -298,3 +298,5 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q293 | A new Random time window (§8.4) | ⚑ 09:00 → 17:00 |
 | Q294 | A Random time later than the event's start (§5.1) | ⚑ Allowed: the window wins; the day stays the day of start − offset |
 | Q295 | An overnight Random time window (§8.4) | ⚑ Not offered: From must be before To |
+| Q296 | Whether an admin not going may open an event (§6.3) | ⚑ Yes: admins may already change any event; the creator too |
+| Q297 | A day-sheet row someone may not open (§8.3) | ⚑ Same row with a 🔒 after the title; tapping does nothing |

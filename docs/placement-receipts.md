@@ -2179,3 +2179,18 @@ REORG RECEIPT
   picking in tick.ts (a rule in orchestration, tick at 130/148). Alarms and Plan it untouched (NULL columns).
 - **Caps:** engine.ts ~263/300; event-rows.ts ~155/300; random-time.ts ~25/300; ReminderFields.tsx ~90/300;
   routes/events.ts ≤117/147; tick.ts ≤132/148. Nothing newly in the band.
+
+## 2026-10-16 — Only an event's people open its details (placement-advisor)
+
+- **Ask:** MojoSOGO: someone not on an event sees only its name and who's going; only the people on it open the details.
+  Rule: nobody assigned, assigned, the creator, or an admin. GET /events/{id} refuses everyone else with 403; the day-sheet
+  row is not tappable for them and shows 🔒; /calendar summary unchanged (v1.80.0, SPEC §6.3, §8.3, §10).
+- **Verdict:** NEW `src/shared/event-access.ts` (canOpenEvent + cannotOpenText; pure, imports nothing). EXISTING
+  `src/worker/routes/events.ts` (GET guard), `frontend/src/components/DaySheet.tsx` (locked row), `Lists.module.css` (`.locked`).
+  No new wire field.
+- **Why:** a rule both Worker and PWA need → shared, one copy; no `canOpen` on /calendar since occurrences already carry
+  assignedTo and createdBy (§0.5). Rejected roles.ts (its header keeps feature rules out), optins.ts (whether an event
+  exists, not its details), participants.ts (frontend-only). Takes `admin: isAdmin(m)` like the roles doctrine; canChange ⇒
+  canOpenEvent pinned by a pure test. DaySheet is the only PWA opener of an event.
+- **Caps:** routes/events.ts 118 → 121/147 (band 133 not entered); DaySheet.tsx 61 → 66/300; event-access.ts ~11/300.
+  No CEILINGS change.
