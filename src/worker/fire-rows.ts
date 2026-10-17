@@ -1,11 +1,12 @@
-// SPEC §5.6, §7B.3 — the fire and chore-run rows, shared by tick and the routes. No Hono; never steps or delivers.
-import { newChoreFire, timerWindow, type AlertConfig, type ChoreAlertText, type FireRow, type NewFire } from '../shared/engine';
+// SPEC §5.6, §7B.3 — the fire, reminder-planning and chore-run rows, shared by tick and the routes. No Hono; never steps or delivers.
+import { newChoreFire, planReminderFires, timerWindow, type AlertConfig, type ChoreAlertText, type FireRow, type NewFire } from '../shared/engine';
 import { DEFAULT_MAX_ALERTS, choreFireContext, choreFromRow, planChoreRuns, type Chore, type ChoreRow, type ChoreRun } from '../shared/chores';
 import { isStartReminder, type ThingRow } from '../shared/things';
 import { doneMessage, isMachineId, isStillLoaded, machineAlert, waitingLoad, type MachineRow } from '../shared/machines';
 import { machineHoursOf, machineQuietUntil } from '../shared/machine-hours';
 import { cookAlert, cookMessage, isCookId, type CookRow } from '../shared/cooking';
 import type { Channel, SunEvent } from '../shared/vocab';
+import type { Recurrence } from '../shared/recurrence';
 import { utcToLocal } from '../shared/time';
 import { sunsetUtc, type Place } from '../shared/sun';
 import { FOUNDER_SQL, all, first, newId, parseJson, placeOf } from './db';
@@ -36,6 +37,28 @@ export function updateFire(db: D1Database, f: FireRow): D1PreparedStatement {
     `UPDATE fires SET due_at = ?, state = ?, alert_count = ?, last_alerted_at = ?, close_reason = ?, closed_by = ?, closed_at = ?
       WHERE id = ?`,
   ).bind(f.due_at, f.state, f.alert_count, f.last_alerted_at, f.close_reason, f.closed_by, f.closed_at, f.id);
+}
+
+interface ReminderEventRow {
+  id: string; start_date: string; start_time: string | null; recurrence: string | null; exdates: string; remind_offset_min: number;
+  start_sun: SunEvent | null; remind_random_from: string | null; remind_random_to: string | null;
+}
+
+/** §5.6 tick step 1: an INSERT OR IGNORE for each reminder fire of every live reminding event due by `toUtc`. */
+export async function reminderInserts(db: D1Database, tz: string, now: string, toUtc: string, place: Place | null): Promise<D1PreparedStatement[]> {
+  const evs = await all<ReminderEventRow>(db,
+    `SELECT id, start_date, start_time, recurrence, exdates, remind_offset_min, start_sun, remind_random_from, remind_random_to FROM events
+      WHERE deleted_at IS NULL AND remind_offset_min IS NOT NULL`);
+  const stmts: D1PreparedStatement[] = [];
+  for (const e of evs) {
+    const planned = planReminderFires({
+      id: e.id, start_date: e.start_date, start_time: e.start_time, remind_offset_min: e.remind_offset_min, start_sun: e.start_sun,
+      remind_random_from: e.remind_random_from, remind_random_to: e.remind_random_to,
+      recurrence: parseJson<Recurrence | null>(e.recurrence, null), exdates: parseJson<string[]>(e.exdates, []),
+    }, tz, now, toUtc, place);
+    for (const f of planned) stmts.push(insertFire(db, f, true));
+  }
+  return stmts;
 }
 
 /** A chore run with its (parsed) chore, or null when either is gone. */

@@ -7,6 +7,19 @@ carry its result.
 
 ---
 
+## 2026-10-16 — tick step 1 reminder planning (reorganizer)
+
+- **Trigger:** steward pass 28 item 1, MojoSOGO 2026-10-16 "SPLIT": tick.ts 131/148, two lines from the band (133).
+- **Seam moved:** step 1 (the reminding-event SELECT, its row type and the planReminderFires mapping) from
+  `src/worker/tick.ts` to a new `reminderInserts` in `src/worker/fire-rows.ts` [EXISTING], beside choreRunInserts.
+- **Room opened:** tick.ts: 131 → 115 lines; cap 148 → 148 (115 + WORKING_BUFFER is above the old cap, so the pin
+  stays; never raised). fire-rows.ts 165 → 188/300, no pin.
+- **Behavior:** preserved — typecheck, npm test and arch:audit green; same SELECT text, same mapping, same
+  INSERT OR IGNORE statements in the same order (reminders, then chore runs, then things) in one batch.
+- **Restraint:** only step 1; 1b and 1c already delegate their row work and stay as one-line calls in tick.
+
+---
+
 ## 2026-10-16 — Steward pass 28, since pass 27 (code-steward)
 
 - **Run:** post-release, v1.80.0 (event-access.ts canOpenEvent, GET /events/:id 403 guard, DaySheet locked row).
