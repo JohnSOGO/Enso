@@ -924,6 +924,10 @@ that are invited to the event can open and look at the details"): `GET /events/{
 assigned, not the creator and not an admin (unless nobody is assigned); the day sheet shows their row with 🔒 and it
 doesn't open. Rule in `src/shared/event-access.ts`. No migration.
 
+**Tick reminder planning split out** (v1.80.1, refactor, no behavior change; steward pass 28, MojoSOGO 2026-10-16 "SPLIT"):
+tick step 1 (the reminding-event SELECT and its planReminderFires mapping) moved from `tick.ts` (131 → 115 lines) to
+`reminderInserts` in `fire-rows.ts`.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
