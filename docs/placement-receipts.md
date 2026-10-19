@@ -2680,3 +2680,12 @@ REORG RECEIPT
 - **Why:** One distinct pure concern, so a focused leaf beats widening holidays.ts or weather.ts. The route fetches the tz and returns the data, and the PWA only draws it, which keeps the rule in shared. Rejected homes: holidays.ts (a different concern with a rules table), a frontend-side computation (the PWA would re-derive what the server returns), and a new route (it is part of the /calendar payload).
 - **Caps:** events.ts about 124/147 (under the warning band); Calendar.tsx 198/300; DayCell.tsx 102/300; DaySheet.tsx 66/300; moon.ts 60/300. No CEILINGS change.
 - **Sources read:** .claude/agents/placement-advisor.md, scripts/arch.ts, arch:audit output, docs/module-ownership.md, SPEC.md §7.2 and §7.12, events.ts, DayCell.tsx.
+
+## 2026-10-19 — /fires hides reminders not assigned to me: isForMe in optins.ts (placement-advisor)
+
+- **Ask:** v1.92.1 patch, SPEC §8.2 Ringing bar: GET /fires also hides a reminder fire from a member outside its audience (event assigned_to is non-empty and doesn't include them), using the same "for me" rule as audience() (§5.7, §7.5).
+- **Verdict:** `src/shared/optins.ts` (new pure `isForMe`, also used by audience's narrowing) + `src/worker/routes/alerts.ts` (fireViews selects e.assigned_to, filters with isForMe) [EXISTING]
+- **Flow stage:** rules (optins.ts) + route (alerts.ts applies it at read time)
+- **Why:** optins.ts already owns "who an event/fire is for" (isOnFor + audience with its assigned-or-everyone narrowing). One predicate shared by push recipients and the Ringing bar keeps them from drifting. Inline in alerts.ts was rejected (restates the rule in a route); a new module was rejected (same concern). audience() keeps its push order and house/funhouse results; isOnFor stays for /calendar; assignedTo does not leak into the /fires shape; Away (hideOff=false) unaffected; `?state=open` narrows too. RingingBar.tsx needs no change.
+- **Caps:** optins.ts about 33/300; alerts.ts 228/300 (no ceiling). No file newly in the warning band.
+- **Sources read:** src/shared/optins.ts, src/worker/routes/alerts.ts, scripts/arch.ts, docs/module-ownership.md, SPEC.md §8.2, isOnFor/audience usages, test/optional-events.test.ts, RingingBar.tsx.

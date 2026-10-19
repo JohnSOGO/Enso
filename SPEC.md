@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.62 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.63 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4145,7 +4145,10 @@ only the grey backdrop):
 
 ### 8.2 Ringing bar
 
-A stack at the top of every screen, one row per `ringing` fire, newest first:
+A stack at the top of every screen, one row per `ringing` fire **that is for me**, newest first. A reminder is for me
+when its event is assigned to nobody (everyone's) or assigned to me, and is on for me (§7.5): the same people its
+pushes go to (§5.7). Someone else's reminder rings only in their bar, not mine ⚑ Q346. A task check-in is its owner's
+alone (below); every other row (timer, chore, thing, machine, cooking) is everyone's.
 
 - Reminder row: `🔔 Take out trash · 19:00` with **[Snooze 10m] [Done]** (an all-day event:
   `· all day`; a sun-timed one, §7.7: `🔔 Put the goats away · sunset` ⚑ Q56)
@@ -4163,6 +4166,13 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
   the row stays. An away row shows `· away ({name})` instead of the button.
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
   "3 more ringing ▾".
+
+**Acceptance (API tests, `test/alerts-api.test.ts`):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| RB1 | a reminder assigned to A and B rings; `GET /fires` as A, as B, as C (an admin) | A and B get the row; C does not |
+| RB2 | a reminder assigned to nobody rings; `GET /fires` as C | C gets the row |
 
 ### 8.3 Day sheet
 

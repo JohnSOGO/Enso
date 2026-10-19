@@ -1045,3 +1045,5 @@ sheet posts a link, text or photo to `POST /share` with my own key; Ensō saves 
 Built as specified. Owed: his TRY on the iPhone (make the Shortcut; share a Safari link, a Notes text, a photo).
 
 **🌕 Moon phases** (v1.92.0, SPEC 3.62, §7.12, §7.2, Q345; a household member's feature request 2026-10-19 "Show the phases of the moon on the calendar"): the four principal phases (🌑🌓🌕🌗) are computed in `src/shared/moon.ts`, returned by `/calendar` as `moonPhases` and drawn as a day icon after the holiday and 📈, and as a line in the day sheet. Built as specified; built by the daily feature-request session. Owed: his TRY (look at the days around the 25th).
+
+**🔔 Only my reminders ring in my bar** (v1.92.1, SPEC 3.63, §8.2, Q346; MojoSOGO 2026-10-19, a "Talk to principal" reminder for Tostig and Shelly rang in his bar): `GET /fires` drops a reminder fire whose event is assigned to others, with the same rule as its pushes (`isForMe` in `src/shared/optins.ts`). Built as specified.

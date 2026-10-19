@@ -7,6 +7,11 @@ export function isOnFor(event: { optional: boolean | number }, memberId: string,
   return !event.optional || onIds.includes(memberId);
 }
 
+/** §8.2 — whether a reminder is for this member: assigned to nobody (everyone's) or to them, and on for them. */
+export function isForMe(event: { optional: boolean | number; assignedTo: readonly string[] }, memberId: string, onIds: readonly string[]): boolean {
+  return (event.assignedTo.length === 0 || event.assignedTo.includes(memberId)) && isOnFor(event, memberId, onIds);
+}
+
 export interface AudienceInput {
   optional: boolean | number;
   assignedTo: readonly string[];
@@ -21,8 +26,7 @@ export interface AudienceInput {
  * House channel speaks / the FunHouse gets it (§9.4b) — for an optional event only when that audience is not empty.
  */
 export function audience(a: AudienceInput): { push: string[]; house: boolean; funhouse: boolean } {
-  const forWhom = a.assignedTo.length === 0 ? a.activeIds : a.assignedTo.filter((id) => a.activeIds.includes(id));
-  const push = forWhom.filter((id) => isOnFor(a, id, a.onIds));
+  const push = (a.assignedTo.length === 0 ? a.activeIds : a.assignedTo).filter((id) => a.activeIds.includes(id) && isForMe(a, id, a.onIds));
   const anyone = !a.optional || push.length > 0;
   return { push, house: a.channels.includes('house') && anyone, funhouse: a.channels.includes('funhouse') && anyone };
 }
