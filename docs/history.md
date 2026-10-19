@@ -936,6 +936,10 @@ Enso; Finish holds up the done list, with an optional Claude photo check; summar
 Focus Sprint, history answers, voice answers. Deviation: phone first (§9.2d) applies, so the speakers hear a check-in
 only from its nudge (alert 2). Owed: MojoSOGO's TRY on the iPhone.
 
+**💪 Running mark** (v1.82.0, SPEC 3.44, §8.1 / §8.5a, Q309; MojoSOGO 2026-10-19 "I need an icon on task buddy if it
+is running so i know"): `/status` carries `myTask`; the ⏰ Alarms tab shows a small 💪 and the Task buddy button
+shows 🟢 Working / ☕ On a break / ⏸ Paused. Built as specified. Owed: his look on the iPhone.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

@@ -95,8 +95,9 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
       )}
       <nav className={s.tabs} aria-label="Sections">
         {NAV.map(([id, icon, label]) => (
-          <button key={id} className={tab === id ? s.active : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => { setTab(id); if (id === 'lists') setListsTap((n) => n + 1); }}>
-            <span aria-hidden className={s.icon}>{icon}</span>{label}
+          <button key={id} className={tab === id ? s.active : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => { setTab(id); if (id === 'lists') setListsTap((n) => n + 1); }}
+            title={id === 'alarms' && status?.myTask ? `${label}, task running` : undefined}>
+            <span aria-hidden className={s.icon}>{icon}{id === 'alarms' && status?.myTask && <span className={s.taskMark}>💪</span>}</span>{label}
           </button>
         ))}
         <span className={s.build} aria-hidden>{__ENSO_BUILD__}</span>

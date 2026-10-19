@@ -1,5 +1,6 @@
 // SPEC §8.5 — Alarms tab: 📢 Announce (§9.3), 🤫 Quiet the house (§9.2b), then a menu of five sections (Alarms: days of
-// week + time, Rolling timers, Washing machines, Cooking machines, 💪 Task buddy), the tapped one in a Modal. Holds which section is open.
+// week + time, Rolling timers, Washing machines, Cooking machines, 💪 Task buddy with my task's state, Q309), the tapped one in a
+// Modal. Holds which section is open.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Modal } from './Modal';
 import { PickGrid } from './PickGrid';
@@ -152,9 +153,14 @@ const SECTIONS: readonly { value: Section; emoji: string; label: string }[] = [
   { value: 'washing', emoji: '🧺', label: 'Washing machines' }, { value: 'cooking', emoji: '🍳', label: 'Cooking machines' },
   { value: 'tasks', emoji: '💪', label: 'Task buddy' }, // §7G ⚑ Q306
 ];
+/** §8.5a ⚑ Q309 — the Task buddy button's note while my task runs. */
+const TASK_NOTE = { working: '🟢 Working', break: '☕ On a break', paused: '⏸ Paused' } as const;
 
 export function Alarms({ onEditAlarm, onEditTimer }: { onEditAlarm: (a: Alarm | null) => void; onEditTimer: (t: Timer | null) => void }) {
+  const { status } = useApp();
   const [open, setOpen] = useState<Section | null>(null);
+  const myTask = status?.myTask;
+  const entries = SECTIONS.map((x) => (x.value === 'tasks' && myTask ? { ...x, note: TASK_NOTE[myTask.state] } : x));
   const shown = SECTIONS.find((x) => x.value === open);
   const body: Record<Section, () => ReactNode> = {
     alarms: () => <ScheduledSection onEdit={onEditAlarm} />,
@@ -168,7 +174,7 @@ export function Alarms({ onEditAlarm, onEditTimer }: { onEditAlarm: (a: Alarm | 
       <h1 style={{ fontSize: '1.15rem', marginBottom: 12 }}>Alarms</h1>
       <Announce />
       <HouseQuiet />
-      <PickGrid entries={SECTIONS} onPick={(v) => setOpen(v as Section)} />
+      <PickGrid entries={entries} onPick={(v) => setOpen(v as Section)} />
       {shown && <Modal title={`${shown.emoji} ${shown.label}`} onClose={() => setOpen(null)}>{body[shown.value]()}</Modal>}
     </div>
   );

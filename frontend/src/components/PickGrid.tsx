@@ -3,15 +3,15 @@
 import type { ReactNode } from 'react';
 import s from './PickGrid.module.css';
 
-/** One button: its value, emoji, label and optional count. */
-export interface PickEntry { value: string; emoji: string; label: string; count?: number | null }
+/** One button: its value, emoji, label, optional count and optional note (a short line under the name). */
+export interface PickEntry { value: string; emoji: string; label: string; count?: number | null; note?: string | null }
 
 /** The emoji / name / count of one entry; also the face of the Lists button. */
-export function PickFace({ emoji, label, count }: Omit<PickEntry, 'value'>) {
+export function PickFace({ emoji, label, count, note }: Omit<PickEntry, 'value'>) {
   return (
     <>
       <span aria-hidden className={s.pickEmoji}>{emoji}</span>
-      <span className={s.pickName}>{label}</span>
+      <span className={s.pickName}>{label}{note && <span className={s.pickNote}>{note}</span>}</span>
       {count != null && <span className={`muted ${s.pickCount}`}>{count}</span>}
     </>
   );
