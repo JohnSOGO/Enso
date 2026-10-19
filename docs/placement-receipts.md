@@ -7,6 +7,34 @@ carry its result.
 
 ---
 
+## 2026-10-19 — mic ask at opening without a tap; buttons only when no popup (placement-advisor)
+
+- **Ask:** Patch v1.92.2 (SPEC §8.10 Voice first, ⚑ Q342; MojoSOGO 2026-10-19 "I have to double tap approve for
+  microphone… just ask at open with system popup"). The opening screen calls getUserMedia by itself so the phone's own
+  popup shows. useMicAsk.ask() returns 'needs-tap' when refused faster than NO_POPUP_MS (400 ms, no popup shown), and
+  only then does Splash show 🎤 Allow microphone / Deny.
+- **Verdict:** frontend/src/components/useSpeech.ts (useMicAsk) + frontend/src/components/Splash.tsx [EXISTING]
+- **Flow stage:** render
+- **Why:** useMicAsk already owns whether the mic is allowed and the ask; telling "popup shown" from "refused without
+  one" is the same question. Splash owns what the opening screen shows. Separate mic module rejected, as in v1.92.1.
+  Known edge: a fast failure (no mediaDevices, or a fast refusal on the tap path) is never recorded as 'denied', so
+  the header badge stays; acceptable. Knock-on: §8.10 paragraph and the Splash / useSpeech ownership rows rewritten.
+- **Caps:** useSpeech.ts 148/300, Splash.tsx 49/300. No file newly in the band.
+- **Sources read:** useSpeech.ts, Splash.tsx, scripts/arch.ts, docs/module-ownership.md, this file (head), SPEC §8.10.
+
+## 2026-10-19 — Day cell weather and moon to bottom-right (placement-advisor)
+
+- **Ask:** Move the day cell's forecast group (`.wx`) to bottom-right at every width, and the moon phase out of the
+  day-icon slot into that group after the weather emoji (alone there with no forecast), freeing both day icons for
+  holiday, 📈 and unassigned event emoji. Patch v1.92.2, SPEC §7.2, §7.11, §7.12, ⚑ Q346.
+- **Verdict:** frontend/src/components/DayCell.tsx + DayCell.module.css [EXISTING]
+- **Flow stage:** render
+- **Why:** The DayCell row already owns the day icons, the weather and the moon drawing; this is layout inside one
+  concern. moonPhases and weather still arrive prepared from /calendar; rules, routes and DaySheet unchanged. Knock-on:
+  the DayCell row in module-ownership.md stops calling the moon a day icon.
+- **Caps:** DayCell.tsx ~103/300, DayCell.module.css 59. No file newly in the band.
+- **Sources read:** docs/module-ownership.md (DayCell, moon.ts rows), scripts/arch.ts, DayCell.tsx, DayCell.module.css
+
 ## 2026-10-19 — mic ask trusts the flag only without a permissions query; splash labels (placement-advisor)
 
 - **Ask:** Patch v1.92.1 (SPEC §8.10 Voice first, §8.1 badge, ⚑ Q342). The iOS home-screen app forgets the mic, so

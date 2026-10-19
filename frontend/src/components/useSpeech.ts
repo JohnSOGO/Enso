@@ -102,13 +102,16 @@ export function unlockSpeech() {
 }
 
 const VOICE_ON = 'enso.voiceOn';
+/** A refusal faster than this came without a popup (no one can read and answer one this fast). */
+const NO_POPUP_MS = 400;
 const voiceOn = () => { try { return localStorage.getItem(VOICE_ON) === '1'; } catch { return false; } };
 
 /**
  * ⚑ Q342 — the mic ask: `show` while the phone can listen but the mic isn't allowed (the browser's permission says
  * 'prompt', which an iPhone home-screen app can say again each opening; or, with no permissions query, voice never
- * turned on here); `refused` once denied; `checked` once the phone has said which. ask() asks on the tap (iOS needs
- * one). One per app: App passes it to the opening screen and the header.
+ * turned on here); `refused` once denied; `checked` once the phone has said which. ask() shows the phone's own popup
+ * (at opening by itself; on a tap where the phone needs one). One per app: App passes it to the opening screen and the
+ * header.
  */
 export function useMicAsk() {
   const [state, setState] = useState<PermissionState | 'unknown'>(() =>
@@ -125,13 +128,20 @@ export function useMicAsk() {
       .finally(() => { if (live) setChecked(true); });
     return () => { live = false; status?.removeEventListener('change', update); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const ask = useCallback(async () => {
+  // Resolves 'answered' once the phone has answered, or 'needs-tap' when it refused at once without asking (a phone that
+  // shows its popup only after a tap); a person's "Don't Allow" takes longer than NO_POPUP_MS to arrive.
+  const ask = useCallback(async (): Promise<'answered' | 'needs-tap'> => {
+    const started = performance.now();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((t) => t.stop());
       try { localStorage.setItem(VOICE_ON, '1'); } catch { /* storage may be blocked */ }
       setState('granted');
-    } catch { setState('denied'); }
+    } catch {
+      if (performance.now() - started < NO_POPUP_MS) return 'needs-tap';
+      setState('denied');
+    }
+    return 'answered';
   }, []);
   return { show: state !== 'granted', refused: state === 'denied', checked, ask };
 }
