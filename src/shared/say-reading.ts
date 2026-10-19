@@ -5,6 +5,7 @@
 import { WEEKDAY, isOneOf, type FeatureRequestSize, type Weekday } from './vocab';
 import { ALERT_TITLE_MAX } from './alert-limits';
 import { reminderTimeError, windowDays, windowError, type ReminderWindow } from './reminders';
+import { isDate, isTime } from './time';
 import { FEATURE_SUMMARY_MAX, FEATURE_TITLE_MAX } from './feature-requests';
 
 export const SAY_TEXT_MAX = 1000;
@@ -14,9 +15,13 @@ const WHERE_MAX = 80;
 /** What the reminder form starts from (§8.5b / §8.5c); a missing date + time leaves the form's own. */
 export interface SayReminder { title: string; assignedTo: string[]; date: string | null; time: string | null; window: ReminderWindow | null }
 
+/** What the new-event form starts from (§8.4, ⚑ Q341); `time` null = all day. */
+export interface SayEvent { title: string; date: string; time: string | null; assignedTo: string[] }
+
 /** POST /say (§10). `heard` = the cleaned-up words; `say` = the sentence shown and spoken. */
 export type SayReading = { heard: string; say: string } & (
   | { kind: 'reminder'; reminder: SayReminder }
+  | { kind: 'event'; event: SayEvent }
   | { kind: 'exists'; where: string }
   | { kind: 'request'; request: FeatureAsk }
   | { kind: 'outside'; where: string | null; request: FeatureAsk } // §1.3: logged as Out of scope on leaving
@@ -64,6 +69,15 @@ export function cleanSayReading(raw: Record<string, unknown>, o: { tz: string; n
     if (raw.kind === 'request') return { kind: 'request', heard, say: requestSay(size), request };
     const where = str(raw.where, WHERE_MAX) || null;
     return { kind: 'outside', heard, say: outsideSay(where), where, request };
+  }
+  if (raw.kind === 'event') {
+    const e = (raw.event && typeof raw.event === 'object' ? raw.event : {}) as Record<string, unknown>;
+    const title = str(e.title, ALERT_TITLE_MAX);
+    if (!title || !isDate(e.date)) return null; // no real date: not read
+    return {
+      kind: 'event', heard, say: say || `I'll add ${title} to the calendar.`,
+      event: { title, date: e.date, time: isTime(e.time) ? e.time : null, assignedTo: whoOf(e.who, o.meId, o.members) },
+    };
   }
   if (raw.kind !== 'reminder' || !raw.reminder || typeof raw.reminder !== 'object') return null;
   const r = raw.reminder as Record<string, unknown>;

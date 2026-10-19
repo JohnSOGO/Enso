@@ -7,12 +7,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from './Modal';
 import { ReminderForm } from './Reminders';
+import { EventForm } from './EventForm';
 import { FeatureRequests } from './FeatureRequests';
 import { useApp } from '../state';
 import { isAdmin } from '../../../src/shared/roles';
 import { speak, stopSpeaking, unlockSpeech, useListen } from './useSpeech';
 import { errorText, post } from '../api';
-import { SAY_TEXT_MAX, clarified, type SayReading, type SayReminder } from '../../../src/shared/say-reading';
+import { SAY_TEXT_MAX, clarified, type SayEvent, type SayReading, type SayReminder } from '../../../src/shared/say-reading';
 import s from './EnsoButton.module.css';
 
 type Phase = 'closed' | 'listen' | 'reading' | 'answer' | 'saved';
@@ -20,6 +21,7 @@ const SAVED = 'Saved. Thanks!';
 const QUIET_MS = 8000; // nothing heard this long → the keyboard-🎤 hint (⚑ Q338)
 const HOLD_MS = 500; // ⚑ Q340 — held at least this long, letting go sends
 const LAST_WORDS_MS = 400; // after letting go, the phone's last words still arrive
+const HOLDING = s.holding; // on <html> while the mark is held: nothing on screen is selected (⚑ Q340)
 
 export function EnsoButton() {
   const listen = useListen();
@@ -35,6 +37,7 @@ export function EnsoButton() {
   const [before, setBefore] = useState<string | null>(null); // Clarify: what was said before
   const [reading, setReading] = useState<SayReading | null>(null);
   const [form, setForm] = useState<SayReminder | null>(null);
+  const [eventForm, setEventForm] = useState<SayEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const words = typed;
@@ -62,16 +65,20 @@ export function EnsoButton() {
   function press(e: React.PointerEvent<HTMLButtonElement>) {
     e.currentTarget.setPointerCapture(e.pointerId);
     pressed.current = Date.now();
+    document.documentElement.classList.add(HOLDING);
     open();
   }
   function letGo(cancelled: boolean) {
     const at = pressed.current;
     pressed.current = null;
+    document.documentElement.classList.remove(HOLDING);
+    window.getSelection()?.removeAllRanges();
     if (at === null || cancelled || Date.now() - at < HOLD_MS) return; // a tap: stays open and listening
     unlockSpeech(); // in the gesture, so the answer can be spoken
     listen.stop();
     setTimeout(() => release.current(), LAST_WORDS_MS);
   }
+  useEffect(() => () => document.documentElement.classList.remove(HOLDING), []);
   const logged = useRef(false); // an outside answer is logged once
   function close() {
     listen.stop(); stopSpeaking(); setPhase('closed');
@@ -98,7 +105,8 @@ export function EnsoButton() {
     if (!reading) return;
     stopSpeaking();
     if (reading.kind === 'reminder') { setForm(reading.reminder); setPhase('closed'); return; }
-    if (reading.kind === 'exists') { close(); return; }
+    if (reading.kind === 'event') { setEventForm(reading.event); setPhase('closed'); return; }
+    if (reading.kind !== 'request') { close(); return; }
     try {
       await post('/feature-requests', { text: reading.heard, ...reading.request });
       setPhase('saved'); speak(SAVED);
@@ -137,6 +145,7 @@ export function EnsoButton() {
       )}
       {requests && <Modal title="💡 Requests" onClose={() => setRequests(false)}><FeatureRequests /></Modal>}
       {form && <ReminderForm reminder={null} start={form} onClose={() => setForm(null)} />}
+      {eventForm && <EventForm date={eventForm.date} start={eventForm} onClose={() => setEventForm(null)} />}
     </>
   );
 

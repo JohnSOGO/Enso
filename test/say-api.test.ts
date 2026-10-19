@@ -1,4 +1,4 @@
-// SPEC §8.18 SY1–SY8 — the Ensō button: POST /say reads what was said (Claude is a fake api.anthropic.com behind a
+// SPEC §8.18 SY1–SY10 — the Ensō button: POST /say reads what was said (Claude is a fake api.anthropic.com behind a
 // fetch spy that refuses every other host; the key is fake), feature requests, and the build session's queue.
 import { SELF, createExecutionContext, env } from 'cloudflare:test';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -34,7 +34,7 @@ async function say(e: Env, answer: object | null, text: unknown = 'weekdays 8 to
   }), e, createExecutionContext());
   return { status: res.status, json: await res.json<any>(), heard };
 }
-const none = { reminder: null, where: null, title: null, summary: null, size: null };
+const none = { reminder: null, event: null, where: null, title: null, summary: null, size: null };
 const reads = async () => (await env.DB.prepare('SELECT COUNT(*) AS n FROM photo_reads').first<{ n: number }>())!.n;
 const requests = async () => (await env.DB.prepare('SELECT COUNT(*) AS n FROM feature_requests').first<{ n: number }>())!.n;
 
@@ -73,6 +73,29 @@ describe('§8.18 POST /say', () => {
     expect(bare.json).toMatchObject({ kind: 'outside', where: null, say: outsideSay(null), request: { size: 'big' } });
     expect(JSON.stringify(r.heard[0])).toContain('banking');
     expect(await requests()).toBe(before);
+  });
+
+  it('SY9 an event → the form start (date, time or all day, who); a bad date is not read; nothing saved', async () => {
+    const m = await member(o);
+    await env.DB.prepare(`UPDATE members SET display_name = 'Shelly' WHERE id = ?`).bind(m.id).run();
+    const before = await requests();
+    const r = await say(keyedEnv(), { ...none, heard: 'Schedule a dinner on the 23rd for me and Shelly at 8 PM.', kind: 'event', say: "I'll add dinner.",
+      event: { title: 'Dinner', date: '2026-10-23', time: '20:00', who: ['me', 'Shelly'] } });
+    expect(r.json).toEqual({ kind: 'event', heard: 'Schedule a dinner on the 23rd for me and Shelly at 8 PM.', say: "I'll add dinner.",
+      event: { title: 'Dinner', date: '2026-10-23', time: '20:00', assignedTo: [A, m.id] } });
+    const allDay = await say(keyedEnv(), { ...none, heard: 'h', kind: 'event', say: 's', event: { title: 'Fair', date: '2026-10-24', time: '8pm', who: [] } });
+    expect(allDay.json.event).toEqual({ title: 'Fair', date: '2026-10-24', time: null, assignedTo: [A] });
+    expect((await say(keyedEnv(), { ...none, heard: 'h', kind: 'event', say: 's', event: { title: 'X', date: '2026-02-30', time: null, who: [] } })).status).toBe(502);
+    expect(await requests()).toBe(before);
+    expect(JSON.stringify(r.heard[0])).toContain('nickname');
+  });
+
+  it('SY10 "after work" / "after school" is the speaker\'s own After', async () => {
+    const reminder = { ...none, heard: 'h', kind: 'reminder', say: 's', reminder: { title: 'x', date: null, time: null, days: [], from: null, to: null, who: [] } };
+    expect(JSON.stringify((await say(keyedEnv(), reminder)).heard[0])).toContain('\\"after work\\" is 17:30');
+    expect((await o.patch('/me', { afterKind: 'school', afterTime: '15:00' })).status).toBe(200);
+    expect(JSON.stringify((await say(keyedEnv(), reminder)).heard[0])).toContain('\\"after school\\" is 15:00');
+    await o.patch('/me', { afterKind: null, afterTime: null });
   });
 
   it('SY6 blank → 400; reads used up → 429; no key → 503; signed out → 401', async () => {
