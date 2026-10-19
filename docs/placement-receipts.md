@@ -7,6 +7,23 @@ carry its result.
 
 ---
 
+## 2026-10-19 — steward pass after v1.85.0 (code-steward)
+
+- **Run:** post-release, v1.85.0 (📥 Send to Enso, §7H / §8.8a, migration 0055: shared/inbox.ts, routes/share.ts,
+  routes/inbox.ts, Inbox.tsx, InboxSetup.tsx, HouseholdLists.tsx 📥 view, vocab INBOX_KIND, photo-store `inbox`), also
+  reconciling the v1.84.1 (identify ttl) and v1.84.2 (Modal scroll-to-top) patches.
+- **Verdict:** SOUND. Typecheck green, 941/941, arch:audit quiet (HouseholdLists.tsx 81%); 3 code commits, 3 matching
+  receipts, built as placed; map rows true.
+- **Top finding:** LOW. The newest receipts were appended at the bottom of this file, not the top (newest first); the
+  Send to Enso one is moved up here, the v1.84.1 and v1.84.2 ones still sit at the bottom.
+- **Handoffs:** 3 to worker (move the two v1.84.x receipts up; derive isShareKey from SHARE_KEY_PREFIX + one SHARE_KEY_LEN
+  and build InboxSetup's address via apiUrl; carried device-check lines for v1.76–v1.84), 0 to reorganizer, 0 to
+  placement-advisor. Still carried: deleteEventStatements, renotifyText, updateEventStatement at their triggers.
+- **Restraint:** HouseholdLists' three fixed views (a fourth is the trigger for a views table); the recent-day formatter
+  copied in Inbox.tsx and HouseholdLists.tsx (two copies, a helper at the third); three one-line clipboard writes;
+  photoTypeOf in inbox.ts, not photos.ts (home/ bundle); share-body parsing kept in the route file; the count fetch of
+  full /inbox; untested >10-photo and batch-failure cleanup branches.
+
 ## 2026-10-19 — 🎲 Window reminders (placement-advisor)
 
 - **Ask:** v1.85.0, SPEC §8.5c (RW1–RW4, ⚑ Q327–Q330), §10 GET/POST/PATCH /reminders `window`. A reminder rings once a
@@ -31,6 +48,33 @@ carry its result.
   engine.ts (planReminderFires), tick.ts (superseded), Reminders.tsx, AlertFields.tsx.
 
 ---
+
+## 2026-10-19 — 📥 Send to Enso, the share inbox (placement-advisor)
+
+- **Ask:** v1.85.0, SPEC §7H (§7H.1 key, §7H.2 POST /share, §7H.3 the Inbox, §7H.4 the Shortcut, SH1–SH9, SH-M), §4.2zzb
+  migration 0055 (share_keys, inbox_items), §8.8a the Inbox screen and Set up, ⚑ Q319–Q326.
+- **Verdict:** NEW `src/shared/inbox.ts` (the limits, shareWindowStart, SHARE_KEY_PREFIX, shareText, photoTypeOf,
+  inboxKind, shareMessage, InboxItem); NEW `src/worker/routes/share.ts` (POST /share by Bearer key, the body parsed by content
+  type in the file; GET/POST/DELETE /share/key); NEW `src/worker/routes/inbox.ts` (GET /inbox, DELETE /inbox/{id},
+  GET /inbox/{id}/photo); NEW `frontend/src/components/Inbox.tsx` and `InboxSetup.tsx`. EXISTING `vocab.ts` (INBOX_KIND),
+  `photo-store.ts` (PhotoPrefix `inbox`), `index.ts` (mount both), `HouseholdLists.tsx` (the 📥 Inbox fixed view and its
+  count), migrations/0055 and its test.
+- **Flow stage:** rules (inbox.ts) → route + persist (share.ts, inbox.ts, photo-store.ts) → render (Inbox.tsx, InboxSetup.tsx,
+  HouseholdLists.tsx).
+- **Why:** no owner covered a key-authenticated way in or a member's own inbox (so no duplicate of an existing feature). Each
+  decision (url versus text, what a photo is by its bytes, kind, the limits, the reply) is pure and lives in shared. Kind is
+  derived and its strings live in vocab. The random key is made in the route; shared holds only its format. Two route files:
+  the bearer door (the ops.ts precedent) and session reads of my own items are separate concerns. Rejected: photoTypeOf in
+  shared/photos.ts (home/ bundles it, so changing it means rebuilding the helper); reusing http.ts photoBody (it trusts the
+  declared type and caps at 4 MB, while §7H checks bytes and caps at 12 MB); a key guard in session.ts (cookie sessions only;
+  sha256hex reused); the setup inside Inbox.tsx; a share-body.ts made now (file-local until it is over about 60 lines).
+- **Caps:** inbox.ts ~55/300, routes/share.ts ~125/300, routes/inbox.ts ~45/300, photo-store.ts 36/300, index.ts ~111/300,
+  HouseholdLists.tsx ~243/300 (below the band; a fourth fixed view is the signal to look at a special-views table),
+  Inbox.tsx ~75, InboxSetup.tsx ~70. Nothing newly in the band; no CEILINGS change.
+- **Reorganizer:** none needed.
+- **Sources read:** the §7H draft, docs/module-ownership.md, docs/modularity.md, scripts/arch.ts, docs/placement-receipts.md
+  (latest four), src/worker/photo-store.ts, src/worker/index.ts, src/worker/http.ts, src/shared/photos.ts,
+  frontend/src/components/HouseholdLists.tsx, frontend/src/components/ListPicker.tsx; grep of session.ts, db.ts, ops.ts, SPEC.md.
 
 ## 2026-10-19 — Steward pass 31, since pass 30 (code-steward)
 
@@ -2388,30 +2432,3 @@ REORG RECEIPT
 - **Why:** Open-time scroll and focus are part of the one `<dialog>` primitive's concern. Modal.tsx is the only `showModal` in frontend/src, so one change covers every popup. Fixing it in each picture-bearing form (edit form, recipe) was rejected: that would put copies of the same fix in several places and let them drift apart. Props are unchanged, so the high fan-in carries no risk. Logic stays in the existing mount effect, and the error scrollIntoView effect is untouched.
 - **Caps:** Modal.tsx goes from 64 to about 75 out of 300 (GLOBAL_FILE_CAP, no CEILINGS entry). No file enters the band.
 - **Sources read:** frontend/src/components/Modal.tsx, frontend/src/components/Modal.module.css, scripts/arch.ts (caps), docs/module-ownership.md (Modal row), grep of frontend/src for showModal/<dialog.
-
-## 2026-10-19 — 📥 Send to Enso, the share inbox (placement-advisor)
-
-- **Ask:** v1.85.0, SPEC §7H (§7H.1 key, §7H.2 POST /share, §7H.3 the Inbox, §7H.4 the Shortcut, SH1–SH9, SH-M), §4.2zzb
-  migration 0055 (share_keys, inbox_items), §8.8a the Inbox screen and Set up, ⚑ Q319–Q326.
-- **Verdict:** NEW `src/shared/inbox.ts` (the limits, shareWindowStart, SHARE_KEY_PREFIX, shareText, photoTypeOf,
-  inboxKind, shareMessage, InboxItem); NEW `src/worker/routes/share.ts` (POST /share by Bearer key, the body parsed by content
-  type in the file; GET/POST/DELETE /share/key); NEW `src/worker/routes/inbox.ts` (GET /inbox, DELETE /inbox/{id},
-  GET /inbox/{id}/photo); NEW `frontend/src/components/Inbox.tsx` and `InboxSetup.tsx`. EXISTING `vocab.ts` (INBOX_KIND),
-  `photo-store.ts` (PhotoPrefix `inbox`), `index.ts` (mount both), `HouseholdLists.tsx` (the 📥 Inbox fixed view and its
-  count), migrations/0055 and its test.
-- **Flow stage:** rules (inbox.ts) → route + persist (share.ts, inbox.ts, photo-store.ts) → render (Inbox.tsx, InboxSetup.tsx,
-  HouseholdLists.tsx).
-- **Why:** no owner covered a key-authenticated way in or a member's own inbox (so no duplicate of an existing feature). Each
-  decision (url versus text, what a photo is by its bytes, kind, the limits, the reply) is pure and lives in shared. Kind is
-  derived and its strings live in vocab. The random key is made in the route; shared holds only its format. Two route files:
-  the bearer door (the ops.ts precedent) and session reads of my own items are separate concerns. Rejected: photoTypeOf in
-  shared/photos.ts (home/ bundles it, so changing it means rebuilding the helper); reusing http.ts photoBody (it trusts the
-  declared type and caps at 4 MB, while §7H checks bytes and caps at 12 MB); a key guard in session.ts (cookie sessions only;
-  sha256hex reused); the setup inside Inbox.tsx; a share-body.ts made now (file-local until it is over about 60 lines).
-- **Caps:** inbox.ts ~55/300, routes/share.ts ~125/300, routes/inbox.ts ~45/300, photo-store.ts 36/300, index.ts ~111/300,
-  HouseholdLists.tsx ~243/300 (below the band; a fourth fixed view is the signal to look at a special-views table),
-  Inbox.tsx ~75, InboxSetup.tsx ~70. Nothing newly in the band; no CEILINGS change.
-- **Reorganizer:** none needed.
-- **Sources read:** the §7H draft, docs/module-ownership.md, docs/modularity.md, scripts/arch.ts, docs/placement-receipts.md
-  (latest four), src/worker/photo-store.ts, src/worker/index.ts, src/worker/http.ts, src/shared/photos.ts,
-  frontend/src/components/HouseholdLists.tsx, frontend/src/components/ListPicker.tsx; grep of session.ts, db.ts, ops.ts, SPEC.md.
