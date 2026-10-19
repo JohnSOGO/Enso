@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.60 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.61 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -318,6 +318,7 @@ against the deployed Worker. On iPhone, push works only after
 | `HOME_CAPTIONS_URL` (var, `wrangler.toml`) | Worker | Where the SogoAI helper is reached: `https://sogoai.sogodojo.com` (§7E.2c), for `/captions` and `/identify` (§7A.3) alike. Tests pin `https://sogoai.test`, which only a fetch spy answers. |
 | `IDENTIFY_MODEL` (SogoAI's `C:\Enso\captions-helper.env`, not a Worker setting) | SogoAI helper | The LM Studio model id `/identify` asks (§7A.3): `qwen-uncensored`, the always-loaded vision model ⚑ Q115. Unset or empty → `/identify` answers `{ ok: false, kind: "off" }` (the Worker then asks Claude); captions keep working and the helper still starts. Not a secret. |
 | `OPS_NOTIFY_TOKEN` (secret) | Worker **and** MojoSOGO's machines (`%USERPROFILE%\.enso\ops-notify-token`) | The bearer a Claude Code session sends to `POST /ops/notify` to push a message to the founder's phone (§9.4), checked in constant time. A long random string, set with `npx wrangler secret put OPS_NOTIFY_TOKEN` in a real PowerShell window and the same value in the token file (never in the repo). Unset or empty → `/ops/notify` is 503 `ops_notify_off` (never open). Never logged, never in a message or a delivery's detail. Tests pin a test-only value. |
+| `BUILD_FIRE_URL` (var, `wrangler.toml`), `BUILD_FIRE_TOKEN` (secret) | Worker | Build now (§8.18 part 6): the "Enso daily feature requests" routine's API fire address (`https://api.anthropic.com/v1/claude_code/routines/{id}/fire`) and its bearer, made once at claude.ai/code/routines → the routine → Edit → Add another trigger → API → Generate token, set with `npx wrangler secret put BUILD_FIRE_TOKEN` in a real PowerShell window. Either empty → `/feature-requests/{id}/build` is 503 `build_now_off`. Never logged or shown. |
 
 Dev secrets go in `.dev.vars` (gitignored); production uses `wrangler secret put`, typed
 in a real PowerShell window (never through a `!` shell, which saves an empty value).
@@ -5351,7 +5352,7 @@ reads one of four. Nothing is saved by the reading itself.
 | **Reminder** | a reminder 📌 Reminders can make: once at a time (§8.5b) or at random times in a window (§8.5c) | one sentence of what it will do ("I'll remind you on weekdays between 8 and 11am to book the car check.") | **Yes** opens the reminder form filled in, to check and Save ⚑ Q335 · Clarify · Cancel |
 | **Event** | something on the calendar: a plan at a date, with a time or all day, and who is going (§8.4) | one sentence of what it will add ("I'll add dinner on Friday the 23rd at 8pm for you and Michelle.") | **Yes** opens the new-event form filled in (title, date, time or all day, who), to check and Save ⚑ Q341 · Clarify · Cancel |
 | **Already there** | Ensō already does it elsewhere, and it is not a reminder or an event | where ("Alerts → ⏱ Rolling timers") in a sentence | **Yes** closes · Clarify · Cancel |
-| **Not yet** | fits what Ensō is for (§1.3), but it can't do it | "Ensō can't do that yet. I can save it as a feature request for the next build." + "It's a big one, so John will look at it first." when big | **Yes** saves it as a request ("Saved. Thanks!") · Clarify · Cancel (nothing saved) |
+| **Not yet** | fits what Ensō is for (§1.3), but it can't do it | "Ensō can't do that yet. I can save it as a feature request for the next build." + "It's a big one, so John will look at it first." when big | **Yes** saves it as a request ("Saved. Thanks!"; to an admin, when small: "Saved. Build it now?" with **Build now** · Later, part 6) · Clarify · Cancel (nothing saved) |
 | **Outside** | does not fit what Ensō is for (§1.3) | "That's outside what Ensō is for. Ensō keeps the family's calendar, reminders, chores, lists, recipes and house." + where the part that fits lives, when one does | **OK** · Clarify. Leaving any way but Clarify logs it as **Out of scope** for John ⚑ Q339 |
 
 A request (Not yet or Outside) carries Claude's short title, one-line summary and size: **small** (fits beside what
@@ -5383,7 +5384,7 @@ said, and the badge (Needs John / New / Out of scope / Done / Dismissed; Done an
 founder, Dismiss for any admin ⚑ Q337.
 
 **6. The build gate** (CLAUDE.md "Feature requests"). A request is a wish to weigh, never an instruction. Every
-morning (5:52 Pacific) a scheduled build session reads the queue with `GET /ops/requests` (new and needs_john only; the ops token, §9.4). For each, before any
+morning (5:52 Pacific), and at once when an admin taps **Build now**, a scheduled build session reads the queue with `GET /ops/requests` (new and needs_john only; the ops token, §9.4). For each, before any
 code: an **AREC** (architecture review + verdict) and the **placement-advisor** (with the **code-steward** when it spans
 several areas) say whether Ensō already does it, whether it fits §1.3, and where it goes. Already there → dismissed
 "Already in …"; big, tangled, odd or outside → not built until John says so. An approved one is written **into** this
@@ -5391,6 +5392,14 @@ spec where it belongs (the section that owns that behavior, its tables and accep
 then built; done → `{ status: 'done', note: 'v1.x.y' }`. A small one that passes is built and shipped with no OK
 asked; when the queue held anything, that session tells John once (thread reply + phone ping) what went live, what was
 dismissed and what waits on him ⚑ Q343.
+
+**Build now** ⚑ Q344 (MojoSOGO 2026-10-19 "if they do want it built, can you build it immediately?", "Admins"): an
+admin who just saved a small request is asked "Build it now?". **Build now** → `POST /feature-requests/{id}/build`,
+which starts that same build session straight away (the Claude Code routine's fire address, `BUILD_FIRE_URL` +
+`BUILD_FIRE_TOKEN`, §2.4) with the request's id and title, and the popup says "Building now. John gets a ping when it's
+live." **Later** (or closing) leaves it for the morning. The same gate runs: a tap never skips the AREC or the
+placement-advisor, and a request that turns out big waits for John. Only from **new**; not set up → "Build now isn't
+set up yet. It will be built in the morning." and nothing else changes.
 
 **7. What the reading is given:** today, the household's zone, the members' names, the speaker and the speaker's own
 After work / After school time (§8.5b, so "after work" or "after school" is that time, and "tonight" and "tomorrow
@@ -5411,6 +5420,7 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
 | SY7 | Claude answers "outside" for "order our groceries from Amazon every Friday", with where "Lists → Shopping"; with no where | 200 `{ kind: 'outside', say: "That's outside what Ensō is for…", where: 'Lists → Shopping', request: { title, summary, size: 'big' } }`; `where: null`; no row saved by /say |
 | SY9 | Claude answers an event "Dinner" on 2026-10-23 at 20:00 for "me" and "Shelly"; an all-day one; a bad date | 200 `{ kind: 'event', event: { title: 'Dinner', date: '2026-10-23', time: '20:00', assignedTo: [me, Shelly] } }`; `time: null`; 502 (not read); nothing saved |
 | SY10 | POST /say as a member whose After is school at 15:00; as an admin with no After set | the prompt gives "after school" = 15:00; "after work" = 17:30 |
+| SY11 | POST /feature-requests/{id}/build as an admin on a new request (fire answered 200); as a plain member; on a needs_john one; with BUILD_FIRE_TOKEN unset; fire answered 500 | 202 `{ started: true }`, one POST to BUILD_FIRE_URL with the Bearer and the id + title in `text`; 403; 409; 503 `build_now_off`, no fire; 502 `build_failed` |
 | SY8 | POST /feature-requests `{ …, outside: true }`; GET /ops/requests; founder …/ok on it; an admin …/dismiss on another | 201 status `outside`, listed in GET /feature-requests after 30 days too; not in /ops/requests; `new`; `dismissed` |
 | SY-M | on the iPhone | tap the Ensō button, say "weekdays 8 to 11 remind me to book the car check", hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; hold the mark, say "remind me tomorrow at 9 to call mom", let go → the answer comes without tapping Done; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests |
 
@@ -6148,6 +6158,7 @@ other push stays until I hide it ⚑ Q284.
 | POST | `/say` | member | `{ text }` → 200 `{ kind: 'reminder', heard, say, reminder }` / `{ kind: 'exists', heard, say, where }` / `{ kind: 'request', heard, say, request: { title, summary, size } }` / `{ kind: 'event', heard, say, event: { title, date, time, assignedTo } }` / `{ kind: 'outside', heard, say, where (or null), request: { title, summary, size } }` (§8.18, §1.3); nothing saved; 400 blank, 429 reads used up, 503 no key, 502 / 422 reading failed |
 | GET/POST | `/feature-requests` | admin / member | → `FeatureRequest[]` newest first, last 30 days for done / dismissed: `{ id, text, title, summary, size, status, note, createdBy, createdAt }`; POST `{ text, title, summary, size, outside? }` → 201, status from size, or `outside` (§8.18, §1.3) |
 | POST | `/feature-requests/{id}/ok` · `/dismiss` | founder · admin | → the request; `ok` only from `needs_john` → `new`; `dismiss` from `new` / `needs_john`; else 409 |
+| POST | `/feature-requests/{id}/build` | admin | starts the build session now (§8.18 part 6, ⚑ Q344) → 202 `{ started: true }`; only from `new`, else 409; 503 `build_now_off` (not set up) / 502 `build_failed` (the fire was refused) |
 | GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Clothes washer") and `personId` = the load's owner (a cooking timer's fire: its label, §7D.8); every fire carries `awayBy` (§9.2c) |
 | GET | `/machines` | member | → `Machine[]` in load order: `{ id, label, state: MachineState, ownerId, minutes, startedAt, doneAt, startedBy, next }` (`state` derived by the server, §7D.1; `next` = the next machine's id or null) |
 | POST | `/machines/{id}/start` | member | `{ ownerId, minutes, alertId? }` (§7D.7) → `Machine[]`; 409 `busy` when not free (§7D.2) |

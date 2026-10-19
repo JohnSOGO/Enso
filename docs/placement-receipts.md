@@ -7,6 +7,25 @@ carry its result.
 
 ---
 
+## 2026-10-19 — Build now: start the build session from the Ensō popup (placement-advisor)
+
+- **Ask:** v1.91.0, SPEC §8.18 part 3 "Not yet" row and part 6 "Build now" (⚑ Q344), SY11, the API row POST
+  /feature-requests/{id}/build, §2.4 BUILD_FIRE_URL / BUILD_FIRE_TOKEN. After a small save an admin is asked "Build it
+  now?"; Build now posts the id and title to the routine's fire address; only from new (409), 503 `build_now_off`, 502
+  `build_failed`, 202 `{ started: true }`.
+- **Verdict:** rule `src/shared/feature-requests.ts` (canBuild, buildRefusal) [EXISTING]; route
+  `src/worker/routes/feature-requests.ts` [EXISTING]; deliver `src/worker/build-fire.ts` [NEW row]; render
+  `frontend/src/components/EnsoButton.tsx` [EXISTING]; config `src/worker/env.ts`, wrangler.toml.
+- **Flow stage:** rules + route + deliver + render, split along the flow.
+- **Why:** the admin + New check is needed by both the route and the popup, so it lives once beside okMove / dismissMove
+  (a predicate, not a Move: build changes no status); the PWA reads the server's status, never the size. The fire has its
+  own secret, beta headers, timeout and failure mapping, so a leaf like home-captions.ts. Rejected: access.ts (Access-only
+  auth), claude.ts (the SDK, model answers), ops.ts / deliveries.ts / push.ts, inline in the route.
+- **Caps:** routes/feature-requests.ts 39 → 51; shared/feature-requests.ts 69 → 77; build-fire.ts new 35; env.ts 47 → 49;
+  EnsoButton.tsx 170 → 186 (/ 300). Nothing in the band.
+- **Sources read:** scripts/arch.ts; docs/module-ownership.md; docs/placement-receipts.md; SPEC.md §2.4, §8.18; the four
+  owners above.
+
 ## 2026-10-19 — Voice first on the opening screen: Splash.tsx (placement-advisor)
 
 - **Ask:** v1.90.2, SPEC §8.10 "Voice first" ⚑ Q342 and the revised §8.1 🎤 badge bullet: signed in, on a phone that can

@@ -65,4 +65,13 @@ export function closeMove(status: FeatureRequestStatus, to: unknown): Move {
   return isOpen(status) ? { status: to } : { code: 409, message: 'That request is already closed.' };
 }
 
+/** ⚑ Q344 — Build now starts the build session on a request still waiting in the queue (it moves no status). */
+export const canBuild = (status: FeatureRequestStatus) => status === 'new';
+
+/** ⚑ Q344 — Build now: any admin, a New request; else the refusal. */
+export function buildRefusal(status: FeatureRequestStatus, admin: boolean): { code: 403 | 409; message: string } | null {
+  if (!admin) return { code: 403, message: 'Only an admin can build a request now.' };
+  return canBuild(status) ? null : { code: 409, message: "That request isn't waiting to be built." };
+}
+
 export const cleanNote = (v: unknown): string | null => clip(v, FEATURE_NOTE_MAX) || null;
