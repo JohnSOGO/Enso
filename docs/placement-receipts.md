@@ -2671,3 +2671,12 @@ REORG RECEIPT
 - **Why:** Open-time scroll and focus are part of the one `<dialog>` primitive's concern. Modal.tsx is the only `showModal` in frontend/src, so one change covers every popup. Fixing it in each picture-bearing form (edit form, recipe) was rejected: that would put copies of the same fix in several places and let them drift apart. Props are unchanged, so the high fan-in carries no risk. Logic stays in the existing mount effect, and the error scrollIntoView effect is untouched.
 - **Caps:** Modal.tsx goes from 64 to about 75 out of 300 (GLOBAL_FILE_CAP, no CEILINGS entry). No file enters the band.
 - **Sources read:** frontend/src/components/Modal.tsx, frontend/src/components/Modal.module.css, scripts/arch.ts (caps), docs/module-ownership.md (Modal row), grep of frontend/src for showModal/<dialog.
+
+## 2026-10-19 — Moon phases (placement-advisor)
+
+- **Ask:** Compute and show the four principal moon phases on the calendar: moon.ts, /calendar moonPhases, cell icon, day sheet line (SPEC §7.12, §7.2, §10).
+- **Verdict:** src/shared/moon.ts + test/moon.test.ts [NEW row]; src/worker/routes/events.ts, frontend/src/components/Calendar.tsx, DayCell.tsx, DaySheet.tsx [EXISTING]
+- **Flow stage:** rules (moon.ts); persist/route (events.ts only returns it); render (Calendar, DayCell, DaySheet)
+- **Why:** One distinct pure concern, so a focused leaf beats widening holidays.ts or weather.ts. The route fetches the tz and returns the data, and the PWA only draws it, which keeps the rule in shared. Rejected homes: holidays.ts (a different concern with a rules table), a frontend-side computation (the PWA would re-derive what the server returns), and a new route (it is part of the /calendar payload).
+- **Caps:** events.ts about 124/147 (under the warning band); Calendar.tsx 198/300; DayCell.tsx 102/300; DaySheet.tsx 66/300; moon.ts 60/300. No CEILINGS change.
+- **Sources read:** .claude/agents/placement-advisor.md, scripts/arch.ts, arch:audit output, docs/module-ownership.md, SPEC.md §7.2 and §7.12, events.ts, DayCell.tsx.

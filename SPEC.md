@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.61 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.62 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -253,6 +253,7 @@ Enso/
 │   │   ├── recurrence.ts   # §4.3
 │   │   ├── holidays.ts     # §7.3
 │   │   ├── markets.ts      # §7.4
+│   │   ├── moon.ts         # §7.12
 │   │   ├── lists.ts        # §7A.1 item rules: itemKey, add/reopen decision, limits, 30-day window
 │   │   ├── item-reading.ts # §7A.3 naming a snapped item: the prompt, cleanItemName, the helper's report
 │   │   ├── machines.ts     # §7D the laundry loop + dish washer: state, transitions, done message
@@ -1720,7 +1721,7 @@ the 5 carried-over "Fall break" days (deleted, not converted — his choice).
 
 **Day icons** — a day's icons sit **to the right of the date number, on the same line, at
 every width** (phones included; never on the line below — decided by MojoSOGO). Icons, in
-order: the public holiday's emoji, 📈 (§7.4), then the emoji of the day's single-day events
+order: the public holiday's emoji, 📈 (§7.4), the moon phase's emoji (§7.12), then the emoji of the day's single-day events
 with **nobody assigned**, in the order of their lines (Q277); at most **two**. An assigned
 event's emoji sits at the start of its own line under the number instead (§7.1, Q275). Each is shown only if
 it is on for the member (§7.5).
@@ -1791,6 +1792,28 @@ options expiration"; `member_prefs.show_options_expiration`, §4.2c).
 - **Acceptance:** 2026-10-16 (3rd Fri); 2026-06-18 (Thu — Fri 06-19 is Juneteenth);
   2025-04-17 (Thu — Fri 04-18 is Good Friday); 2026-04-17 (Good Friday 2026 is 04-03,
   unaffected). Easter: 2025-04-20, 2026-04-05, 2027-03-28.
+
+### 7.12 Moon phases 🌑🌓🌕🌗 (`src/shared/moon.ts`, pure) — asked by MojoSOGO's household 2026-10-19
+
+"Show the phases of the moon on the calendar." The four principal phases are computed, never typed in: **🌑 New moon**,
+**🌓 First quarter**, **🌕 Full moon**, **🌗 Last quarter**, about four days a month.
+
+- `moonPhasesBetween(from, to, tz)` returns `{ date, name, emoji }[]` in date order. Each phase is an instant (Meeus,
+  *Astronomical Algorithms* ch. 49, the main periodic terms, good to a few minutes); its `date` is the day that instant
+  falls on **in the household's time zone** (§4.1), so a full moon at 04:12 UTC is the evening before in Los Angeles.
+- **On the calendar:** the emoji takes a day-icon place (§7.2), after the holiday and 📈, so it never pushes out a
+  holiday; an unassigned event's emoji comes after it and the limit of two still holds. No cell tint. The day sheet
+  (§8.3) lists "🌕 Full moon" under the weather line; the cell's accessible label adds the name.
+- **Everyone sees it; there is no switch** and no legend entry (the emoji names itself) ⚑ Q345.
+- `/calendar` always returns `moonPhases` for the range (§10).
+- **Acceptance (each row a test):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| MN1 | `moonPhasesBetween('2025-10-01', '2025-10-31', 'UTC')` | 🌕 10-07 (03:48 UTC), 🌗 10-13, 🌑 10-21 (12:25 UTC), 🌓 10-29 |
+| MN2 | `moonPhasesBetween('2026-10-01', '2026-10-31', 'UTC')` then with `America/Los_Angeles` | full moon 2026-10-26 (04:12 UTC) in UTC; 2026-10-25 in Los Angeles |
+| MN3 | a 12-month range | 48 to 50 phases, alternating new → first quarter → full → last quarter in order |
+| MN4 | GET `/calendar` for a week holding a phase | `moonPhases` has that day with its name and emoji; a week without one gives `[]` |
 
 ### 7.5 Optional events — each person turns them on
 
@@ -6138,7 +6161,7 @@ other push stays until I hide it ⚑ Q284.
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
 | DELETE | `/invites/{id}` | owner | revoke |
-| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[], weather[] }` (each occurrence carries `emoji`; `weather` is the stored forecast days in the range, §7.11); recurring events expanded server-side with `recurrence.ts`; alarms and sun-timed events (§7.7) excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
+| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[], moonPhases[], weather[] }` (each occurrence carries `emoji`; `moonPhases` is `{ date, name, emoji }[]` for the range (§7.12); `weather` is the stored forecast days in the range, §7.11); recurring events expanded server-side with `recurrence.ts`; alarms and sun-timed events (§7.7) excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
 | GET | `/optional-events` | member | → `{ id, title, emoji, recurrence, startDate, on }[]` — every optional event, with this member's switch |
 | PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |

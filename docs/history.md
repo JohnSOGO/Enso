@@ -1043,3 +1043,5 @@ feature that lets you send URLs, images, and text directly from your iPhone" …
 sheet posts a link, text or photo to `POST /share` with my own key; Ensō saves it in the background to my 📥 Inbox
 (Lists popup) and the Shortcut shows "✅ Saved to your Enso Inbox". Set up (key + steps) is folded under the Inbox.
 Built as specified. Owed: his TRY on the iPhone (make the Shortcut; share a Safari link, a Notes text, a photo).
+
+**🌕 Moon phases** (v1.92.0, SPEC 3.62, §7.12, §7.2, Q345; a household member's feature request 2026-10-19 "Show the phases of the moon on the calendar"): the four principal phases (🌑🌓🌕🌗) are computed in `src/shared/moon.ts`, returned by `/calendar` as `moonPhases` and drawn as a day icon after the holiday and 📈, and as a line in the day sheet. Built as specified; built by the daily feature-request session. Owed: his TRY (look at the days around the 25th).
