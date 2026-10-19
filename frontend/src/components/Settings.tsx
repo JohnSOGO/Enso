@@ -1,4 +1,4 @@
-// SPEC §8.6 — the Settings menu: one PickGrid button per area (Household and Members for admins only; Calendar adds Days off for admins), the open
+// SPEC §8.6 — the Settings menu: one PickGrid button per area (Household, Members and 💡 Requests (§8.18) for admins only; Calendar adds Days off for admins), the open
 // area in a Modal titled with its name, Log out under the grid. Holds which area is open and no setting of its own;
 // a tapped alert notification (§9.5) opens Alerts on its card.
 import { useEffect, useState, type ReactNode } from 'react';
@@ -18,8 +18,9 @@ import { SettingsHousehold } from './SettingsHousehold';
 import { SettingsMembers } from './SettingsMembers';
 import { SettingsStatus } from './SettingsStatus';
 import { SettingsAbout } from './SettingsAbout';
+import { FeatureRequests } from './FeatureRequests';
 
-type Area = 'me' | 'calendar' | 'phone' | 'speakers' | 'alerts' | 'household' | 'members' | 'status' | 'about';
+type Area = 'me' | 'calendar' | 'phone' | 'speakers' | 'alerts' | 'household' | 'members' | 'status' | 'about' | 'requests';
 
 /** ⚑ Q226, Q247 — the buttons in order; `admin` ones show only to admins. */
 const AREAS: readonly { value: Area; emoji: string; label: string; admin?: true }[] = [
@@ -27,7 +28,7 @@ const AREAS: readonly { value: Area; emoji: string; label: string; admin?: true 
   { value: 'phone', emoji: '📱', label: 'Phone alerts' }, { value: 'speakers', emoji: '🔊', label: 'Speakers' },
   { value: 'alerts', emoji: '🔔', label: 'Alerts' }, { value: 'household', emoji: '🏠', label: 'Household', admin: true },
   { value: 'members', emoji: '👥', label: 'Members', admin: true }, { value: 'status', emoji: '📊', label: 'Status' },
-  { value: 'about', emoji: 'ℹ️', label: 'About' },
+  { value: 'about', emoji: 'ℹ️', label: 'About' }, { value: 'requests', emoji: '💡', label: 'Requests', admin: true },
 ];
 
 /** `openAlert`: a tapped notification's alert, whose card opens in Alerts (§9.5). */
@@ -49,6 +50,7 @@ export function Settings({ onLogout, openAlert, onAlertOpened }: { onLogout: () 
     members: () => <SettingsMembers />,
     status: () => <SettingsStatus />,
     about: () => <SettingsAbout />,
+    requests: () => <FeatureRequests />,
   };
 
   return (

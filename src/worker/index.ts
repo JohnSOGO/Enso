@@ -35,6 +35,8 @@ import { myAlerts } from './routes/my-alerts';
 import { phoneLogin } from './routes/phone-login';
 import { share } from './routes/share';
 import { inbox } from './routes/inbox';
+import { say } from './routes/say';
+import { featureRequests } from './routes/feature-requests';
 
 const api = new Hono<AppEnv>();
 
@@ -83,6 +85,8 @@ api.route('/', ops);
 api.route('/', myAlerts); // §9.5 /me/alerts
 api.route('/', share); // §7H POST /share (Bearer key) and /share/key
 api.route('/', inbox); // §7H.3 my 📥 Inbox
+api.route('/', say); // §8.18 POST /say, the Ensō button
+api.route('/', featureRequests); // §8.18
 
 api.post('/dev/tick', async (c) => {
   if (c.env.DEV_ENDPOINTS !== '1') return fail(c, 404, 'not_found', 'Not found.');

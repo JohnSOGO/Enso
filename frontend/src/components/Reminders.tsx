@@ -14,6 +14,7 @@ import {
   AFTER_LABEL, REMINDER_RENOTIFY, REMINDER_RENOTIFY_DEFAULT, WHEN_CHOICE, WHEN_DEFAULT, WINDOW_DEFAULT, whenChoice,
   type After, type ReminderWindow, type WhenChoiceId,
 } from '../../../src/shared/reminders';
+import type { SayReminder } from '../../../src/shared/say-reading';
 import s from './Lists.module.css';
 
 /** GET /reminders (§10). */
@@ -79,23 +80,26 @@ export function RemindersSection() {
   );
 }
 
-function ReminderForm({ reminder, onClose }: { reminder: Reminder | null; onClose: () => void }) {
+/** The reminder form; the Ensō button (§8.18) opens it with `start`, what was said, to check and Save. */
+export function ReminderForm({ reminder, start, onClose }: { reminder: Reminder | null; start?: SayReminder; onClose: () => void }) {
   const { me, members, tz, refresh } = useApp();
   const founder = useIsFounder();
   /** ⚑ Q316 — the one person ticked under Remind decides After work / After school; none or several, mine. */
   const afterFor = (ids: string[]): After => (ids.length === 1 && members.find((m) => m.id === ids[0])?.after) || me.after;
   const init = useMemo(() => {
-    const at = reminder ?? whenChoice(WHEN_DEFAULT, new Date().toISOString(), tz, me.after.time);
+    const said = start?.date && start.time ? { date: start.date, time: start.time } : null;
+    const at = reminder ?? said ?? whenChoice(WHEN_DEFAULT, new Date().toISOString(), tz, me.after.time);
+    const window = reminder?.window ?? start?.window ?? null;
     return {
-      title: reminder?.title ?? '', date: at.date, time: at.time, assignedTo: reminder?.assignedTo ?? [me.id],
+      title: reminder?.title ?? start?.title ?? '', date: at.date, time: at.time, assignedTo: reminder?.assignedTo ?? start?.assignedTo ?? [me.id],
       ...flagsOf(reminder?.channels, founder), renotify: reminder?.renotifyMin ?? REMINDER_RENOTIFY_DEFAULT,
-      random: !!reminder?.window, window: reminder?.window ?? WINDOW_DEFAULT, // ⚑ Q328
+      random: !!window, window: window ?? WINDOW_DEFAULT, // ⚑ Q328
     };
-  }, [reminder, me.id, me.after.time, tz, founder]);
+  }, [reminder, start, me.id, me.after.time, tz, founder]);
   const [f, setF] = useState(init);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const dirty = JSON.stringify(f) !== JSON.stringify(init);
+  const dirty = !!start || JSON.stringify(f) !== JSON.stringify(init);
   const canEdit = !reminder || canChange(reminder.createdBy, me);
   const after = afterFor(f.assignedTo);
   const pick = (id: WhenChoiceId) => setF({ ...f, ...whenChoice(id, new Date().toISOString(), tz, after.time) });
