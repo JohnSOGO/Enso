@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.66 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.67 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1816,7 +1816,7 @@ options expiration"; `member_prefs.show_options_expiration`, §4.2c).
   cell tint. The day sheet
   (§8.3) lists "🌕 Full moon" under the weather line; the cell's accessible label adds the name.
 - **On for everyone by default**; a member can turn **🌕 Moon phases** off in Optional calendar items (§7.5), which
-  hides it in the cell and the day sheet. No legend entry (the emoji names itself) ⚑ Q345, Q347.
+  hides it in the cell and the day sheet. No legend entry (the emoji names itself) ⚑ Q345, Q348.
 - `/calendar` always returns `moonPhases` for the range (§10).
 - **Acceptance (each row a test):**
 
@@ -1838,7 +1838,7 @@ switch on for their own calendar (decided by MojoSOGO 2026-10-03):
 4. **🌕 Moon phases** — built in, on by default (`member_prefs.show_moon`, §7.12);
 5. then every **optional event** (below), each with its emoji and how it repeats.
 Each row is one line with its **On** switch; the rows sit close together (32px, MojoSOGO 2026-10-19 "Reduce spacing")
-⚑ Q347.
+⚑ Q348.
 The old separate checkboxes in Me are gone.
 
 Some calendar items matter only to whoever wants them — street sweeping (move the car),
@@ -2142,7 +2142,7 @@ reading)` (pure, `event-reading.ts`) ⚑ Q196:
 - **`/calendar`** returns `weather: { date, emoji, words, high, low }[]` for the stored days in the range.
 - **On the calendar** (§7.1): the emoji sits in the **bottom-right corner** of the day cell at every width (MojoSOGO
   2026-10-19 "Calendar weather stuff should be bottom right including moon"), with the moon phase after it (§7.12),
-  apart from the two day icons (§7.2) so it never pushes a holiday or event emoji out ⚑ Q202, Q346. It shows unless the member turned **🌤️ Weather** off in Optional calendar items (§7.5), which hides the corner and the day sheet line ⚑ Q203, Q347. The cell's
+  apart from the two day icons (§7.2) so it never pushes a holiday or event emoji out ⚑ Q202, Q346. It shows unless the member turned **🌤️ Weather** off in Optional calendar items (§7.5), which hides the corner and the day sheet line ⚑ Q203, Q348. The cell's
   accessible label adds the words ("Clear, high 72°, low 58°").
 - **The high beside it** (asked by MojoSOGO 2026-10-13: "left of weather emoji post the days high temperature; blue if
   cold; white nice; red hot; two digits"): just left of the emoji, the day's high as a bare number (`72`, no °), in the
@@ -4161,7 +4161,12 @@ only the grey backdrop):
 
 ### 8.2 Ringing bar
 
-A stack at the top of every screen, one row per `ringing` fire, newest first:
+A stack at the top of every screen, one row per `ringing` fire **that is for me**, newest first. Nobody sees another
+person's alert: a fire is for me when I am among the people its alert pushes to (§5.7), whatever its channels: a
+reminder or timer assigned to nobody or to me and on for me (§7.5), a chore step that is mine, a machine or cooking
+timer that alerts me, a task check-in that is mine. One that names nobody (assigned to nobody, a thing, a machine
+with nobody to alert) is everyone's; one whose people are all gone shows to nobody, as it pushes to nobody. A fire
+whose source is gone still shows, so it can be closed ⚑ Q347.
 
 - Reminder row: `🔔 Take out trash · 19:00` with **[Snooze 10m] [Done]** (an all-day event:
   `· all day`; a sun-timed one, §7.7: `🔔 Put the goats away · sunset` ⚑ Q56)
@@ -4179,6 +4184,14 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
   the row stays. An away row shows `· away ({name})` instead of the button.
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
   "3 more ringing ▾".
+
+**Acceptance (API tests, `test/alerts-api.test.ts`):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| RB1 | a reminder assigned to A and B rings; `GET /fires` as A, as B, as C (an admin) | A and B get the row; C does not |
+| RB2 | a reminder assigned to nobody rings; `GET /fires` as C | C gets the row |
+| RB3 | a timer assigned to A rings; `GET /fires` as A, as C | A gets the row; C does not |
 
 ### 8.3 Day sheet
 

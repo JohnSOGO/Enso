@@ -3,19 +3,18 @@ import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { ACTION, CHANNEL, TIMER_CMD, isOneOf, type Channel, type CookKind } from '../../shared/vocab';
 import { applyAction, applyTimerCmd, timerWindow, timerWindowError, type FireRow } from '../../shared/engine';
-import { all, first, householdTz, newId, nowIso, parseJson, run } from '../db';
+import { activeMemberIds, all, first, householdTz, newId, nowIso, parseJson, run } from '../db';
 import { isTime } from '../../shared/time';
 import { body, fail, intIn, str } from '../http';
 import { requireMember } from '../session';
 import { canChange } from '../../shared/roles';
 import { ALERT_TITLE_MAX, TIMER_INTERVAL_MAX, TIMER_INTERVAL_MIN } from '../../shared/alert-limits';
 import { choreFireContext } from '../../shared/chores';
-import { insertFire, loadChoreRun, sourceOf, updateFire } from '../fire-rows';
+import { audienceOf, insertFire, loadChoreRun, sourceOf, updateFire } from '../fire-rows';
 import { completeStep, finisherOf } from './chores';
-import { isOnFor } from '../../shared/optins';
 import { MACHINE_LABEL, isMachineId } from '../../shared/machines';
 import { cookLabel } from '../../shared/cooking';
-import { endWindowStatements, onEventIds } from '../event-rows';
+import { endWindowStatements } from '../event-rows';
 import { ANNOUNCE_NEEDS_WINDOW } from '../../shared/timer-start';
 import { isTaskId, taskFromRow, timeUp, type TaskRow } from '../../shared/tasks';
 import { TASK_ACK_REFUSED } from '../../shared/task-replies';
@@ -140,34 +139,40 @@ alerts.post('/timers/:id/commands', requireMember, async (c) => {
 });
 
 /**
- * §10 GET /fires rows, as the PWA shows them, for fires matching `where`. `hideOff`: drop the reminders of optional
- * events this member has off (§7.5) — the list does; the away answer (§9.2c) returns the caller's own fire regardless.
+ * §10 GET /fires rows, as the PWA shows them, for fires matching `where`. `hideOff`: drop every fire not for this
+ * member (§8.2: not in its alert's audience, the same people tick pushes) — the list does; the away answer (§9.2c) returns the caller's own fire regardless.
  */
 async function fireViews(db: D1Database, me: string, where: string, binds: unknown[], hideOff = true) {
   const rows = await all<Record<string, unknown> & {
-    kind: string; choreRunId: string | null; optional: number | null; machineId: string | null; machineOwner: string | null;
+    kind: string; choreRunId: string | null; machineId: string | null; machineOwner: string | null;
     cookKind: CookKind | null; cookName: string | null; taskOwner: string | null;
   }>(db,
     `SELECT f.id, f.kind, f.due_at AS dueAt, f.state, f.alert_count AS alertCount, f.occurrence_date AS occurrenceDate,
             f.event_id AS eventId, f.timer_id AS timerId, f.chore_run_id AS choreRunId, f.thing_id AS thingId,
             f.machine_id AS machineId, m.owner_id AS machineOwner, m.cook_kind AS cookKind, m.name AS cookName, f.away_by AS awayBy, ts.member_id AS taskOwner,
-            COALESCE(e.title, t.title, th.title) AS title, e.start_time AS startTime, e.start_sun AS startSun, e.optional
+            COALESCE(e.title, t.title, th.title) AS title, e.start_time AS startTime, e.start_sun AS startSun
        FROM fires f LEFT JOIN events e ON e.id = f.event_id LEFT JOIN timers t ON t.id = f.timer_id
        LEFT JOIN things th ON th.id = f.thing_id LEFT JOIN machines m ON m.id = f.machine_id LEFT JOIN task_sessions ts ON ts.id = f.timer_id
       WHERE ${where}
       ORDER BY f.due_at DESC`, ...binds);
-  const on = await onEventIds(db, me);
+  const now = nowIso(), active = hideOff ? await activeMemberIds(db) : [];
   const out = [];
-  for (const { choreRunId, optional, machineId, machineOwner, cookKind, cookName, taskOwner, ...r } of rows) {
+  for (const { choreRunId, machineId, machineOwner, cookKind, cookName, taskOwner, ...r } of rows) {
     // §7G.1: a task check-in is its owner's alone; it carries taskTimeUp so the PWA shows the time-up answers (§7G.3).
     if (isTaskId(r.timerId)) {
       if (taskOwner !== me) continue;
       const ts = await first<TaskRow>(db, 'SELECT * FROM task_sessions WHERE id = ?', r.timerId);
-      out.push({ ...r, taskTimeUp: ts ? timeUp(taskFromRow(ts), nowIso()) : false });
+      out.push({ ...r, taskTimeUp: ts ? timeUp(taskFromRow(ts), now) : false });
       continue;
     }
-    // §7.5: a reminder of an optional event is hidden from whoever doesn't have it on.
-    if (hideOff && r.kind === 'reminder' && !isOnFor({ optional: optional ?? 0 }, me, on.has(r.eventId as string) ? [me] : [])) continue;
+    // §8.2: a row only for whoever its alert is for (a gone source stays, so it can be closed).
+    if (hideOff) {
+      const src = await sourceOf(db, {
+        kind: r.kind as FireRow['kind'], event_id: r.eventId as string | null, timer_id: r.timerId as string | null, chore_run_id: choreRunId,
+        thing_id: r.thingId as string | null, machine_id: machineId, occurrence_date: r.occurrenceDate as string | null, due_at: r.dueAt as string,
+      }, now);
+      if (src && !audienceOf(src, active).push.includes(me)) continue;
+    }
     // §10: machine fires carry the machine, its label as the title, and the load's owner.
     if (r.kind === 'machine') {
       const title = isMachineId(machineId) ? MACHINE_LABEL[machineId] : cookKind ? cookLabel({ cook_kind: cookKind, name: cookName }) : null; // §7D.8

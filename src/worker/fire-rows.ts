@@ -13,6 +13,7 @@ import { utcToLocal } from '../shared/time';
 import { sunsetUtc, type Place } from '../shared/sun';
 import { FOUNDER_SQL, all, first, newId, parseJson, placeOf } from './db';
 import { onMemberIds } from './event-rows';
+import { audience } from '../shared/optins';
 
 interface SourceRow {
   title: string; assigned_to: string; channels: string | null; renotify_min: number | null; max_alerts: number;
@@ -200,3 +201,7 @@ async function taskSay(db: D1Database, id: string, title: string, intervalMin: n
   const s = taskFromRow(r);
   return { say: (n) => checkinText(s, title, intervalMin, now, n).text, houseSay: (n) => checkinText(s, title, intervalMin, now, n).house };
 }
+
+/** §5.7, §8.2 — who a fire's alert is for, from its source: the one mapping tick step 2 (pushes) and GET /fires (the bar) share. */
+export const audienceOf = (src: Source, activeIds: readonly string[]) =>
+  audience({ optional: src.optional ?? false, assignedTo: src.assignedTo, activeIds, onIds: src.onIds ?? [], channels: src.cfg.channels });
