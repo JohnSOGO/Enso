@@ -1,10 +1,11 @@
-// SPEC §8.8 — the 🛒 Lists tab: the list button and its ListPicker popup (Things to do + Movies & shows + every
+// SPEC §8.8 — the 🛒 Lists tab: the list button and its ListPicker popup (Things to do + Movies & shows + 📥 Inbox (§8.8a) + every
 // list with its emoji + ＋ New list…, opened by each tap of the tab), ⋯ options, composing ThingsToDo (§8.11), Shows (§8.14) and HouseholdListOptions, and the list panel (add box with ItemPhoto's 📷,
 // rows, Done). Every list behaves the same (Q24). The server decides added / existing / reopened and who may manage
 // a list (§7A.1); this screen shows what it returns. A snapped photo waits here until Add, then is saved (§7A.3).
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { ThingsToDo } from './ThingsToDo';
 import { Shows } from './Shows';
+import { Inbox } from './Inbox';
 import { ItemForm, type Item } from './HouseholdListItemForm';
 import { ListOptions, NewListForm, type ListSummary } from './HouseholdListOptions';
 import { ListPicker, pickerEntries } from './ListPicker';
@@ -20,10 +21,11 @@ import s from './HouseholdLists.module.css';
 
 interface ListData { list: Omit<ListSummary, 'openCount'>; open: Item[]; checked: Item[] }
 
-/** Remembered per device: a list id, THINGS or SHOWS. (An old `today` falls back to Shopping: chores have their own tab, §8.15.) */
+/** Remembered per device: a list id, THINGS, SHOWS or INBOX. (An old `today` falls back to Shopping: chores have their own tab, §8.15.) */
 const STORE_KEY = 'enso.list';
 const THINGS = 'things';
 const SHOWS = 'shows';
+const INBOX = 'inbox';
 
 function remembered(): string | null {
   try { return localStorage.getItem(STORE_KEY); } catch { return null; }
@@ -40,6 +42,7 @@ export function HouseholdLists({ pickRequest }: { pickRequest: number }) {
   const [lists, setLists] = useState<ListSummary[] | null>(null);
   const [thingsOpen, setThingsOpen] = useState<number | null>(null);
   const [showsWant, setShowsWant] = useState<number | null>(null);
+  const [inboxCount, setInboxCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [choice, setChoice] = useState<string | null>(remembered);
   const [creating, setCreating] = useState(false);
@@ -52,12 +55,13 @@ export function HouseholdLists({ pickRequest }: { pickRequest: number }) {
     // The open count only; a failure leaves the option without a count (ThingsToDo shows the error when opened).
     get<{ open: unknown[] }>('/things').then((t) => setThingsOpen(t.open.length)).catch(() => setThingsOpen(null));
     get<{ want: unknown[] }>('/shows').then((t) => setShowsWant(t.want.length)).catch(() => setShowsWant(null));
+    get<{ items: unknown[] }>('/inbox').then((t) => setInboxCount(t.items.length)).catch(() => setInboxCount(null));
   }, []);
   useEffect(() => { loadLists(); }, [loadLists, version]);
   useEffect(() => { if (choice) try { localStorage.setItem(STORE_KEY, choice); } catch { /* storage may be blocked: the choice just isn't remembered */ } }, [choice]);
 
   // A remembered list that no longer exists falls back to Shopping, else the first list (§8.8).
-  const special = choice === THINGS || choice === SHOWS;
+  const special = choice === THINGS || choice === SHOWS || choice === INBOX;
   const current = special || lists === null ? undefined
     : lists.find((l) => l.id === choice) ?? lists.find((l) => l.id === SHOPPING_LIST_ID) ?? lists[0];
   const view = special ? choice : current?.id ?? '';
@@ -65,6 +69,7 @@ export function HouseholdLists({ pickRequest }: { pickRequest: number }) {
   const entries = pickerEntries(lists ?? [], [
     { value: THINGS, emoji: '✅', label: 'Things to do', count: thingsOpen },
     { value: SHOWS, emoji: '🎬', label: 'Movies & shows', count: showsWant },
+    { value: INBOX, emoji: '📥', label: 'Inbox', count: inboxCount },
   ]);
   const shown = entries.find((e) => e.value === view);
 
@@ -91,6 +96,7 @@ export function HouseholdLists({ pickRequest }: { pickRequest: number }) {
       {/* Keyed by list: switching lists starts a fresh panel (empty add box, no note, reloads). */}
       {view === THINGS ? <ThingsToDo />
         : view === SHOWS ? <Shows onChanged={loadLists} />
+        : view === INBOX ? <Inbox onChanged={loadLists} />
         : current ? <ListPanel key={current.id} list={current} onItemsChanged={loadLists} />
         : lists && <p className="muted">No lists yet. Tap the list button, then ＋ New list…, to make one.</p>}
 

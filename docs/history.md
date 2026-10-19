@@ -974,3 +974,9 @@ Deviations from this spec, deliberately:
 - Fixed while building (already reflected above): `login_failures` table; the
   reminder unique index covers only **open** fires (a closed `removed` fire must not
   block its rescheduled replacement); all-day reminders fire at 09:00 local ⚑.
+
+**📥 Send to Enso** (v1.85.0, SPEC 3.50, §7H, §8.8a, migration 0055, Q319–Q326; MojoSOGO 2026-10-19 "a Share to App
+feature that lets you send URLs, images, and text directly from your iPhone" … "Do it"): an iOS Shortcut in the Share
+sheet posts a link, text or photo to `POST /share` with my own key; Ensō saves it in the background to my 📥 Inbox
+(Lists popup) and the Shortcut shows "✅ Saved to your Enso Inbox". Set up (key + steps) is folded under the Inbox.
+Built as specified. Owed: his TRY on the iPhone (make the Shortcut; share a Safari link, a Notes text, a photo).

@@ -76,6 +76,10 @@ export type TaskMood = (typeof TASK_MOOD)[number];
 export type TaskOutcome = (typeof TASK_OUTCOME)[number];
 export type TaskLooks = (typeof TASK_LOOKS)[number];
 
+/** §7H an Inbox item's kind — derived from which of photo / url / text it has, never stored. */
+export const INBOX_KIND = ['photo', 'link', 'text'] as const;
+export type InboxKind = (typeof INBOX_KIND)[number];
+
 /** /status `house.state` (§9.2) — derived from the deliveries table, never stored. */
 export const HOUSE_STATE = ['ok', 'failing', 'not_configured', 'untried'] as const;
 export type HouseState = (typeof HOUSE_STATE)[number];
