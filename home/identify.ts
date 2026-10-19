@@ -14,6 +14,8 @@ const BODY_MAX = 200;
 /** Room for the model's thinking AND the answer: at 100 it was cut off mid-thought with an empty answer every time,
  * which silently sent every photo to the paid Claude fallback. ~400 tokens of thinking measured; 1024 leaves room. */
 export const IDENTIFY_MAX_TOKENS = 1024;
+/** ⚑ Q317 — seconds LM Studio keeps the model it loaded on demand after the last photo, so it isn't reloaded each time. */
+export const IDENTIFY_TTL_S = 86_400;
 
 export interface IdentifyDeps {
   /** IDENTIFY_MODEL from the helper's env; unset or empty → `off`. */
@@ -39,6 +41,7 @@ export const identifyPayload = (model: string, photo: Uint8Array, type: string) 
   }],
   temperature: 0,
   max_tokens: IDENTIFY_MAX_TOKENS,
+  ttl: IDENTIFY_TTL_S,
   stream: false,
 });
 

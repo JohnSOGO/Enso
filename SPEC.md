@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.47 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.48 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2218,7 +2218,9 @@ the cap); an empty body → 400; then `identify` (`home/identify.ts`) → **200*
 JSON, whatever its `ok`. `home/identify.ts`: one POST to LM Studio at
 `http://127.0.0.1:1234/v1/chat/completions` — `model` = `IDENTIFY_MODEL` (the helper's env), one user
 message with a text part `IDENTIFY_PROMPT + " /no_think"` and an `image_url` part holding the image as a
-`data:` URL, `temperature` 0, `max_tokens` 100, `stream` false — with a 15 s timeout ⚑ Q114. It answers
+`data:` URL, `temperature` 0, `max_tokens` `IDENTIFY_MAX_TOKENS` (room for the thinking it does anyway), `ttl`
+`IDENTIFY_TTL_S` (24 h, so LM Studio keeps a model it loaded on demand instead of reloading it for the next
+photo ⚑ Q317), `stream` false — with a 15 s timeout ⚑ Q114. It answers
 `{ ok: true, text: choices[0].message.content }`, else `{ ok: false, kind: "failed", reason }` ("LM Studio
 HTTP n: {body ≤ 200}", "LM Studio error: {message}", "LM Studio answered in an unexpected shape.").
 `IDENTIFY_MODEL` unset or empty → `{ ok: false, kind: "off", reason: "IDENTIFY_MODEL isn't set on SogoAI." }`,
@@ -2263,7 +2265,7 @@ One log line per request (the outcome, never the token, never the image).
 | SN11 | tick an item with a photo, then add its text again | `reopened`; the photo still there |
 | SN12 | `cleanItemName`, `parseIdentifyReport` | as the rules above |
 | SN13 | the helper's `/identify`: no / a wrong bearer; GET; a type that isn't an image; a body over the cap; a good request | 401; 405; 400; 413; 200 with the report |
-| SN14 | `identify` over a fake LM Studio: a good answer; a timeout; a non-2xx; `IDENTIFY_MODEL` unset | one POST with the model, the prompt + " /no_think", the image as a data URL, temperature 0 → `ok`; `failed` "LM Studio error: …"; `failed` "LM Studio HTTP …"; `off`, nothing called |
+| SN14 | `identify` over a fake LM Studio: a good answer; a timeout; a non-2xx; `IDENTIFY_MODEL` unset | one POST with the model, the prompt + " /no_think", the image as a data URL, temperature 0, ttl `IDENTIFY_TTL_S` → `ok`; `failed` "LM Studio error: …"; `failed` "LM Studio HTTP …"; `off`, nothing called |
 | SN15 | every report `identify` produces (found by **calling** it over fake LM Studio answers) through `handle()` and the wire into `identifyFromHome` | each accepted: the text for `ok`, the reason for a failure |
 | SN-M | migration check (§4.2v) | rows written before 0023 survive with `photo_key` NULL; `foreign_key_check` empty |
 

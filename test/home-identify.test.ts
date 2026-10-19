@@ -1,7 +1,7 @@
 // SN14 (SPEC §7A.3) — home/identify.ts over a fake LM Studio (never a real network): the one request's shape, and
 // every failure honest — a timeout, a non-2xx, an unexpected shape, IDENTIFY_MODEL unset (off, nothing called).
 import { describe, expect, it } from 'vitest';
-import { IDENTIFY_MAX_TOKENS, IDENTIFY_TIMEOUT_MS, LM_STUDIO_URL, NO_THINK, identify } from '../home/identify';
+import { IDENTIFY_MAX_TOKENS, IDENTIFY_TTL_S, IDENTIFY_TIMEOUT_MS, LM_STUDIO_URL, NO_THINK, identify } from '../home/identify';
 import { IDENTIFY_PROMPT } from '../src/shared/item-reading';
 
 const PHOTO = new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3, 250]);
@@ -43,6 +43,7 @@ describe('SN14 identify', () => {
       }],
       temperature: 0,
       max_tokens: IDENTIFY_MAX_TOKENS,
+      ttl: IDENTIFY_TTL_S,
       stream: false,
     });
     expect(NO_THINK).toBe(' /no_think');
