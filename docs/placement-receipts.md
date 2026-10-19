@@ -7,6 +7,21 @@ carry its result.
 
 ---
 
+## 2026-10-19 — log why Build now failed (placement-advisor)
+
+- **Ask:** v1.93.2 patch, SPEC §8.18 part 6 Build now (steward backlog, MojoSOGO "Fix"): when POST
+  /feature-requests/:id/build gets {ok:false, reason} from fireBuild, log `console.error('build now not started', r.id,
+  reason)`, then return the existing 502.
+- **Verdict:** src/worker/routes/feature-requests.ts [EXISTING]
+- **Flow stage:** route
+- **Why:** The route holds r.id and already maps the failure to the 502; logging at the call site matches phone-login.ts
+  / cook-rows.ts. build-fire.ts stays a leaf that returns `reason` without logging. reason is "HTTP <status>" / "error:
+  <name>", never the token. SY11 gets a console.error spy inside its `build()` helper (the helper's restoreAllMocks
+  would drop one set in the test body); it pins id + reason and no token.
+- **Caps:** feature-requests.ts ~55/300. Nothing newly in the band.
+- **Sources read:** feature-requests.ts, build-fire.ts, scripts/arch.ts, test/say-api.test.ts, console.error call
+  sites, this file (head).
+
 ## 2026-10-19 — steward pass after v1.93.0 (code-steward)
 
 - **Run:** post-release, v1.93.0 (weather and moon as optional calendar items, migration 0058, Q348), plus v1.92.1–v1.92.2

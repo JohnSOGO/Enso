@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.68 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.69 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5453,7 +5453,9 @@ which starts that same build session straight away (the Claude Code routine's fi
 `BUILD_FIRE_TOKEN`, §2.4) with the request's id and title, and the popup says "Building now. John gets a ping when it's
 live." **Later** (or closing) leaves it for the morning. The same gate runs: a tap never skips the AREC or the
 placement-advisor, and a request that turns out big waits for John. Only from **new**; not set up → "Build now isn't
-set up yet. It will be built in the morning." and nothing else changes.
+set up yet. It will be built in the morning." and nothing else changes. A refused fire answers "The build couldn't start. It will be built
+in the morning." and the Worker logs one line with the request's id and why (the HTTP status or the error's name; never
+the token).
 
 **7. What the reading is given:** today, the household's zone, the members' names, the speaker and the speaker's own
 After work / After school time (§8.5b, so "after work" or "after school" is that time, and "tonight" and "tomorrow
@@ -5474,7 +5476,7 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
 | SY7 | Claude answers "outside" for "order our groceries from Amazon every Friday", with where "Lists → Shopping"; with no where | 200 `{ kind: 'outside', say: "That's outside what Ensō is for…", where: 'Lists → Shopping', request: { title, summary, size: 'big' } }`; `where: null`; no row saved by /say |
 | SY9 | Claude answers an event "Dinner" on 2026-10-23 at 20:00 for "me" and "Shelly"; an all-day one; a bad date | 200 `{ kind: 'event', event: { title: 'Dinner', date: '2026-10-23', time: '20:00', assignedTo: [me, Shelly] } }`; `time: null`; 502 (not read); nothing saved |
 | SY10 | POST /say as a member whose After is school at 15:00; as an admin with no After set | the prompt gives "after school" = 15:00; "after work" = 17:30 |
-| SY11 | POST /feature-requests/{id}/build as an admin on a new request (fire answered 200); as a plain member; on a needs_john one; with BUILD_FIRE_TOKEN unset; fire answered 500 | 202 `{ started: true }`, one POST to BUILD_FIRE_URL with the Bearer and the id + title in `text`; 403; 409; 503 `build_now_off`, no fire; 502 `build_failed` |
+| SY11 | POST /feature-requests/{id}/build as an admin on a new request (fire answered 200); as a plain member; on a needs_john one; with BUILD_FIRE_TOKEN unset; fire answered 500 | 202 `{ started: true }`, one POST to BUILD_FIRE_URL with the Bearer and the id + title in `text`; 403; 409; 503 `build_now_off`, no fire; 502 `build_failed` and one log line naming the id and `HTTP 500`, never the token |
 | SY8 | POST /feature-requests `{ …, outside: true }`; GET /ops/requests; founder …/ok on it; an admin …/dismiss on another | 201 status `outside`, listed in GET /feature-requests after 30 days too; not in /ops/requests; `new`; `dismissed` |
 | SY-M | on the iPhone | tap the Ensō button, say "weekdays 8 to 11 remind me to book the car check", hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; hold the mark, say "remind me tomorrow at 9 to call mom", let go → the answer comes without tapping Done; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests |
 

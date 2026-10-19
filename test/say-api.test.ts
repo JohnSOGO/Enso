@@ -149,10 +149,12 @@ describe('§8.18 Build now', () => {
       fired.push(req);
       return new Response('{}', { status });
     });
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const res = await worker.fetch(new Request(`${BASE}/feature-requests/${id}/build`, { method: 'POST', headers: { cookie } }),
       { ...env, ...e } as Env, createExecutionContext());
+    const logged = err.mock.calls.map((a) => a.map(String));
     vi.restoreAllMocks();
-    return { status: res.status, json: await res.json<any>(), fired };
+    return { status: res.status, json: await res.json<any>(), fired, logged };
   }
   it('SY11 an admin starts the build on a new request; others, other statuses and no setup do not', async () => {
     const on = { BUILD_FIRE_URL: FIRE, BUILD_FIRE_TOKEN: 'test-fire-token' };
@@ -169,7 +171,10 @@ describe('§8.18 Build now', () => {
     const off = await build(small.id, o.cookie!, { BUILD_FIRE_URL: FIRE, BUILD_FIRE_TOKEN: '' });
     expect(off).toMatchObject({ status: 503, json: { error: 'build_now_off' } });
     expect(off.fired).toHaveLength(0);
-    expect((await build(small.id, o.cookie!, on, 500)).json.error).toBe('build_failed');
+    const failed = await build(small.id, o.cookie!, on, 500);
+    expect(failed.json.error).toBe('build_failed');
+    expect(failed.logged).toEqual([['build now not started', small.id, 'HTTP 500']]);
+    expect(JSON.stringify(failed.logged)).not.toContain('test-fire-token');
     expect((await o.get('/feature-requests')).json.find((x: any) => x.id === small.id).status).toBe('new');
   });
   it('the rule', () => {
