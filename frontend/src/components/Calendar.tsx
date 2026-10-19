@@ -16,6 +16,7 @@ export interface DayData {
   items: (Occurrence & { continued: boolean })[];
   publicHolidays: { name: string; emoji: string }[];
   marketDays: { name: string; emoji: string }[];
+  moonPhases: { name: string; emoji: string }[]; // §7.12
   weather?: WeatherDay; // §7.11
 }
 
@@ -58,7 +59,7 @@ function buildDays(json: any, from: string, to: string): Map<string, DayData> {
   const days = new Map<string, DayData>();
   const day = (d: string) => {
     let x = days.get(d);
-    if (!x) { x = { items: [], publicHolidays: [], marketDays: [] }; days.set(d, x); }
+    if (!x) { x = { items: [], publicHolidays: [], marketDays: [], moonPhases: [] }; days.set(d, x); }
     return x;
   };
   for (const o of json.occurrences as Occurrence[]) {
@@ -70,6 +71,7 @@ function buildDays(json: any, from: string, to: string): Map<string, DayData> {
   }
   for (const h of json.publicHolidays) day(h.date).publicHolidays.push({ name: h.name, emoji: h.emoji });
   for (const m of json.marketDays ?? []) day(m.date).marketDays.push({ name: m.name, emoji: m.emoji });
+  for (const m of json.moonPhases ?? []) day(m.date).moonPhases.push({ name: m.name, emoji: m.emoji });
   for (const w of (json.weather ?? []) as WeatherDay[]) day(w.date).weather = w;
   return days;
 }

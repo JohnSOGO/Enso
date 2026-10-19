@@ -5,8 +5,9 @@ import { addDays, diffDays, isDate } from '../../shared/time';
 import { occurrences, type Recurrence } from '../../shared/recurrence';
 import { publicHolidaysBetween } from '../../shared/holidays';
 import { marketDaysBetween } from '../../shared/markets';
+import { moonPhasesBetween } from '../../shared/moon';
 import { isOnFor } from '../../shared/optins';
-import { all, first, newId, nowIso, parseJson } from '../db';
+import { all, first, householdTz, newId, nowIso, parseJson } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
 import { canChange, isAdmin } from '../../shared/roles';
@@ -50,6 +51,7 @@ events.get('/calendar', requireMember, async (c) => {
   }
   occ.sort((a, b) => (a.date + (a.startTime ?? '')).localeCompare(b.date + (b.startTime ?? '')));
   return c.json({ occurrences: occ, publicHolidays: publicHolidaysBetween(from, to, await daysOff(c.env.DB)), marketDays: marketDaysBetween(from, to),
+    moonPhases: moonPhasesBetween(from, to, await householdTz(c.env.DB)),
     weather: await weatherBetween(c.env.DB, from, to) });
 });
 

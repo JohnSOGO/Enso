@@ -28,10 +28,11 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
   const [y, m, d] = date.split('-').map(Number);
   const pub = me.showPublicHolidays ? data?.publicHolidays ?? [] : [];
   const market = me.showOptionsExpiration ? data?.marketDays ?? [] : [];
+  const moon = data?.moonPhases ?? []; // §7.12: everyone sees it
   const items = data?.items ?? [];
   const days = items.filter((o) => !isMultiDay(o)); // multi-day events are drawn as bars
-  // §7.2 day icons beside the number: holiday, 📈, then unassigned events' emoji (Q277); at most two.
-  const lead = [...pub.slice(0, 1), ...market.slice(0, 1)];
+  // §7.2 day icons beside the number: holiday, 📈, moon phase, then unassigned events' emoji (Q277); at most two.
+  const lead = [...pub.slice(0, 1), ...market.slice(0, 1), ...moon.slice(0, 1)].slice(0, 2);
   const iconed = days.filter((o) => o.emoji && !o.assignedTo.length).slice(0, 2 - lead.length);
   const icons = [...lead, ...iconed.map((o) => ({ emoji: o.emoji! }))];
   const single = days.filter((o) => !iconed.includes(o)); // an iconed event gets no line (§7.1)
@@ -57,7 +58,7 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
   const label = [
     new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }),
     items.length ? `${items.length} event${items.length > 1 ? 's' : ''}` : '',
-    ...pub.map((h) => h.name), ...market.map((m) => m.name),
+    ...pub.map((h) => h.name), ...market.map((m) => m.name), ...moon.map((m) => m.name),
     data?.weather ? `${data.weather.words}, high ${data.weather.high}°, low ${data.weather.low}°` : '',
   ].filter(Boolean).join(', ');
   return (
@@ -73,7 +74,7 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
         {d === 1 ? <><span className={s.monthTag}>{MONTHS[m - 1]}</span> </> : null}
         <span className={s.dot}>{d}</span>
         {icons.length > 0 && (
-          <span className={s.hEmoji} aria-hidden title={[...pub.map((h) => h.name), ...market.map((m) => m.name), ...iconed.map((o) => o.title)].join(', ')}>{icons.map((x) => x.emoji).join('')}</span>
+          <span className={s.hEmoji} aria-hidden title={[...pub.map((h) => h.name), ...market.map((m) => m.name), ...moon.map((m) => m.name), ...iconed.map((o) => o.title)].join(', ')}>{icons.map((x) => x.emoji).join('')}</span>
         )}
       </span>
       {data?.weather && ( // §7.11: the high in its heat band, then the emoji
