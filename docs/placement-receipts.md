@@ -7,6 +7,29 @@ carry its result.
 
 ---
 
+## 2026-10-19 — Say it, it does it: the event reading, the speaker's After, no selection while held (placement-advisor)
+
+- **Ask:** v1.90.0, SPEC 3.57 §8.18 parts 1, 3 and 7, SY9 / SY10, ⚑ Q340 revised, ⚑ Q341. (A) a fifth reading `event`
+  whose Yes opens the new-event form filled in. (B) "after work" / "after school" is the speaker's own After, and
+  tonight / morning are the When chips' times (steward v1.87 item 1). (C) holding the mark selects nothing on screen and
+  shows no copy / save menu; the text box stays editable.
+- **Verdict:** EXISTING. `src/shared/vocab.ts` (SAY_KIND + 'event'), `src/shared/say-reading.ts` (SayEvent and its
+  branch), `src/worker/say-reader.ts` (event schema, prompt lines, `after: After`, AFTER_LABEL and WHEN_CHOICE imported),
+  `src/worker/routes/say.ts` (one member_prefs read → afterOf), `frontend/src/components/EnsoButton.tsx` and
+  `.module.css` (Yes on event → EventForm; the holding class on <html>), `frontend/src/components/EventForm.tsx`
+  (`start?: SayEvent` merged in blank(), dirty when given). No new row; row texts updated.
+- **Flow stage:** rules (say-reading) → the reading (say-reader) → route (say.ts) → render (EnsoButton, EventForm).
+- **Why:** each part fits its owner's single concern and reuses existing shapes (whoOf, isDate / isTime, blank()'s
+  date-derived fields). Rejected: a helper for the event start and re-pinning EventForm (the merge is a few lines); a
+  shared After row helper (afterOf is the one rule; auth.ts and members.ts fold the columns into different joins; a
+  fourth single-member reader would put `memberAfter` in db.ts); passing chip times through the route (imported in
+  say-reader instead). The bad-time case was settled in §8.18 before building (left out → all day).
+- **Caps:** EventForm.tsx 196 → 200 / 223 (band starts at 201); EnsoButton.tsx ~170 / 300; say-reading.ts ~92 / 300;
+  say-reader.ts ~106 / 300; say.ts ~46 / 300.
+- **Sources read:** scripts/arch.ts; docs/module-ownership.md; docs/placement-receipts.md; SPEC.md §8.18 and SY1–SY10;
+  say-reading.ts, say-reader.ts, routes/say.ts, routes/members.ts, shared/reminders.ts, session.ts, EventForm.tsx,
+  EnsoButton.tsx and its CSS.
+
 ## 2026-10-19 — Hold to talk on the Ensō mark (placement-advisor)
 
 - **Ask:** Pressing the Ensō mark opens the popup listening; letting go after ≥ 0.5 s sends what was heard; a shorter

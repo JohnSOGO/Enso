@@ -39,7 +39,7 @@ export const TASK_OUTCOME = ['finished', 'stopped'] as const; // §7G.6 task_ses
 export const TASK_LOOKS = ['yes', 'no', 'unsure'] as const; // §7G.6 a done line, as the photo check read it
 export const FEATURE_REQUEST_STATUS = ['new', 'needs_john', 'outside', 'done', 'dismissed'] as const; // §8.18 feature_requests.status
 export const FEATURE_REQUEST_SIZE = ['small', 'big'] as const; // §8.18 feature_requests.size
-export const SAY_KIND = ['reminder', 'exists', 'request', 'outside'] as const; // §8.18 what POST /say read — never stored
+export const SAY_KIND = ['reminder', 'event', 'exists', 'request', 'outside'] as const; // §8.18 what POST /say read — never stored
 
 export type AlertKind = (typeof ALERT_KIND)[number];
 export type Channel = (typeof CHANNEL)[number];

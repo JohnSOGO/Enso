@@ -6,6 +6,7 @@
 // ENSO_SCOPE (the code-steward checks both).
 import { askClaude } from './claude';
 import { FEATURE_REQUEST_SIZE, SAY_KIND } from '../shared/vocab';
+import { AFTER_LABEL, WHEN_CHOICE, type After } from '../shared/reminders';
 import type { z as Zod } from 'zod';
 
 /** Everything else Ensō does, and where it lives, so a request for something that exists is pointed there. */
@@ -52,28 +53,39 @@ const sayReadingSchema = (z: typeof Zod) => z.object({
     title: z.string(), date: z.string().nullable(), time: z.string().nullable(),
     days: z.array(z.string()), from: z.string().nullable(), to: z.string().nullable(), who: z.array(z.string()),
   }).nullable(),
+  event: z.object({ title: z.string(), date: z.string().nullable(), time: z.string().nullable(), who: z.array(z.string()) }).nullable(),
   where: z.string().nullable(),
   title: z.string().nullable(),
   summary: z.string().nullable(),
   size: z.enum(FEATURE_REQUEST_SIZE).nullable(),
 });
 
-export interface ReadSayInput { apiKey: string; text: string; today: string; weekday: string; nowTime: string; tz: string; me: string; members: string[] }
+export interface ReadSayInput { apiKey: string; text: string; today: string; weekday: string; nowTime: string; tz: string; me: string; members: string[]; after: After }
 
 export type ReadSayResult = { ok: true; raw: Record<string, unknown> } | { ok: false; kind: 'refused' | 'failed'; reason: string };
 
+/** The When chips' times (§8.5b), the speaker's own After for "after work" / "after school". */
+const chipTime = (id: 'tonight' | 'morning') => WHEN_CHOICE.find((c) => c.id === id)!.time;
+const whenWords = (a: After) =>
+  `"${AFTER_LABEL[a.kind].toLowerCase()}" is ${a.time}, "tonight" ${chipTime('tonight')}, "tomorrow morning" ${chipTime('morning')}`;
+
 export const sayPrompt = (i: Omit<ReadSayInput, 'apiKey' | 'text'>) =>
   `Above is what ${i.me} said (spoken, so it may be misheard) to Ensō, a family's calendar, reminder and house app. ` +
-  `Today is ${i.weekday} ${i.today}, ${i.nowTime}, in the household's time zone, ${i.tz}. The family members are: ${i.members.join(', ')}.\n\n` +
+  `Today is ${i.weekday} ${i.today}, ${i.nowTime}, in the household's time zone, ${i.tz}. The family members are: ${i.members.join(', ')} ` +
+  `(people may be said by a nickname or real name: match the closest member; ${i.me}'s own name, or "me", is "me").\n\n` +
   `First fix the words: spelling, grammar and anything plainly misheard; put that in "heard" (the same language and meaning, nothing added).\n\n` +
   `Then pick one kind:\n` +
   `- "reminder" when it is a reminder Ensō's 📌 Reminders can make: either once at a date and time (date YYYY-MM-DD, time HH:MM 24-hour, ` +
-  `the next such time after now; "after work" is 17:30, "tonight" 20:00, "tomorrow morning" 08:00), or rings once at a random time inside a ` +
+  `the next such time after now; ${whenWords(i.after)}), or rings once at a random time inside a ` +
   `window on chosen days until Done (days as two-letter codes SU MO TU WE TH FR SA, "weekdays" = MO–FR; from and to HH:MM, from before to; ` +
   `date and time null). Title: a short line of what to do, with the useful details kept ("Book car check: fix headlight, fan stays on after parking"). ` +
   `who: "me", "everyone", or the members' names as listed. Fill "say" with one friendly sentence of what Ensō will do, spoken to ${i.me} ` +
   `("I'll remind you on weekdays between 8 and 11am to book the car check.").\n` +
-  `- "exists" when Ensō already does it somewhere else (not a reminder): "where" names the place from the list below, ` +
+  `- "event" when it is something for the calendar: a plan on a day, with a time or all day, and who is going ` +
+  `("dinner on the 23rd at 8pm for John and Michelle"). event: title (short, like "Dinner"), date YYYY-MM-DD (the next such day), ` +
+  `time HH:MM 24-hour or null for all day, who: "me" or the members' names (nobody named = "me"). "say": one sentence of what Ensō ` +
+  `will add ("I'll add dinner on Friday the 23rd at 8pm for you and Michelle.").\n` +
+  `- "exists" when Ensō already does it somewhere else and it is not a reminder or an event (those Ensō makes right here): "where" names the place from the list below, ` +
   `like "Alerts → ⏱ Rolling timers", and "say" tells them so in one sentence.\n` +
   `- "request" when Ensō can't do it yet: "title" a short name for the feature, "summary" one line of what it would do, ` +
   `"size" "small" when it fits beside what exists in one screen, else "big" (a new area, many screens, outside services, or unclear). ` +

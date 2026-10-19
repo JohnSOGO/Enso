@@ -1004,6 +1004,13 @@ after MojoSOGO's "think of a way to wholistic adding to the spec; not a fragment
 so for every change, and the request gate adds an AREC ("arec and placement advisor in work flow"). Test L19 got the
 30 s timeout roles-api already has (its ~35 round trips timed out under the full run on the PC).
 
+**Say it, it does it** (v1.90.0, SPEC 3.57, §8.18, Q340–Q341; MojoSOGO 2026-10-19 "It understands what doesn't do it I
+wanted to enter it into the calendar", "the pop-up is also selecting text", FIX on the steward's after-work item): a
+fifth reading, Event: "dinner on the 23rd for John and Michelle at 8 PM" → Yes opens the new-event form filled in
+(title, date, time or all day, who). The reading is told a reminder or an event is never "already there". "After work"
+/ "after school" said to the button is the speaker's own After (was always 17:30), and tonight / morning come from the
+reminder chips. Holding the mark selects nothing on screen. Built as specified. Owed: his TRY.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

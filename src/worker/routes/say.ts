@@ -6,7 +6,9 @@ import type { AppEnv } from '../env';
 import { READS_PER_DAY } from '../../shared/things';
 import { SAY_TEXT_MAX, cleanSayReading } from '../../shared/say-reading';
 import { utcToLocal, weekdayOf } from '../../shared/time';
-import { all, nowIso } from '../db';
+import { afterOf } from '../../shared/reminders';
+import { isAdmin } from '../../shared/roles';
+import { all, first, nowIso } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
 import { readSay } from '../say-reader';
@@ -30,9 +32,11 @@ say.post('/say', requireMember, async (c) => {
   }
   const members = (await all<{ id: string; display_name: string }>(c.env.DB, 'SELECT id, display_name FROM members WHERE disabled_at IS NULL ORDER BY created_at'))
     .map((m) => ({ id: m.id, name: m.display_name }));
+  const p = await first<{ kind: string | null; time: string | null }>(c.env.DB, 'SELECT after_kind AS kind, after_time AS time FROM member_prefs WHERE member_id = ?', me.id);
+  const after = afterOf({ admin: isAdmin(me), kind: p?.kind ?? null, time: p?.time ?? null }); // §8.5b: "after work" is theirs
   const r = await readSay({
     apiKey: spent.apiKey, text, today: spent.today, weekday: DAY_NAME[weekdayOf(spent.today)], nowTime: utcToLocal(now, spent.tz).time,
-    tz: spent.tz, me: me.display_name, members: members.map((m) => m.name),
+    tz: spent.tz, me: me.display_name, members: members.map((m) => m.name), after,
   });
   if (!r.ok && r.kind === 'refused') return fail(c, 422, 'say_refused', "Ensō couldn't help with that.");
   if (!r.ok) return fail(c, 502, 'say_failed', `Ensō couldn't read that: ${r.reason}`);

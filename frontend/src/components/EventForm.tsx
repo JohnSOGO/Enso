@@ -8,6 +8,7 @@ import { weekdayOf } from '../../../src/shared/time';
 import { canChange } from '../../../src/shared/roles';
 import { ALERT_TITLE_MAX, EVENT_NOTES_MAX } from '../../../src/shared/alert-limits';
 import { type Recurrence } from '../../../src/shared/recurrence';
+import type { SayEvent } from '../../../src/shared/say-reading';
 import { longDate } from './DaySheet';
 import { FromThing } from './ThingPhoto';
 import { EventFillBar } from './EventFillBar';
@@ -21,11 +22,13 @@ interface Form extends RepeatValue, ReminderValue {
   assignedTo: string[]; optional: boolean; emoji: string;
 }
 
-function blank(date: string, founder: boolean): Form {
+/** A new event; `start` = what the Ensō button read (§8.18, ⚑ Q341). */
+function blank(date: string, founder: boolean, start?: SayEvent): Form {
+  const said = start && { title: start.title, allDay: start.time === null, startTime: start.time ?? '09:00', assignedTo: start.assignedTo };
   return {
     title: '', address: '', bring: [], notes: '', date, allDay: false, startTime: '09:00', endTime: '', endDate: date,
     repeat: 'none', byDay: [WEEKDAY[weekdayOf(date)]], weeks: ownWeek(date), until: '', assignedTo: [], optional: false, emoji: '',
-    ...reminderOf(null, founder),
+    ...reminderOf(null, founder), ...said,
   };
 }
 
@@ -54,14 +57,15 @@ function toPayload(f: Form) {
 interface Props {
   eventId?: string;
   date: string; // the tapped day (new) or the tapped occurrence (edit)
+  start?: SayEvent; // a new one from the Ensō button: filled in and dirty
   onClose: () => void;
 }
 
-export function EventForm({ eventId, date, onClose }: Props) {
+export function EventForm({ eventId, date, start, onClose }: Props) {
   const { me, members, refresh } = useApp();
   const founder = useIsFounder();
-  const [form, setForm] = useState<Form | null>(eventId ? null : blank(date, founder));
-  const [initial, setInitial] = useState<string>(JSON.stringify(form));
+  const [form, setForm] = useState<Form | null>(eventId ? null : blank(date, founder, start));
+  const [initial, setInitial] = useState<string>(() => JSON.stringify(eventId ? null : blank(date, founder)));
   const [meta, setMeta] = useState<{ createdBy: string; recurring: boolean; thingId: string | null; optional: boolean; on: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

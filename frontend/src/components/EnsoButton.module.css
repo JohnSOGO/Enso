@@ -11,6 +11,8 @@
 }
 .enso img { width: 68px; height: 68px; border-radius: 99px; pointer-events: none; -webkit-touch-callout: none; }
 .enso:active { transform: translateX(-50%) scale(.94); }
+/* ⚑ Q340 — while the mark is held the popup opens under the finger: select nothing, show no callout; the box stays editable. */
+.holding, .holding *:not(textarea) { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .listening { font-weight: 600; margin-bottom: 8px; }
 .words { font-size: 1.05rem; min-height: 3em; }
 .say { font-size: 1.1rem; line-height: 1.4; margin-bottom: 8px; }

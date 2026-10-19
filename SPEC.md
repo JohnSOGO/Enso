@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.56 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.57 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5320,8 +5320,8 @@ and the reminder form (§8.5b, §8.5c). No paid voice service ⚑ Q331.
 
 **1. The mark.** A round Ensō mark (the app icon, 84 px), centred just above the tab bar on every tab ⚑ Q332. **Tap**
 it and the popup opens listening. **Hold** it and talk: let go after at least half a second and it sends what it heard
-(as Done); let go with nothing heard and it stays open with the keyboard hint. No copy / save menu on a long press
-⚑ Q340.
+(as Done); let go with nothing heard and it stays open with the keyboard hint. While it is held nothing on screen is
+selected and no copy / save menu shows (the popup opens under the finger); the text box stays editable ⚑ Q340.
 
 **2. Listening.** "🎤 Listening…" over a **text box** that is always there. Heard words fill the box; it can be fixed by
 hand or typed (typing stops listening) ⚑ Q333. **Done** sends the box (enabled once it holds words), **🗑 Clear**
@@ -5336,12 +5336,18 @@ reads one of four. Nothing is saved by the reading itself.
 | Reading | When | What Ensō says | Buttons |
 |---|---|---|---|
 | **Reminder** | a reminder 📌 Reminders can make: once at a time (§8.5b) or at random times in a window (§8.5c) | one sentence of what it will do ("I'll remind you on weekdays between 8 and 11am to book the car check.") | **Yes** opens the reminder form filled in, to check and Save ⚑ Q335 · Clarify · Cancel |
-| **Already there** | Ensō already does it elsewhere | where ("Alerts → ⏱ Rolling timers") in a sentence | **Yes** closes · Clarify · Cancel |
+| **Event** | something on the calendar: a plan at a date, with a time or all day, and who is going (§8.4) | one sentence of what it will add ("I'll add dinner on Friday the 23rd at 8pm for you and Michelle.") | **Yes** opens the new-event form filled in (title, date, time or all day, who), to check and Save ⚑ Q341 · Clarify · Cancel |
+| **Already there** | Ensō already does it elsewhere, and it is not a reminder or an event | where ("Alerts → ⏱ Rolling timers") in a sentence | **Yes** closes · Clarify · Cancel |
 | **Not yet** | fits what Ensō is for (§1.3), but it can't do it | "Ensō can't do that yet. I can save it as a feature request for the next build." + "It's a big one, so John will look at it first." when big | **Yes** saves it as a request ("Saved. Thanks!") · Clarify · Cancel (nothing saved) |
 | **Outside** | does not fit what Ensō is for (§1.3) | "That's outside what Ensō is for. Ensō keeps the family's calendar, reminders, chores, lists, recipes and house." + where the part that fits lives, when one does | **OK** · Clarify. Leaving any way but Clarify logs it as **Out of scope** for John ⚑ Q339 |
 
 A request (Not yet or Outside) carries Claude's short title, one-line summary and size: **small** (fits beside what
 exists in one screen) or **big** (a new area, many screens, outside services, or unclear; unsure = big).
+
+Whatever Ensō can do from the popup it does, not explains: a reminder or an event is never read as Already there.
+Who is going is matched to the members by name; the speaker's own name, or "me", is the speaker; nobody named on an
+event means just the speaker. An event with no real date is not read (the speaker is asked to say it another way); a
+time that is not a real time is left out, so the form opens all day for the speaker to fix.
 
 **4. The answer.** The popup shows what Ensō heard, the sentence and the buttons, and the phone **says the sentence
 aloud** in its best English voice ⚑ Q334; 🔇 stops it. **Clarify** listens again and sends what was said before with
@@ -5371,7 +5377,9 @@ several areas) say whether Ensō already does it, whether it fits §1.3, and whe
 spec where it belongs (the section that owns that behavior, its tables and acceptance), not added as a separate piece,
 then built; done → `{ status: 'done', note: 'v1.x.y' }`.
 
-**7. What the reading is given:** today, the household's zone, the members' names, the speaker, the list of what else
+**7. What the reading is given:** today, the household's zone, the members' names, the speaker and the speaker's own
+After work / After school time (§8.5b, so "after work" or "after school" is that time, and "tonight" and "tomorrow
+morning" are the reminder chips' times), the list of what else
 Ensō does and where (ENSO_DOES), and the scope (ENSO_SCOPE, §1.3), both in `src/worker/say-reader.ts`. A new tab or
 section updates the list; a change to §1.3 updates the scope (the code-steward checks both).
 
@@ -5386,6 +5394,8 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
 | SY5 | GET /ops/requests with the token; PATCH one `{ status: 'done', note: 'v1.88.0' }`; no token | the open ones, oldest first; `done` with its note; 401 |
 | SY6 | POST /say blank; the day's reads used up; no key | 400; 429; 503 |
 | SY7 | Claude answers "outside" for "order our groceries from Amazon every Friday", with where "Lists → Shopping"; with no where | 200 `{ kind: 'outside', say: "That's outside what Ensō is for…", where: 'Lists → Shopping', request: { title, summary, size: 'big' } }`; `where: null`; no row saved by /say |
+| SY9 | Claude answers an event "Dinner" on 2026-10-23 at 20:00 for "me" and "Shelly"; an all-day one; a bad date | 200 `{ kind: 'event', event: { title: 'Dinner', date: '2026-10-23', time: '20:00', assignedTo: [me, Shelly] } }`; `time: null`; 502 (not read); nothing saved |
+| SY10 | POST /say as a member whose After is school at 15:00; as an admin with no After set | the prompt gives "after school" = 15:00; "after work" = 17:30 |
 | SY8 | POST /feature-requests `{ …, outside: true }`; GET /ops/requests; founder …/ok on it; an admin …/dismiss on another | 201 status `outside`, listed in GET /feature-requests after 30 days too; not in /ops/requests; `new`; `dismissed` |
 | SY-M | on the iPhone | tap the Ensō button, say "weekdays 8 to 11 remind me to book the car check", hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; hold the mark, say "remind me tomorrow at 9 to call mom", let go → the answer comes without tapping Done; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests |
 
@@ -6120,7 +6130,7 @@ other push stays until I hide it ⚑ Q284.
 | GET | `/reminders` | member | → open reminders (§8.5b), soonest first: `{ id, title, date, time, channels, renotifyMin, assignedTo, createdBy, state: 'due' \| 'ringing' \| 'missed', dueAt, window: { days: Weekday[], from, to } \| null }` (`dueAt` = the open fire's due time, else the reminder's own; a window's next ring, §8.5c) |
 | POST | `/reminders` | member | `{ title, date, time: "HH:MM", channels, renotifyMin?, assignedTo? }` or `{ title, window: { days, from, to }, channels, assignedTo? }` (§8.5c) → reminder (201); 400 when not after now, or a bad window |
 | PATCH/DELETE | `/reminders/{id}` | creator or owner | POST fields, all optional, merged; either shape (`window: null` back to a set time, §8.5c); re-plans like an alarm edit |
-| POST | `/say` | member | `{ text }` → 200 `{ kind: 'reminder', heard, say, reminder }` / `{ kind: 'exists', heard, say, where }` / `{ kind: 'request', heard, say, request: { title, summary, size } }` / `{ kind: 'outside', heard, say, where (or null), request: { title, summary, size } }` (§8.18, §1.3); nothing saved; 400 blank, 429 reads used up, 503 no key, 502 / 422 reading failed |
+| POST | `/say` | member | `{ text }` → 200 `{ kind: 'reminder', heard, say, reminder }` / `{ kind: 'exists', heard, say, where }` / `{ kind: 'request', heard, say, request: { title, summary, size } }` / `{ kind: 'event', heard, say, event: { title, date, time, assignedTo } }` / `{ kind: 'outside', heard, say, where (or null), request: { title, summary, size } }` (§8.18, §1.3); nothing saved; 400 blank, 429 reads used up, 503 no key, 502 / 422 reading failed |
 | GET/POST | `/feature-requests` | admin / member | → `FeatureRequest[]` newest first, last 30 days for done / dismissed: `{ id, text, title, summary, size, status, note, createdBy, createdAt }`; POST `{ text, title, summary, size, outside? }` → 201, status from size, or `outside` (§8.18, §1.3) |
 | POST | `/feature-requests/{id}/ok` · `/dismiss` | founder · admin | → the request; `ok` only from `needs_john` → `new`; `dismiss` from `new` / `needs_john`; else 409 |
 | GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Clothes washer") and `personId` = the load's owner (a cooking timer's fire: its label, §7D.8); every fire carries `awayBy` (§9.2c) |
