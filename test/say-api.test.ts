@@ -1,12 +1,13 @@
 // SPEC §8.18 SY1–SY10 — the Ensō button: POST /say reads what was said (Claude is a fake api.anthropic.com behind a
-// fetch spy that refuses every other host; the key is fake), feature requests, and the build session's queue.
+// fetch spy that refuses every other host; the key is fake), feature requests, Build now (SY11) and the build
+// session's queue.
 import { SELF, createExecutionContext, env } from 'cloudflare:test';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src/worker/index';
 import type { Env } from '../src/worker/env';
 import { READS_PER_DAY } from '../src/shared/things';
 import { cleanSayReading, clarified, outsideSay, requestSay } from '../src/shared/say-reading';
-import { closeMove, dismissMove, okMove, statusFor } from '../src/shared/feature-requests';
+import { buildRefusal, canBuild, closeMove, dismissMove, okMove, statusFor } from '../src/shared/feature-requests';
 import { ADMIN_ROLE } from '../src/shared/roles';
 import { addDays, utcToLocal } from '../src/shared/time';
 import { BASE, Client, member, owner } from './helpers';
@@ -135,6 +136,47 @@ describe('§8.18 feature requests', () => {
     expect((await SELF.fetch(`${BASE}/ops/requests`)).status).toBe(401);
     expect((await m.client.post(`/feature-requests/${small.json.id}/dismiss`)).json.status).toBe('dismissed');
     expect((await o.get('/feature-requests')).json.find((x: any) => x.id === big.json.id).status).toBe('done');
+  });
+});
+
+describe('§8.18 Build now', () => {
+  const FIRE = 'https://api.anthropic.com/v1/claude_code/routines/trig_test/fire';
+  async function build(id: string, cookie: string, e: Partial<Env>, status = 200) {
+    const fired: Request[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (req.url !== FIRE) throw new Error(`a test tried to reach ${req.url} — no fake for it`);
+      fired.push(req);
+      return new Response('{}', { status });
+    });
+    const res = await worker.fetch(new Request(`${BASE}/feature-requests/${id}/build`, { method: 'POST', headers: { cookie } }),
+      { ...env, ...e } as Env, createExecutionContext());
+    vi.restoreAllMocks();
+    return { status: res.status, json: await res.json<any>(), fired };
+  }
+  it('SY11 an admin starts the build on a new request; others, other statuses and no setup do not', async () => {
+    const on = { BUILD_FIRE_URL: FIRE, BUILD_FIRE_TOKEN: 'test-fire-token' };
+    const small = (await o.post('/feature-requests', { text: 'a dark blue theme', title: 'Blue theme', summary: '', size: 'small' })).json;
+    const big = (await o.post('/feature-requests', { text: 'order groceries', title: 'Groceries', summary: '', size: 'big' })).json;
+    const ok = await build(small.id, o.cookie!, on);
+    expect(ok).toMatchObject({ status: 202, json: { started: true } });
+    expect(ok.fired).toHaveLength(1);
+    expect(ok.fired[0].headers.get('authorization')).toBe('Bearer test-fire-token');
+    expect((await ok.fired[0].json<any>()).text).toBe(`Build now: feature request ${small.id} — Blue theme`);
+    const m = await member(o);
+    expect((await build(small.id, m.client.cookie!, on)).status).toBe(403);
+    expect((await build(big.id, o.cookie!, on)).status).toBe(409);
+    const off = await build(small.id, o.cookie!, { BUILD_FIRE_URL: FIRE, BUILD_FIRE_TOKEN: '' });
+    expect(off).toMatchObject({ status: 503, json: { error: 'build_now_off' } });
+    expect(off.fired).toHaveLength(0);
+    expect((await build(small.id, o.cookie!, on, 500)).json.error).toBe('build_failed');
+    expect((await o.get('/feature-requests')).json.find((x: any) => x.id === small.id).status).toBe('new');
+  });
+  it('the rule', () => {
+    expect(canBuild('new')).toBe(true);
+    expect(buildRefusal('new', false)).toMatchObject({ code: 403 });
+    expect(buildRefusal('needs_john', true)).toMatchObject({ code: 409 });
+    expect(buildRefusal('new', true)).toBeNull();
   });
 });
 

@@ -1,9 +1,10 @@
 // SPEC §8.18 — feature requests: GET (admins), POST (any member, after Yes in the Ensō popup), OK to build (the
-// founder) and Dismiss (admins). Validates and persists through feature-request-rows.ts; the moves are
+// founder), Dismiss (admins) and Build now (admins, ⚑ Q344: starts the build session through build-fire.ts). Validates and persists through feature-request-rows.ts; the moves are
 // shared/feature-requests.ts.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
-import { dismissMove, okMove, parseFeatureRequestInput, type Move } from '../../shared/feature-requests';
+import { buildRefusal, dismissMove, okMove, parseFeatureRequestInput, type Move } from '../../shared/feature-requests';
+import { buildFireConfigOf, fireBuild } from '../build-fire';
 import { isAdmin } from '../../shared/roles';
 import { FOUNDER_SQL, first, nowIso } from '../db';
 import { body, fail } from '../http';
@@ -37,3 +38,14 @@ featureRequests.post('/feature-requests/:id/ok', requireMember, (c) =>
   move(c, async (s) => okMove(s, (await first<{ id: string }>(c.env.DB, FOUNDER_SQL))?.id === c.get('member').id)));
 
 featureRequests.post('/feature-requests/:id/dismiss', requireMember, (c) => move(c, async (s) => dismissMove(s, isAdmin(c.get('member')))));
+
+featureRequests.post('/feature-requests/:id/build', requireMember, async (c) => {
+  const r = await loadFeatureRequest(c.env.DB, c.req.param('id'));
+  if (!r) return fail(c, 404, 'not_found', 'That request no longer exists.');
+  const no = buildRefusal(r.status, isAdmin(c.get('member')));
+  if (no) return fail(c, no.code, no.code === 403 ? 'forbidden' : 'invalid_state', no.message);
+  const cfg = buildFireConfigOf(c.env);
+  if (!cfg) return fail(c, 503, 'build_now_off', "Build now isn't set up yet. It will be built in the morning.");
+  if (!(await fireBuild(cfg, r)).ok) return fail(c, 502, 'build_failed', "The build couldn't start. It will be built in the morning.");
+  return c.json({ started: true }, 202);
+});

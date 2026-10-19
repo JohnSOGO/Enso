@@ -21,7 +21,7 @@ the working agreement in `CLAUDE.md`.
 ## Secrets: where the values live (never in the repo)
 
 - **Worker secrets** (`wrangler secret list`): ANTHROPIC_API_KEY, YOUTUBE_API_KEY, HA_TOKEN, CF_ACCESS_CLIENT_ID,
-  CF_ACCESS_CLIENT_SECRET, CAPTIONS_TOKEN, OPS_NOTIFY_TOKEN, VAPID_PRIVATE_KEY, SETUP_TOKEN.
+  CF_ACCESS_CLIENT_SECRET, CAPTIONS_TOKEN, OPS_NOTIFY_TOKEN, VAPID_PRIVATE_KEY, SETUP_TOKEN, BUILD_FIRE_TOKEN (Build now, §8.18 part 6: made at claude.ai/code/routines → "Enso daily feature requests" → Edit → API trigger → Generate token; not set until John does it).
 - **Local copies on the dev PC**, in `C:\Users\Public\git\HomeAssistant\secrets\`: ha_token, cf_access_enso,
   cf_tunnel_token / cf_tunnel_sogoai, captions_token, cf_api_token (the YouTube key is the `API_TOK_YT_ENSO` line). The ops ping
   token is in `%USERPROFILE%\.enso\ops-notify-token`. SogoAI's copy of CAPTIONS_TOKEN is in `C:\Enso\captions-helper.env`.

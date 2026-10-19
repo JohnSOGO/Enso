@@ -1020,6 +1020,12 @@ voice and Not now above the stamp (now last), and the app opens once the phone a
 as in About and the iPhone launch PNGs were re-rendered to match; the header badge stays only after Not now. The
 splash timer moved from App.tsx to Splash.tsx first (reorganizer, no behavior change).
 
+
+**Build now** (v1.91.0, SPEC 3.61, §8.18 parts 3 and 6, Q344; MojoSOGO 2026-10-19 "if they do want it built, can you
+build it immediately?", "Only me and admins"): an admin who saves a small request is asked "Build it now?"; Build now
+starts the daily build routine at once through its API fire address (BUILD_FIRE_URL + the BUILD_FIRE_TOKEN secret), with
+the same gate. The same day the daily 5:52 run was added (Q343). Built as specified. Owed: his one-time token setup, then
+his TRY.
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

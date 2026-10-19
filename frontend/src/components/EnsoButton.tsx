@@ -1,7 +1,7 @@
 // SPEC §8.18 — the Ensō button and its popup, rendered once by App.tsx: tap, say what you want into the text box
 // (heard words fill it; type or fix it by hand; 🗑 Clear starts over, ⚑ Q338), POST /say, then what Ensō heard and
 // what it will do, spoken aloud, with Yes / Clarify / Cancel. Yes on a reminder opens the reminder form filled in; on
-// a request POST /feature-requests. Outside the scope (§1.3): Clarify / OK, and leaving any way but Clarify logs it
+// a request POST /feature-requests, then for an admin's small one "Build it now?" (⚑ Q344). Outside the scope (§1.3): Clarify / OK, and leaving any way but Clarify logs it
 // as Out of scope (POST /feature-requests with outside). Hold to talk (⚑ Q340): press opens it listening, letting go
 // after HOLD_MS sends. Renders what the server read; never decides it.
 import { useEffect, useRef, useState } from 'react';
@@ -13,11 +13,14 @@ import { useApp } from '../state';
 import { isAdmin } from '../../../src/shared/roles';
 import { speak, stopSpeaking, unlockSpeech, useListen } from './useSpeech';
 import { errorText, post } from '../api';
+import { canBuild, type FeatureRequest } from '../../../src/shared/feature-requests';
 import { SAY_TEXT_MAX, clarified, type SayEvent, type SayReading, type SayReminder } from '../../../src/shared/say-reading';
 import s from './EnsoButton.module.css';
 
 type Phase = 'closed' | 'listen' | 'reading' | 'answer' | 'saved';
 const SAVED = 'Saved. Thanks!';
+const SAVED_BUILD = 'Saved. Build it now?'; // ⚑ Q344, to an admin when the request is small
+const BUILDING = "Building now. John gets a ping when it's live.";
 const QUIET_MS = 8000; // nothing heard this long → the keyboard-🎤 hint (⚑ Q338)
 const HOLD_MS = 500; // ⚑ Q340 — held at least this long, letting go sends
 const LAST_WORDS_MS = 400; // after letting go, the phone's last words still arrive
@@ -39,6 +42,8 @@ export function EnsoButton() {
   const [form, setForm] = useState<SayReminder | null>(null);
   const [eventForm, setEventForm] = useState<SayEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<FeatureRequest | null>(null); // offered Build now (⚑ Q344)
+  const [building, setBuilding] = useState(false);
 
   const words = typed;
   const hint = listen.unavailable || quiet;
@@ -108,9 +113,16 @@ export function EnsoButton() {
     if (reading.kind === 'event') { setEventForm(reading.event); setPhase('closed'); return; }
     if (reading.kind !== 'request') { close(); return; }
     try {
-      await post('/feature-requests', { text: reading.heard, ...reading.request });
-      setPhase('saved'); speak(SAVED);
+      const r = await post<FeatureRequest>('/feature-requests', { text: reading.heard, ...reading.request });
+      const offer = isAdmin(me) && canBuild(r.status);
+      setSaved(offer ? r : null); setBuilding(false); setPhase('saved'); speak(offer ? SAVED_BUILD : SAVED);
     } catch (e) { setError(errorText(e)); }
+  }
+  async function buildNow() {
+    if (!saved) return;
+    setError(null);
+    try { await post(`/feature-requests/${saved.id}/build`, {}); setSaved(null); setBuilding(true); speak(BUILDING); }
+    catch (e) { setError(errorText(e)); }
   }
   function clarify() { setBefore(reading?.heard ?? before); setReading(null); begin(); }
 
@@ -140,7 +152,7 @@ export function EnsoButton() {
               <button className="plain" onClick={stopSpeaking} aria-label="Stop speaking">🔇</button>
             </div>
           )}
-          {phase === 'saved' && <p className={s.say}>{SAVED}</p>}
+          {phase === 'saved' && <p className={s.say}>{building ? BUILDING : saved ? SAVED_BUILD : SAVED}</p>}
         </Modal>
       )}
       {requests && <Modal title="💡 Requests" onClose={() => setRequests(false)}><FeatureRequests /></Modal>}
@@ -163,6 +175,10 @@ export function EnsoButton() {
       <button className="primary" onClick={yes}>Yes</button>
       <button onClick={clarify}>Clarify</button>
       <button onClick={close}>Cancel</button>
+    </>;
+    if (phase === 'saved' && saved) return <>
+      <button className="primary" onClick={buildNow}>Build now</button>
+      <button onClick={close}>Later</button>
     </>;
     if (phase === 'saved') return <button className="primary" onClick={close}>OK</button>;
     return <button onClick={close}>Cancel</button>;
