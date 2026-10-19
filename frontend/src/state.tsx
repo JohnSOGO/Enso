@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { get } from './api';
 import { clockText, utcToLocal } from '../../src/shared/time';
 import type { AlertKind, Channel, DeliveryStatus, HouseState, Role, TaskMood } from '../../src/shared/vocab';
-import type { Task } from '../../src/shared/tasks';
+import type { Task, TaskState } from '../../src/shared/tasks';
 
 export interface Me {
   id: string; email: string; displayName: string; color: string; role: Role;
@@ -38,6 +38,8 @@ export interface Status {
   house: { state: HouseState; lastOkAt: string | null; lastFailedAt: string | null; lastError: string | null };
   mySubscriptions: { id: string; endpoint: string; userAgent: string | null; createdAt: string; lastOkAt: string | null; lastError: string | null }[];
   recentDeliveries: { id: string; channel: Channel; message: string; status: DeliveryStatus; detail: string | null; createdAt: string; member: string | null }[];
+  /** §8.5a ⚑ Q309 — my open task session, if any; its state as the server decided it. */
+  myTask: { title: string; state: Exclude<TaskState, 'ended'> } | null;
 }
 
 interface Ctx {

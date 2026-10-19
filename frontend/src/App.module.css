@@ -45,4 +45,6 @@
   padding: 0 2px; min-width: 0; white-space: nowrap;
 }
 .tabs .icon { font-size: 1.15rem; line-height: 1; }
+/* §8.5a ⚑ Q309 — my task is running: a small 💪 on the Alarms icon. */
+.tabs .taskMark { font-size: .7rem; vertical-align: top; margin-left: 1px; }
 .tabs .active { color: var(--text); box-shadow: inset 0 3px 0 var(--accent); }

@@ -11,6 +11,8 @@ import { NO_SUBSCRIPTION, PUSH_NOT_CONFIGURED, sendTestPush } from '../push';
 import { defaultSpeakers, houseConfigOf, houseSpeakerList, houseState, HOUSE_NOT_CONFIGURED } from '../house';
 import { speakerList } from '../../shared/speakers';
 import { speakerChoices } from '../speaker-choices';
+import { myOpenTask } from '../task-rows';
+import { taskState } from '../../shared/tasks';
 
 export const household = new Hono<AppEnv>();
 
@@ -52,6 +54,7 @@ household.patch('/settings', requireMember, requireOwner, async (c) => {
 
 household.get('/status', requireMember, async (c) => {
   const me = c.get('member').id;
+  const task = await myOpenTask(c.env.DB, me);
   return c.json({
     house: await houseState(c.env),
     mySubscriptions: await all(c.env.DB,
@@ -61,6 +64,7 @@ household.get('/status', requireMember, async (c) => {
          FROM deliveries d LEFT JOIN members m ON m.id = d.member_id LEFT JOIN fires f ON f.id = d.fire_id
          LEFT JOIN task_sessions ts ON ts.id = f.timer_id
         WHERE ts.member_id IS NULL OR ts.member_id = ? ORDER BY d.created_at DESC LIMIT 20`, me), // §7G.3 Q308: my task check-ins only
+    myTask: task ? { title: task.timer.title, state: taskState(task.session) } : null, // §8.5a ⚑ Q309: my running task, mine only
   });
 });
 

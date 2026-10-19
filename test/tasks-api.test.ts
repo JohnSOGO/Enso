@@ -85,6 +85,21 @@ describe('TB7–TB8 start and the first check-in', () => {
     expect((await b.get('/tasks')).json.active.id).toBe(other.task.id);
     expect((await o.post('/tasks', { ...START, title: '' })).status).toBe(400);
   });
+
+  it('TB15 /status myTask: mine only, with its state (Q309)', async () => {
+    expect((await o.get('/status')).json.myTask).toBeNull();
+    const r = await start(o, { private: true });
+    const id = r.task.id;
+    expect((await o.get('/status')).json.myTask).toEqual({ title: 'Clean the garage', state: 'working' });
+    expect((await b.get('/status')).json.myTask).toBeNull();
+    await o.post(`/tasks/${id}/checkin`, { mood: 'break', breakMin: 15 });
+    expect((await o.get('/status')).json.myTask.state).toBe('break');
+    await o.post(`/tasks/${id}/resume`);
+    await o.post(`/tasks/${id}/pause`);
+    expect((await o.get('/status')).json.myTask.state).toBe('paused');
+    await o.post(`/tasks/${id}/stop`);
+    expect((await o.get('/status')).json.myTask).toBeNull();
+  });
 });
 
 describe('TB9–TB12 answers, changes, the end', () => {

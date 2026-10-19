@@ -7,6 +7,23 @@ carry its result.
 
 ---
 
+## 2026-10-19 — My running task on the tab bar and the Alarms menu (placement-advisor)
+
+- **Ask:** v1.82.0, ⚑ Q309, SPEC §8.1 / §8.5a / §10. GET /status gains `myTask: { title, state } | null` (my open session only); while set, ⏰ Alarms on the tab bar shows a small 💪 and the 💪 Task buddy button shows "🟢 Working" / "☕ On a break" / "⏸ Paused". MojoSOGO: "I need an icon on task buddy if it is running so i know".
+- **Verdict:** EXISTING `src/worker/routes/household.ts` (/status: myOpenTask + taskState, no new SELECT), `frontend/src/state.tsx` (Status.myTask typed `Exclude<TaskState, 'ended'>`), `frontend/src/App.tsx` + `App.module.css` (the mark in the NAV render; NAV unchanged), `frontend/src/components/PickGrid.tsx` + `PickGrid.module.css` (optional `note` on PickEntry / PickFace), `frontend/src/components/Alarms.tsx` (file-local state → note text for the 'tasks' entry), `test/tasks-api.test.ts`. No new row, no shared change, no migration.
+- **Flow stage:** route + persist (read) → render.
+- **Why:** the state is already decided by tasks.ts taskState over the row task-rows.ts myOpenTask reads; /status only composes. Rejected: a smaller SELECT (a second copy of "my open task", §0.5); reusing numeric `count` (widens a field four importers use); the state words in vocab / shared tasks.ts (PWA-only display text); changing TaskCard's own state line; a NAV column for one tab. Freshness needs no code: task moves already refresh() via useTaskSend.
+- **Caps:** household.ts ~108/300, state.tsx ~126/300, App.tsx ~174/300, Alarms.tsx ~182/300, PickGrid.tsx ~34/300; nothing in the band.
+- **Sources read:** docs/module-ownership.md, scripts/arch.ts, docs/placement-receipts.md, household.ts, task-rows.ts, shared/tasks.ts, App.tsx, Alarms.tsx, PickGrid.tsx, state.tsx, the CSS modules, Task*.tsx, test/tasks-api.test.ts.
+
+## 2026-10-19 — Steward pass 29, since pass 28 (code-steward)
+
+- **Run:** post-release, v1.81.0 (💪 Task buddy: shared tasks / task-moves / task-replies / task-say, worker task-rows + routes/tasks + routes/task-photos, migration 0053, six Task*.tsx); also covers v1.80.1 (tick step 1 → fire-rows reminderInserts).
+- **Verdict:** SOUND. Typecheck green, 915/915, arch:audit quiet; 2 code commits, 2 matching receipts, built as placed; the map rows for fire-rows, tick, alerts, push, household and my-alerts describe the code.
+- **Top finding:** LOW, photo-reader.ts readDonePhoto restates TASK_LOOKS as `z.enum(['yes','no','unsure'])` → `z.enum(TASK_LOOKS)` (show-reader precedent).
+- **Handoffs:** 5 to worker (the TASK_LOOKS schema; TASK_MAX_ALERTS for the hard-coded 2 in checkinText and TaskCard plus one TASK_ID_PREFIX for NOT_TASK, with the next §7G change; applyTaskMove into one guarded batch, optional; a push.test case for a task check-in's empty actions; owed device checks v1.76–v1.81 in where-things-stand.md), 0 to reorganizer, 0 to placement-advisor. Carried: updateEventStatement with the next event-column change.
+- **Restraint:** the four shared task modules stay split by concern; task-photos.ts stays its own route; the machine/cook/task id-prefix branches across 9 files are accepted at three instances (a fourth gets a placement question about a shared fire descriptor); sourceOf's breadth, fireViews' per-row task read, the founder default in GET /tasks and engine.ts at 88% are watched, not flagged.
+
 ## 2026-10-19 — 💪 Task buddy (placement-advisor)
 
 - **Ask:** v1.81.0, SPEC §7G, §4.2zz, §8.2, §8.5, §8.5a, §5.4, §9.5, §10. A task session rides on a rolling timer

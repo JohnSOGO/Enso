@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.43 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.44 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3875,6 +3875,7 @@ Private, started now. Nothing is ever scheduled for an unfinished task by itself
 | TB12 | finish with ticked [0, 2] of 3; stop | outcome, ended, the fire closed, `doneTicked`, the summary; stop: outcome stopped; GET /tasks lists both under recent |
 | TB13 | check-photo (fake Claude) | the image block before a prompt naming each line; yes / no / unsure per line; one photo-read counted; nothing stored |
 | TB14 | POST /fires/{id}/actions ack on a task fire; GET /fires as another member | 409 "Answer this check-in with how it's going."; the task's fire not listed |
+| TB15 | `/status` `myTask` (Q309) | null; after POST /tasks `{ title, state: 'working' }` (Private too); another member null; break → `break`; pause → `paused`; stop → null |
 | TB-M | migration check (§4.2zz) | earlier timers and fires untouched; a task session row can be written |
 
 
@@ -3936,6 +3937,9 @@ only the grey backdrop):
   opening screen's (one `buildStamp()` feeds both), so it always names the build that is running.
   **Check:** on the installed iPhone app, the bar touches the bottom edge with no page showing under
   it, and the stamp under the tabs matches the opening screen's.
+- **My task is running** (asked by MojoSOGO 2026-10-19, "I need an icon on task buddy if it is running so i know",
+  v1.82.0 ⚑ Q309): while I have an open task session (§7G), the ⏰ Alarms tab shows a small 💪 on its icon (title
+  "Alarms, task running"), on every tab, from `/status` `myTask`. Only mine; nobody sees another member's.
 - The **＋** floating button appears on Calendar only and creates an event. The
   Alarms tab has its own **＋ Add** button in each section header.
 - **Status badges:**
@@ -4250,6 +4254,9 @@ The modal shows **my** session only; nobody else's sessions are shown anywhere.
 - **Ringing bar** (§8.2): a task check-in row is `💪 Clean the garage · check-in` with the five answer buttons
   (time up: Finished! · +15 · +30 · Stop) and Away; no Ack. An alert card (§9.5) for it shows the same.
 - **Finish** opens the done check (§7G.6) in a modal; the summary shows after Finish or Stop.
+- **Running mark** (v1.82.0 ⚑ Q309): while my session is open, the 💪 Task buddy button on the Alarms menu shows its
+  state under the name, from `/status` `myTask.state` as the server decided it: **🟢 Working** / **☕ On a break** /
+  **⏸ Paused**; and the tab bar carries the 💪 of §8.1. A Private task still shows them: `/status` is mine alone.
 
 ### 8.6 Settings
 
@@ -5794,7 +5801,7 @@ other push stays until I hide it ⚑ Q284.
 | DELETE | `/push/subscriptions/{id}` | owner of the subscription | |
 | GET | `/push/vapid-key` | public | → `{ key }` |
 | GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff }`; PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
-| GET | `/status` | member | → `{ house: { state: HouseState, lastOkAt, lastFailedAt, lastError } (§9.2, derived, never stored), mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[] }` |
+| GET | `/status` | member | → `{ house: { state: HouseState, lastOkAt, lastFailedAt, lastError } (§9.2, derived, never stored), mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[], myTask: { title, state: working \| break \| paused } \| null (my open task session, §8.5a Q309) }` |
 | GET | `/me/alerts` | member | → `{ alerts: { id, title, message, source, kind, alertNumber, status, detail, createdAt }[] }` — my pushes not hidden, newest first, ≤ 200 (§9.5) |
 | DELETE | `/me/alerts/{id}` | member (my push) | → 204, hidden from my list; 404 `not_found` otherwise (§9.5) |
 | DELETE | `/me/alerts` | member | → `{ cleared }`, all of mine hidden (§9.5) |
