@@ -1,5 +1,5 @@
 // SPEC §8.10 — the opening screen: plain HTML in index.html (#splash) covers loading; this removes it. Voice first
-// (⚑ Q342): signed in, with the mic not yet allowed, it stays and asks with 🎤 Turn on voice / Not now.
+// (⚑ Q342): signed in, with the mic not allowed, it stays until the answer: 🎤 Allow microphone or Deny.
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { MicAsk } from './useSpeech';
@@ -10,7 +10,7 @@ const SPLASH_MIN_MS = 800;
 
 /** Removes the opening screen once `ready` (App knows who this is), after at least 0.8 s from page start so it never flickers. */
 export function Splash({ ready, signedIn, mic }: { ready: boolean; signedIn: boolean; mic: MicAsk }) {
-  const [notNow, setNotNow] = useState(false); // this opening only; the next one asks again
+  const [notNow, setNotNow] = useState(false); // Deny holds for this opening only; the next one asks again
   const [asking, setAsking] = useState(false);
   const askVoice = signedIn && mic.show && !mic.refused && !notNow;
   const leave = ready && mic.checked && !askVoice;
@@ -29,8 +29,8 @@ export function Splash({ ready, signedIn, mic }: { ready: boolean; signedIn: boo
   async function turnOn() { setAsking(true); await mic.ask(); setNotNow(true); } // answered either way: open the app
   return createPortal(
     <div className={s.voice}>
-      <button className={s.on} onClick={turnOn} disabled={asking}>🎤 Turn on voice</button>
-      <button className={s.later} onClick={() => setNotNow(true)} disabled={asking}>Not now</button>
+      <button className={s.on} onClick={turnOn} disabled={asking}>🎤 Allow microphone</button>
+      <button className={s.later} onClick={() => setNotNow(true)} disabled={asking}>Deny</button>
     </div>,
     splash,
   );

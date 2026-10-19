@@ -7,6 +7,36 @@ carry its result.
 
 ---
 
+## 2026-10-19 — mic ask trusts the flag only without a permissions query; splash labels (placement-advisor)
+
+- **Ask:** Patch v1.92.1 (SPEC §8.10 Voice first, §8.1 badge, ⚑ Q342). The iOS home-screen app forgets the mic, so
+  `enso.voiceOn` must not hide the ask when permissions.query says 'prompt'. Relabel the opening-screen buttons
+  "🎤 Allow microphone" / "Deny" (Deny = this opening only).
+- **Verdict:** frontend/src/components/useSpeech.ts (useMicAsk) + frontend/src/components/Splash.tsx [EXISTING]
+- **Flow stage:** render
+- **Why:** useMicAsk already decides whether the mic is allowed, and the fix is to its starting state only. Splash.tsx
+  owns the opening screen's buttons. Both are small, single-concern, low fan-in (App.tsx, Splash.tsx); a new
+  mic-permission module was rejected. The header badge follows the hook's `show` with no code change.
+- **Caps:** useSpeech.ts ~137/300, Splash.tsx ~38/300. No file newly in the band.
+- **Sources read:** useSpeech.ts, Splash.tsx, scripts/arch.ts (caps), docs/module-ownership.md, this file (head), repo
+  grep for useMicAsk / voiceOn / labels.
+
+## 2026-10-19 — steward pass after v1.92.0 (code-steward)
+
+- **Run:** post-release, v1.92.0 (moon phases, §7.12, Q345: src/shared/moon.ts, /calendar moonPhases, DayCell / DaySheet
+  / Calendar), the first release built by the daily feature-request session. Ran on ca9e716.
+- **Verdict:** MINOR DRIFT. Typecheck green, 963/963, arch:audit quiet (top EventForm.tsx 200/223, engine.ts 88%,
+  events.ts 123/147); 1 code commit, 1 matching receipt, built as placed; 0 without a receipt.
+- **Top finding:** MED: ENSO_DOES's Calendar line (say-reader.ts:14) does not list moon phases, holidays or 📈, so the
+  same ask said again reads as a new request instead of "already does this".
+- **Handoffs:** 0 to reorganizer. 4 to worker: ENSO_DOES Calendar line (with the carried 🔇 → 🤫); the three receipts at
+  the bottom of this file (v1.84.1, v1.84.2, v1.92.0) moved to the top, and the build-session brief told "top, newest
+  first" and "update ENSO_DOES"; where-things-stand TRYs and Q range up to Q345; the three map rows rewritten whole
+  (carried). 2 to placement-advisor then worker (carried): log fireBuild's dropped reason; where a failed Out of scope
+  log shows. Still carried: isShareKey / InboxSetup apiUrl; deleteEventStatements, renotifyText, updateEventStatement.
+- **Restraint:** moon.ts's coarse lunation window (bounded, MN3 covers it); §7.12's position (by topic); the repeated
+  { name, emoji } shape in DayData; one more D1 read on /calendar; EventForm at the band edge.
+
 ## 2026-10-19 — steward pass after v1.91.0 (code-steward)
 
 - **Run:** post-release, v1.90.0 (the event reading, the speaker's After, no selection while held), v1.90.1 (🎤 Turn
