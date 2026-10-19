@@ -954,6 +954,11 @@ pipeline unchanged; no migration. Built as specified. Owed: his TRY on the iPhon
 After work / After school (Work / School + a time). Unset: admins After work 5:30pm, kids After school 3:00pm; the
 founder starts at 3:30pm. The reminder chip follows the one person ticked, else mine. Built as specified.
 
+**Keep the local model loaded** (v1.84.1, SPEC 3.48, §7A.3, Q317; MojoSOGO 2026-10-19 "Is it reloading the same model
+on every photo?"): the helper's LM Studio request carries `ttl` 24 h, so a model loaded on demand stays loaded
+between photos. Spec's stale `max_tokens` 100 corrected to `IDENTIFY_MAX_TOKENS`. Built as specified. Owed: rebuild
+the helper on SogoAI (`npm run build:home`, copy to C:\Enso, restart its task).
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

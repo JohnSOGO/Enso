@@ -2345,3 +2345,12 @@ REORG RECEIPT
   201. Day one: green, nothing in the warning band (highest 87 %).
 - **New owners:** `scripts/arch.ts`, `scripts/arch-types.ts`, `scripts/arch-audit.ts`
   (Tooling).
+
+## 2026-10-19 — identify payload carries LM Studio ttl (placement-advisor)
+
+- **Ask:** SPEC §7A.3 v1.84.1 (patch, Q317 ⚑ default): `identifyPayload` also sends `ttl: IDENTIFY_TTL_S` (86400), so LM Studio keeps the vision model it loaded on demand in memory for 24 h after the last photo. The spec's max_tokens 100 is corrected to IDENTIFY_MAX_TOKENS 1024 (the code already matches).
+- **Verdict:** `home/identify.ts` (+ `test/home-identify.test.ts` SN14) [EXISTING]
+- **Flow stage:** deliver
+- **Why:** The row for `home/identify.ts` already owns the one LM Studio request and its payload fields (temperature, max_tokens). ttl is one more of those fields, so this is still one concern with no new owner. It is a delivery setting, not a decision, so src/shared/ was rejected as a home. Fan-in is the helper and its test only. The value is a named constant so it is written once.
+- **Caps:** home/identify.ts about 75/300; test/home-identify.test.ts about 88/300; no file in the warning band.
+- **Sources read:** home/identify.ts, scripts/arch.ts (caps), docs/module-ownership.md (identify row), test/home-identify.test.ts (line count).
