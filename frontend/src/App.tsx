@@ -16,7 +16,7 @@ import { Settings } from './components/Settings';
 import { useAlertLink } from './components/MyAlerts';
 import { RingingBar } from './components/RingingBar';
 import { EnsoButton } from './components/EnsoButton';
-import { useMicAsk } from './components/useSpeech';
+import { useMicAsk, type MicAsk } from './components/useSpeech';
 import { TaskSaid } from './components/TaskSaid';
 import { MessBanner } from './components/MessBanner';
 import { SignIn } from './components/SignIn';
@@ -51,7 +51,7 @@ type Overlay =
   | { kind: 'explain'; title: string; text: string }
   | null;
 
-function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: () => void; justJoined: boolean; openAlert: string | null; onAlertOpened: () => void }) {
+function Shell({ onLogout, justJoined, openAlert, onAlertOpened, mic }: { onLogout: () => void; justJoined: boolean; openAlert: string | null; onAlertOpened: () => void; mic: MicAsk }) {
   const { me, status, today } = useApp();
   const [tab, setTab] = useState<Tab>(() => {
     if (openAlert) return 'settings'; // §9.5 — a tapped notification opens its card in Settings → 🔔 Alerts
@@ -64,7 +64,6 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
 
   const house = status ? HOUSE_BADGE[status.house.state] : undefined;
   const phoneOff = status !== null && status.mySubscriptions.length === 0;
-  const mic = useMicAsk();
 
   return (
     <div className={s.app}>
@@ -139,6 +138,7 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
 
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
+  const mic = useMicAsk(); // ⚑ Q342 one mic state for the opening screen and the header badge
   useEffect(() => { get<Me>('/me').then(setMe).catch(() => setMe(null)); }, []);
   const onMe = useCallback((m: Me | null) => setMe(m), []);
   // §6.2a — the join page lives at /join#CODE; leaving it (joined, chose Sign in, or already signed in — Q20) means '/'.
@@ -152,7 +152,7 @@ export function App() {
   // §9.5 — a tapped notification's /settings/alerts?alert={id}; kept across a sign-in first (⚑ Q225).
   const [openAlert, onAlertOpened] = useAlertLink();
 
-  return <>{body()}<Splash ready={me !== undefined} /></>;
+  return <>{body()}<Splash ready={me !== undefined} signedIn={!!me} mic={mic} /></>;
 
   function body() {
     if (me === undefined) return null;
@@ -164,7 +164,7 @@ export function App() {
     if (approveId) return <ApproveLogin id={approveId} clock24h={me.clock24h} onDone={() => { forgetApproveRequest(); setApproveId(null); }} />;
     return (
       <AppProvider me={me} onMe={onMe}>
-        <Shell onLogout={() => { setJustJoined(false); setMe(null); }} justJoined={justJoined} openAlert={openAlert} onAlertOpened={onAlertOpened} />
+        <Shell onLogout={() => { setJustJoined(false); setMe(null); }} justJoined={justJoined} openAlert={openAlert} onAlertOpened={onAlertOpened} mic={mic} />
       </AppProvider>
     );
   }

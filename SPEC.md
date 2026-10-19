@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.59 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.60 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4114,12 +4114,10 @@ only the grey backdrop):
   - A **red badge** "Phone alerts off" appears when the current member has no push
     subscription.
   - Tapping either explains it and how to fix it.
-  - A **"🎤 Turn on voice"** badge appears when the phone can listen (§8.18) but has not yet been
-    allowed the microphone (the browser's microphone permission is still "ask", or the browser
-    can't say and voice was never turned on on this phone). The opening screen can't hold a tap and
-    iOS asks for the mic only on one, so the ask is this badge: tapping it asks for the microphone
-    and the badge goes away once allowed (refused: it stays, and tapping explains where to allow
-    it). ⚑ Q342
+  - A **"🎤 Turn on voice"** badge appears while the phone can listen (§8.18) but has not yet been
+    allowed the microphone, after **Not now** on the opening screen's ask (§8.10): tapping it asks
+    for the microphone and it goes away once allowed; refused, it stays, and tapping explains where
+    to allow it. ⚑ Q342
 
 ### 8.2 Ringing bar
 
@@ -4700,9 +4698,10 @@ least 0.8 s so it never flickers:
 ```
 - Centred on `--bg`: the ensō, **Ensō** in a large, light-weight serif-free type, under it
   the tagline **"Closing the loop. Peace of mind, every day."** (MojoSOGO's exact words,
-  2026-10-11) in small light text, breaking only between its two sentences so it fits 320 px,
+  2026-10-11) in small light text on two lines, one sentence each (as in ℹ About),
   then the **full address the app is served from** (`location.origin`, so the home-network server
-  shows its own) in small dim text, and under it the **build stamp** — `v{version} ·
+  shows its own) in small dim text, and last, at the bottom of it all (under the voice ask when
+  there is one), the **build stamp** — `v{version} ·
   {commit}` (decided by MojoSOGO 2026-10-03): the app version from `package.json` and the
   short git commit the page was built from, written into the page **at build time** (never
   typed by hand). A build from a tree with uncommitted changes shows `{commit}-dirty`; a
@@ -4712,8 +4711,16 @@ least 0.8 s so it never flickers:
   version lives only in `package.json` (the stamp reads it); the spec's own version line is
   separate and counts spec revisions.
   Nothing else — no spinner.
+- **Voice first** ⚑ Q342 (MojoSOGO 2026-10-19 "Request to use the microphone when it opens on the splash screen
+  before the rest of the app opens"): signed in, on a phone that can listen (§8.18) whose microphone is not yet
+  allowed (the browser's permission is still "ask", or it can't say and voice was never turned on on this phone), the
+  opening screen stays and shows **🎤 Turn on voice** (a green button that pulses, so it reads as one to press)
+  and **Not now** under the address, above the stamp. iOS asks for the mic only on a
+  tap, so this is that tap: it asks, and the app opens once the phone has answered. **Not now** opens the app, with
+  the header badge (§8.1) to ask later; the next opening asks again. Allowed or refused, the opening screen never
+  asks.
 - One source: the screen is plain HTML in `index.html`, outside the React root, so it
-  appears before any script loads; `App` removes it when ready (signed in or not).
+  appears before any script loads; the app removes it when ready (signed in or not).
 - iPhone shows its own launch image before the page exists: `apple-touch-startup-image`
   PNGs of this same screen are rendered for current iPhone sizes (portrait), with the
   production address. The PNGs are rendered from `index.html`'s screen, never drawn

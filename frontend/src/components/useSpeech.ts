@@ -106,18 +106,21 @@ const voiceOn = () => { try { return localStorage.getItem(VOICE_ON) === '1'; } c
 
 /**
  * ⚑ Q342 — "🎤 Turn on voice": `show` while the phone can listen but the mic isn't allowed yet (permission 'prompt',
- * or no permissions query and voice never turned on here); `refused` once denied. ask() asks on the tap (iOS needs one).
+ * or no permissions query and voice never turned on here); `refused` once denied; `checked` once the phone has said
+ * which. ask() asks on the tap (iOS needs one). One per app: App passes it to the opening screen and the header.
  */
 export function useMicAsk() {
   const [state, setState] = useState<PermissionState | 'unknown'>(() => (recognizerCtor() === null || voiceOn() ? 'granted' : 'unknown'));
+  const [checked, setChecked] = useState(() => state === 'granted' || !navigator.permissions?.query);
   useEffect(() => {
-    if (state === 'granted' || !navigator.permissions?.query) return;
+    if (checked) return;
     let live = true;
     let status: PermissionStatus | null = null;
     const update = () => { if (live && status) setState(status.state); };
     navigator.permissions.query({ name: 'microphone' as PermissionName })
       .then((p) => { status = p; update(); p.addEventListener('change', update); })
-      .catch(() => { /* the browser can't say: the flag decides */ });
+      .catch(() => { /* the browser can't say: the flag decides */ })
+      .finally(() => { if (live) setChecked(true); });
     return () => { live = false; status?.removeEventListener('change', update); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const ask = useCallback(async () => {
@@ -128,5 +131,6 @@ export function useMicAsk() {
       setState('granted');
     } catch { setState('denied'); }
   }, []);
-  return { show: state !== 'granted', refused: state === 'denied', ask };
+  return { show: state !== 'granted', refused: state === 'denied', checked, ask };
 }
+export type MicAsk = ReturnType<typeof useMicAsk>;

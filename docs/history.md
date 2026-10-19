@@ -1015,6 +1015,10 @@ reminder chips. Holding the mark selects nothing on screen. Built as specified. 
 necessary"): a "🎤 Turn on voice" badge in the header while the phone can listen but hasn't allowed the mic; one tap
 asks, and it goes once allowed. Not on the splash itself: it shows for under a second and iOS asks only on a tap.
 Built as specified. Owed: his TRY.
+v1.90.2 (his "before the rest of the app opens", "only one screen"): the opening screen itself asks, a pulsing green 🎤 Turn on
+voice and Not now above the stamp (now last), and the app opens once the phone answers; the tagline is on two lines
+as in About and the iPhone launch PNGs were re-rendered to match; the header badge stays only after Not now. The
+splash timer moved from App.tsx to Splash.tsx first (reorganizer, no behavior change).
 
 Deviations from this spec, deliberately:
 
