@@ -2354,3 +2354,12 @@ REORG RECEIPT
 - **Why:** The row for `home/identify.ts` already owns the one LM Studio request and its payload fields (temperature, max_tokens). ttl is one more of those fields, so this is still one concern with no new owner. It is a delivery setting, not a decision, so src/shared/ was rejected as a home. Fan-in is the helper and its test only. The value is a named constant so it is written once.
 - **Caps:** home/identify.ts about 75/300; test/home-identify.test.ts about 88/300; no file in the warning band.
 - **Sources read:** home/identify.ts, scripts/arch.ts (caps), docs/module-ownership.md (identify row), test/home-identify.test.ts (line count).
+
+## 2026-10-19 — Popups open scrolled to the top (placement-advisor)
+
+- **Ask:** Every popup opens scrolled to the top. On iPhone, when the field showModal focused sits below a big picture, focus moves to the dialog with preventScroll (SPEC §8 iPhone rules, v1.84.2 patch, ⚑ Q318).
+- **Verdict:** `frontend/src/components/Modal.tsx` + `frontend/src/components/Modal.module.css` [EXISTING]
+- **Flow stage:** render
+- **Why:** Open-time scroll and focus are part of the one `<dialog>` primitive's concern. Modal.tsx is the only `showModal` in frontend/src, so one change covers every popup. Fixing it in each picture-bearing form (edit form, recipe) was rejected: that would put copies of the same fix in several places and let them drift apart. Props are unchanged, so the high fan-in carries no risk. Logic stays in the existing mount effect, and the error scrollIntoView effect is untouched.
+- **Caps:** Modal.tsx goes from 64 to about 75 out of 300 (GLOBAL_FILE_CAP, no CEILINGS entry). No file enters the band.
+- **Sources read:** frontend/src/components/Modal.tsx, frontend/src/components/Modal.module.css, scripts/arch.ts (caps), docs/module-ownership.md (Modal row), grep of frontend/src for showModal/<dialog.

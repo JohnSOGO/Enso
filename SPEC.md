@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.48 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.49 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3914,6 +3914,11 @@ only the grey backdrop):
   not fixed as **zero**. Inside any box whose height comes from its content, flex
   children grow from `auto` (`flex: 1 1 auto`), never from 0. Chrome and desktop
   WebKit did not reproduce it — only the real phone did.
+- **Every popup opens scrolled to the top** (v1.84.2, ⚑ Q318; MojoSOGO 2026-10-19 "window opening mid
+  scroll and not at top where picture is largest"). On iPhone, `showModal` focuses the first text field;
+  below a big picture (an edit form's photo, a recipe's screenshot) Safari scrolled the dialog down to it.
+  So on open the dialog body starts at the top, and a field `showModal` focused that is not fully visible
+  there gives up focus to the dialog itself (`preventScroll`). A field at the top (a new form's title) keeps it.
 
 ### 8.1 Frame
 

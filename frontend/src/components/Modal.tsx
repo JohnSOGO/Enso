@@ -18,13 +18,24 @@ interface Props {
 
 export function Modal({ title, onClose, dirty = false, confirmCloseText = 'Discard your changes?', error, footer, children }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const errRef = useRef<HTMLDivElement>(null);
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
-    ref.current?.showModal();
+    const dialog = ref.current, body = bodyRef.current;
+    dialog?.showModal();
+    // SPEC §8 iPhone rules (Q318): open at the top. iOS focuses the first field, which can sit below a big picture.
+    if (dialog && body) {
+      body.scrollTop = 0;
+      const f = document.activeElement;
+      if (f instanceof HTMLElement && body.contains(f) && f.getBoundingClientRect().bottom > body.getBoundingClientRect().bottom) {
+        dialog.focus({ preventScroll: true });
+        body.scrollTop = 0;
+      }
+    }
     return () => opener?.focus?.();
   }, []);
 
@@ -41,6 +52,7 @@ export function Modal({ title, onClose, dirty = false, confirmCloseText = 'Disca
   return createPortal(
     <dialog
       ref={ref}
+      tabIndex={-1}
       className={s.dialog}
       aria-label={title}
       onCancel={(e) => { e.preventDefault(); requestClose(); }}
@@ -52,7 +64,7 @@ export function Modal({ title, onClose, dirty = false, confirmCloseText = 'Disca
           <PointAtButton />
           <button className="plain" aria-label="Close" title="Close" onClick={requestClose}>✕</button>
         </header>
-        <div className={s.body}>
+        <div ref={bodyRef} className={s.body}>
           {error && <div ref={errRef} role="alert" className="alert-error">{error}</div>}
           {children}
         </div>

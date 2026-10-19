@@ -959,6 +959,10 @@ on every photo?"): the helper's LM Studio request carries `ttl` 24 h, so a model
 between photos. Spec's stale `max_tokens` 100 corrected to `IDENTIFY_MAX_TOKENS`. Built as specified. Owed: rebuild
 the helper on SogoAI (`npm run build:home`, copy to C:\Enso, restart its task).
 
+**Popups open at the top** (v1.84.2, SPEC 3.49, §8 iPhone rules, Q318; MojoSOGO 2026-10-19 "First exit window opening
+mid scroll and not at top where picture is largest"): `Modal` resets its body to the top after `showModal` and moves
+focus to the dialog when the auto-focused field is below the fold. Built as specified. Owed: his TRY on the iPhone.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
