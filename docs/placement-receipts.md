@@ -7,6 +7,19 @@ carry its result.
 
 ---
 
+## 2026-10-19 — opening screen timer into Splash.tsx (reorganizer)
+
+- **Trigger:** placement-advisor extract-first verdict for the upcoming opening-screen change (§8.10): its code should own
+  a file of its own rather than grow App().
+- **Seam moved:** the splash-removal effect and SPLASH_MIN_MS from `frontend/src/App.tsx` to
+  `frontend/src/components/Splash.tsx` (`<Splash ready={me !== undefined} />`, rendered once at App level after every
+  branch's body) [NEW row]
+- **Room opened:** App.tsx: 182 → 171 lines; no CEILINGS pin (under GLOBAL_FILE_CAP 300), so cap 300 → 300
+- **Behavior:** preserved — typecheck, npm test and arch:audit green; same 0.8 s minimum from page start, `.gone` then
+  remove after 300 ms, timer cleared on unmount; App still renders nothing while `/me` is loading.
+- **Restraint:** only the timer moved; index.html's #splash markup and styles, and App's sign-in / join / approve
+  branches, are untouched.
+
 ## 2026-10-19 — Ask for the microphone up front: 🎤 Turn on voice (placement-advisor)
 
 - **Ask:** v1.90.1, SPEC §8.1 status badges, ⚑ Q342. A "🎤 Turn on voice" badge shows while the phone can listen but

@@ -157,6 +157,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/main.tsx` | React root mount; starts the service worker registration (push-client.ts) |
 | `frontend/src/push-client.ts` | Browser push plumbing (§9.1): registers `/sw.js` (scope `/`, updateViaCache none), this browser's facts (supported, iOS-not-standalone, permission, current subscription), Turn on (permission → subscribe → POST /push/subscriptions) and Turn off (unsubscribe → DELETE) via api.ts — no React, no app state |
 | `frontend/src/App.tsx` | The frame (§8.1): the Ensō button (EnsoButton, §8.18), Ringing bar, the 💪 Enso box (TaskSaid, §8.5a), mess banner, badges, tabs (the 💪 running mark on ⏰ Alarms, Q309), ＋ button; opens Settings → Alerts for an alert link (useAlertLink, §9.5) |
+| `frontend/src/components/Splash.tsx` | The opening screen in the app (§8.10; the screen itself is plain HTML in index.html #splash): removes it once App knows who this is, at least SPLASH_MIN_MS after page start; no fetch |
 | `frontend/src/api.ts` | HTTP transport to the Worker; every failure an `ApiError` with a message |
 | `frontend/src/state.tsx` | App-wide state context + freshness polling (§10) — the home for cross-cutting client state; taskSheet / showTask (the 💪 Enso box, §8.5a) |
 | `frontend/src/theme.css` | Theme tokens (§8.7) and global base styles |
