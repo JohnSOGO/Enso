@@ -14,9 +14,9 @@
 .toneB { background: var(--month-b); }
 .past .num { opacity: .6; }
 
-/* §7.11 the day's forecast: top-right corner; on phones bottom-right, where the date line is already full. */
-.wx { position: absolute; top: 3px; right: 3px; font-size: .8rem; line-height: 1; pointer-events: none; }
-.narrow .wx { top: auto; bottom: 3px; right: 2px; font-size: .62rem; }
+/* §7.11, §7.12 the day's forecast and moon phase: the bottom-right corner, at every width. */
+.wx { position: absolute; bottom: 3px; right: 3px; font-size: .8rem; line-height: 1; pointer-events: none; }
+.narrow .wx { right: 2px; font-size: .62rem; }
 /* §7.11 the high, left of the emoji, colored by heatOf. */
 .wx > span { font-weight: 600; font-variant-numeric: tabular-nums; margin-right: 1px; }
 .cold { color: #60A5FA; }

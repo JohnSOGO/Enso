@@ -7,6 +7,34 @@ carry its result.
 
 ---
 
+## 2026-10-19 — mic ask at opening without a tap; buttons only when no popup (placement-advisor)
+
+- **Ask:** Patch v1.92.2 (SPEC §8.10 Voice first, ⚑ Q342; MojoSOGO 2026-10-19 "I have to double tap approve for
+  microphone… just ask at open with system popup"). The opening screen calls getUserMedia by itself so the phone's own
+  popup shows. useMicAsk.ask() returns 'needs-tap' when refused faster than NO_POPUP_MS (400 ms, no popup shown), and
+  only then does Splash show 🎤 Allow microphone / Deny.
+- **Verdict:** frontend/src/components/useSpeech.ts (useMicAsk) + frontend/src/components/Splash.tsx [EXISTING]
+- **Flow stage:** render
+- **Why:** useMicAsk already owns whether the mic is allowed and the ask; telling "popup shown" from "refused without
+  one" is the same question. Splash owns what the opening screen shows. Separate mic module rejected, as in v1.92.1.
+  Known edge: a fast failure (no mediaDevices, or a fast refusal on the tap path) is never recorded as 'denied', so
+  the header badge stays; acceptable. Knock-on: §8.10 paragraph and the Splash / useSpeech ownership rows rewritten.
+- **Caps:** useSpeech.ts 148/300, Splash.tsx 49/300. No file newly in the band.
+- **Sources read:** useSpeech.ts, Splash.tsx, scripts/arch.ts, docs/module-ownership.md, this file (head), SPEC §8.10.
+
+## 2026-10-19 — Day cell weather and moon to bottom-right (placement-advisor)
+
+- **Ask:** Move the day cell's forecast group (`.wx`) to bottom-right at every width, and the moon phase out of the
+  day-icon slot into that group after the weather emoji (alone there with no forecast), freeing both day icons for
+  holiday, 📈 and unassigned event emoji. Patch v1.92.2, SPEC §7.2, §7.11, §7.12, ⚑ Q346.
+- **Verdict:** frontend/src/components/DayCell.tsx + DayCell.module.css [EXISTING]
+- **Flow stage:** render
+- **Why:** The DayCell row already owns the day icons, the weather and the moon drawing; this is layout inside one
+  concern. moonPhases and weather still arrive prepared from /calendar; rules, routes and DaySheet unchanged. Knock-on:
+  the DayCell row in module-ownership.md stops calling the moon a day icon.
+- **Caps:** DayCell.tsx ~103/300, DayCell.module.css 59. No file newly in the band.
+- **Sources read:** docs/module-ownership.md (DayCell, moon.ts rows), scripts/arch.ts, DayCell.tsx, DayCell.module.css
+
 ## 2026-10-19 — mic ask trusts the flag only without a permissions query; splash labels (placement-advisor)
 
 - **Ask:** Patch v1.92.1 (SPEC §8.10 Voice first, §8.1 badge, ⚑ Q342). The iOS home-screen app forgets the mic, so
@@ -2713,7 +2741,7 @@ REORG RECEIPT
 
 ## 2026-10-19 — /fires hides reminders not assigned to me: isForMe in optins.ts (placement-advisor)
 
-- **Ask:** v1.92.2 patch, SPEC §8.2 Ringing bar: GET /fires also hides a reminder fire from a member outside its audience (event assigned_to is non-empty and doesn't include them), using the same "for me" rule as audience() (§5.7, §7.5).
+- **Ask:** v1.92.3 patch, SPEC §8.2 Ringing bar: GET /fires also hides a reminder fire from a member outside its audience (event assigned_to is non-empty and doesn't include them), using the same "for me" rule as audience() (§5.7, §7.5).
 - **Verdict:** `src/shared/optins.ts` (new pure `isForMe`, also used by audience's narrowing) + `src/worker/routes/alerts.ts` (fireViews selects e.assigned_to, filters with isForMe) [EXISTING]
 - **Flow stage:** rules (optins.ts) + route (alerts.ts applies it at read time)
 - **Why:** optins.ts already owns "who an event/fire is for" (isOnFor + audience with its assigned-or-everyone narrowing). One predicate shared by push recipients and the Ringing bar keeps them from drifting. Inline in alerts.ts was rejected (restates the rule in a route); a new module was rejected (same concern). audience() keeps its push order and house/funhouse results; isOnFor stays for /calendar; assignedTo does not leak into the /fires shape; Away (hideOff=false) unaffected; `?state=open` narrows too. RingingBar.tsx needs no change.

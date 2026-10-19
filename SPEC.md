@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.64 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.66 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1721,7 +1721,7 @@ the 5 carried-over "Fall break" days (deleted, not converted — his choice).
 
 **Day icons** — a day's icons sit **to the right of the date number, on the same line, at
 every width** (phones included; never on the line below — decided by MojoSOGO). Icons, in
-order: the public holiday's emoji, 📈 (§7.4), the moon phase's emoji (§7.12), then the emoji of the day's single-day events
+order: the public holiday's emoji, 📈 (§7.4), then the emoji of the day's single-day events
 with **nobody assigned**, in the order of their lines (Q277); at most **two**. An assigned
 event's emoji sits at the start of its own line under the number instead (§7.1, Q275). Each is shown only if
 it is on for the member (§7.5).
@@ -1801,8 +1801,9 @@ options expiration"; `member_prefs.show_options_expiration`, §4.2c).
 - `moonPhasesBetween(from, to, tz)` returns `{ date, name, emoji }[]` in date order. Each phase is an instant (Meeus,
   *Astronomical Algorithms* ch. 49, the main periodic terms, good to a few minutes); its `date` is the day that instant
   falls on **in the household's time zone** (§4.1), so a full moon at 04:12 UTC is the evening before in Los Angeles.
-- **On the calendar:** the emoji takes a day-icon place (§7.2), after the holiday and 📈, so it never pushes out a
-  holiday; an unassigned event's emoji comes after it and the limit of two still holds. No cell tint. The day sheet
+- **On the calendar:** the emoji sits in the day cell's **bottom-right corner** with the weather, after the weather
+  emoji (alone there past the forecast days), never in a day-icon place (§7.2), so it pushes nothing out ⚑ Q346. No
+  cell tint. The day sheet
   (§8.3) lists "🌕 Full moon" under the weather line; the cell's accessible label adds the name.
 - **Everyone sees it; there is no switch** and no legend entry (the emoji names itself) ⚑ Q345.
 - `/calendar` always returns `moonPhases` for the range (§10).
@@ -2124,9 +2125,9 @@ reading)` (pure, `event-reading.ts`) ⚑ Q196:
   | 95, 96, 99 | ⛈️ | Thunderstorms |
 
 - **`/calendar`** returns `weather: { date, emoji, words, high, low }[]` for the stored days in the range.
-- **On the calendar** (§7.1): the emoji sits in the **top-right corner** of the day cell (bottom-right below 480px,
-  where the date line is already full), apart from the two day icons
-  (§7.2) so it never pushes a holiday or event emoji out ⚑ Q202. Everyone sees it; there is no switch ⚑ Q203. The cell's
+- **On the calendar** (§7.1): the emoji sits in the **bottom-right corner** of the day cell at every width (MojoSOGO
+  2026-10-19 "Calendar weather stuff should be bottom right including moon"), with the moon phase after it (§7.12),
+  apart from the two day icons (§7.2) so it never pushes a holiday or event emoji out ⚑ Q202, Q346. Everyone sees it; there is no switch ⚑ Q203. The cell's
   accessible label adds the words ("Clear, high 72°, low 58°").
 - **The high beside it** (asked by MojoSOGO 2026-10-13: "left of weather emoji post the days high temperature; blue if
   cold; white nice; red hot; two digits"): just left of the emoji, the day's high as a bare number (`72`, no °), in the
@@ -4139,7 +4140,7 @@ only the grey backdrop):
     subscription.
   - Tapping either explains it and how to fix it.
   - A **"🎤 Turn on voice"** badge appears while the phone can listen (§8.18) but has not yet been
-    allowed the microphone, after **Deny** on the opening screen's ask (§8.10): tapping it asks
+    allowed the microphone, after the opening screen's ask was answered no (§8.10): tapping it asks
     for the microphone and it goes away once allowed; refused, it stays, and tapping explains where
     to allow it. ⚑ Q342
 
@@ -4150,7 +4151,7 @@ person's alert: a fire is for me when I am among the people its alert pushes to 
 reminder or timer assigned to nobody or to me and on for me (§7.5), a chore step that is mine, a machine or cooking
 timer that alerts me, a task check-in that is mine. One that names nobody (assigned to nobody, a thing, a machine
 with nobody to alert) is everyone's; one whose people are all gone shows to nobody, as it pushes to nobody. A fire
-whose source is gone still shows, so it can be closed ⚑ Q346.
+whose source is gone still shows, so it can be closed ⚑ Q347.
 
 - Reminder row: `🔔 Take out trash · 19:00` with **[Snooze 10m] [Done]** (an all-day event:
   `· all day`; a sun-timed one, §7.7: `🔔 Put the goats away · sunset` ⚑ Q56)
@@ -4749,14 +4750,15 @@ least 0.8 s so it never flickers:
   separate and counts spec revisions.
   Nothing else — no spinner.
 - **Voice first** ⚑ Q342 (MojoSOGO 2026-10-19 "Request to use the microphone when it opens on the splash screen
-  before the rest of the app opens"; "user must approve or deny at open screen"): signed in, on a phone that can listen
-  (§8.18) whose microphone is not allowed (the browser's permission says "ask", which an iPhone home-screen app can say
-  again at each opening; or the browser can't say and voice was never turned on on this phone), the opening screen
-  stays until the person answers: **🎤 Allow microphone** (a green button that pulses, so it reads as one to press)
-  and **Deny**, under the address, above the stamp. iOS asks for the mic only on a tap, so Allow is that tap: it asks,
-  and the app opens once the phone has answered. **Deny** opens the app without the mic, with the header badge (§8.1)
-  to ask later; the next opening asks again. When the phone already allows or refuses it, the opening screen never
-  asks.
+  before the rest of the app opens"; "user must approve or deny at open screen"; "just ask at open with system popup"):
+  signed in, on a phone that can listen (§8.18) whose microphone is not allowed (the browser's permission says "ask",
+  which an iPhone home-screen app can say again at each opening; or the browser can't say and voice was never turned on
+  on this phone), the opening screen stays and asks **by itself**: the phone's own Allow / Don't Allow popup shows over
+  it, with nothing to tap first, and the app opens once the person has answered. Only a phone that refuses at once
+  without showing a popup (it wants a tap first) gets **🎤 Allow microphone** (a green button that pulses) and **Deny**
+  under the address, above the stamp; Allow is that tap. Don't Allow or Deny opens the app without the mic, with the
+  header badge (§8.1) to ask later; the next opening asks again. When the phone already allows or refuses it, the
+  opening screen never asks. There is one opening screen: the launch image is the same screen (below).
 - One source: the screen is plain HTML in `index.html`, outside the React root, so it
   appears before any script loads; the app removes it when ready (signed in or not).
 - iPhone shows its own launch image before the page exists: `apple-touch-startup-image`
