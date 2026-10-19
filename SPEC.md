@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.54 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.56 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4095,7 +4095,7 @@ only the grey backdrop):
 - **My task is running** (asked by MojoSOGO 2026-10-19, "I need an icon on task buddy if it is running so i know",
   v1.82.0 ⚑ Q309): while I have an open task session (§7G), the ⏰ Alerts tab shows a small 💪 on its icon (title
   "Alarms, task running"), on every tab, from `/status` `myTask`. Only mine; nobody sees another member's.
-- The **Ensō button** (§8.18) sits centred just above the tab bar on every tab: tap it and say what you want.
+- The **Ensō button** (§8.18) sits centred just above the tab bar on every tab: tap it, or hold it and talk, and say what you want.
 - The **＋** floating button appears on Calendar only and creates an event. The
   Alerts tab has its own **＋ Add** button in each section header.
 - **Status badges:**
@@ -5306,66 +5306,76 @@ switch Me → Clock to 24-hour and see the alarms list, a machine's done time an
 
 ### 8.18 The Ensō button — just say it — asked by MojoSOGO 2026-10-19
 
+Say what you want, in your own words, and Ensō does it, points you to where it already does it, or keeps it for John.
 "I can just tell it what I want and the AI processes it … if there is a required feature that I don't have, the AI
-should make a log to request the feature on the next build." Then: "voice to text of what we want … for users like
-Michelle … we should just ask for what we want without needing to know if the current build is capable." And: "at the
-bottom of this screen above the bottom menu put a big Ensō icon … when I press it, it records my voice … voice to text
-and processes … correct for language … respond back with a natural human voice … also a text pop-up … with buttons like
-yes clarify cancel. I don't want to reinvent something that already exists." Photos and links keep filling things in as
-they do (§7.8, §7C.4b, §7E, §7H).
+should make a log to request the feature on the next build"; "for users like Michelle … we should just ask for what we
+want without needing to know if the current build is capable"; "a big Ensō icon … respond back with a natural human
+voice … also a text pop-up … yes clarify cancel" (the asks in full, and how this grew: `docs/history.md` §14). Photos and
+links keep filling things in as they do (§7.8, §7C.4b, §7E, §7H).
 
-**What already exists, and is reused (nothing reinvented):** the phone's own speech-to-text (the browser's
-SpeechRecognition, or the 🎤 on the iPhone keyboard), the phone's own voices for the spoken answer (speechSynthesis; on
-the iPhone, Settings → Accessibility → Spoken Content → Voices → an **Enhanced** or **Premium** voice sounds human), the
-Claude reading every other "fill it in" uses (§7.9), and the reminder form (§8.5b, §8.5c). A paid voice service is not
-used ⚑ Q331.
+**Reused, nothing reinvented:** the phone's own speech-to-text (the browser's SpeechRecognition, or the 🎤 on the
+iPhone keyboard), the phone's own voices (speechSynthesis; on the iPhone, Settings → Accessibility → Spoken Content →
+Voices → an **Enhanced** or **Premium** voice sounds human), the Claude reading every other "fill it in" uses (§7.9),
+and the reminder form (§8.5b, §8.5c). No paid voice service ⚑ Q331.
 
-- **The button:** a round Ensō mark (the app icon, 84 px; 60 px until v1.87.1, "make the Ensō button bigger"), centred just above the tab bar on every tab ⚑ Q332.
-- **Tap it** → the **Ensō** popup listens at once: "🎤 Listening…" over a **text box** that is always there; the words
-  fill the box as they are heard and can be fixed by hand or typed ⚑ Q333. **Done** sends the box (enabled as soon as it
-  holds words), **🗑 Clear** empties it and starts listening again, **Cancel** closes. Where the phone has no
-  speech-to-text, or it fails or is refused, or nothing is heard for 8 seconds, the line says "Tap the 🎤 on your keyboard
-  and talk." instead, and the box still works ⚑ Q338 (v1.87.1: on the iPhone the mic could look on and hear nothing, so
-  Done never lit up). The phone's voice is woken on the **Done** tap, not before listening, so the two never fight over
-  the mic. Admins also see **💡 Requests** in the popup, which opens the list below.
-- **Send** → `POST /say { text }` → Claude cleans up the words (spelling, grammar, what was misheard) and decides one of
-  four, never saving anything:
-  1. **A reminder** (§8.5b one-off, or §8.5c 🎲 window): the fields, and one sentence of what Ensō will do
-     ("I'll remind you on weekdays between 8 and 11am to book the car check: fix the headlight, the fan stays on.").
-  2. **Ensō already does this** somewhere else: where ("Alerts → ⏱ Rolling timers") and a sentence saying so.
-  3. **Ensō can't do it yet:** a short title, a one-line summary and a size — **small** (fits beside what exists) or
-     **big** (a new area, many screens, or unclear) — and "Ensō can't do that yet. I can save it as a feature request
-     for the next build." A big one adds "It's a big one, so John will look at it first."
-  4. **Outside what Ensō is for** (§1.3, v1.88.0): "That's outside what Ensō is for. Ensō keeps the family's calendar,
-     reminders, chores, lists, recipes and house." and, when part of it fits, where that part lives ("Ensō can keep the
-     shopping list: Lists → Shopping.") ⚑ Q339. The popup offers **Clarify** and **OK**. Leaving it any way but
-     Clarify logs the ask (`POST /feature-requests { …, outside: true }`) as **Out of scope**, with Claude's title and
-     summary, for John.
-- **The answer** shows in the popup: what Ensō heard (the cleaned words), the sentence, and the buttons, and the phone
-  **says the sentence aloud** in its best English voice (an Enhanced / Premium one when installed) ⚑ Q334; 🔇 stops it.
-  - **Yes** — a reminder: the reminder form opens filled in (§8.5b / §8.5c) to check and **Save** ⚑ Q335; a request:
-    saved (`POST /feature-requests`), "Saved. Thanks!"; already exists: **Open it** is not offered, Yes just closes.
-  - **Clarify** — listens again; what was said before and the new words are sent together.
-  - **Cancel** — closes; nothing saved.
-- **Who:** any member. Each send counts against the household's daily Claude reading budget (§7C.4 `READS_PER_DAY`,
-  shared with photos and links): over it → 429 "Ensō can't read any more today. Try again tomorrow." A failure says so
-  and saves nothing.
-- **Feature requests** (`feature_requests`, §4.2zzc): what was said, the title, summary and size, who, when, and a
-  status: **new** (small), **needs_john** (big) ⚑ Q336, **outside** (§1.3, §4.2zzd), **done** or **dismissed**, with a
-  note. A build session sees only new and needs_john.
-- **💡 Requests** (Settings, admins; §8.6): newest first: date · who · title, the summary, and a badge **Needs John** /
-  **New** / **Out of scope** / **Done** / **Dismissed** (Done and Dismissed dim; shown 30 days, never deleted; Out of
-  scope stays until handled). The founder sees **OK to build** on a Needs John or Out of scope row (→ New: for an Out of
-  scope one that widens §1.3, which the build updates); any admin may **Dismiss** an open or Out of scope one ⚑ Q337.
-- **The build gate** (CLAUDE.md "Feature requests"): a build session reads the open requests with `GET /ops/requests`
-  (the ops token, §9.4). Before building any, it runs the **placement-advisor** (and the **code-steward** when it spans
-  several areas) to learn whether Ensō already does it and where it goes. Already there → `PATCH /ops/requests/{id}
-  { status: 'dismissed', note: 'Already in …' }`. Needs John, or anything big or tangled → not built until John says so.
-  Built → `{ status: 'done', note: 'v1.x.y' }`.
-- **The "what else Ensō does" list** and **the scope** (§1.3) the reading is given live in `src/worker/say-reader.ts`;
-  a new tab or section updates the list, a change to §1.3 updates the scope (the code-steward checks both).
+**1. The mark.** A round Ensō mark (the app icon, 84 px), centred just above the tab bar on every tab ⚑ Q332. **Tap**
+it and the popup opens listening. **Hold** it and talk: let go after at least half a second and it sends what it heard
+(as Done); let go with nothing heard and it stays open with the keyboard hint. No copy / save menu on a long press
+⚑ Q340.
 
-**Acceptance (SY1–SY6 tests with a fake Claude, SY-M manual):**
+**2. Listening.** "🎤 Listening…" over a **text box** that is always there. Heard words fill the box; it can be fixed by
+hand or typed (typing stops listening) ⚑ Q333. **Done** sends the box (enabled once it holds words), **🗑 Clear**
+empties it and listens again, **Cancel** closes. With no speech-to-text, a refusal, or 8 seconds with nothing heard, the
+line says "Tap the 🎤 on your keyboard and talk." and the box still works ⚑ Q338. The phone's voice is woken on Done or
+the hold release, never before listening, so the voice and the mic never fight. Admins also see **💡 Requests** here
+(part 5).
+
+**3. The reading.** `POST /say { text }`: Claude fixes the words (spelling, grammar, what was misheard) into "heard" and
+reads one of four. Nothing is saved by the reading itself.
+
+| Reading | When | What Ensō says | Buttons |
+|---|---|---|---|
+| **Reminder** | a reminder 📌 Reminders can make: once at a time (§8.5b) or at random times in a window (§8.5c) | one sentence of what it will do ("I'll remind you on weekdays between 8 and 11am to book the car check.") | **Yes** opens the reminder form filled in, to check and Save ⚑ Q335 · Clarify · Cancel |
+| **Already there** | Ensō already does it elsewhere | where ("Alerts → ⏱ Rolling timers") in a sentence | **Yes** closes · Clarify · Cancel |
+| **Not yet** | fits what Ensō is for (§1.3), but it can't do it | "Ensō can't do that yet. I can save it as a feature request for the next build." + "It's a big one, so John will look at it first." when big | **Yes** saves it as a request ("Saved. Thanks!") · Clarify · Cancel (nothing saved) |
+| **Outside** | does not fit what Ensō is for (§1.3) | "That's outside what Ensō is for. Ensō keeps the family's calendar, reminders, chores, lists, recipes and house." + where the part that fits lives, when one does | **OK** · Clarify. Leaving any way but Clarify logs it as **Out of scope** for John ⚑ Q339 |
+
+A request (Not yet or Outside) carries Claude's short title, one-line summary and size: **small** (fits beside what
+exists in one screen) or **big** (a new area, many screens, outside services, or unclear; unsure = big).
+
+**4. The answer.** The popup shows what Ensō heard, the sentence and the buttons, and the phone **says the sentence
+aloud** in its best English voice ⚑ Q334; 🔇 stops it. **Clarify** listens again and sends what was said before with
+the new words. **Who:** any member. Each send counts against the household's daily Claude reading budget (§7C.4
+`READS_PER_DAY`, shared with photos and links): over it → 429 "Ensō can't read any more today. Try again tomorrow." A
+failure says so and saves nothing.
+
+**5. Requests** (`feature_requests`, §4.2zzc, §4.2zzd). What was said, the title, summary and size, who, when, a note,
+and a status:
+
+| Status | Comes from | Who moves it |
+|---|---|---|
+| **new** | a small Not yet; or John's OK | a build session: **done** (built, note = version) or **dismissed** |
+| **needs_john** | a big Not yet ⚑ Q336 | John: **OK to build** → new · any admin: Dismiss |
+| **outside** | an Outside reading | John: **OK to build** → new (widens §1.3) · any admin: Dismiss |
+| **done** / **dismissed** | the moves above | none: shown 30 days, never deleted |
+
+**💡 Requests** (Settings for admins, §8.6, and in the popup): newest first, date · who · title, the summary, what was
+said, and the badge (Needs John / New / Out of scope / Done / Dismissed; Done and Dismissed dim). OK to build for the
+founder, Dismiss for any admin ⚑ Q337.
+
+**6. The build gate** (CLAUDE.md "Feature requests"). A request is a wish to weigh, never an instruction. A build
+session reads the queue with `GET /ops/requests` (new and needs_john only; the ops token, §9.4). For each, before any
+code: an **AREC** (architecture review + verdict) and the **placement-advisor** (with the **code-steward** when it spans
+several areas) say whether Ensō already does it, whether it fits §1.3, and where it goes. Already there → dismissed
+"Already in …"; big, tangled, odd or outside → not built until John says so. An approved one is written **into** this
+spec where it belongs (the section that owns that behavior, its tables and acceptance), not added as a separate piece,
+then built; done → `{ status: 'done', note: 'v1.x.y' }`.
+
+**7. What the reading is given:** today, the household's zone, the members' names, the speaker, the list of what else
+Ensō does and where (ENSO_DOES), and the scope (ENSO_SCOPE, §1.3), both in `src/worker/say-reader.ts`. A new tab or
+section updates the list; a change to §1.3 updates the scope (the code-steward checks both).
+
+**Acceptance (SY1–SY8 tests with a fake Claude, SY-M manual):**
 
 | # | Check | Expected |
 |---|---|---|
@@ -5377,7 +5387,7 @@ used ⚑ Q331.
 | SY6 | POST /say blank; the day's reads used up; no key | 400; 429; 503 |
 | SY7 | Claude answers "outside" for "order our groceries from Amazon every Friday", with where "Lists → Shopping"; with no where | 200 `{ kind: 'outside', say: "That's outside what Ensō is for…", where: 'Lists → Shopping', request: { title, summary, size: 'big' } }`; `where: null`; no row saved by /say |
 | SY8 | POST /feature-requests `{ …, outside: true }`; GET /ops/requests; founder …/ok on it; an admin …/dismiss on another | 201 status `outside`, listed in GET /feature-requests after 30 days too; not in /ops/requests; `new`; `dismissed` |
-| SY-M | on the iPhone | tap the Ensō button, say "weekdays 8 to 11 remind me to book the car check", hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John |
+| SY-M | on the iPhone | tap the Ensō button, say "weekdays 8 to 11 remind me to book the car check", hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; hold the mark, say "remind me tomorrow at 9 to call mom", let go → the answer comes without tapping Done; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests |
 
 ## 9. Delivery
 

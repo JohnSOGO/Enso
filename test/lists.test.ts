@@ -316,7 +316,7 @@ describe('M4b + M4e lists API (§7A.2)', () => {
     expect(r.status).toBe(400);
     expect(r.json.error).toBe('invalid_input');
     expect(r.json.message).toMatch(String(LISTS_MAX));
-  });
+  }, 30_000); // ~35 sequential round trips: the 5 s default ran out under a full run on the PC (v1.88.0 deploy)
 
   it('L21 POST /lists with an emoji → 201 carrying it; GET /lists carries it', async () => {
     const r = await o.post('/lists', { name: 'Costco', emoji: '🛍️' });

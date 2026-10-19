@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-10-19 — Hold to talk on the Ensō mark (placement-advisor)
+
+- **Ask:** Pressing the Ensō mark opens the popup listening; letting go after ≥ 0.5 s sends what was heard; a shorter
+  tap stays open; nothing heard → stays open with the hint; no long-press callout (SPEC 3.55 §8.18 "Hold to talk",
+  v1.89.0, ⚑ Q340).
+- **Verdict:** frontend/src/components/EnsoButton.tsx + EnsoButton.module.css [EXISTING]
+- **Flow stage:** render (capture intent)
+- **Why:** The gesture reuses EnsoButton's existing begin/send path. Hold start and the latest send live in refs, and
+  unlockSpeech moves into the release gesture, same as on Done. No new phase, rule or server change. useSpeech stays
+  free of UI policy. A separate useHold hook was rejected: one gesture, one user, about 25 lines. Worker notes: stop
+  the click after pointerup from opening again (keyboard still opens); an empty release goes to the hint, not send()'s
+  error; pointercancel never sends; suppress the img callout too.
+- **Caps:** EnsoButton.tsx 136 → ~160 / 300; nothing newly in the band.
+- **Sources read:** scripts/arch.ts, docs/module-ownership.md (EnsoButton, useSpeech, App rows), docs/placement-receipts.md,
+  SPEC.md §8.18 Hold to talk, docs/decisions.md Q340, frontend/src/components/EnsoButton.tsx.
+
 ## 2026-10-19 — Out of scope: the fourth reading and the `outside` status (placement-advisor)
 
 - **Ask:** v1.88.0, SPEC 3.54: §1.3 Scope, §8.18 item 4 "Outside what Ensō is for" with Clarify / OK and logging on

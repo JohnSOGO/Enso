@@ -6,8 +6,10 @@
   background: var(--surface); border: 1px solid var(--border);
   box-shadow: 0 6px 18px rgba(0, 0, 0, .45);
   z-index: 5; display: grid; place-items: center;
+  /* ⚑ Q340 hold to talk: no copy / save menu or text selection on a long press. */
+  -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; touch-action: none;
 }
-.enso img { width: 68px; height: 68px; border-radius: 99px; }
+.enso img { width: 68px; height: 68px; border-radius: 99px; pointer-events: none; -webkit-touch-callout: none; }
 .enso:active { transform: translateX(-50%) scale(.94); }
 .listening { font-weight: 600; margin-bottom: 8px; }
 .words { font-size: 1.05rem; min-height: 3em; }
