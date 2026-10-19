@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.42 · **Date:** 2026-10-16 · **Owner:** MojoSOGO
+**Version:** 3.43 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -360,6 +360,8 @@ This table says what each term means.
 | `open` / `taken` / `pending` / `paid` (bounty) | A one-off bounty (§7B.8): anyone can take it / someone said I'll do it in the last 3 h / done, waiting for an admin's OK / OK'd, its points count — derived, never stored |
 | `open` / `discuss` / `owed` / `closed` / `settled` (mess) | A mess report (§7B.7): asking who left it / on To talk about / claimed or recorded, a point owed / closed as nobody's / the point paid back or let go — derived from the row |
 | `sogoai` / `claude` | Who named a snapped item (§7A.3): SogoAI's local vision model (free) / the Claude API (the fallback) |
+| `great` / `steady` / `distracted` / `struggling` / `break` (task mood) | A task check-in answer (§7G.3): 🚀 Great! / 👍 Steady! / 🦋 Got distracted / 😩 Struggling / ☕ Taking a break |
+| `finished` / `stopped` (task outcome) | How a task session ended (§7G.6): Finish / Stop for now. A running, paused or on-break session has none |
 | `at` | Chore rings at its time, like an alarm |
 | `by` | Chore is quiet: due by its time, optionally one nudge then |
 | `superseded` | A newer occurrence of the same event started ringing while this one still was |
@@ -974,6 +976,19 @@ Schema: [`migrations/0052_reminder_random_time.sql`](migrations/0052_reminder_ra
 reminder). Additive only; it runs before the deploy. **Migration check (RT-M):** events that exist before 0052 come
 through it with both NULL.
 
+### 4.2zz Schema change — `migrations/0053_task_sessions.sql`
+
+Asked by MojoSOGO 2026-10-19: the 💪 Task buddy (§7G). A session is a rolling timer (`timers` row, id `task_…`)
+plus this row with the same id for what a timer doesn't hold: whose it is, the limit, working time, break and
+pause, what done looks like, the check-in log, and how it ended. A new table and nothing else, so the fires
+table's kind check is untouched (no table rebuild).
+
+Schema: [`migrations/0053_task_sessions.sql`](migrations/0053_task_sessions.sql). The migration is the schema; it is not copied here.
+
+`checkins` is a JSON list of `{ at, mood, said }` (mood from `TASK_MOOD`, `said` = Enso's reply), at most 200.
+`done_looks` a JSON list of lines; `done_ticked` the ticked line numbers at Finish. Additive only; it runs before
+the deploy. **Migration check (TB-M):** earlier timers and fires come through unchanged; a session row can be written.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1115,6 +1130,7 @@ app's Ringing bar (§8.2) until someone acts.
 | `snooze` | reminder, `ringing` | `scheduled`, `due_at = now + SNOOZE_MIN`, `alert_count = 0` |
 | `done` | chore, `ringing` | advances the run one step (§7B.3) — the route calls `advanceRun`; the fire closes `done` |
 | `ack` | timer, `ringing` **or** `scheduled` | `closed`, reason `acked`; **next** = new timer fire `due_at = nextTimerDue(now, intervalMin, window)` (= `now + intervalMin` without a window) |
+| `ack` | a task check-in (timer id `task_…`) | `invalid_action` at the route: a check-in is answered through `/tasks` (§7G.3) |
 | any | machine | `invalid_action` — a machine fire is closed only by the `/machines` and `/cooking` routes (§7D, §7D.8) |
 | anything else | — | `{ error: 'invalid_action' }` → HTTP 409 |
 
@@ -3692,6 +3708,178 @@ null means it couldn't tell which show it is.
 
 ---
 
+## 7G. 💪 Task buddy — `src/shared/tasks.ts` (pure) — asked by MojoSOGO 2026-10-19
+
+"A task accountability system that periodically checks in with me while I'm working on something, helps me stay
+focused, encourages me when things are difficult, and celebrates progress … accountability without nagging … Enso
+is my accountability teammate, not my boss." And: "Enso should ask 'what does done look like' so when we think we
+are done, Enso can verify." Plan: `/mnt/project-files/arec-task-buddy.md`.
+
+### 7G.1 A session rides on a rolling timer
+
+A **task session** is one person's piece of work, from Start to Finish or Stop. It is stored as a rolling timer
+(§5.5) the way a cooking timer is a machines row (§7D.8): a `timers` row with id `task_…` (`isTaskId`) holds the
+title, the check-in interval, the channels, `assigned_to = [me]` and `running`; its fires are ordinary `timer`
+fires, so Away, Quiet the house, phone first and the FunHouse rule all apply unchanged (§9.2b–9.2d, §9.4b). The
+session's own state is one `task_sessions` row with the same id (§4.2zz). A task timer is never listed, edited or
+started by `/timers` (404 there), and `GET /fires` shows a task's fire only to its owner.
+
+- **One open session per person** ⚑ Q298: Start while one is open → 409 `busy` "You already have a task going: {title}."
+- **State**, derived, never stored (`taskState`): `ended` (ended_at set) · `break` (break_until set) · `paused`
+  (paused_at set) · `working`.
+- **Working time** = `worked_ms` + (now − `working_since` while working). Break and pause time never count.
+  Elapsed = now − `started_at`.
+- **Timed or open-ended:** `limit_min` (1–720) or NULL. A timed task's clock is working time, so a break or
+  a pause stops it ⚑ Q299. Time up never means done.
+
+### 7G.2 Starting — say it the way you'd say it
+
+The start box takes one sentence, typed or dictated ("I'm going to work on my coding project for two hours",
+"Keep me on track while I organize the office. Check on me every 10 minutes"). `readTaskStart(text)` (pure) gives
+`{ title, limitMin, intervalMin }`:
+- **interval:** "every N minutes" / "every N min" / "every hour" (N as digits or a word, one–sixty) → N; absent → null.
+- **limit:** "for N minutes / hours", "for an hour", "for half an hour", "for an hour and a half", "for 1.5 hours"
+  → minutes; absent → null (open-ended).
+- **title:** what is left once a leading "Enso," / "Hey Enso," and one lead-in ("I'm starting to", "I'm starting",
+  "I am going to work on", "I'm going to", "I'm working on", "I need to finish", "I need to", "Keep me on track
+  while I", "Help me", "Let's") are dropped, cut at the first sentence end, trimmed of punctuation, first letter
+  capitalized, at most `ALERT_TITLE_MAX`. "I'm starting a task" alone leaves no title (null) and the form asks for one.
+
+The form shows what it read as fields the person can change: **What** (title), **How long** (Open-ended, 15 min,
+30 min, 1 hour, 2 hours, or what was said), **Check on me every** (5, 10, 15, 20, 30, 45, 60 min, or what was said),
+**What does done look like?** (one line each, up to 8 lines of up to 80 characters ⚑ Q300; optional, but the box is
+always shown with a hint "Floor clear, bikes on hooks, trash out"), the channel ticks (§8.5 `ChannelChecks`) and
+**🤫 Private** (the title is never spoken on a speaker). A new form starts from my **last session's** interval,
+channels and Private — that is "my default"; a first session: every 15 minutes, 📱 Phone + 🔊 House (+ 🎪 FunHouse
+for the founder) ⚑ Q301. **Start** says *"Sounds good! I'll check on you every 15 minutes while you work on {title}.
+Let's make some progress!"* (and *"… for the next hour"* when timed).
+
+### 7G.3 Check-ins
+
+The session's timer fire is the **check-in**. It is due `interval` after Start or the last answer; for a timed task
+never later than the moment working time reaches the limit (`nextCheckinDue`). There is only ever one open
+check-in per session (the timer's one open fire, `uq_timer_open`), so an answer from the phone, the Ringing bar or
+the session card answers it everywhere.
+
+**On the phone** a check-in's push has **no buttons** ⚑ Q307 (a timer's Ack would skip the answer): a tap opens its
+alert card (§9.5) with the answers. `GET /fires` gives a task's fire `taskTimeUp` (true when its working time has
+reached the limit), so the Ringing bar and the card show Finished! · +15 · +30 · Stop without working it out. In
+Settings → 📊 Status (§8.6) another member's task deliveries are left out of Recent deliveries ⚑ Q308.
+
+**Missed check-ins** ⚑ Q302: the timer's renotify is 10 minutes and max alerts 2: one gentle nudge, then the
+check-in stays open and silent ("Waiting for you" on the card) until answered. Not answering is never read as
+distracted, stopped or failed, and gets no feedback at all.
+
+**What it says** (`checkinText(task, now, alertNumber)`, the whole text, no "Timer:" and no "(alert n)"):
+
+| When | Alert 1 | Alert 2 (the nudge) |
+|---|---|---|
+| working | one of "{T}: how's it going?" · "{T}: how are you doing?" · "{T}: how's it coming along?" (by check-in count); plus " About N min to go." when a timed task has ≤ one interval left; plus " You've been at it a while. A longer break might feel good." when working time since the last break or start is ≥ 90 min ⚑ Q303 | "Still working on {T}? No rush checking in. I'm here when you need me." |
+| time up (timed, working time ≥ limit) | "That's your {limit}! Nice work showing up for {T}. Did you finish, or would you like a little more time?" | "Still there? Tell me how {T} went whenever you're ready." |
+| break over | "Break's over! Ready to get back to {T}?" | "Whenever you're ready, {T} is waiting. No rush." |
+
+`{T}` is the title, or "Your task" when Private. Spoken on a speaker, a Private task's check-in is "Time for a
+task check-in." `{limit}` reads "hour", "2 hours", "30 minutes", "hour and a half".
+
+**The answers** — the five, then the session actions:
+
+| Answer | What happens next |
+|---|---|
+| 🚀 Great! | check-in closes `acked`; next one in `interval` |
+| 👍 Steady! | same |
+| 🦋 Got distracted | same; the reply offers **Check on me in 5 min** (one-off) ⚑ Q304 |
+| 😩 Struggling | same; the reply offers **Check on me in 5 min**, **+15 min** (timed) and **☕ Take a break** |
+| ☕ Taking a break | asks how long: 5 · **10** · 15 · 30 min ⚑ Q305; working time stops; the check-in moves to the break's end and says "Break's over"; **Back to it** ends the break early |
+| time-up check-in | **Finished!** · **+15 min** · **+30 min** · **Stop for now** instead of the five |
+
+Any answer while on a break (from its "Break's over" check-in) ends the break first. Pause and Resume (§7G.5) sit
+beside the answers, with Finish and Stop.
+
+### 7G.4 Enso's reply — supportive, varied, never the same line twice running
+
+Every answer gets a reply at once (`taskReply`, pure), shown in a small "💪 Enso" box on the phone. The line is
+picked by mood **and** how the session has gone, from a pool of at least four per case, never the same as the
+last line said this session (each check-in keeps what was said):
+
+| Case | Example |
+|---|---|
+| great | "That's what I like to hear! You're building momentum. Keep it going!" |
+| great, 3rd in a row | "Three great check-ins in a row. You're on a roll!" |
+| great or steady after distracted/struggling | "Look at you, back in the groove. That bounce-back counts." |
+| steady | "Progress doesn't have to be fast. You're still moving forward, and that counts!" |
+| distracted (first) | "Thanks for checking in! Let's get back to it. What's one small thing you can tackle right now?" |
+| distracted or struggling, 2nd+ in a row | "Looks like getting started again has been tricky. Want to try just five focused minutes?" |
+| struggling (first) | "Okay, sounds like this one's putting up a fight. You've already made an effort. Let's make the next step smaller." |
+| break | "Good call! Breaks are part of getting things done. Enjoy a little downtime, and I'll check back in {n} minutes." |
+| back from break / resume | "Welcome back! Let's pick up where we left off." |
+
+When struggling or distracted and the session has a done list, the reply names one line of it as the next small
+step: *"Want to start with just this: “bikes on hooks”?"* Replies are never sarcastic, guilt-giving or judging, and
+never mention missed check-ins.
+
+### 7G.5 Changing a session while it runs
+
+Buttons on the session card, and the same in words in its **Tell Enso** box (`readTaskSay(text)`, pure):
+
+| Say | Does |
+|---|---|
+| "pause", "pause my task" | **Pause**: working time stops, the check-in closes `stopped`, the timer stops; "Paused. Take the time you need." |
+| "resume", "I'm back", "back to it" | **Resume**: working time restarts, a check-in in `interval`; "Welcome back! …" |
+| "taking a 20 minute break", "break" | ☕ break of that length (else 10) |
+| "check on me every 10 minutes instead" | the interval changes; the open check-in moves to now + new interval |
+| "give me another 30 minutes", "30 more minutes", "add 15" | a timed task's limit grows (an open-ended one becomes timed: worked + N); the check-in re-plans |
+| "stop announcing", "don't announce", "quiet" | the House (and FunHouse) channel is dropped for this session |
+| "how long have I been working?" | answers in the box: "You've worked 42 minutes (55 since you started), 18 to go." |
+| "done", "finished", "I finished" | Finish (§7G.6) |
+| "stop" | Stop (§7G.6) |
+| "great", "steady", "distracted", "struggling", "stuck" | that answer |
+
+Anything else: "I didn't catch that. Try 'pause', 'break', 'every 10 minutes' or 'done'."
+
+### 7G.6 Finish, the done check, and Stop
+
+**Finish** first holds up what done looks like, when there is a list: "Before we call it done, does it look like
+this?" with a tick box per line and **📷 Check with a photo**. The photo (one, not kept) is read by Claude against
+the list (`POST /tasks/{id}/check-photo`, the photo-read budget of §7C.4): each line comes back yes / no / not
+sure, the yes lines are ticked for the person to confirm, with one short warm sentence. The person always decides:
+**All done 🎉** finishes whatever is ticked; **Not yet, keep going** goes back to working. With no list, Finish is one
+tap.
+
+Finish and Stop both end the session (`ended_at`, `outcome` `finished` / `stopped`), close the open check-in
+(`done` / `stopped`) and stop the timer. Each shows the **summary**: title, elapsed, working time, check-ins answered,
+the answers as a row of emoji, a one-line pattern (`taskPattern`: "Strong momentum all the way", "Steady and
+consistent", "A tough patch, then a strong finish", "A tricky one, and you kept showing up", "Heads down, no
+check-ins needed"), and for a finish with a list "Done check: 3 of 4". Finish celebrates ("{T} is done? That's
+awesome! You put in the work and got it handled. Enjoy that feeling!"); Stop recognizes the effort ("You put some
+time into it today, and that matters. We can pick it up another time.").
+
+**Recent** under the start form lists my last 10 ended sessions (title, date, working time, the emoji row, ✅ or
+⏸). A stopped one has **Pick it up again**: a new session with its title, done list, interval, channels and
+Private, started now. Nothing is ever scheduled for an unfinished task by itself.
+
+### 7G.7 Acceptance (M4zb — each row is a test)
+
+| # | Check | Expected |
+|---|---|---|
+| TB1 | `readTaskStart` on the six example sentences | "I'm starting to clean the garage." → Clean the garage, null, null; "I'm going to work on my coding project for two hours." → My coding project, 120; "I need to finish the laundry" → The laundry; "Keep me on track while I organize the office" → Organize the office; "I'm starting a task. Check on me every 15 minutes." → null title, interval 15; "clean the garage for an hour and a half, every 10 min" → 90, 10 |
+| TB2 | `readTaskSay` | each row of §7G.5 → its command with its number; "banana" → null |
+| TB3 | `workedMs`, `taskState`, `nextCheckinDue` | working since 10:00 with 5 min banked, at 10:20 → 25 min; on a break → banked only; a 30-min task with 25 worked and interval 15 → due in 5 min; open-ended → now + interval |
+| TB4 | `checkinText` | the table's texts for working (1st, 2nd count, the to-go and long-break suffixes), time up, break over; Private → "Your task"; alert 2 the nudges |
+| TB5 | `taskReply` | each case of §7G.4; never equal to the last line said; the done-list step line when struggling with a list |
+| TB6 | `taskPattern` / summary | 🚀🚀🚀 → strong; 👍👍 → steady; 🦋😩🚀 → tough patch then strong; 🦋😩🦋 → tricky; none → heads down |
+| TB7 | POST /tasks then a tick at the due time | 201, a `task_…` timer row not in GET /timers; one push to me only (not to another member); phone first (§9.2d): the house row comes with the nudge, Private speaks "Time for a task check-in."; Ack on it 409; another member's GET /fires and Status leave it out |
+| TB8 | POST /tasks while one is open | 409 `busy` |
+| TB9 | check-in answer great; struggling; break 15 | fire closed `acked`, a new fire `interval` later, a reply; struggling offers soon; break: state `break`, the fire due at the break end, working time stops |
+| TB10 | missed: ticks at due, +10 min, +20 min | alert 1, the nudge "Still working on…", then nothing; the fire stays ringing |
+| TB11 | pause, resume, PATCH interval / addMin / quiet | paused: fire closed `stopped`, no tick alerts; resume: a new fire; interval moves the open fire; addMin grows the limit; quiet drops house and funhouse |
+| TB12 | finish with ticked [0, 2] of 3; stop | outcome, ended, the fire closed, `doneTicked`, the summary; stop: outcome stopped; GET /tasks lists both under recent |
+| TB13 | check-photo (fake Claude) | the image block before a prompt naming each line; yes / no / unsure per line; one photo-read counted; nothing stored |
+| TB14 | POST /fires/{id}/actions ack on a task fire; GET /fires as another member | 409 "Answer this check-in with how it's going."; the task's fire not listed |
+| TB-M | migration check (§4.2zz) | earlier timers and fires untouched; a task session row can be written |
+
+
+---
+
 ## 8. Screens
 
 General rules come from `MOJOSOGO-PREFERENCES.md`: chips are entities, badges are
@@ -3780,6 +3968,7 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
   dryer-minutes chooser the Machines card uses (§8.5); `🧺 Clothes dryer · Sam` with **[Unload
   Clothes Dryer]**; `🧺 Dish washer · Sam` (who started it, §7D.6) with **[Emptied]**. No Done:
   a machine fire is closed only by the `/machines` routes (§7D.2), or `/cooking` (§7D.8). ⚑ Q40
+- Task check-in row (§7G, §8.5a): `💪 Clean the garage · check-in` with the five answers, no Ack; only its owner sees it.
 - Cooking timer row (§7D.8): `🍳 Air fryer · Sam` (its label, then who started it) with **[Off]**. The glyph is 🍳 for
   every kind ⚑ Q246.
 - **Away** (§9.2c) on every row not yet away: "I've seen it, I'm not home." The speakers and phones stop for that alert;
@@ -3880,8 +4069,8 @@ success the box closes (there is no toast in the app). What happens is §9.3.
 Right under it, **🤫 Quiet the house** (§9.2b): 1 hour · 2 hours · 4 hours · Rest of today, or, while quiet,
 how long is left, who set it, and **Turn off now**.
 
-Then a **menu of four buttons**, the same grid as Settings (§8.6, `PickGrid`) ⚑ (Q238): **⏰ Alarms**,
-**⏱ Rolling timers**, **🧺 Washing machines**, **🍳 Cooking machines**. Asked by MojoSOGO 2026-10-11 ("alarms needs its own modal";
+Then a **menu of five buttons**, the same grid as Settings (§8.6, `PickGrid`) ⚑ (Q238): **⏰ Alarms**,
+**⏱ Rolling timers**, **🧺 Washing machines**, **🍳 Cooking machines**, **💪 Task buddy** (§7G, §8.5a ⚑ Q306). Asked by MojoSOGO 2026-10-11 ("alarms needs its own modal";
 then "have two machines buttons; washing machines; cooking machines and move cooking to that new button"). A tap opens
 that section in a modal titled with its emoji and name; ✕, Escape or a tap outside closes it back to the tab. An
 alarm or timer form opens on top of its section and closing it returns there. Nothing in a section changed what it
@@ -3896,6 +4085,7 @@ Alarms
 🤫 Quiet the house  [1 hour] [2 hours] [4 hours] [Rest of today]
 [ ⏰ Alarms           ] [ ⏱ Rolling timers  ]
 [ 🧺 Washing machines ] [ 🍳 Cooking machines ]
+[ 💪 Task buddy      ]
 ```
 
 **Acceptance (AM1–AM3, manual on the iPhone at 320 px):** AM1 the tab shows Announce, Quiet the house and the
@@ -4042,6 +4232,24 @@ Time      Chore            Days        This week
   - Channels (☐ Phone ☐ House) · Repeat alert every (Off / 5 / 10 / 15 / 30 min) ·
     Save / Cancel / Delete (creator or owner, like alarms). Delete asks "Delete chore "{title}" and what
     done looks like for it?" (§7B.6).
+
+### 8.5a 💪 Task buddy (Alarms → 💪 Task buddy, §7G)
+
+The modal shows **my** session only; nobody else's sessions are shown anywhere.
+
+- **No open session:** a big box "What are you starting?" (placeholder "Clean the garage for an hour, check on me
+  every 15 minutes"), **Read it** fills the fields below from it (§7G.2); then What · How long · Check on me every ·
+  What does done look like? · the channel ticks · 🤫 Private · **Start**. Under it, **Recent** (§7G.6).
+- **An open session:** a card: the title, its state (Working / On a break until 3:40pm / Paused / Waiting for you
+  when a check-in has gone unanswered past its nudge), "Every 15 min", working time, and for a timed task "18 min
+  to go" (or "Time's up"). When its check-in is ringing, the answers (§7G.3) sit on the card too. Then **Check in
+  now** (the five answers, at any time: it answers the open check-in), **Pause** / **Resume**, **Finish**, **Stop**,
+  **+15 min** (timed), and the **Tell Enso** box (§7G.5) with **Say**.
+- **Enso's reply** (§7G.4) shows in a small "💪 Enso" modal over whatever screen the answer came from (the Ringing
+  bar, an alert card, the session card), with the offer buttons of §7G.3 and **OK**.
+- **Ringing bar** (§8.2): a task check-in row is `💪 Clean the garage · check-in` with the five answer buttons
+  (time up: Finished! · +15 · +30 · Stop) and Away; no Ack. An alert card (§9.5) for it shows the same.
+- **Finish** opens the done check (§7G.6) in a modal; the summary shows after Finish or Stop.
 
 ### 8.6 Settings
 
@@ -5452,7 +5660,7 @@ other push stays until I hide it ⚑ Q284.
 - `PUSH_TITLE = "Ensō"` (moved from push.ts). `pushTitle({ hasFire, title })` → the title the phone showed: a fire's
   push → `PUSH_TITLE`; else `title ?? ANNOUNCE_TITLE`. push.ts sends it and the list shows it — one copy.
 - `alertSource({ kind, isAlarm, notice, messId, title, hasFire })` → where it came from, in this order: a fire →
-  its kind (`reminder` → "Reminder", or "Alarm" when the event `is_alarm` ⚑ Q222; `timer` → "Rolling timer";
+  its kind (`reminder` → "Reminder", or "Alarm" when the event `is_alarm` ⚑ Q222; `timer` → "Rolling timer", or "💪 Task buddy" for a task check-in (§7G);
   `chore` → "Chore"; `thing` → "Thing to do"; `machine` → "Machine"); a `notice` → "Sign-in"; a `mess_id` →
   "Whose mess?"; a `title` → that title (a ping: "🏛️ Ozymandias", "🤖 Claude"); else "Announcement" (a timer
   start announcement too ⚑ Q223). The ping branch matches `opsPingsSince` (§9.4), except that a bounty push (§7B.8)
@@ -5571,7 +5779,15 @@ other push stays until I hide it ⚑ Q284.
 | POST | `/cooking` | member | Create `{ kind, name?, minutes, alertId? }` → 201 `Cooking[]`; 400 `invalid_input` |
 | PATCH | `/cooking/{id}` | member | Edit `{ kind?, name?, minutes?, alertId? }` → `Cooking[]` |
 | POST | `/cooking/{id}/off` · `/stop` · `/start` · `/close` | member | → `Cooking[]`; 409 `not_done` / `not_running` / `busy` / `conflict`; 404 for an unknown or closed timer (§7D.8) |
-| POST | `/fires/{id}/actions` | member | `{ action: Action }` → fire (+ next); 409 on `invalid_action` |
+| GET | `/tasks` | member | → `{ active: Task \| null, recent: Task[] (my last 10 ended, newest first), defaults: { intervalMin, channels, private } }` (§7G). `Task = { id, title, state: 'working' \| 'break' \| 'paused' \| 'ended', limitMin, intervalMin, channels, private, doneLooks, startedAt, workedMin, elapsedMin, remainingMin, timeUp, breakUntil, checkins: { at, mood }[], openFire: { id, dueAt, state, alertCount } \| null, outcome, endedAt, doneTicked, summary }` |
+| POST | `/tasks` | member | `{ title, limitMin?, intervalMin, doneLooks?, channels, private? }` → 201 `{ task, said }`; 400 `invalid_input`; 409 `busy` (§7G.1) |
+| POST | `/tasks/{id}/checkin` | the task's member | `{ mood: TaskMood, breakMin? }` → `{ task, said }`; 409 `ended` |
+| PATCH | `/tasks/{id}` | the task's member | `{ intervalMin?, nextInMin?, addMin?, quiet?: true }` → `{ task, said }` (§7G.5) |
+| POST | `/tasks/{id}/pause` · `/resume` · `/stop` | the task's member | → `{ task, said }`; 409 `not_working` / `not_paused` / `ended` |
+| POST | `/tasks/{id}/finish` | the task's member | `{ ticked?: number[] }` → `{ task, said }` (§7G.6) |
+| POST | `/tasks/{id}/check-photo` | the task's member | raw image body → `{ lines: { text, looks: 'yes' \| 'no' \| 'unsure' }[], note }`; 400 with no list; 503 / 502 / 422 / 429 per §7C.4 |
+| POST | `/tasks/{id}/again` | the task's member | a stopped session → 201 `{ task, said }`, a new session like it; 409 `busy` |
+| POST | `/fires/{id}/actions` | member | `{ action: Action }` → fire (+ next); 409 on `invalid_action` | (409 on a task check-in: it is answered through `/tasks`, §7G.3)
 | POST | `/fires/{id}/away` | member | "I'm away": → the fire with `awayBy`; its speakers stop, it stays open (§9.2c); 404; 409 `invalid_action` when closed |
 | POST | `/push/subscriptions` | member | `PushSubscriptionJSON` + userAgent → `{ id }` (upserted by endpoint) |
 | POST | `/push/test` | member | one test push to my subscriptions → `{ sent }`; 409 when I have none (§9.1) |
@@ -5747,6 +5963,13 @@ Captured from v1.0-draft so nothing is lost:
 - Members suggesting a bounty for an admin to price; paying a mess point with bounty points; streaks.
 - A push to the reporter when someone claims their mess.
 - Mess sizes worth more than one point.
+
+### 12.6 Task buddy — follow-ups (suggested 2026-10-19, not built, need MojoSOGO's word)
+
+- Focus Sprint recovery: after repeated distracted / struggling answers, a real 5-minute sprint with its own check-in that celebrates the effort.
+- History answers: "How much time did I spend cleaning today?", "How many tasks did I finish this week?".
+- Answering a check-in by voice on a speaker (a Home Assistant Assist intent into Enso), and spoken replies.
+- An encouragement style (calm, upbeat, playful, coach-like) and a settings page for the defaults.
 
 ### 12.1 Next — decided with MojoSOGO (2026-10-03), spec to be written before building
 

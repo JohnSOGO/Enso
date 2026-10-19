@@ -6,6 +6,8 @@ import { doneMessage, isMachineId, isStillLoaded, machineAlert, waitingLoad, typ
 import { machineHoursOf, machineQuietUntil } from '../shared/machine-hours';
 import { cookAlert, cookMessage, isCookId, type CookRow } from '../shared/cooking';
 import type { Channel, SunEvent } from '../shared/vocab';
+import { isTaskId, taskFromRow, type TaskRow } from '../shared/tasks';
+import { checkinText } from '../shared/task-replies';
 import type { Recurrence } from '../shared/recurrence';
 import { utcToLocal } from '../shared/time';
 import { sunsetUtc, type Place } from '../shared/sun';
@@ -105,6 +107,9 @@ interface Source {
   allSpeakers?: boolean;
   /** §7.10: an event reminder's things to bring. */
   bring?: string[];
+  /** §7G.3: a task check-in's whole text for alert n, and what a speaker says (a private task is never named). */
+  say?: (alertNumber: number) => string;
+  houseSay?: (alertNumber: number) => string;
 }
 
 /** Loads the alert config + title for a fire from its event, timer, chore run, thing or machine (as of `now`). */
@@ -184,5 +189,14 @@ export async function sourceOf(
     ...(row.optional === 1 ? { optional: true, onIds: await onMemberIds(db, fire.event_id) } : {}),
     ...(row.bring ? { bring: parseJson<string[]>(row.bring, []) } : {}),
     ...(row.start_sun ? { sunsetAt: sunset && row.tz ? utcToLocal(sunset, row.tz).time : null } : {}),
+    ...(isTaskId(fire.timer_id) ? await taskSay(db, fire.timer_id, row.title, row.interval_min ?? 0, now) : {}),
   };
+}
+
+/** §7G.3 — a task timer's check-in texts, over its task_sessions row as of `now`. */
+async function taskSay(db: D1Database, id: string, title: string, intervalMin: number, now: string): Promise<Pick<Source, 'say' | 'houseSay'>> {
+  const r = await first<TaskRow>(db, 'SELECT * FROM task_sessions WHERE id = ?', id);
+  if (!r) return {};
+  const s = taskFromRow(r);
+  return { say: (n) => checkinText(s, title, intervalMin, now, n).text, houseSay: (n) => checkinText(s, title, intervalMin, now, n).house };
 }

@@ -58,7 +58,9 @@ household.get('/status', requireMember, async (c) => {
       'SELECT id, endpoint, user_agent AS userAgent, created_at AS createdAt, last_ok_at AS lastOkAt, last_error AS lastError FROM push_subscriptions WHERE member_id = ?', me),
     recentDeliveries: await all(c.env.DB,
       `SELECT d.id, d.channel, d.message, d.status, d.detail, d.created_at AS createdAt, m.display_name AS member
-         FROM deliveries d LEFT JOIN members m ON m.id = d.member_id ORDER BY d.created_at DESC LIMIT 20`),
+         FROM deliveries d LEFT JOIN members m ON m.id = d.member_id LEFT JOIN fires f ON f.id = d.fire_id
+         LEFT JOIN task_sessions ts ON ts.id = f.timer_id
+        WHERE ts.member_id IS NULL OR ts.member_id = ? ORDER BY d.created_at DESC LIMIT 20`, me), // §7G.3 Q308: my task check-ins only
   });
 });
 

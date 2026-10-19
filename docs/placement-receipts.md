@@ -7,6 +7,30 @@ carry its result.
 
 ---
 
+## 2026-10-19 — 💪 Task buddy (placement-advisor)
+
+- **Ask:** v1.81.0, SPEC §7G, §4.2zz, §8.2, §8.5, §8.5a, §5.4, §9.5, §10. A task session rides on a rolling timer
+  (`task_…`) plus a task_sessions row (migration 0053). Check-ins are its timer fires with whole-sentence texts (Private
+  spoken as "Time for a task check-in."); five answers and varied replies; readTaskStart / readTaskSay; pause, break,
+  resume and changes; Finish's done check with a Claude photo read; summary. Hidden from /timers and from other
+  members' /fires and Status; Ack refused on it. A fifth Alarms button; a reply box that outlives the ringing row.
+- **Verdict:** NEW `src/shared/tasks.ts` (model, limits, validation, derived state, Task wire, cleanDoneCheck),
+  `src/shared/task-moves.ts` (transitions → session / timer / fires / said), `src/shared/task-replies.ts` (every text),
+  `src/shared/task-say.ts` (readers), `src/worker/task-rows.ts`, `src/worker/routes/tasks.ts`,
+  `src/worker/routes/task-photos.ts`, and the PWA's `Tasks.tsx`, `TaskStart.tsx`, `TaskCard.tsx`, `TaskCheckin.tsx`,
+  `TaskDone.tsx`, `TaskSaid.tsx`. EXISTING: vocab.ts, fire-rows.ts (Source say / houseSay over an inline task_sessions
+  read), tick.ts, routes/alerts.ts, push.ts, alert-history.ts + routes/my-alerts.ts, photo-reader.ts (readDonePhoto),
+  index.ts, state.tsx (taskSheet / showTask), App.tsx, Alarms.tsx, FireActions.tsx, RingingBar.tsx. The three spec
+  gaps it named were settled as ⚑ defaults before building: no push buttons (Q307), `taskTimeUp` on GET /fires, and
+  other members' Status leaving task check-ins out (Q308, so routes/household.ts too).
+- **Flow stage:** rules (four shared modules), route + persist (two route files, task-rows.ts), deliver (tick / push
+  take whole texts from Source; no task names in tick), render (six components, state.tsx).
+- **Why:** one tasks.ts would be ~450 lines, so it splits by concern up front (model / moves / words out / words in);
+  the transitions are rules, so they are shared as in cooking.ts; a `taskSource` in task-rows.ts was rejected (a
+  fire-rows ⇄ task-rows cycle); the done-check reader joins photo-reader.ts; the reply box is cross-cutting client state.
+- **Caps:** tick.ts 115/148, alerts.ts 227/300, fire-rows.ts 202/300; new files ≤ ~190; arch:audit quiet, nothing in the
+  band. Built as placed; task-replies.ts also imports time.ts (for `ms`), recorded in its ownership row.
+
 ## 2026-10-16 — tick step 1 reminder planning (reorganizer)
 
 - **Trigger:** steward pass 28 item 1, MojoSOGO 2026-10-16 "SPLIT": tick.ts 131/148, two lines from the band (133).

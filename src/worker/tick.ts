@@ -63,7 +63,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
     if (dayEnded && fire.away_by) stmts.push(db.prepare('UPDATE fires SET away_by = NULL, away_at = NULL WHERE id = ?').bind(fire.id));
     if (alert) {
       summary.alerts++;
-      const message = alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sunsetAt, src.bring);
+      const message = src.say?.(next.alert_count) ?? alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sunsetAt, src.bring);
       const message24 = typeof src.sunsetAt === 'string' ? alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sunsetAt, src.bring, true) : message; // §8.17: a push in its member's clock
       const base = { fireId: next.id, alertNumber: next.alert_count };
       // §5.7, §7.5: who it is for. Nobody → the fire still steps, nothing is delivered.
@@ -85,7 +85,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
       const speakers = quiet || fire.away_by || !(aud.house && speaksOnHouse(next.alert_count, src.cfg)) ? []
         : src.allSpeakers ? (everySpeakerNow ??= allHouseSpeakers(env), await everySpeakerNow) : await deliverySpeakers(db, aud.push);
       if (speakers === null || speakers.length) {
-        stmts.push(houseDelivery(db, { ...base, message, speakers }, now).stmt);
+        stmts.push(houseDelivery(db, { ...base, message: src.houseSay?.(next.alert_count) ?? message, speakers }, now).stmt); // §7G.3
       }
       summary.deliveries += stmts.length - 1;
       if (fire.state === 'scheduled' && fire.kind === 'reminder') {

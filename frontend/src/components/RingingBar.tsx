@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useApp, type Fire } from '../state';
 import { FireActions } from './FireActions';
 import { isCookId } from '../../../src/shared/cooking';
+import { isTaskId } from '../../../src/shared/tasks';
 import type { AlertKind } from '../../../src/shared/vocab';
 import s from './RingingBar.module.css';
 
@@ -23,6 +24,7 @@ export function RingingBar() {
     if (f.kind === 'machine' && !f.personId) return ' · owner unknown'; // §7D.2 Done now with nobody named
     if (f.kind === 'chore' || f.kind === 'machine') return ` · ${person(f.personId)}`;
     if (f.kind === 'thing') return ' · to do'; // ⚑ (§8.2)
+    if (isTaskId(f.timerId)) return ' · check-in'; // §7G
     return ` · ringing ${minsAgo(f.dueAt)} min`;
   };
 
@@ -32,7 +34,7 @@ export function RingingBar() {
       {shown.map((f) => (
         <div key={f.id} className={s.row}>
           <span className={s.what}>
-            {isCookId(f.machineId) ? '🍳' : ICON[f.kind]} <b>{f.title}</b>
+            {isCookId(f.machineId) ? '🍳' : isTaskId(f.timerId) ? '💪' : ICON[f.kind]} <b>{f.title}</b>
             {f.kind === 'chore' && f.stepTitle && <> — {f.stepTitle}</>}
             <span className={s.sub}>{sub(f)}{f.awayBy && ` · away (${person(f.awayBy)})`}</span>
           </span>

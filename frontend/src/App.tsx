@@ -15,6 +15,7 @@ import { Recipes } from './components/Recipes';
 import { Settings } from './components/Settings';
 import { useAlertLink } from './components/MyAlerts';
 import { RingingBar } from './components/RingingBar';
+import { TaskSaid } from './components/TaskSaid';
 import { MessBanner } from './components/MessBanner';
 import { SignIn } from './components/SignIn';
 import { JoinPage } from './components/JoinPage';
@@ -64,6 +65,7 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
   return (
     <div className={s.app}>
       <RingingBar />
+      <TaskSaid />
       <MessBanner />
       {(house || phoneOff) && (
         <div className={s.badges}>

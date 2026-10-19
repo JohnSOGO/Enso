@@ -82,3 +82,22 @@ export async function readItemPhoto(input: { apiKey: string; bytes: ArrayBuffer;
   });
   return res.ok ? { ok: true, name: res.value.name } : res;
 }
+
+export type ReadDonePhotoResult = { ok: true; raw: { lines?: unknown; note?: unknown } } | { ok: false; kind: 'refused' | 'failed'; reason: string };
+
+/** §7G.6 — the done check: does the photo look like each line of "what done looks like"? One request, the image block
+ *  before a prompt naming each numbered line; → the raw answer (tasks.ts cleanDoneCheck cleans it), or an honest failure. */
+export async function readDonePhoto(input: { apiKey: string; bytes: ArrayBuffer; mediaType: string; title: string; lines: string[] },
+  opts: { fetch?: typeof fetch } = {}): Promise<ReadDonePhotoResult> {
+  const image = imageBlock(input.bytes, input.mediaType);
+  if ('ok' in image) return image;
+  const res = await askClaude({
+    apiKey: input.apiKey, fetch: opts.fetch, content: [image],
+    prompt: `Someone just finished a household task, "${input.title}", and took this photo to check it. They said done looks like:\n` +
+      input.lines.map((l, i) => `${i + 1}. ${l}`).join('\n') +
+      `\nFor each numbered line, say whether the photo shows it done: "yes", "no", or "unsure" when the photo can't tell. ` +
+      `Then write note: one short, warm, encouraging sentence (under 25 words) about what you see, like a supportive teammate; never scold.`,
+    schema: (z) => z.object({ lines: z.array(z.object({ n: z.number(), looks: z.enum(['yes', 'no', 'unsure']) })), note: z.string() }),
+  });
+  return res.ok ? { ok: true, raw: res.value } : res;
+}

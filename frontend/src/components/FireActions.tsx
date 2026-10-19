@@ -1,4 +1,5 @@
-// SPEC §8.2, §9.5 — one fire's one-tap actions: Away, Snooze 10m, Ack / Done, and the machine button (Move to …, the last machine's finish, Off on a cooking timer).
+// SPEC §8.2, §9.5 — one fire's one-tap actions: Away, Snooze 10m, Ack / Done, the machine button (Move to …, the last machine's finish, Off on a cooking timer),
+// and a task check-in's answers (§7G.3, TaskCheckin) in place of Ack.
 import { useState } from 'react';
 import { errorText, post } from '../api';
 import { useApp, type Fire } from '../state';
@@ -6,6 +7,8 @@ import { MachineChooser } from './Machines';
 import { MACHINE_LABEL, finishLabel, isMachineId, nextMachine } from '../../../src/shared/machines';
 import { isCookId } from '../../../src/shared/cooking';
 import type { MachineId } from '../../../src/shared/vocab';
+import { isTaskId } from '../../../src/shared/tasks';
+import { TaskCheckin } from './TaskCheckin';
 
 export function FireActions({ fire: f, onActed, onError }: {
   fire: Fire; onActed?: () => void; onError: (message: string | null) => void;
@@ -39,6 +42,7 @@ export function FireActions({ fire: f, onActed, onError }: {
       {!f.awayBy && <button disabled={busy} onClick={() => send(`/fires/${f.id}/away`, {})}>Away</button>}
       {(f.kind === 'reminder' || f.kind === 'thing') && <button disabled={busy} onClick={() => act('snooze')}>Snooze 10m</button>}
       {f.kind === 'machine' ? machineButton()
+        : isTaskId(f.timerId) ? <TaskCheckin taskId={f.timerId} timeUp={!!f.taskTimeUp} onError={onError} onActed={onActed} />
         : f.kind === 'timer'
           ? <button className="primary" disabled={busy} onClick={() => act('ack')}>Ack</button>
           : <button className="primary" disabled={busy} onClick={() => act('done')}>Done</button>}
