@@ -1011,6 +1011,11 @@ fifth reading, Event: "dinner on the 23rd for John and Michelle at 8 PM" → Yes
 / "after school" said to the button is the speaker's own After (was always 17:30), and tonight / morning come from the
 reminder chips. Holding the mark selects nothing on screen. Built as specified. Owed: his TRY.
 
+**Turn on voice** (v1.90.1, SPEC 3.58, §8.1, Q342; MojoSOGO 2026-10-19 "Request microphone on opening splash screen if
+necessary"): a "🎤 Turn on voice" badge in the header while the phone can listen but hasn't allowed the mic; one tap
+asks, and it goes once allowed. Not on the splash itself: it shows for under a second and iOS asks only on a tap.
+Built as specified. Owed: his TRY.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

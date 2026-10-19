@@ -16,6 +16,7 @@ import { Settings } from './components/Settings';
 import { useAlertLink } from './components/MyAlerts';
 import { RingingBar } from './components/RingingBar';
 import { EnsoButton } from './components/EnsoButton';
+import { useMicAsk } from './components/useSpeech';
 import { TaskSaid } from './components/TaskSaid';
 import { MessBanner } from './components/MessBanner';
 import { SignIn } from './components/SignIn';
@@ -62,13 +63,14 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
 
   const house = status ? HOUSE_BADGE[status.house.state] : undefined;
   const phoneOff = status !== null && status.mySubscriptions.length === 0;
+  const mic = useMicAsk();
 
   return (
     <div className={s.app}>
       <RingingBar />
       <TaskSaid />
       <MessBanner />
-      {(house || phoneOff) && (
+      {(house || phoneOff || mic.show) && (
         <div className={s.badges}>
           {house && (
             <button className="badge bad" onClick={() => setOverlay({ kind: 'explain', title: house.title, text: house.text })}>
@@ -79,6 +81,12 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
             <button className="badge bad" onClick={() => setOverlay({ kind: 'explain', title: 'Phone alerts off',
               text: 'This account has no phone subscribed for push alerts, so “Phone” alerts cannot reach you. Turn them on in Settings → 📱 Phone alerts (on iPhone: from the Ensō app on the Home Screen). See Settings → 📊 Status for each delivery.' })}>
               📵 Phone alerts off
+            </button>
+          )}
+          {mic.show && (
+            <button className="badge" onClick={() => (mic.refused ? setOverlay({ kind: 'explain', title: 'Voice is off',
+              text: 'This phone said no to the microphone, so the Ensō button can’t listen. Allow it in the phone’s settings (on iPhone: Settings → Safari → Microphone, or the website settings for enso.sogodojo.com), then tap again.' }) : void mic.ask())}>
+              🎤 Turn on voice
             </button>
           )}
         </div>

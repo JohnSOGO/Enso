@@ -100,3 +100,33 @@ export function unlockSpeech() {
   u.volume = 0;
   window.speechSynthesis.speak(u);
 }
+
+const VOICE_ON = 'enso.voiceOn';
+const voiceOn = () => { try { return localStorage.getItem(VOICE_ON) === '1'; } catch { return false; } };
+
+/**
+ * ⚑ Q342 — "🎤 Turn on voice": `show` while the phone can listen but the mic isn't allowed yet (permission 'prompt',
+ * or no permissions query and voice never turned on here); `refused` once denied. ask() asks on the tap (iOS needs one).
+ */
+export function useMicAsk() {
+  const [state, setState] = useState<PermissionState | 'unknown'>(() => (recognizerCtor() === null || voiceOn() ? 'granted' : 'unknown'));
+  useEffect(() => {
+    if (state === 'granted' || !navigator.permissions?.query) return;
+    let live = true;
+    let status: PermissionStatus | null = null;
+    const update = () => { if (live && status) setState(status.state); };
+    navigator.permissions.query({ name: 'microphone' as PermissionName })
+      .then((p) => { status = p; update(); p.addEventListener('change', update); })
+      .catch(() => { /* the browser can't say: the flag decides */ });
+    return () => { live = false; status?.removeEventListener('change', update); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const ask = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+      try { localStorage.setItem(VOICE_ON, '1'); } catch { /* storage may be blocked */ }
+      setState('granted');
+    } catch { setState('denied'); }
+  }, []);
+  return { show: state !== 'granted', refused: state === 'denied', ask };
+}
