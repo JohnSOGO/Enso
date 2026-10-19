@@ -963,6 +963,12 @@ the helper on SogoAI (`npm run build:home`, copy to C:\Enso, restart its task).
 mid scroll and not at top where picture is largest"): `Modal` resets its body to the top after `showModal` and moves
 focus to the dialog when the auto-focused field is below the fold. Built as specified. Owed: his TRY on the iPhone.
 
+
+**🎲 Random times in a window** (v1.85.0, SPEC 3.50, §8.5c, Q319–Q322; MojoSOGO 2026-10-19 "send me random reminders
+on weekdays between 8 AM and 11 AM to make an appointment to get my car checked"): a reminder's 🎲 tick swaps the When
+chips for Days + From / To; it rings once on each chosen day at a random time in the window (the §8.4 pick), until Done
+or Ack ends it (the repeat's `until` set to that day, later fires removed). Stored as an alarm with a Random window; no
+migration. PATCH takes either shape. Built as specified. Owed: his TRY on the iPhone (RW-M).
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

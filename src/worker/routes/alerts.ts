@@ -15,7 +15,7 @@ import { completeStep, finisherOf } from './chores';
 import { isOnFor } from '../../shared/optins';
 import { MACHINE_LABEL, isMachineId } from '../../shared/machines';
 import { cookLabel } from '../../shared/cooking';
-import { onEventIds } from '../event-rows';
+import { endWindowStatements, onEventIds } from '../event-rows';
 import { ANNOUNCE_NEEDS_WINDOW } from '../../shared/timer-start';
 import { isTaskId, taskFromRow, timeUp, type TaskRow } from '../../shared/tasks';
 import { TASK_ACK_REFUSED } from '../../shared/task-replies';
@@ -220,7 +220,7 @@ alerts.post('/fires/:id/actions', requireMember, async (c) => {
     if ('error' in s) return fail(c, 409, 'invalid_action', `Cannot ${b.action} this chore right now (${s.error}).`);
     return c.json({ fire: s.change.closeFire ?? r.fire, next: s.change.newFire ?? null });
   }
-  const stmts = [updateFire(c.env.DB, r.fire)];
+  const stmts = [updateFire(c.env.DB, r.fire), ...await endWindowStatements(c.env.DB, fire, b.action, now)]; // §8.5c
   if (r.next) stmts.push(insertFire(c.env.DB, r.next));
   await c.env.DB.batch(stmts);
   return c.json({ fire: r.fire, next: r.next ?? null });

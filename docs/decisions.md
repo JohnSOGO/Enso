@@ -321,3 +321,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q316 | Whose After time the reminder chip uses (§8.5b) | ⚑ The one person ticked under Remind; with none or several ticked, mine |
 | Q317 | How long LM Studio keeps the snap-an-item model loaded after a photo (§7A.3) | ⚑ 24 h (`ttl` 86400 on each request); a model loaded by hand in LM Studio is not affected |
 | Q318 | Where focus goes when a popup opens and the first field is below the fold (§8 iPhone rules) | ⚑ the dialog itself, body at the top; a field already visible at the top keeps focus |
+| Q319 | How often a window reminder rings (§8.5c) | ⚑ Once on each chosen day, at a random time inside the window; unanswered, it waits silently in the Ringing bar and the next day's ring replaces it |
+| Q320 | A new window reminder's days and window (§8.5c) | ⚑ Weekdays, 8:00am–11:00am |
+| Q321 | What Done does on a window reminder (§8.5c) | ⚑ Ends it: no more days, gone from the list |
+| Q322 | Editing a window reminder (§8.5c) | ⚑ PATCH takes either shape: change the days or window, or switch between a set time and a window |

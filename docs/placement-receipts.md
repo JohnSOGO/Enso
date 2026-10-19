@@ -7,6 +7,31 @@ carry its result.
 
 ---
 
+## 2026-10-19 — 🎲 Window reminders (placement-advisor)
+
+- **Ask:** v1.85.0, SPEC §8.5c (RW1–RW4, ⚑ Q319–Q322), §10 GET/POST/PATCH /reminders `window`. A reminder rings once a
+  day at a random time inside From–To on chosen days until Done or Ack. No migration.
+- **Verdict:** EXISTING owners, no new row. Rules: src/shared/reminders.ts (windowError, nextWindowRing via
+  engine.planReminderFires, reminderState never missed for a window, windowEnd). Route and persist: routes/reminders.ts
+  (window body, widened SELECT, `window` in the view, PATCH writes recurrence + random columns), routes/alarms.ts
+  (excludes rows with a random window), event-rows.ts (endWindowStatements: reads the event, asks windowEnd, returns the
+  recurrence UPDATE plus removeFutureFires); alerts.ts spreads them into its actions batch. Render: Reminders.tsx,
+  reusing AlertFields' DayChips and daysText. REUSE-add-nothing: daysText, the day chips, randomTimeIn, tick's
+  superseded step.
+- **Flow stage:** rules → route + persist → render.
+- **Why:** the alarm event, the engine's random pick and the tick's superseded step already deliver this, so only the
+  decisions are new, and they are pure and sit beside the reminder rules. Rejected: daysText in shared (duplicate of
+  AlertFields); the end-series check inline in alerts.ts (a rule in a route); a helper in routes/reminders.ts (a
+  route-to-route import); widening sourceOf. The spec gap it named (PATCH with a window) was settled as ⚑ Q322.
+- **Caps:** shared/reminders.ts ~105/300, routes/reminders.ts ~130/300, alerts.ts 227/300, event-rows.ts ~165/300,
+  alarms.ts 123/300, Reminders.tsx ~185/300 (seam if it reaches the band: ReminderForm.tsx). No CEILINGS change.
+- **Reorganizer:** none needed.
+- **Sources read:** docs/module-ownership.md, docs/modularity.md, scripts/arch.ts, docs/placement-receipts.md (top 4),
+  SPEC §8.5c and §10, src/shared/reminders.ts, routes/reminders.ts, routes/alarms.ts, routes/alerts.ts, event-rows.ts,
+  engine.ts (planReminderFires), tick.ts (superseded), Reminders.tsx, AlertFields.tsx.
+
+---
+
 ## 2026-10-19 — Steward pass 31, since pass 30 (code-steward)
 
 - **Run:** post-release, v1.84.0 (After work / After school per person for 📌 Reminders, §8.5b: migration 0054,

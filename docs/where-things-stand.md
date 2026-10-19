@@ -51,6 +51,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 🎲 Window reminders (v1.85.0, §8.5c): on the iPhone, Alerts → 📌 Reminders → ＋ Add, tick 🎲, Weekdays 8–11, Save; one push comes between 8 and 11 on the next weekday; Done clears it (RW-M). Q319–Q322 are ⚑ defaults.
 - Alert cards (v1.74.0–v1.75.0, §9.5, §8.15a): on the iPhone, tap a Whose mess? push → the card shows the photo and That was me with Not me under it, at the right; answer → the card closes and the line is gone from Settings → Alerts. Same for a ringing alert's Ack. Tap a ping's push → Ack (left) clears it, Close (right) just closes. Q283–Q284 are ⚑ defaults.
 - Each person once / Family (v1.73.0, §7.1/§8.3): on the iPhone, an event for everyone shows one green Family chip in the day sheet and one green dot
   on its calendar line; a creator who is also assigned shows once. Q281–Q282 are ⚑ defaults.
