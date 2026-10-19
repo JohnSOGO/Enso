@@ -11,14 +11,14 @@ import type { z as Zod } from 'zod';
 
 /** Everything else Ensō does, and where it lives, so a request for something that exists is pointed there. */
 export const ENSO_DOES = [
-  'Calendar tab: events with times, places, who is going, things to bring, weather; an event reminder before it (also every hour until Done, or at a random time in a window); fill an event from a screenshot, copied text or a link.',
+  'Calendar tab: events with times, places, who is going, things to bring; public holidays (days off set by admins), 📈 options expiration, the weather and 🌑🌓🌕🌗 moon phases, each one turned on or off per person in Settings → Calendar → Optional calendar items; an event reminder before it (also every hour until Done, or at a random time in a window); fill an event from a screenshot, copied text or a link.',
   'Alerts tab → 📌 Reminders: a one-off reminder that rings until Done, or random times inside a window on chosen days until Done.',
   'Alerts tab → ⏰ Alarms: rings at a set time on chosen days of the week, every week.',
   'Alerts tab → ⏱ Rolling timers: a countdown that restarts when acknowledged ("check on the dog every hour"), with active hours.',
   'Alerts tab → 🧺 Washing machines: clothes washer, dryer and dish washer loads, with a done alert.',
   'Alerts tab → 🍳 Cooking machines: cooking timers (air fryer, oven…).',
   'Alerts tab → 💪 Task buddy: checks in on you every N minutes while you work on something.',
-  'Alerts tab, at the top: 📢 Announce (say something on Phone / House speakers / FunHouse) and 🔇 Quiet the house.',
+  'Alerts tab, at the top: 📢 Announce (say something on Phone / House speakers / FunHouse) and 🤫 Quiet the house.',
   'Chores tab: chores on chosen days that rotate between people, steps that hand off, rooms with "what done looks like" photos, Whose mess? reports, bounties and the score.',
   'Lists tab: Shopping, Wish list and any custom list, every day lists with a time, ✅ Things to do (with Plan it), 🎬 Movies & shows, 📥 Inbox (shared from the iPhone Share sheet).',
   'Recipes tab: recipes from a link or video, with photos and each person\'s emoji.',
