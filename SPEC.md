@@ -4145,10 +4145,12 @@ only the grey backdrop):
 
 ### 8.2 Ringing bar
 
-A stack at the top of every screen, one row per `ringing` fire **that is for me**, newest first. A reminder is for me
-when its event is assigned to nobody (everyone's) or assigned to me, and is on for me (§7.5): the same people its
-pushes go to (§5.7). Someone else's reminder rings only in their bar, not mine ⚑ Q346. A task check-in is its owner's
-alone (below); every other row (timer, chore, thing, machine, cooking) is everyone's.
+A stack at the top of every screen, one row per `ringing` fire **that is for me**, newest first. Nobody sees another
+person's alert: a fire is for me when I am among the people its alert pushes to (§5.7), whatever its channels: a
+reminder or timer assigned to nobody or to me and on for me (§7.5), a chore step that is mine, a machine or cooking
+timer that alerts me, a task check-in that is mine. One that names nobody (assigned to nobody, a thing, a machine
+with nobody to alert) is everyone's; one whose people are all gone shows to nobody, as it pushes to nobody. A fire
+whose source is gone still shows, so it can be closed ⚑ Q346.
 
 - Reminder row: `🔔 Take out trash · 19:00` with **[Snooze 10m] [Done]** (an all-day event:
   `· all day`; a sun-timed one, §7.7: `🔔 Put the goats away · sunset` ⚑ Q56)
@@ -4173,6 +4175,7 @@ alone (below); every other row (timer, chore, thing, machine, cooking) is everyo
 |---|---|---|
 | RB1 | a reminder assigned to A and B rings; `GET /fires` as A, as B, as C (an admin) | A and B get the row; C does not |
 | RB2 | a reminder assigned to nobody rings; `GET /fires` as C | C gets the row |
+| RB3 | a timer assigned to A rings; `GET /fires` as A, as C | A gets the row; C does not |
 
 ### 8.3 Day sheet
 

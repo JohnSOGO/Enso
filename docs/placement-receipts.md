@@ -2719,3 +2719,12 @@ REORG RECEIPT
 - **Why:** optins.ts already owns "who an event/fire is for" (isOnFor + audience with its assigned-or-everyone narrowing). One predicate shared by push recipients and the Ringing bar keeps them from drifting. Inline in alerts.ts was rejected (restates the rule in a route); a new module was rejected (same concern). audience() keeps its push order and house/funhouse results; isOnFor stays for /calendar; assignedTo does not leak into the /fires shape; Away (hideOff=false) unaffected; `?state=open` narrows too. RingingBar.tsx needs no change.
 - **Caps:** optins.ts about 33/300; alerts.ts 228/300 (no ceiling). No file newly in the warning band.
 - **Sources read:** src/shared/optins.ts, src/worker/routes/alerts.ts, scripts/arch.ts, docs/module-ownership.md, SPEC.md §8.2, isOnFor/audience usages, test/optional-events.test.ts, RingingBar.tsx.
+
+## 2026-10-19 — Ringing bar rows only for their audience: audienceOf shared by tick and /fires (placement-advisor)
+
+- **Ask:** SPEC §8.2 widens to every Ringing bar row (reminder, timer, chore, thing, machine, cooking): each shows only to its alert's audience = audience(...).push as tick step 2 computes it from sourceOf; nobody named → everyone. Follows the isForMe receipt above (MojoSOGO: "no cross contamination between users on upper alert").
+- **Verdict:** src/worker/fire-rows.ts (`audienceOf(src, activeIds)`), applied in src/worker/routes/alerts.ts fireViews; tick.ts step 2 adopts it [EXISTING]
+- **Flow stage:** rules (optins.ts audience, unchanged) → mapping (fire-rows.ts) → route view (alerts.ts)
+- **Why:** The danger is the /fires filter drifting from who actually gets pushed; the Source → AudienceInput mapping goes next to sourceOf so tick and /fires share one copy. A `fireIsFor` boolean was rejected (tick needs the full audience; it would hide a query per fire). activeMemberIds is fetched once per request. The per-row isForMe/onEventIds path in fireViews is deleted. Spec edges settled: a gone source still shows (so it can be closed); all-assigned-disabled → nobody; push does not depend on channel.
+- **Caps:** fire-rows.ts about 207/300; alerts.ts about 229/300; tick.ts about 112/148. None enters the band.
+- **Sources read:** fire-rows.ts, alerts.ts, tick.ts, optins.ts, docs/module-ownership.md, scripts/arch.ts, audience/activeMemberIds callers.

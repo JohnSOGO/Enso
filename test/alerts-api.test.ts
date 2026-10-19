@@ -263,4 +263,15 @@ describe('§8.2 whose reminders ring in my bar (RB1–RB2)', () => {
     expect(await rings(c, id)).toBe(true);
     expect(await rings(o, id)).toBe(true);
   });
+
+  it('RB3 a timer assigned to A rings for A, not for C', async () => {
+    const o = await owner();
+    const { client: a, id: A } = await member(o);
+    const t = await o.post('/timers', { title: 'Feed the fish', intervalMin: 60, channels: ['push'], renotifyMin: null, maxAlerts: 1, assignedTo: [A] });
+    await o.post(`/timers/${t.json.id}/commands`, { cmd: 'start' });
+    await env.DB.prepare(`UPDATE fires SET state = 'ringing', alert_count = 1 WHERE timer_id = ?`).bind(t.json.id).run();
+    const sees = async (c: { get: (p: string) => Promise<any> }) => (await c.get('/fires?state=ringing')).json.some((f: any) => f.timerId === t.json.id);
+    expect(await sees(a)).toBe(true);
+    expect(await sees(o)).toBe(false);
+  });
 });
