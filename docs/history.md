@@ -940,6 +940,12 @@ only from its nudge (alert 2). Owed: MojoSOGO's TRY on the iPhone.
 is running so i know"): `/status` carries `myTask`; the ⏰ Alarms tab shows a small 💪 and the Task buddy button
 shows 🟢 Working / ☕ On a break / ⏸ Paused. Built as specified. Owed: his look on the iPhone.
 
+**📌 Reminders** (v1.83.0, SPEC 3.46, §8.5b, Q311–Q314; MojoSOGO 2026-10-19 "We need simple reminders in alerts
+section … like today after work I need to get bird food"): Alerts → 📌 Reminders lists one-off reminders; the form
+has What?, When chips (In 1 hour · After work · Tonight · Tomorrow morning) with Date + Time, Remind (me
+preselected), channels and Repeat until Done. Stored as an alarm with no repeat, so it rings through the reminder
+pipeline unchanged; no migration. Built as specified. Owed: his TRY on the iPhone (RM-M).
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

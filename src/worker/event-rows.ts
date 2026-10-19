@@ -120,16 +120,16 @@ export function removeFutureFires(db: D1Database, eventId: string, now: string):
       WHERE event_id = ? AND state = 'scheduled' AND due_at > ?`).bind(now, eventId, now);
 }
 
-/** One new event row — POST /events, and Plan it (§7C.2) with its `thingId`. */
-export function insertEventStatement(db: D1Database, id: string, input: EventInput, memberId: string, now: string, thingId: string | null = null): D1PreparedStatement {
+/** One new event row — POST /events, Plan it (§7C.2) with its `thingId`, and a reminder (§8.5b) with `isAlarm`. */
+export function insertEventStatement(db: D1Database, id: string, input: EventInput, memberId: string, now: string, thingId: string | null = null, isAlarm = false): D1PreparedStatement {
   return db.prepare(
     `INSERT INTO events (id, title, notes, address, bring, start_date, start_time, end_date, end_time, recurrence, assigned_to,
        remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at, thing_id, optional, emoji,
-       remind_random_from, remind_random_to)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       remind_random_from, remind_random_to, is_alarm)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(id, input.title, input.notes, input.address, input.bring, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
     input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, memberId, now, now, thingId, input.optional, input.emoji,
-    input.remind_random_from, input.remind_random_to);
+    input.remind_random_from, input.remind_random_to, isAlarm ? 1 : 0);
 }
 
 /** §7.5 — the ids of the events this member has turned on (their on-set). */

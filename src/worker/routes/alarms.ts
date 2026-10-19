@@ -41,7 +41,7 @@ const SELECT_ALARMS = `
   SELECT e.*,
     (SELECT MIN(f.due_at) FROM fires f WHERE f.event_id = e.id AND f.state = 'scheduled') AS next_due_at,
     EXISTS (SELECT 1 FROM fires f WHERE f.event_id = e.id AND f.state = 'ringing') AS ringing
-  FROM events e WHERE e.is_alarm = 1 AND e.deleted_at IS NULL`;
+  FROM events e WHERE e.is_alarm = 1 AND e.recurrence IS NOT NULL AND e.deleted_at IS NULL`; // §8.5b: reminders have none
 
 /** Alarm fields → the event body parseEventInput understands. Returns an error message or the body. */
 function toEventBody(b: Record<string, unknown>, startDate: string): Record<string, unknown> | string {

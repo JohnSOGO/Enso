@@ -1,0 +1,104 @@
+// SPEC §8.5b — one-off reminders: is_alarm events with recurrence NULL that ring until Done. Validates, persists and
+// composes the view; the state and the time check are src/shared/reminders.ts.
+import { Hono, type Context } from 'hono';
+import type { AppEnv } from '../env';
+import type { Channel } from '../../shared/vocab';
+import { localToUtc, ms } from '../../shared/time';
+import { canChange, cannotChangeText } from '../../shared/roles';
+import { REMINDER_MAX_ALERTS, REMINDER_RENOTIFY_DEFAULT, reminderState, reminderTimeError } from '../../shared/reminders';
+import { all, first, householdTz, newId, nowIso, parseJson } from '../db';
+import { body, fail } from '../http';
+import { requireMember } from '../session';
+import { insertEventStatement, parseEventInput, removeFutureFires, type EventRow } from '../event-rows';
+
+interface ReminderRow extends EventRow {
+  open_due_at: string | null;
+  ringing: number;
+  done: number;
+}
+
+const SELECT_REMINDERS = `
+  SELECT e.*,
+    (SELECT MIN(f.due_at) FROM fires f WHERE f.event_id = e.id AND f.state != 'closed') AS open_due_at,
+    EXISTS (SELECT 1 FROM fires f WHERE f.event_id = e.id AND f.state = 'ringing') AS ringing,
+    EXISTS (SELECT 1 FROM fires f WHERE f.event_id = e.id AND f.state = 'closed' AND f.close_reason IN ('done', 'acked')) AS done
+  FROM events e WHERE e.is_alarm = 1 AND e.recurrence IS NULL AND e.deleted_at IS NULL`;
+
+function reminderView(e: ReminderRow, tz: string, now: string) {
+  const startAt = localToUtc(e.start_date, e.start_time!, tz);
+  const state = reminderState({ done: e.done === 1, ringing: e.ringing === 1, openDueAt: e.open_due_at, startAt }, now);
+  if (!state) return null;
+  return {
+    id: e.id, title: e.title, date: e.start_date, time: e.start_time,
+    channels: parseJson<Channel[]>(e.remind_channels, []), renotifyMin: e.renotify_min,
+    assignedTo: parseJson<string[]>(e.assigned_to, []), createdBy: e.created_by, state, dueAt: e.open_due_at ?? startAt,
+  };
+}
+
+/** Reminder fields → the event body parseEventInput understands, or the refusal. */
+function toEventBody(b: Record<string, unknown>, tz: string, now: string): Record<string, unknown> | string {
+  const err = reminderTimeError(b.date, b.time, tz, now);
+  if (err) return err;
+  return {
+    title: b.title, startDate: b.date, startTime: b.time, endTime: null, recurrence: null, assignedTo: b.assignedTo ?? [],
+    reminder: { offsetMin: 0, channels: b.channels, renotifyMin: b.renotifyMin ?? REMINDER_RENOTIFY_DEFAULT, maxAlerts: REMINDER_MAX_ALERTS },
+  };
+}
+
+const loadRow = (db: D1Database, id: string) => first<ReminderRow>(db, `${SELECT_REMINDERS} AND e.id = ?`, id);
+
+/** A listed reminder this member may change, or the refusal (a done one is gone: 404). */
+async function loadForWrite(c: Context<AppEnv>, tz: string, now: string): Promise<{ row: ReminderRow; view: NonNullable<ReturnType<typeof reminderView>> } | Response> {
+  const row = await loadRow(c.env.DB, c.req.param('id')!);
+  const view = row && reminderView(row, tz, now);
+  if (!row || !view) return fail(c, 404, 'not_found', 'That reminder no longer exists.');
+  if (!canChange(row.created_by, c.get('member'))) return fail(c, 403, 'forbidden', cannotChangeText('reminder'));
+  return { row, view };
+}
+
+export const reminders = new Hono<AppEnv>();
+
+reminders.get('/reminders', requireMember, async (c) => {
+  const tz = await householdTz(c.env.DB), now = nowIso();
+  const views = (await all<ReminderRow>(c.env.DB, SELECT_REMINDERS)).map((r) => reminderView(r, tz, now)).filter((v) => v !== null);
+  return c.json(views.sort((a, b) => ms(a.dueAt) - ms(b.dueAt) || a.title.localeCompare(b.title)));
+});
+
+reminders.post('/reminders', requireMember, async (c) => {
+  const tz = await householdTz(c.env.DB), now = nowIso();
+  const eventBody = toEventBody(await body(c), tz, now);
+  if (typeof eventBody === 'string') return fail(c, 400, 'invalid_input', eventBody);
+  const input = await parseEventInput(c.env.DB, eventBody);
+  if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
+  const id = newId('evt');
+  await insertEventStatement(c.env.DB, id, input, c.get('member').id, now, null, true).run();
+  return c.json(reminderView((await loadRow(c.env.DB, id))!, tz, now), 201);
+});
+
+reminders.patch('/reminders/:id', requireMember, async (c) => {
+  const tz = await householdTz(c.env.DB), now = nowIso();
+  const r = await loadForWrite(c, tz, now);
+  if (r instanceof Response) return r;
+  const eventBody = toEventBody({ ...r.view, ...(await body(c)) }, tz, now);
+  if (typeof eventBody === 'string') return fail(c, 400, 'invalid_input', eventBody);
+  const input = await parseEventInput(c.env.DB, eventBody);
+  if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE events SET title = ?, start_date = ?, end_date = ?, start_time = ?, assigned_to = ?, remind_channels = ?, renotify_min = ?, updated_at = ?
+        WHERE id = ?`).bind(input.title, input.start_date, input.end_date, input.start_time, input.assigned_to, input.remind_channels, input.renotify_min, now, r.row.id),
+    removeFutureFires(c.env.DB, r.row.id, now),
+  ]);
+  return c.json(reminderView((await loadRow(c.env.DB, r.row.id))!, tz, now));
+});
+
+reminders.delete('/reminders/:id', requireMember, async (c) => {
+  const tz = await householdTz(c.env.DB), now = nowIso();
+  const r = await loadForWrite(c, tz, now);
+  if (r instanceof Response) return r;
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE events SET deleted_at = ?, updated_at = ? WHERE id = ?').bind(now, now, r.row.id),
+    removeFutureFires(c.env.DB, r.row.id, now),
+  ]);
+  return c.json({ ok: true });
+});
