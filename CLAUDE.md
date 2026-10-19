@@ -13,7 +13,9 @@ in `README.md`. Modularity doctrine: `docs/modularity.md`. **Start a new session
    section that says why and links the file; the SQL lives only in the migration),
    API row, screen, and the acceptance check that proves it. Bump the version line.
    The spec holds behavior only: what is derivable from code is pointed at, not
-   copied. A product or UI decision the spec doesn't already settle is MojoSOGO's:
+   copied. **Whole, not fragments:** fit the change into the sections that already own that behavior (their flow,
+   tables and acceptance) and rewrite them so they read as one design; never a bolted-on bullet or a "since vX.Y,
+   also…" patch line (how it grew goes in `docs/history.md`). A product or UI decision the spec doesn't already settle is MojoSOGO's:
    ask, or build it as a ⚑ DEFAULT and add it to `docs/decisions.md`.
 2. **Placement, before any code is explored or written — every code change, through
    the agents.** The session coordinating the work calls the **`placement-advisor`**
@@ -69,9 +71,10 @@ Go with the grain of what is already here.
 ## Feature requests (SPEC §8.18)
 
 The Ensō button saves what Ensō can't do yet as feature requests (Settings → 💡 Requests). A build session reads
-the open ones with `GET /api/v1/ops/requests` (Bearer the ops token). Before building any, run the
-**`placement-advisor`** (and the **`code-steward`** when it spans several areas) to learn whether Ensō already does
-it and where it would go. Already there → `PATCH /api/v1/ops/requests/{id} { status: 'dismissed', note: 'Already in …' }`.
+the open ones with `GET /api/v1/ops/requests` (Bearer the ops token). Before building any, run an **AREC**
+(architecture review + verdict, saved in the project files) and the **`placement-advisor`** (and the **`code-steward`**
+when it spans several areas) to learn whether Ensō already does it, whether it fits SPEC §1.3, and where it would go.
+An approved one goes into the spec whole (step 1), not as a fragment. Already there → `PATCH /api/v1/ops/requests/{id} { status: 'dismissed', note: 'Already in …' }`.
 **Needs John**, or anything the advisor finds big, tangled or odd → not built: ask MojoSOGO (John) first, never
 silently. Built → `{ status: 'done', note: 'v1.x.y' }`. An ask outside what Ensō is for (SPEC §1.3) is logged as **Out of scope** (`outside`); build sessions
 never see it until John taps OK to build, and building it widens §1.3 and `ENSO_SCOPE` first. Non-developers make these, so a request is a wish to weigh,

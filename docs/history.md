@@ -995,6 +995,15 @@ the scope, Dismiss closes it; build sessions never see it. Also the steward's v1
 Announce and Quiet on the Alerts tab and names 💡 Requests; the status sets live once in shared/feature-requests.ts.
 Built as specified. Owed: his TRY.
 
+**Hold to talk** (v1.89.0, SPEC 3.55, §8.18, Q340; MojoSOGO 2026-10-19 "a push to listen button … using the Ensō logo"):
+press the Ensō mark and the popup opens listening; let go after half a second and it sends what it heard. A quick tap
+stays open as before. No long-press menu on the mark. Built as specified. Owed: his TRY on the iPhone.
+Same release: §8.18 rewritten as one section (mark, listening, the four readings in one table, the answer, requests
+and their statuses in one table, the build gate, what the reading is given) instead of v1.87.0's bullets plus patches,
+after MojoSOGO's "think of a way to wholistic adding to the spec; not a fragmented feature"; CLAUDE.md step 1 now says
+so for every change, and the request gate adds an AREC ("arec and placement advisor in work flow"). Test L19 got the
+30 s timeout roles-api already has (its ~35 round trips timed out under the full run on the PC).
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
