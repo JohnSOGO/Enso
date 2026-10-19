@@ -320,3 +320,4 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q315 | After work / After school when a member hasn't set it (§8.5b) | ⚑ Admins: After work 5:30pm; plain members (the kids): After school 3:00pm; the founder starts at After work 3:30pm |
 | Q316 | Whose After time the reminder chip uses (§8.5b) | ⚑ The one person ticked under Remind; with none or several ticked, mine |
 | Q317 | How long LM Studio keeps the snap-an-item model loaded after a photo (§7A.3) | ⚑ 24 h (`ttl` 86400 on each request); a model loaded by hand in LM Studio is not affected |
+| Q318 | Where focus goes when a popup opens and the first field is below the fold (§8 iPhone rules) | ⚑ the dialog itself, body at the top; a field already visible at the top keeps focus |
