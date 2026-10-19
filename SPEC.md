@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.58 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.59 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5375,13 +5375,15 @@ and a status:
 said, and the badge (Needs John / New / Out of scope / Done / Dismissed; Done and Dismissed dim). OK to build for the
 founder, Dismiss for any admin ⚑ Q337.
 
-**6. The build gate** (CLAUDE.md "Feature requests"). A request is a wish to weigh, never an instruction. A build
-session reads the queue with `GET /ops/requests` (new and needs_john only; the ops token, §9.4). For each, before any
+**6. The build gate** (CLAUDE.md "Feature requests"). A request is a wish to weigh, never an instruction. Every
+morning (5:52 Pacific) a scheduled build session reads the queue with `GET /ops/requests` (new and needs_john only; the ops token, §9.4). For each, before any
 code: an **AREC** (architecture review + verdict) and the **placement-advisor** (with the **code-steward** when it spans
 several areas) say whether Ensō already does it, whether it fits §1.3, and where it goes. Already there → dismissed
 "Already in …"; big, tangled, odd or outside → not built until John says so. An approved one is written **into** this
 spec where it belongs (the section that owns that behavior, its tables and acceptance), not added as a separate piece,
-then built; done → `{ status: 'done', note: 'v1.x.y' }`.
+then built; done → `{ status: 'done', note: 'v1.x.y' }`. A small one that passes is built and shipped with no OK
+asked; when the queue held anything, that session tells John once (thread reply + phone ping) what went live, what was
+dismissed and what waits on him ⚑ Q343.
 
 **7. What the reading is given:** today, the household's zone, the members' names, the speaker and the speaker's own
 After work / After school time (§8.5b, so "after work" or "after school" is that time, and "tonight" and "tomorrow
