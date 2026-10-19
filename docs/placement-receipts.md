@@ -7,6 +7,24 @@ carry its result.
 
 ---
 
+## 2026-10-19 — Ensō popup: always-on text box, Clear, 8 s hint, iOS listening, admin Requests (placement-advisor)
+
+- **Ask:** v1.87.1 patch, SPEC §8.18 "Tap it" (⚑ Q338): the box is always there and filled by heard words, 🗑 Clear
+  restarts listening, the keyboard-🎤 hint after 8 s with nothing heard, the voice is woken on the Done tap, iOS
+  recognition is non-continuous with restart and accumulated finals, and admins get 💡 Requests in the popup
+  (FeatureRequests in a Modal). Also the button 60 → 84 px (CSS only, Q332).
+- **Verdict:** frontend/src/components/useSpeech.ts + frontend/src/components/EnsoButton.tsx [EXISTING]
+- **Flow stage:** render (capturing intent; the phone's own speech I/O)
+- **Why:** Each part fits one owner's row as it stands. Recognizer behavior goes to useSpeech (the Web Speech wrapper,
+  no app state). Box, Clear, timer, unlock timing and the Requests entry go to EnsoButton (the popup). The 8 s timer
+  sits in EnsoButton, and useSpeech only reports `heard`, so the hook stays free of UI policy. Requests reuses
+  FeatureRequests and the shared isAdmin as Settings.tsx does; no copy of the list and no new owner. A shared
+  "requests launcher" module was rejected: two call sites of an existing component do not need one. No worker, shared
+  or schema change.
+- **Caps:** EnsoButton.tsx 106 → ~125 / 300; useSpeech.ts 74 → ~100 / 300; nothing newly in the band.
+- **Sources read:** docs/module-ownership.md (EnsoButton, useSpeech, FeatureRequests, Settings, Modal rows),
+  scripts/arch.ts, SPEC.md §8.18, docs/placement-receipts.md, EnsoButton.tsx, useSpeech.ts, isAdmin usages.
+
 ## 2026-10-19 — steward pass after v1.87.0 (code-steward)
 
 - **Run:** post-release, v1.86.0 (🎲 window reminders, §8.5c: shared/reminders.ts windowError / nextWindowRing / windowEnd,

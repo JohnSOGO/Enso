@@ -334,9 +334,10 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q329 | What Done does on a window reminder (§8.5c) | ⚑ Ends it: no more days, gone from the list |
 | Q330 | Editing a window reminder (§8.5c) | ⚑ PATCH takes either shape: change the days or window, or switch between a set time and a window |
 | Q331 | The Ensō button's spoken answer (§8.18) | ⚑ The phone's own voices (speechSynthesis), best English one, Enhanced / Premium when installed; no paid voice service |
-| Q332 | Where the Ensō button sits (§8.18) | ⚑ A 60 px round Ensō mark centred just above the tab bar, on every tab |
+| Q332 | Where the Ensō button sits (§8.18) | ⚑ An 84 px round Ensō mark (60 px until v1.87.1, he asked for bigger) centred just above the tab bar, on every tab |
 | Q333 | No speech-to-text on the phone (§8.18) | ⚑ A text box with "Tap the 🎤 on your keyboard and talk." and Send |
 | Q334 | When the answer is spoken (§8.18) | ⚑ Every answer, aloud, as the popup shows it; 🔇 stops it |
 | Q335 | Whether Yes saves a reminder at once (§8.18) | ⚑ No: Yes opens the filled-in reminder form; Save saves |
 | Q336 | Which feature requests wait for John (§8.18) | ⚑ The big ones (status needs_john); small ones are New; a build session still checks every one with the placement-advisor |
 | Q337 | Who sees and acts on feature requests (§8.18) | ⚑ Settings → 💡 Requests for admins; only the founder taps OK to build; any admin may Dismiss |
+| Q338 | The Ensō popup when the mic hears nothing (§8.18, v1.87.1) | ⚑ The text box is always shown and the heard words fill it; 🗑 Clear empties it and listens again; after 8 s with nothing heard the keyboard-🎤 hint shows; the voice is unlocked on the Done tap; admins get 💡 Requests in the popup |

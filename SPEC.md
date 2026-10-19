@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.52 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.53 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5284,10 +5284,14 @@ the iPhone, Settings → Accessibility → Spoken Content → Voices → an **En
 Claude reading every other "fill it in" uses (§7.9), and the reminder form (§8.5b, §8.5c). A paid voice service is not
 used ⚑ Q331.
 
-- **The button:** a round Ensō mark (the app icon, 60 px), centred just above the tab bar on every tab ⚑ Q332.
-- **Tap it** → the **Ensō** popup listens at once: "Listening…", the words appear as they are heard, **Done** (stop and
-  send) and **Cancel**. Where the phone has no speech-to-text, or it fails or is refused, the popup shows a text box
-  instead with "Tap the 🎤 on your keyboard and talk." and **Send** ⚑ Q333. Typing always works.
+- **The button:** a round Ensō mark (the app icon, 84 px; 60 px until v1.87.1, "make the Ensō button bigger"), centred just above the tab bar on every tab ⚑ Q332.
+- **Tap it** → the **Ensō** popup listens at once: "🎤 Listening…" over a **text box** that is always there; the words
+  fill the box as they are heard and can be fixed by hand or typed ⚑ Q333. **Done** sends the box (enabled as soon as it
+  holds words), **🗑 Clear** empties it and starts listening again, **Cancel** closes. Where the phone has no
+  speech-to-text, or it fails or is refused, or nothing is heard for 8 seconds, the line says "Tap the 🎤 on your keyboard
+  and talk." instead, and the box still works ⚑ Q338 (v1.87.1: on the iPhone the mic could look on and hear nothing, so
+  Done never lit up). The phone's voice is woken on the **Done** tap, not before listening, so the two never fight over
+  the mic. Admins also see **💡 Requests** in the popup, which opens the list below.
 - **Send** → `POST /say { text }` → Claude cleans up the words (spelling, grammar, what was misheard) and decides one of
   three, never saving anything:
   1. **A reminder** (§8.5b one-off, or §8.5c 🎲 window): the fields, and one sentence of what Ensō will do

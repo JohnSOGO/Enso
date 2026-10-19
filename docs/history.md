@@ -979,6 +979,13 @@ Yes opens the reminder form filled in, or saves a feature request (Settings → 
 Build sessions read `GET /ops/requests` and run the placement-advisor first (CLAUDE.md). Built as specified. Owed: his
 TRY on the iPhone (SY-M): whether the home-screen app gets browser speech-to-text, and how the voice sounds.
 
+**The Ensō popup, fixed for the iPhone** (v1.87.1, SPEC 3.53, §8.18, Q338; MojoSOGO 2026-10-19 "microphone is active,
+but it's not recording and the button to accept never enables", "an option to completely clear it", "make the Ensō
+button bigger", "see a list of what the pending requests are"): the text box is always there and heard words fill it;
+🗑 Clear empties it and listens again; 8 s with nothing heard shows the keyboard-🎤 hint. Listening runs one phrase at a
+time and restarts on end (the iPhone's continuous mode drops results), and the voice is woken on Done rather than before
+listening. Admins get 💡 Requests in the popup. The button is 84 px (was 60). Owed: his TRY (SY-M).
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

@@ -2,12 +2,12 @@
 .enso {
   position: fixed; left: 50%; transform: translateX(-50%);
   bottom: calc(var(--tabbar-h) + 10px + max(calc(env(safe-area-inset-bottom) - 12px), 14px));
-  width: 60px; height: 60px; border-radius: 99px; padding: 0;
+  width: 84px; height: 84px; border-radius: 99px; padding: 0;
   background: var(--surface); border: 1px solid var(--border);
   box-shadow: 0 6px 18px rgba(0, 0, 0, .45);
   z-index: 5; display: grid; place-items: center;
 }
-.enso img { width: 46px; height: 46px; border-radius: 99px; }
+.enso img { width: 68px; height: 68px; border-radius: 99px; }
 .enso:active { transform: translateX(-50%) scale(.94); }
 .listening { font-weight: 600; margin-bottom: 8px; }
 .words { font-size: 1.05rem; min-height: 3em; }
