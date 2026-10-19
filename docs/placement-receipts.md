@@ -7,6 +7,25 @@ carry its result.
 
 ---
 
+## 2026-10-19 — steward pass after v1.91.0 (code-steward)
+
+- **Run:** post-release, v1.90.0 (the event reading, the speaker's After, no selection while held), v1.90.1 (🎤 Turn
+  on voice badge, useMicAsk), v1.90.2 (the opening screen asks; Splash.tsx after a reorganizer extract) and v1.91.0
+  (Build now: canBuild / buildRefusal, build-fire.ts, POST /feature-requests/{id}/build). Ran on a8001b6. Report:
+  /mnt/project-files/steward/2026-10-19-v1-91-pass.md.
+- **Verdict:** MINOR DRIFT. Typecheck green, 959/959, arch:audit quiet (top EventForm.tsx 200/223, engine.ts 88%);
+  5 code commits, 5 matching receipts, each built as placed; 0 without a receipt.
+- **Top finding:** LOW: map rows added to rather than rewritten in v1.90.0 (say-reading.ts, routes/say.ts,
+  EventForm.tsx), and the say-reading row still lacks outside / outsideSay / FeatureAsk.
+- **Handoffs:** 0 to reorganizer. 3 to worker: map rows rewritten whole; where-things-stand TRYs for hold to talk,
+  the event reading and Build now, with Q range to Q344; carried ENSO_DOES 🔇 → 🤫. 2 to placement-advisor then worker:
+  log fireBuild's dropped failure reason (spec line first); carried, where a failed Out of scope log shows. Still
+  carried: isShareKey / InboxSetup apiUrl, v1.84.x receipts order, the window receipt's version; deleteEventStatements,
+  renotifyText, updateEventStatement at their triggers.
+- **Restraint:** EnsoButton.tsx hotspot (186/300, 6 commits/week), seam kept for ~250; EventForm at the band edge, a
+  verdict on its next edit; the PWA's isAdmin && canBuild; Build now re-fire (spec: moves no status); Splash waiting
+  on permissions.query; no browser tests (SY-M); the hard-coded routine beta header.
+
 ## 2026-10-19 — Build now: start the build session from the Ensō popup (placement-advisor)
 
 - **Ask:** v1.91.0, SPEC §8.18 part 3 "Not yet" row and part 6 "Build now" (⚑ Q344), SY11, the API row POST
