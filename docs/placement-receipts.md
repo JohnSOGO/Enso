@@ -7,6 +7,28 @@ carry its result.
 
 ---
 
+## 2026-10-19 — steward pass after v1.87.0 (code-steward)
+
+- **Run:** post-release, v1.86.0 (🎲 window reminders, §8.5c: shared/reminders.ts windowError / nextWindowRing / windowEnd,
+  routes/reminders.ts, routes/alarms.ts, event-rows.ts endWindowStatements, alerts.ts, Reminders.tsx) and v1.87.0 (the Ensō
+  button and feature requests, §8.18, migration 0056: shared/say-reading.ts, shared/feature-requests.ts, say-reader.ts,
+  routes/say.ts, feature-request-rows.ts, routes/feature-requests.ts, ops.ts /ops/requests, EnsoButton.tsx, useSpeech.ts,
+  FeatureRequests.tsx, ReminderForm exported, Settings.tsx, App.tsx).
+- **Verdict:** MINOR DRIFT. Typecheck green, 952/952, arch:audit quiet (top engine.ts / EventForm.tsx 88%); 2 code commits,
+  2 matching receipts, built as placed; map rows true; no stale Q numbers after the 645c828 renumber.
+- **Top finding:** MED. sayPrompt hard-codes "after work" 17:30 / tonight 20:00 / morning 08:00, copying WHEN_CHOICE and
+  ignoring the speaker's own `after` (§8.5b RM7, Q315–Q316); §8.18 does not settle it. Also MED: ENSO_DOES puts Announce
+  and Quiet the house under Settings (they sit on the Alerts tab, Alarms.tsx:178–179) and omits 💡 Requests.
+- **Handoffs:** 1 to placement-advisor then worker (the §8.18 line, and say.ts as the third after_kind / after_time reader,
+  the trigger for a helper), 4 to worker (the ENSO_DOES wording; one OPEN_STATUSES and FEATURE_REQUEST_SIZE in say-reader;
+  carried isShareKey / InboxSetup apiUrl; carried docs: v1.84.x receipts to the top, device-check lines v1.76–v1.84, the
+  window receipt's v1.85.0 → v1.86.0), 0 to reorganizer. Still carried: deleteEventStatements, renotifyText,
+  updateEventStatement at their triggers. Report: /mnt/project-files/steward/2026-10-19-v1-87-pass.md.
+- **Restraint:** Reminders.tsx 181/300 (ReminderForm.tsx seam at ~270); DAY_NAME in say.ts vs RepeatFields' WEEKDAY_NAME
+  (two bundles, a third gets shared); `dirty = !!start`; whoOf "everyone" → []; READS_PER_DAY from shared/things; no tests
+  for the browser speech (SY-M); endWindowStatements' read in the action path; ops.ts carrying the request queue (98/300,
+  one ops-token surface).
+
 ## 2026-10-19 — The Ensō button, just say it, and feature requests (placement-advisor)
 
 - **Ask:** v1.87.0, SPEC §8.18 (SY1–SY6, SY-M, ⚑ Q331–Q337), §4.2zzc migration 0056 feature_requests, §10 POST /say,
