@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.65 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.66 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4146,7 +4146,12 @@ only the grey backdrop):
 
 ### 8.2 Ringing bar
 
-A stack at the top of every screen, one row per `ringing` fire, newest first:
+A stack at the top of every screen, one row per `ringing` fire **that is for me**, newest first. Nobody sees another
+person's alert: a fire is for me when I am among the people its alert pushes to (§5.7), whatever its channels: a
+reminder or timer assigned to nobody or to me and on for me (§7.5), a chore step that is mine, a machine or cooking
+timer that alerts me, a task check-in that is mine. One that names nobody (assigned to nobody, a thing, a machine
+with nobody to alert) is everyone's; one whose people are all gone shows to nobody, as it pushes to nobody. A fire
+whose source is gone still shows, so it can be closed ⚑ Q347.
 
 - Reminder row: `🔔 Take out trash · 19:00` with **[Snooze 10m] [Done]** (an all-day event:
   `· all day`; a sun-timed one, §7.7: `🔔 Put the goats away · sunset` ⚑ Q56)
@@ -4164,6 +4169,14 @@ A stack at the top of every screen, one row per `ringing` fire, newest first:
   the row stays. An away row shows `· away ({name})` instead of the button.
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
   "3 more ringing ▾".
+
+**Acceptance (API tests, `test/alerts-api.test.ts`):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| RB1 | a reminder assigned to A and B rings; `GET /fires` as A, as B, as C (an admin) | A and B get the row; C does not |
+| RB2 | a reminder assigned to nobody rings; `GET /fires` as C | C gets the row |
+| RB3 | a timer assigned to A rings; `GET /fires` as A, as C | A gets the row; C does not |
 
 ### 8.3 Day sheet
 

@@ -237,3 +237,41 @@ describe('timer active time range (§4.2n, TW)', () => {
     await o.post(`/timers/${t.json.id}/commands`, { cmd: 'stop' });
   });
 });
+
+describe('§8.2 whose reminders ring in my bar (RB1–RB2)', () => {
+  const ringFor = async (o: Awaited<ReturnType<typeof owner>>, assignedTo: string[]) => {
+    const ev = await o.post('/events', { title: 'Talk to principal', startDate: '2030-04-02', startTime: '14:00', assignedTo, reminder: { offsetMin: 60, channels: ['push'], renotifyMin: null } });
+    await env.DB.prepare(`INSERT INTO fires (id, kind, event_id, occurrence_date, due_at, state, alert_count) VALUES (?, 'reminder', ?, '2030-04-02', ?, 'ringing', 1)`)
+      .bind(`fir_rb_${ev.json.id}`, ev.json.id, iso('2030-04-02T20:00Z')).run();
+    return ev.json.id as string;
+  };
+  const rings = async (c: { get: (p: string) => Promise<any> }, eventId: string) => (await c.get('/fires?state=ringing')).json.some((f: any) => f.eventId === eventId);
+
+  it('RB1 a reminder assigned to A and B rings for them, not for C', async () => {
+    const o = await owner();
+    const { client: a, id: A } = await member(o), { client: b, id: B } = await member(o);
+    const id = await ringFor(o, [A, B]);
+    expect(await rings(a, id)).toBe(true);
+    expect(await rings(b, id)).toBe(true);
+    expect(await rings(o, id)).toBe(false);
+  });
+
+  it('RB2 a reminder assigned to nobody rings for everyone', async () => {
+    const o = await owner();
+    const { client: c } = await member(o);
+    const id = await ringFor(o, []);
+    expect(await rings(c, id)).toBe(true);
+    expect(await rings(o, id)).toBe(true);
+  });
+
+  it('RB3 a timer assigned to A rings for A, not for C', async () => {
+    const o = await owner();
+    const { client: a, id: A } = await member(o);
+    const t = await o.post('/timers', { title: 'Feed the fish', intervalMin: 60, channels: ['push'], renotifyMin: null, maxAlerts: 1, assignedTo: [A] });
+    await o.post(`/timers/${t.json.id}/commands`, { cmd: 'start' });
+    await env.DB.prepare(`UPDATE fires SET state = 'ringing', alert_count = 1 WHERE timer_id = ?`).bind(t.json.id).run();
+    const sees = async (c: { get: (p: string) => Promise<any> }) => (await c.get('/fires?state=ringing')).json.some((f: any) => f.timerId === t.json.id);
+    expect(await sees(a)).toBe(true);
+    expect(await sees(o)).toBe(false);
+  });
+});

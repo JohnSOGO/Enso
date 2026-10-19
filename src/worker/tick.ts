@@ -2,12 +2,11 @@
 import { MATERIALIZE_AHEAD_H, alertMessage, stepFire, type FireRow } from '../shared/engine';
 import { choreFromRow, type ChoreRow } from '../shared/chores';
 import { planThingFires, type ThingRow } from '../shared/things';
-import { audience } from '../shared/optins';
 import { addMinutes } from '../shared/time';
 import type { Env } from './env';
 import { activeMemberIds, all, first, placeOf } from './db';
 import { funhouseDelivery, houseDelivery, pushDelivery } from './deliveries';
-import { choreRunInserts, insertFire, reminderInserts, sourceOf, updateFire } from './fire-rows';
+import { audienceOf, choreRunInserts, insertFire, reminderInserts, sourceOf, updateFire } from './fire-rows';
 import { sendPushDeliveries } from './push';
 import { allHouseSpeakers, sendHouseDeliveries } from './house';
 import { deliverySpeakers } from './speaker-choices';
@@ -67,10 +66,7 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
       const message24 = typeof src.sunsetAt === 'string' ? alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sunsetAt, src.bring, true) : message; // §8.17: a push in its member's clock
       const base = { fireId: next.id, alertNumber: next.alert_count };
       // §5.7, §7.5: who it is for. Nobody → the fire still steps, nothing is delivered.
-      const aud = audience({
-        optional: src.optional ?? false, assignedTo: src.assignedTo, activeIds: await activeMemberIds(db),
-        onIds: src.onIds ?? [], channels: src.cfg.channels,
-      });
+      const aud = audienceOf(src, await activeMemberIds(db));
       // §9.2c: someone away from this alert → no phone rings either.
       if (src.cfg.channels.includes('push') && !fire.away_by) {
         for (const memberId of aud.push) {

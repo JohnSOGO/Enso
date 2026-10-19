@@ -2,7 +2,7 @@
 import { env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Client, member, owner, tickAt } from './helpers';
-import { audience, isOnFor } from '../src/shared/optins';
+import { audience, isForMe, isOnFor } from '../src/shared/optins';
 import type { Channel } from '../src/shared/vocab';
 
 let A: Client, aId: string, B: Client, bId: string;
@@ -120,6 +120,14 @@ describe('M4h optional events (O1–O9)', () => {
 
 describe('the optional-event rule (§7.5) — isOnFor and audience', () => {
   const base = { assignedTo: [] as string[], activeIds: ['a', 'b', 'c'], onIds: [] as string[], channels: ['push', 'house'] as Channel[] };
+
+  it('isForMe: assigned to nobody or to me, and on for me (§8.2)', () => {
+    expect(isForMe({ optional: 0, assignedTo: [] }, 'c', [])).toBe(true);
+    expect(isForMe({ optional: 0, assignedTo: ['a', 'b'] }, 'a', [])).toBe(true);
+    expect(isForMe({ optional: 0, assignedTo: ['a', 'b'] }, 'c', [])).toBe(false);
+    expect(isForMe({ optional: 1, assignedTo: ['a'] }, 'a', [])).toBe(false);
+    expect(isForMe({ optional: 1, assignedTo: ['a'] }, 'a', ['a'])).toBe(true);
+  });
 
   it('isOnFor: a non-optional event exists for everyone; an optional one only for who has it on', () => {
     expect(isOnFor({ optional: false }, 'a', [])).toBe(true);
