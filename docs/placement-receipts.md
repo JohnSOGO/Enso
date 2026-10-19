@@ -7,6 +7,21 @@ carry its result.
 
 ---
 
+## 2026-10-19 — Steward pass 30, since pass 29 (code-steward)
+
+- **Run:** post-release, v1.83.0 (📌 Reminders §8.5b: shared reminders.ts, routes/reminders.ts, Reminders.tsx; touches
+  alarms.ts, event-rows.ts, vocab.ts, index.ts, Alarms.tsx); also covers v1.82.0 (💪 running mark) and v1.82.1 (Alerts label).
+- **Verdict:** SOUND. Typecheck green, 922/922, arch:audit quiet; 3 code commits, 3 matching receipts, built as placed.
+- **Top finding:** LOW: the soft-delete batch (UPDATE deleted_at + removeFutureFires) is now in events.ts, alarms.ts and
+  reminders.ts → one `deleteEventStatements` in event-rows.ts.
+- **Handoffs:** 3 to worker (deleteEventStatements at the next event-route touch; one renotifyText for the three PWA
+  renotify label tables; owed device checks v1.76–v1.83 in where-things-stand.md, carried), 0 to reorganizer, 0 to
+  placement-advisor. Still carried: updateEventStatement with the next event-column change, plus pass 29's task items.
+- **Restraint:** reminders.ts stays a sibling of alarms.ts; two positional optionals on insertEventStatement are accepted
+  (a third becomes an options object); the API's 1–240 renotify range matches alarms; Alarms.tsx churn is watched.
+
+---
+
 ## 2026-10-19 — 📌 Reminders, one-off until Done (placement-advisor)
 
 - **Ask:** v1.83.0, SPEC §8.5b, §4.2a note, §10 /reminders rows (⚑ Q311–Q314). A reminder is an is_alarm event with
