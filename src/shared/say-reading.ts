@@ -1,5 +1,6 @@
-// SPEC §8.18 — what was said to the Ensō button, as Claude read it: the wire shape POST /say answers with, the cleaner
-// that checks a reminder with the same rules POST /reminders uses, the fixed request lines, and what Clarify sends.
+// SPEC §8.18, §1.3 — what was said to the Ensō button, as Claude read it: the wire shape POST /say answers with, the
+// cleaner that checks a reminder with the same rules POST /reminders uses, the fixed request and outside lines, and
+// what Clarify sends.
 // Pure: `now` and `tz` are passed in; never decides what is saved.
 import { WEEKDAY, isOneOf, type FeatureRequestSize, type Weekday } from './vocab';
 import { ALERT_TITLE_MAX } from './alert-limits';
@@ -17,8 +18,10 @@ export interface SayReminder { title: string; assignedTo: string[]; date: string
 export type SayReading = { heard: string; say: string } & (
   | { kind: 'reminder'; reminder: SayReminder }
   | { kind: 'exists'; where: string }
-  | { kind: 'request'; request: { title: string; summary: string; size: FeatureRequestSize } }
+  | { kind: 'request'; request: FeatureAsk }
+  | { kind: 'outside'; where: string | null; request: FeatureAsk } // §1.3: logged as Out of scope on leaving
 );
+export interface FeatureAsk { title: string; summary: string; size: FeatureRequestSize }
 
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max) : '');
 
@@ -26,6 +29,12 @@ const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().repla
 export function requestSay(size: FeatureRequestSize): string {
   return "Ensō can't do that yet. I can save it as a feature request for the next build."
     + (size === 'big' ? " It's a big one, so John will look at it first." : '');
+}
+
+/** The outside line (§8.18 item 4, ⚑ Q339), with where the part that fits lives when there is one. */
+export function outsideSay(where: string | null): string {
+  return "That's outside what Ensō is for. Ensō keeps the family's calendar, reminders, chores, lists, recipes and house."
+    + (where ? ` The part that fits is in ${where}.` : '');
 }
 
 /** Clarify: what was said before, then the new words. */
@@ -47,10 +56,14 @@ export function cleanSayReading(raw: Record<string, unknown>, o: { tz: string; n
     const where = str(raw.where, WHERE_MAX);
     return where ? { kind: 'exists', heard, say: say || `Ensō already does this: ${where}.`, where } : null;
   }
-  if (raw.kind === 'request') {
+  if (raw.kind === 'request' || raw.kind === 'outside') {
     const title = str(raw.title, FEATURE_TITLE_MAX);
+    if (!title) return null;
     const size: FeatureRequestSize = raw.size === 'small' ? 'small' : 'big'; // unsure reads as big
-    return title ? { kind: 'request', heard, say: requestSay(size), request: { title, summary: str(raw.summary, FEATURE_SUMMARY_MAX), size } } : null;
+    const request = { title, summary: str(raw.summary, FEATURE_SUMMARY_MAX), size };
+    if (raw.kind === 'request') return { kind: 'request', heard, say: requestSay(size), request };
+    const where = str(raw.where, WHERE_MAX) || null;
+    return { kind: 'outside', heard, say: outsideSay(where), where, request };
   }
   if (raw.kind !== 'reminder' || !raw.reminder || typeof raw.reminder !== 'object') return null;
   const r = raw.reminder as Record<string, unknown>;

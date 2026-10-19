@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.53 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.54 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -107,6 +107,32 @@ usually in the house and hears house announcements. Every feature is judged by:
 
 FunHouse integration (separate project), native app-store apps, public/shared
 calendars, anything in §12.
+
+### 1.3 Scope — what Ensō is for ⚑ Q339
+
+MojoSOGO 2026-10-19: "the ask has to fit with the scope of the app … the app needs to know its scope." Ensō keeps one
+household's home life turning. An ask fits when it is about:
+
+- the family's **calendar** and plans, and who is going;
+- **reminders, alarms and timers** for the people in the house;
+- **chores**, rooms, messes, bounties and who did what;
+- the **house** itself: its machines (washer, dryer, dish washer, cooking), its speakers and announcements, quiet times;
+- the household's **lists**: shopping, wishes, to-dos, every day lists, movies and shows, things shared in;
+- **recipes** and cooking;
+- the **members** of the household and their settings.
+
+It does not fit when it is about the list below. Ensō says so instead of offering to build it, and logs the ask as
+**Out of scope** for John to review (he may widen the scope; "still log the ask as out of scope for my review"):
+
+- **buying, ordering or paying** (stores, Amazon, deliveries, bills). Ensō keeps the list, not the cart;
+- **money**: banking, budgets, investing, trading;
+- **work or school systems**, or other apps, websites or accounts to log into or control;
+- **general questions, chat, search or news** (Ensō is not an assistant for everything);
+- **people outside the household**, or anything to do with them that isn't the household's own plan.
+
+When unsure, it fits and is a **big** request, so John decides (§8.18). The reading's copy of this scope lives beside
+ENSO_DOES in `src/worker/say-reader.ts`; a change here changes it there. The build gate (CLAUDE.md "Feature requests")
+dismisses an open request that does not fit.
 
 ---
 
@@ -1017,6 +1043,16 @@ Asked by MojoSOGO 2026-10-19: what Ensō can't do yet, said to the Ensō button,
 `dismissed`), a note, who asked and when. Additive; it runs before the deploy.
 
 Schema: [`migrations/0056_feature_requests.sql`](migrations/0056_feature_requests.sql). The migration is the schema; it is not copied here. **Migration check (SY-M2,** [`test/migration-0056.test.ts`](test/migration-0056.test.ts)**):** the table takes a request and refuses an unknown status or size.
+
+### 4.2zzd Schema change — `migrations/0057_feature_request_outside.sql`
+
+Asked by MojoSOGO 2026-10-19: "still log the ask as out of scope for my review as I may want to increase scope." A
+fifth `feature_requests.status`, `outside` (§1.3, §8.18). SQLite can't widen a CHECK in place, so the table is rebuilt
+with its rows copied, then the index again. Nothing references it. It runs before the deploy.
+
+Schema: [`migrations/0057_feature_request_outside.sql`](migrations/0057_feature_request_outside.sql). **Migration check
+(SY-M3,** [`test/migration-0057.test.ts`](test/migration-0057.test.ts)**):** a row saved under 0056 is still there after
+0057, `outside` is taken, an unknown status is still refused.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -5293,13 +5329,18 @@ used ⚑ Q331.
   Done never lit up). The phone's voice is woken on the **Done** tap, not before listening, so the two never fight over
   the mic. Admins also see **💡 Requests** in the popup, which opens the list below.
 - **Send** → `POST /say { text }` → Claude cleans up the words (spelling, grammar, what was misheard) and decides one of
-  three, never saving anything:
+  four, never saving anything:
   1. **A reminder** (§8.5b one-off, or §8.5c 🎲 window): the fields, and one sentence of what Ensō will do
      ("I'll remind you on weekdays between 8 and 11am to book the car check: fix the headlight, the fan stays on.").
   2. **Ensō already does this** somewhere else: where ("Alerts → ⏱ Rolling timers") and a sentence saying so.
   3. **Ensō can't do it yet:** a short title, a one-line summary and a size — **small** (fits beside what exists) or
      **big** (a new area, many screens, or unclear) — and "Ensō can't do that yet. I can save it as a feature request
      for the next build." A big one adds "It's a big one, so John will look at it first."
+  4. **Outside what Ensō is for** (§1.3, v1.88.0): "That's outside what Ensō is for. Ensō keeps the family's calendar,
+     reminders, chores, lists, recipes and house." and, when part of it fits, where that part lives ("Ensō can keep the
+     shopping list: Lists → Shopping.") ⚑ Q339. The popup offers **Clarify** and **OK**. Leaving it any way but
+     Clarify logs the ask (`POST /feature-requests { …, outside: true }`) as **Out of scope**, with Claude's title and
+     summary, for John.
 - **The answer** shows in the popup: what Ensō heard (the cleaned words), the sentence, and the buttons, and the phone
   **says the sentence aloud** in its best English voice (an Enhanced / Premium one when installed) ⚑ Q334; 🔇 stops it.
   - **Yes** — a reminder: the reminder form opens filled in (§8.5b / §8.5c) to check and **Save** ⚑ Q335; a request:
@@ -5310,17 +5351,19 @@ used ⚑ Q331.
   shared with photos and links): over it → 429 "Ensō can't read any more today. Try again tomorrow." A failure says so
   and saves nothing.
 - **Feature requests** (`feature_requests`, §4.2zzc): what was said, the title, summary and size, who, when, and a
-  status: **new** (small), **needs_john** (big) ⚑ Q336, **done** or **dismissed**, with a note.
+  status: **new** (small), **needs_john** (big) ⚑ Q336, **outside** (§1.3, §4.2zzd), **done** or **dismissed**, with a
+  note. A build session sees only new and needs_john.
 - **💡 Requests** (Settings, admins; §8.6): newest first: date · who · title, the summary, and a badge **Needs John** /
-  **New** / **Done** / **Dismissed** (Done and Dismissed dim; shown 30 days, never deleted). The founder sees **OK to
-  build** on a Needs John row (→ New); any admin may **Dismiss** an open one ⚑ Q337.
+  **New** / **Out of scope** / **Done** / **Dismissed** (Done and Dismissed dim; shown 30 days, never deleted; Out of
+  scope stays until handled). The founder sees **OK to build** on a Needs John or Out of scope row (→ New: for an Out of
+  scope one that widens §1.3, which the build updates); any admin may **Dismiss** an open or Out of scope one ⚑ Q337.
 - **The build gate** (CLAUDE.md "Feature requests"): a build session reads the open requests with `GET /ops/requests`
   (the ops token, §9.4). Before building any, it runs the **placement-advisor** (and the **code-steward** when it spans
   several areas) to learn whether Ensō already does it and where it goes. Already there → `PATCH /ops/requests/{id}
   { status: 'dismissed', note: 'Already in …' }`. Needs John, or anything big or tangled → not built until John says so.
   Built → `{ status: 'done', note: 'v1.x.y' }`.
-- **The "what else Ensō does" list** the reading is given lives in `src/worker/say-reader.ts`; a new tab or section
-  updates it (the code-steward checks it).
+- **The "what else Ensō does" list** and **the scope** (§1.3) the reading is given live in `src/worker/say-reader.ts`;
+  a new tab or section updates the list, a change to §1.3 updates the scope (the code-steward checks both).
 
 **Acceptance (SY1–SY6 tests with a fake Claude, SY-M manual):**
 
@@ -5332,6 +5375,8 @@ used ⚑ Q331.
 | SY4 | founder POST …/ok; an admin POST …/dismiss; a non-founder admin …/ok; …/ok on a `new` one | `new`; `dismissed`; 403; 409 |
 | SY5 | GET /ops/requests with the token; PATCH one `{ status: 'done', note: 'v1.88.0' }`; no token | the open ones, oldest first; `done` with its note; 401 |
 | SY6 | POST /say blank; the day's reads used up; no key | 400; 429; 503 |
+| SY7 | Claude answers "outside" for "order our groceries from Amazon every Friday", with where "Lists → Shopping"; with no where | 200 `{ kind: 'outside', say: "That's outside what Ensō is for…", where: 'Lists → Shopping', request: { title, summary, size: 'big' } }`; `where: null`; no row saved by /say |
+| SY8 | POST /feature-requests `{ …, outside: true }`; GET /ops/requests; founder …/ok on it; an admin …/dismiss on another | 201 status `outside`, listed in GET /feature-requests after 30 days too; not in /ops/requests; `new`; `dismissed` |
 | SY-M | on the iPhone | tap the Ensō button, say "weekdays 8 to 11 remind me to book the car check", hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John |
 
 ## 9. Delivery
@@ -6065,8 +6110,8 @@ other push stays until I hide it ⚑ Q284.
 | GET | `/reminders` | member | → open reminders (§8.5b), soonest first: `{ id, title, date, time, channels, renotifyMin, assignedTo, createdBy, state: 'due' \| 'ringing' \| 'missed', dueAt, window: { days: Weekday[], from, to } \| null }` (`dueAt` = the open fire's due time, else the reminder's own; a window's next ring, §8.5c) |
 | POST | `/reminders` | member | `{ title, date, time: "HH:MM", channels, renotifyMin?, assignedTo? }` or `{ title, window: { days, from, to }, channels, assignedTo? }` (§8.5c) → reminder (201); 400 when not after now, or a bad window |
 | PATCH/DELETE | `/reminders/{id}` | creator or owner | POST fields, all optional, merged; either shape (`window: null` back to a set time, §8.5c); re-plans like an alarm edit |
-| POST | `/say` | member | `{ text }` → 200 `{ kind: 'reminder', heard, say, reminder }` / `{ kind: 'exists', heard, say, where }` / `{ kind: 'request', heard, say, request: { title, summary, size } }` (§8.18); nothing saved; 400 blank, 429 reads used up, 503 no key, 502 / 422 reading failed |
-| GET/POST | `/feature-requests` | admin / member | → `FeatureRequest[]` newest first, last 30 days for done / dismissed: `{ id, text, title, summary, size, status, note, createdBy, createdAt }`; POST `{ text, title, summary, size }` → 201, status from size (§8.18) |
+| POST | `/say` | member | `{ text }` → 200 `{ kind: 'reminder', heard, say, reminder }` / `{ kind: 'exists', heard, say, where }` / `{ kind: 'request', heard, say, request: { title, summary, size } }` / `{ kind: 'outside', heard, say, where (or null), request: { title, summary, size } }` (§8.18, §1.3); nothing saved; 400 blank, 429 reads used up, 503 no key, 502 / 422 reading failed |
+| GET/POST | `/feature-requests` | admin / member | → `FeatureRequest[]` newest first, last 30 days for done / dismissed: `{ id, text, title, summary, size, status, note, createdBy, createdAt }`; POST `{ text, title, summary, size, outside? }` → 201, status from size, or `outside` (§8.18, §1.3) |
 | POST | `/feature-requests/{id}/ok` · `/dismiss` | founder · admin | → the request; `ok` only from `needs_john` → `new`; `dismiss` from `new` / `needs_john`; else 409 |
 | GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Clothes washer") and `personId` = the load's owner (a cooking timer's fire: its label, §7D.8); every fire carries `awayBy` (§9.2c) |
 | GET | `/machines` | member | → `Machine[]` in load order: `{ id, label, state: MachineState, ownerId, minutes, startedAt, doneAt, startedBy, next }` (`state` derived by the server, §7D.1; `next` = the next machine's id or null) |

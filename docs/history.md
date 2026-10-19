@@ -986,6 +986,15 @@ button bigger", "see a list of what the pending requests are"): the text box is 
 time and restarts on end (the iPhone's continuous mode drops results), and the voice is woken on Done rather than before
 listening. Admins get 💡 Requests in the popup. The button is 84 px (was 60). Owed: his TRY (SY-M).
 
+**What Ensō is for** (v1.88.0, SPEC 3.54, §1.3, §8.18, migration 0057, Q339; MojoSOGO 2026-10-19 "the ask has to fit
+with the scope of the app … the app needs to know its scope", "still log the ask as out of scope for my review as I may
+want to increase scope"): §1.3 says what fits and what doesn't; the reading is given it (ENSO_SCOPE) and answers a
+fourth kind, outside: "That's outside what Ensō is for…", with where the part that fits lives, Clarify / OK. Leaving it
+logs the ask as Out of scope (status `outside`, 0057 rebuilt the table to allow it) in 💡 Requests; OK to build widens
+the scope, Dismiss closes it; build sessions never see it. Also the steward's v1.87 items 2 and 3: ENSO_DOES puts
+Announce and Quiet on the Alerts tab and names 💡 Requests; the status sets live once in shared/feature-requests.ts.
+Built as specified. Owed: his TRY.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

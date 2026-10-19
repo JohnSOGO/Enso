@@ -1,14 +1,15 @@
 // SPEC §8.18, §8.6 — Settings → 💡 Requests (admins): what the Ensō button saved for the next build, newest first,
-// with OK to build (the founder, on Needs John) and Dismiss (any admin, on an open one). Shows the server's status.
+// with OK to build (the founder, on Needs John or Out of scope) and Dismiss (any admin, on an open or Out of scope one). Shows the server's status.
 import { useEffect, useState } from 'react';
 import { errorText, get, post } from '../api';
 import { useApp, useIsFounder } from '../state';
-import type { FeatureRequest } from '../../../src/shared/feature-requests';
+import { canOk, isListed, type FeatureRequest } from '../../../src/shared/feature-requests';
 import type { FeatureRequestStatus } from '../../../src/shared/vocab';
 import s from './Lists.module.css';
 
 const BADGE: Record<FeatureRequestStatus, { text: string; cls: string }> = {
   needs_john: { text: 'Needs John', cls: 'badge warn' }, new: { text: 'New', cls: 'badge good' },
+  outside: { text: 'Out of scope', cls: 'badge warn' },
   done: { text: 'Done', cls: 'badge neutral' }, dismissed: { text: 'Dismissed', cls: 'badge neutral' },
 };
 
@@ -29,14 +30,14 @@ export function FeatureRequests() {
 
   return (
     <section aria-label="Feature requests">
-      <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>What people asked the Ensō button for that Ensō can't do yet. The next build picks these up; Needs John waits for John's OK.</p>
+      <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>What people asked the Ensō button for that Ensō can't do yet. The next build picks these up; Needs John waits for John's OK. Out of scope is outside what Ensō is for; OK to build widens it.</p>
       {error && <div role="alert" className="alert-error">{error}</div>}
       {list === null && !error && <p className="muted">Loading…</p>}
       {list?.length === 0 && <p className="muted">No requests yet.</p>}
       {!!list?.length && (
         <ul className={s.list}>
           {list.map((r) => {
-            const open = r.status === 'new' || r.status === 'needs_john';
+            const open = isListed(r.status);
             return (
               <li key={r.id} style={{ opacity: open ? 1 : 0.55, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
                 <div className="row" style={{ gap: 6, alignItems: 'baseline' }}>
@@ -48,7 +49,7 @@ export function FeatureRequests() {
                 <div className="muted" style={{ fontSize: '.8rem', marginTop: 2, overflowWrap: 'anywhere' }}>“{r.text}”</div>
                 {open && (
                   <div className="row wrap" style={{ marginTop: 6 }}>
-                    {founder && r.status === 'needs_john' && <button className="primary" disabled={busy} onClick={() => act(r.id, 'ok')}>OK to build</button>}
+                    {founder && canOk(r.status) && <button className="primary" disabled={busy} onClick={() => act(r.id, 'ok')}>OK to build</button>}
                     <button disabled={busy} onClick={() => act(r.id, 'dismiss')}>Dismiss</button>
                   </div>
                 )}
