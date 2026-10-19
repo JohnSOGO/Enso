@@ -7,6 +7,27 @@ carry its result.
 
 ---
 
+## 2026-10-19 — steward pass after v1.89.0 (code-steward)
+
+- **Run:** post-release, v1.87.1 (useSpeech one phrase at a time with restart, EnsoButton always-on box / 🗑 Clear / 8 s
+  hint / admin 💡 Requests, 84 px mark), v1.88.0 (§1.3 scope, ENSO_SCOPE, the `outside` reading and status, migration
+  0057, OPEN_STATUSES / LISTED_STATUSES / canOk, bound IN lists, Out of scope badge) and v1.89.0 (hold to talk, §8.18
+  rewritten whole, CLAUDE.md whole-spec and AREC rules, L19 timeout). Ran on bc0da27, before v1.90.0.
+- **Verdict:** MINOR DRIFT. Typecheck green, 955/955, arch:audit quiet (top engine.ts / EventForm.tsx 88%); 3 code
+  commits, 3 matching receipts, built as placed. ENSO_SCOPE equals SPEC §1.3 line for line; ENSO_DOES true apart from
+  one emoji; v1.87 items 2 and 3 closed.
+- **Top finding:** MED, carried: sayPrompt hard-coded "after work" 17:30 / tonight / morning. Fixed in v1.90.0 (his FIX)
+  before this receipt landed.
+- **Handoffs:** 1 to placement-advisor then worker (a ⚑ line for where a failed Out of scope log shows: close() posts
+  after closing). 3 to worker: ENSO_DOES "🔇 Quiet the house" → 🤫; docs (say-reading.ts map row lacks outside /
+  outsideSay / FeatureAsk; where-things-stand lacks the hold-to-talk TRY and Q339–Q341); carried isShareKey /
+  InboxSetup apiUrl, v1.84.x receipts at the bottom, device-check lines v1.76–v1.84, the window receipt's version. 0 to
+  reorganizer. Still carried: deleteEventStatements, renotifyText, updateEventStatement at their triggers. Report:
+  /mnt/project-files/steward/2026-10-19-v1-89-pass.md.
+- **Restraint:** EnsoButton.tsx is the hotspot (3 commits) but one popup; the seam (hold gesture + box sync) is named
+  for ~250 lines. outsideSay's short scope line; size kept on outside requests; `open = isListed` naming; double
+  unlockSpeech; RESTARTS=30; Clarify then Cancel not logging (per spec); no browser-speech tests (SY-M manual).
+
 ## 2026-10-19 — Say it, it does it: the event reading, the speaker's After, no selection while held (placement-advisor)
 
 - **Ask:** v1.90.0, SPEC 3.57 §8.18 parts 1, 3 and 7, SY9 / SY10, ⚑ Q340 revised, ⚑ Q341. (A) a fifth reading `event`
