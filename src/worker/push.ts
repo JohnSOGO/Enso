@@ -3,6 +3,7 @@
 import type { Env } from './env';
 import { all } from './db';
 import { pushActions } from '../shared/engine';
+import { isTaskId } from '../shared/tasks';
 import { PUSH_TITLE, pushTitle } from '../shared/alert-history';
 import type { Action, AlertKind } from '../shared/vocab';
 import { sendWebPush, type VapidKeys } from './web-push';
@@ -70,8 +71,8 @@ async function sendToAll(db: D1Database, vapid: VapidKeys, subs: Sub[], payload:
 export async function sendPushDeliveries(env: Env, deliveryIds: string[], now: string): Promise<void> {
   const db = env.DB;
   const vapid = vapidOf(env);
-  const rows = await all<{ id: string; member_id: string; message: string; title: string | null; url: string | null; fire_id: string | null; kind: AlertKind | null }>(db,
-    `SELECT d.id, d.member_id, d.message, d.title, d.url, d.fire_id, f.kind FROM deliveries d LEFT JOIN fires f ON f.id = d.fire_id
+  const rows = await all<{ id: string; member_id: string; message: string; title: string | null; url: string | null; fire_id: string | null; kind: AlertKind | null; timer_id: string | null }>(db,
+    `SELECT d.id, d.member_id, d.message, d.title, d.url, d.fire_id, f.kind, f.timer_id FROM deliveries d LEFT JOIN fires f ON f.id = d.fire_id
       WHERE d.id IN (${deliveryIds.map(() => '?').join(',')})`, ...deliveryIds);
   for (const d of rows) {
     let status: 'sent' | 'failed' = 'failed';
@@ -84,7 +85,7 @@ export async function sendPushDeliveries(env: Env, deliveryIds: string[], now: s
         const title = pushTitle({ hasFire: d.fire_id !== null && d.kind !== null, title: d.title });
         const payload: PushPayload = d.fire_id === null || d.kind === null
           ? { fireId: null, kind: null, tag: d.id, title, body: d.message, actions: [], url: d.url, alertId: d.id }
-          : { fireId: d.fire_id, kind: d.kind, tag: d.fire_id, title, body: d.message, actions: pushActions(d.kind), url: null, alertId: d.id };
+          : { fireId: d.fire_id, kind: d.kind, tag: d.fire_id, title, body: d.message, actions: isTaskId(d.timer_id) ? [] : pushActions(d.kind), url: null, alertId: d.id };
         const r = await sendToAll(db, vapid, subs, payload, now);
         if (r.sent > 0) status = 'sent';
         detail = r.failures.length ? r.failures.join('; ').slice(0, DETAIL_MAX) : null;

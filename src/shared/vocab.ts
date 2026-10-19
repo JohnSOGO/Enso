@@ -32,6 +32,9 @@ export const SHOW_STATUS = ['want', 'watched'] as const; // §7F shows.status
 export const WATCH_HOW = ['theater', 'stream', 'tv', 'rent', 'buy'] as const; // §7F a way to watch, in bestWatch order
 export const LIST_ADD_RESULT = ['added', 'existing', 'reopened'] as const; // §7A.1 POST /lists/{id}/items result
 export const HOUSE_QUIET_FOR = ['1h', '2h', '4h', 'today'] as const; // §9.2b how long the house is quiet
+export const TASK_MOOD = ['great', 'steady', 'distracted', 'struggling', 'break'] as const; // §7G.3 a check-in answer, in button order
+export const TASK_OUTCOME = ['finished', 'stopped'] as const; // §7G.6 task_sessions.outcome
+export const TASK_LOOKS = ['yes', 'no', 'unsure'] as const; // §7G.6 a done line, as the photo check read it
 
 export type AlertKind = (typeof ALERT_KIND)[number];
 export type Channel = (typeof CHANNEL)[number];
@@ -65,6 +68,9 @@ export type ShowStatus = (typeof SHOW_STATUS)[number];
 export type WatchHow = (typeof WATCH_HOW)[number];
 export type ListAddResult = (typeof LIST_ADD_RESULT)[number];
 export type HouseQuietFor = (typeof HOUSE_QUIET_FOR)[number];
+export type TaskMood = (typeof TASK_MOOD)[number];
+export type TaskOutcome = (typeof TASK_OUTCOME)[number];
+export type TaskLooks = (typeof TASK_LOOKS)[number];
 
 /** /status `house.state` (§9.2) — derived from the deliveries table, never stored. */
 export const HOUSE_STATE = ['ok', 'failing', 'not_configured', 'untried'] as const;

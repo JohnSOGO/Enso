@@ -1,11 +1,12 @@
-// SPEC §8.5 — Alarms tab: 📢 Announce (§9.3), 🤫 Quiet the house (§9.2b), then a menu of four sections (Alarms: days of
-// week + time, Rolling timers, Washing machines, Cooking machines), the tapped one in a Modal. Holds which section is open.
+// SPEC §8.5 — Alarms tab: 📢 Announce (§9.3), 🤫 Quiet the house (§9.2b), then a menu of five sections (Alarms: days of
+// week + time, Rolling timers, Washing machines, Cooking machines, 💪 Task buddy), the tapped one in a Modal. Holds which section is open.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Modal } from './Modal';
 import { PickGrid } from './PickGrid';
 import { TimersSection, type Timer } from './Timers';
 import { MachinesSection } from './Machines';
 import { CookingSection } from './Cooking';
+import { Tasks } from './Tasks';
 import { Announce } from './Announce';
 import { HouseQuiet } from './HouseQuiet';
 import { ChannelChecks, DayChips, RenotifySelect, SHORT, channelsOf, daysText, flagsOf, pickOneWay } from './AlertFields';
@@ -143,12 +144,13 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
   );
 }
 
-type Section = 'alarms' | 'timers' | 'washing' | 'cooking';
+type Section = 'alarms' | 'timers' | 'washing' | 'cooking' | 'tasks';
 
 /** ⚑ Q238 — the menu under Announce and Quiet the house, as on Settings (§8.6). */
 const SECTIONS: readonly { value: Section; emoji: string; label: string }[] = [
   { value: 'alarms', emoji: '⏰', label: 'Alarms' }, { value: 'timers', emoji: '⏱', label: 'Rolling timers' },
   { value: 'washing', emoji: '🧺', label: 'Washing machines' }, { value: 'cooking', emoji: '🍳', label: 'Cooking machines' },
+  { value: 'tasks', emoji: '💪', label: 'Task buddy' }, // §7G ⚑ Q306
 ];
 
 export function Alarms({ onEditAlarm, onEditTimer }: { onEditAlarm: (a: Alarm | null) => void; onEditTimer: (t: Timer | null) => void }) {
@@ -159,6 +161,7 @@ export function Alarms({ onEditAlarm, onEditTimer }: { onEditAlarm: (a: Alarm | 
     timers: () => <TimersSection onEdit={onEditTimer} />,
     washing: () => <MachinesSection />,
     cooking: () => <CookingSection />,
+    tasks: () => <Tasks />,
   };
   return (
     <div style={{ padding: 12, overflowY: 'auto', height: '100%' }}>

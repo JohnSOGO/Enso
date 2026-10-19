@@ -17,6 +17,8 @@ import { MACHINE_LABEL, isMachineId } from '../../shared/machines';
 import { cookLabel } from '../../shared/cooking';
 import { onEventIds } from '../event-rows';
 import { ANNOUNCE_NEEDS_WINDOW } from '../../shared/timer-start';
+import { isTaskId, taskFromRow, timeUp, type TaskRow } from '../../shared/tasks';
+import { TASK_ACK_REFUSED } from '../../shared/task-replies';
 
 interface TimerRow {
   id: string; title: string; interval_min: number; channels: string; renotify_min: number | null; max_alerts: number;
@@ -66,8 +68,11 @@ function parseTimerInput(b: Record<string, unknown>) {
   };
 }
 
+/** §7G.1: a task's timer (task_…) is the Task buddy's, never a rolling timer of the list. */
+const NOT_TASK = "substr(id, 1, 5) != 'task_'";
+
 async function loadTimer(c: Context<AppEnv>, forWrite: boolean): Promise<TimerRow | Response> {
-  const t = await first<TimerRow>(c.env.DB, 'SELECT * FROM timers WHERE id = ? AND deleted_at IS NULL', c.req.param('id'));
+  const t = await first<TimerRow>(c.env.DB, `SELECT * FROM timers WHERE id = ? AND deleted_at IS NULL AND ${NOT_TASK}`, c.req.param('id'));
   if (!t) return fail(c, 404, 'not_found', 'That timer no longer exists.');
   const me = c.get('member');
   if (forWrite && !canChange(t.created_by, me)) return fail(c, 403, 'forbidden', 'Only the creator or an admin can change this timer.');
@@ -77,7 +82,7 @@ async function loadTimer(c: Context<AppEnv>, forWrite: boolean): Promise<TimerRo
 export const alerts = new Hono<AppEnv>();
 
 alerts.get('/timers', requireMember, async (c) => {
-  const rows = await all<TimerRow>(c.env.DB, 'SELECT * FROM timers WHERE deleted_at IS NULL ORDER BY created_at');
+  const rows = await all<TimerRow>(c.env.DB, `SELECT * FROM timers WHERE deleted_at IS NULL AND ${NOT_TASK} ORDER BY created_at`);
   return c.json(await Promise.all(rows.map((t) => timerView(c.env.DB, t))));
 });
 
@@ -141,19 +146,26 @@ alerts.post('/timers/:id/commands', requireMember, async (c) => {
 async function fireViews(db: D1Database, me: string, where: string, binds: unknown[], hideOff = true) {
   const rows = await all<Record<string, unknown> & {
     kind: string; choreRunId: string | null; optional: number | null; machineId: string | null; machineOwner: string | null;
-    cookKind: CookKind | null; cookName: string | null;
+    cookKind: CookKind | null; cookName: string | null; taskOwner: string | null;
   }>(db,
     `SELECT f.id, f.kind, f.due_at AS dueAt, f.state, f.alert_count AS alertCount, f.occurrence_date AS occurrenceDate,
             f.event_id AS eventId, f.timer_id AS timerId, f.chore_run_id AS choreRunId, f.thing_id AS thingId,
-            f.machine_id AS machineId, m.owner_id AS machineOwner, m.cook_kind AS cookKind, m.name AS cookName, f.away_by AS awayBy,
+            f.machine_id AS machineId, m.owner_id AS machineOwner, m.cook_kind AS cookKind, m.name AS cookName, f.away_by AS awayBy, ts.member_id AS taskOwner,
             COALESCE(e.title, t.title, th.title) AS title, e.start_time AS startTime, e.start_sun AS startSun, e.optional
        FROM fires f LEFT JOIN events e ON e.id = f.event_id LEFT JOIN timers t ON t.id = f.timer_id
-       LEFT JOIN things th ON th.id = f.thing_id LEFT JOIN machines m ON m.id = f.machine_id
+       LEFT JOIN things th ON th.id = f.thing_id LEFT JOIN machines m ON m.id = f.machine_id LEFT JOIN task_sessions ts ON ts.id = f.timer_id
       WHERE ${where}
       ORDER BY f.due_at DESC`, ...binds);
   const on = await onEventIds(db, me);
   const out = [];
-  for (const { choreRunId, optional, machineId, machineOwner, cookKind, cookName, ...r } of rows) {
+  for (const { choreRunId, optional, machineId, machineOwner, cookKind, cookName, taskOwner, ...r } of rows) {
+    // §7G.1: a task check-in is its owner's alone; it carries taskTimeUp so the PWA shows the time-up answers (§7G.3).
+    if (isTaskId(r.timerId)) {
+      if (taskOwner !== me) continue;
+      const ts = await first<TaskRow>(db, 'SELECT * FROM task_sessions WHERE id = ?', r.timerId);
+      out.push({ ...r, taskTimeUp: ts ? timeUp(taskFromRow(ts), nowIso()) : false });
+      continue;
+    }
     // §7.5: a reminder of an optional event is hidden from whoever doesn't have it on.
     if (hideOff && r.kind === 'reminder' && !isOnFor({ optional: optional ?? 0 }, me, on.has(r.eventId as string) ? [me] : [])) continue;
     // §10: machine fires carry the machine, its label as the title, and the load's owner.
@@ -196,6 +208,7 @@ alerts.post('/fires/:id/actions', requireMember, async (c) => {
   if (!isOneOf(ACTION, b.action)) return fail(c, 400, 'invalid_input', `action must be one of: ${ACTION.join(', ')}.`);
   const fire = await first<FireRow>(c.env.DB, 'SELECT * FROM fires WHERE id = ?', c.req.param('id'));
   if (!fire) return fail(c, 404, 'not_found', 'That alert no longer exists.');
+  if (isTaskId(fire.timer_id)) return fail(c, 409, 'invalid_action', TASK_ACK_REFUSED); // §5.4: answered through /tasks
   const now = nowIso();
   const src = await sourceOf(c.env.DB, fire, now);
   if (!src) return fail(c, 404, 'not_found', 'That alert no longer has an event or timer.');

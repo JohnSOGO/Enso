@@ -928,6 +928,14 @@ doesn't open. Rule in `src/shared/event-access.ts`. No migration.
 tick step 1 (the reminding-event SELECT and its planReminderFires mapping) moved from `tick.ts` (131 → 115 lines) to
 `reminderInserts` in `fire-rows.ts`.
 
+**💪 Task buddy** (v1.81.0, SPEC 3.43, §7G, migration 0053, Q298–Q308; MojoSOGO 2026-10-19, the Active Task Companion
+reference spec plus "Enso should ask what does done look like so when we think we are done, Enso can verify"; plan in
+`arec-task-buddy.md`): Alarms → 💪 Task buddy. Say what you're starting in one sentence; check-ins ride a hidden
+rolling timer (`task_…`) on Phone / House / FunHouse with five answers and varied replies; break, pause, resume, Tell
+Enso; Finish holds up the done list, with an optional Claude photo check; summary and Recent. Not built (SPEC §12.6):
+Focus Sprint, history answers, voice answers. Deviation: phone first (§9.2d) applies, so the speakers hear a check-in
+only from its nudge (alert 2). Owed: MojoSOGO's TRY on the iPhone.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

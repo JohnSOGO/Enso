@@ -3,7 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { get } from './api';
 import { clockText, utcToLocal } from '../../src/shared/time';
-import type { AlertKind, Channel, DeliveryStatus, HouseState, Role } from '../../src/shared/vocab';
+import type { AlertKind, Channel, DeliveryStatus, HouseState, Role, TaskMood } from '../../src/shared/vocab';
+import type { Task } from '../../src/shared/tasks';
 
 export interface Me {
   id: string; email: string; displayName: string; color: string; role: Role;
@@ -26,7 +27,12 @@ export interface Fire {
   machineId?: string | null;
   /** §9.2c: who said "I'm away" on it (its speakers and phones stop), else null. */
   awayBy: string | null;
+  /** §7G.3: a task check-in whose working time has reached its limit (task fires only). */
+  taskTimeUp?: boolean;
 }
+
+/** §8.5a — the 💪 Enso box over every screen: a reply (and the summary once ended), or Finish's done check. */
+export type TaskSheet = { kind: 'said'; said: string; task: Task; mood?: TaskMood } | { kind: 'finish'; taskId: string };
 export interface Status {
   /** §9.2 — the server's verdict; shown as given, never re-derived here. */
   house: { state: HouseState; lastOkAt: string | null; lastFailedAt: string | null; lastError: string | null };
@@ -50,6 +56,9 @@ interface Ctx {
   /** An instant's local time, in my clock. */
   localTime: (iso: string) => string;
   memberById: (id: string) => Member | undefined;
+  /** §8.5a: the 💪 Enso box; it outlives the ringing row that answered. */
+  taskSheet: TaskSheet | null;
+  showTask: (t: TaskSheet | null) => void;
 }
 
 const AppCtx = createContext<Ctx | null>(null);
@@ -72,6 +81,7 @@ export function AppProvider({ me, onMe, children }: { me: Me; onMe: (m: Me | nul
   const [ringing, setRinging] = useState<Fire[]>([]);
   const [status, setStatus] = useState<Status | null>(null);
   const [version, setVersion] = useState(0);
+  const [taskSheet, showTask] = useState<TaskSheet | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -107,7 +117,8 @@ export function AppProvider({ me, onMe, children }: { me: Me; onMe: (m: Me | nul
     clock: (hhmm: string) => clockText(hhmm, me.clock24h),
     localTime: (iso: string) => clockText(utcToLocal(iso, settings.timezone).time, me.clock24h),
     memberById: (id: string) => members.find((m) => m.id === id),
-  }), [me, members, settings, ringing, status, version, refresh]);
+    taskSheet, showTask,
+  }), [me, members, settings, ringing, status, version, refresh, taskSheet]);
 
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
 }

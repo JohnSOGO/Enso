@@ -300,3 +300,14 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q295 | An overnight Random time window (§8.4) | ⚑ Not offered: From must be before To |
 | Q296 | Whether an admin not going may open an event (§6.3) | ⚑ Yes: admins may already change any event; the creator too |
 | Q297 | A day-sheet row someone may not open (§8.3) | ⚑ Same row with a 🔒 after the title; tapping does nothing |
+| Q298 | How many task sessions one person may have open (§7G.1) | ⚑ One; Start while one is open → 409 "You already have a task going" |
+| Q299 | A timed task's clock during a break or pause (§7G.1) | ⚑ Stops: the limit is working time, never break time |
+| Q300 | Size of "what does done look like" (§7G.2) | ⚑ Up to 8 lines of up to 80 characters; optional |
+| Q301 | A first session's defaults (§7G.2) | ⚑ Every 15 min, Phone + House (+ FunHouse for the founder), not private; later sessions start from my last one |
+| Q302 | A missed check-in (§7G.3) | ⚑ One nudge 10 min later, then it waits silently ("Waiting for you") |
+| Q303 | When an open-ended task suggests a longer break (§7G.3) | ⚑ At 90 working minutes since the start or the last break |
+| Q304 | Shorter next check-in after distracted / struggling (§7G.3) | ⚑ Offered as a button, "Check on me in 5 min" (one-off); never automatic |
+| Q305 | A break's length (§7G.3) | ⚑ 10 min unless 5 / 15 / 30 is picked or said |
+| Q306 | Where the Task buddy lives (§8.5) | ⚑ A fifth button on the Alarms tab menu, next to the other things that ring |
+| Q307 | Buttons on a task check-in's phone push (§7G.3) | ⚑ None; a tap opens its alert card with the five answers |
+| Q308 | Others seeing my task texts in Status → Recent deliveries (§7G.3, §8.6) | ⚑ Left out for everyone but the task's owner |

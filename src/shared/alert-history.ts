@@ -28,12 +28,13 @@ const KIND_SOURCE: Record<AlertKind, string> = {
 };
 
 export interface SourceFacts {
-  hasFire: boolean; kind: AlertKind | null; isAlarm: boolean; notice: string | null; messId: string | null; title: string | null;
+  hasFire: boolean; kind: AlertKind | null; isAlarm: boolean; isTask?: boolean; notice: string | null; messId: string | null; title: string | null;
 }
 
 /** Where a push came from, in the order §9.5 gives (the ping branch matches opsPingsSince, §9.4, except that a bounty
  *  push, §7B.8, and a list ping, §7A.4, also take the title branch). */
 export function alertSource(r: SourceFacts): string {
+  if (r.hasFire && r.kind === 'timer' && r.isTask) return '💪 Task buddy'; // §7G
   if (r.hasFire && r.kind) return r.kind === 'reminder' && r.isAlarm ? 'Alarm' : KIND_SOURCE[r.kind]; // ⚑ Q222
   if (r.notice) return 'Sign-in';
   if (r.messId) return 'Whose mess?';
