@@ -1045,3 +1045,5 @@ sheet posts a link, text or photo to `POST /share` with my own key; Ensō saves 
 Built as specified. Owed: his TRY on the iPhone (make the Shortcut; share a Safari link, a Notes text, a photo).
 
 **🌕 Moon phases** (v1.92.0, SPEC 3.62, §7.12, §7.2, Q345; a household member's feature request 2026-10-19 "Show the phases of the moon on the calendar"): the four principal phases (🌑🌓🌕🌗) are computed in `src/shared/moon.ts`, returned by `/calendar` as `moonPhases` and drawn as a day icon after the holiday and 📈, and as a line in the day sheet. Built as specified; built by the daily feature-request session. Owed: his TRY (look at the days around the 25th).
+
+**🎤 Opening-screen mic ask always asks** (v1.92.1, SPEC 3.63, §8.10, Q342; MojoSOGO 2026-10-19 "I still want the permission request … user must approve or deny at open screen"): the iPhone home-screen app forgets the mic, but the saved "voice on" mark hid the ask. Now the browser's answer decides and the mark counts only when it can't say; the buttons read 🎤 Allow microphone / Deny. Owed: his TRY on the iPhone.

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.62 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.63 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4139,7 +4139,7 @@ only the grey backdrop):
     subscription.
   - Tapping either explains it and how to fix it.
   - A **"🎤 Turn on voice"** badge appears while the phone can listen (§8.18) but has not yet been
-    allowed the microphone, after **Not now** on the opening screen's ask (§8.10): tapping it asks
+    allowed the microphone, after **Deny** on the opening screen's ask (§8.10): tapping it asks
     for the microphone and it goes away once allowed; refused, it stays, and tapping explains where
     to allow it. ⚑ Q342
 
@@ -4736,12 +4736,13 @@ least 0.8 s so it never flickers:
   separate and counts spec revisions.
   Nothing else — no spinner.
 - **Voice first** ⚑ Q342 (MojoSOGO 2026-10-19 "Request to use the microphone when it opens on the splash screen
-  before the rest of the app opens"): signed in, on a phone that can listen (§8.18) whose microphone is not yet
-  allowed (the browser's permission is still "ask", or it can't say and voice was never turned on on this phone), the
-  opening screen stays and shows **🎤 Turn on voice** (a green button that pulses, so it reads as one to press)
-  and **Not now** under the address, above the stamp. iOS asks for the mic only on a
-  tap, so this is that tap: it asks, and the app opens once the phone has answered. **Not now** opens the app, with
-  the header badge (§8.1) to ask later; the next opening asks again. Allowed or refused, the opening screen never
+  before the rest of the app opens"; "user must approve or deny at open screen"): signed in, on a phone that can listen
+  (§8.18) whose microphone is not allowed (the browser's permission says "ask", which an iPhone home-screen app can say
+  again at each opening; or the browser can't say and voice was never turned on on this phone), the opening screen
+  stays until the person answers: **🎤 Allow microphone** (a green button that pulses, so it reads as one to press)
+  and **Deny**, under the address, above the stamp. iOS asks for the mic only on a tap, so Allow is that tap: it asks,
+  and the app opens once the phone has answered. **Deny** opens the app without the mic, with the header badge (§8.1)
+  to ask later; the next opening asks again. When the phone already allows or refuses it, the opening screen never
   asks.
 - One source: the screen is plain HTML in `index.html`, outside the React root, so it
   appears before any script loads; the app removes it when ready (signed in or not).
