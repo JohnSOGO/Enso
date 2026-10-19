@@ -1,4 +1,4 @@
-// SPEC §7.1–7.2 — one calendar day cell: classes, stay tint, date line, weather, bar-lane gap, event marks.
+// SPEC §7.1–7.2 — one calendar day cell: classes, stay tint, date line, weather and moon corner, bar-lane gap, event marks.
 import { useApp } from '../state';
 import { dotSize, fitLines, LINE_GAP } from '../day-lines';
 import { participants } from '../participants';
@@ -31,8 +31,8 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
   const moon = data?.moonPhases ?? []; // §7.12: everyone sees it
   const items = data?.items ?? [];
   const days = items.filter((o) => !isMultiDay(o)); // multi-day events are drawn as bars
-  // §7.2 day icons beside the number: holiday, 📈, moon phase, then unassigned events' emoji (Q277); at most two.
-  const lead = [...pub.slice(0, 1), ...market.slice(0, 1), ...moon.slice(0, 1)].slice(0, 2);
+  // §7.2 day icons beside the number: holiday, 📈, then unassigned events' emoji (Q277); at most two.
+  const lead = [...pub.slice(0, 1), ...market.slice(0, 1)];
   const iconed = days.filter((o) => o.emoji && !o.assignedTo.length).slice(0, 2 - lead.length);
   const icons = [...lead, ...iconed.map((o) => ({ emoji: o.emoji! }))];
   const single = days.filter((o) => !iconed.includes(o)); // an iconed event gets no line (§7.1)
@@ -74,12 +74,13 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
         {d === 1 ? <><span className={s.monthTag}>{MONTHS[m - 1]}</span> </> : null}
         <span className={s.dot}>{d}</span>
         {icons.length > 0 && (
-          <span className={s.hEmoji} aria-hidden title={[...pub.map((h) => h.name), ...market.map((m) => m.name), ...moon.map((m) => m.name), ...iconed.map((o) => o.title)].join(', ')}>{icons.map((x) => x.emoji).join('')}</span>
+          <span className={s.hEmoji} aria-hidden title={[...pub.map((h) => h.name), ...market.map((m) => m.name), ...iconed.map((o) => o.title)].join(', ')}>{icons.map((x) => x.emoji).join('')}</span>
         )}
       </span>
-      {data?.weather && ( // §7.11: the high in its heat band, then the emoji
-        <span className={s.wx} aria-hidden title={data.weather.words}>
-          <span className={s[heatOf(data.weather.high)]}>{data.weather.high}</span>{data.weather.emoji}
+      {(data?.weather || moon.length > 0) && ( // §7.11, §7.12 bottom-right: the high in its heat band, the emoji, the moon
+        <span className={s.wx} aria-hidden title={[data?.weather?.words, ...moon.map((m) => m.name)].filter(Boolean).join(', ')}>
+          {data?.weather && <><span className={s[heatOf(data.weather.high)]}>{data.weather.high}</span>{data.weather.emoji}</>}
+          {moon.slice(0, 1).map((m) => m.emoji)}
         </span>
       )}
       {lanes > 0 && <span aria-hidden style={{ height: lanes * (barH + 1), flex: 'none' }} />}
