@@ -963,12 +963,12 @@ the helper on SogoAI (`npm run build:home`, copy to C:\Enso, restart its task).
 mid scroll and not at top where picture is largest"): `Modal` resets its body to the top after `showModal` and moves
 focus to the dialog when the auto-focused field is below the fold. Built as specified. Owed: his TRY on the iPhone.
 
-
-**🎲 Random times in a window** (v1.85.0, SPEC 3.50, §8.5c, Q319–Q322; MojoSOGO 2026-10-19 "send me random reminders
+**🎲 Random times in a window** (v1.86.0, SPEC 3.51, §8.5c, Q327–Q330; MojoSOGO 2026-10-19 "send me random reminders
 on weekdays between 8 AM and 11 AM to make an appointment to get my car checked"): a reminder's 🎲 tick swaps the When
 chips for Days + From / To; it rings once on each chosen day at a random time in the window (the §8.4 pick), until Done
 or Ack ends it (the repeat's `until` set to that day, later fires removed). Stored as an alarm with a Random window; no
 migration. PATCH takes either shape. Built as specified. Owed: his TRY on the iPhone (RW-M).
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
@@ -980,3 +980,9 @@ Deviations from this spec, deliberately:
 - Fixed while building (already reflected above): `login_failures` table; the
   reminder unique index covers only **open** fires (a closed `removed` fire must not
   block its rescheduled replacement); all-day reminders fire at 09:00 local ⚑.
+
+**📥 Send to Enso** (v1.85.0, SPEC 3.50, §7H, §8.8a, migration 0055, Q319–Q326; MojoSOGO 2026-10-19 "a Share to App
+feature that lets you send URLs, images, and text directly from your iPhone" … "Do it"): an iOS Shortcut in the Share
+sheet posts a link, text or photo to `POST /share` with my own key; Ensō saves it in the background to my 📥 Inbox
+(Lists popup) and the Shortcut shows "✅ Saved to your Enso Inbox". Set up (key + steps) is folded under the Inbox.
+Built as specified. Owed: his TRY on the iPhone (make the Shortcut; share a Safari link, a Notes text, a photo).

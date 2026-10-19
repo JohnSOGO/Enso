@@ -321,7 +321,15 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q316 | Whose After time the reminder chip uses (§8.5b) | ⚑ The one person ticked under Remind; with none or several ticked, mine |
 | Q317 | How long LM Studio keeps the snap-an-item model loaded after a photo (§7A.3) | ⚑ 24 h (`ttl` 86400 on each request); a model loaded by hand in LM Studio is not affected |
 | Q318 | Where focus goes when a popup opens and the first field is below the fold (§8 iPhone rules) | ⚑ the dialog itself, body at the top; a field already visible at the top keeps focus |
-| Q319 | How often a window reminder rings (§8.5c) | ⚑ Once on each chosen day, at a random time inside the window; unanswered, it waits silently in the Ringing bar and the next day's ring replaces it |
-| Q320 | A new window reminder's days and window (§8.5c) | ⚑ Weekdays, 8:00am–11:00am |
-| Q321 | What Done does on a window reminder (§8.5c) | ⚑ Ends it: no more days, gone from the list |
-| Q322 | Editing a window reminder (§8.5c) | ⚑ PATCH takes either shape: change the days or window, or switch between a set time and a window |
+| Q319 | Who sees an Inbox item (§7H.3) | ⚑ Only the member whose key sent it |
+| Q320 | How a shared file is known to be a photo (§7H.2) | ⚑ By its first bytes (JPEG, PNG, WebP, HEIC), never the declared type: Shortcuts may send octet-stream |
+| Q321 | A shared text with a link inside (§7H.2) | ⚑ The first link becomes the url and the whole text is kept |
+| Q322 | Size of a shared photo (§7H.2) | ⚑ Up to 12 MB, kept as sent (full-size iPhone photos, not shrunk) |
+| Q323 | A share of text and photos together (§7H.2) | ⚑ One item per photo; the text rides on the first photo |
+| Q324 | How long Inbox items stay, and Clear (§7H.3, §8.8a) | ⚑ Until cleared; ✓ Clear deletes with no ask (clearing marks it handled) |
+| Q325 | What the Shortcut receives (§7H.4) | ⚑ Images, URLs and Text; not Safari web pages (Get Images from Input would pull the page's pictures) |
+| Q326 | Where the Inbox lives (§8.8a) | ⚑ Lists popup, third, after 🎬 Movies & shows; the set-up folded at the bottom of the Inbox |
+| Q327 | How often a window reminder rings (§8.5c) | ⚑ Once on each chosen day, at a random time inside the window; unanswered, it waits silently in the Ringing bar and the next day's ring replaces it |
+| Q328 | A new window reminder's days and window (§8.5c) | ⚑ Weekdays, 8:00am–11:00am |
+| Q329 | What Done does on a window reminder (§8.5c) | ⚑ Ends it: no more days, gone from the list |
+| Q330 | Editing a window reminder (§8.5c) | ⚑ PATCH takes either shape: change the days or window, or switch between a set time and a window |

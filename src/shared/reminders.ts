@@ -70,7 +70,7 @@ export function reminderState(f: { done: boolean; ringing: boolean; openDueAt: s
 
 /** §8.5c — a window reminder's days and [from, to). */
 export interface ReminderWindow { days: Weekday[]; from: string; to: string }
-/** ⚑ Q320 — a new window: Weekdays, 8:00am–11:00am. */
+/** ⚑ Q328 — a new window: Weekdays, 8:00am–11:00am. */
 export const WINDOW_DEFAULT: ReminderWindow = { days: ['MO', 'TU', 'WE', 'TH', 'FR'], from: '08:00', to: '11:00' };
 
 /** null, or the 400 message for a window: at least one real day, then randomWindowError. */
@@ -89,7 +89,7 @@ export function nextWindowRing(ev: ReminderEvent, now: string, tz: string): stri
   return planReminderFires(ev, tz, now, addMinutes(now, 8 * 1440))[0]?.due_at ?? null;
 }
 
-/** ⚑ Q321 — Done or Ack on a window reminder's ring ends it: its repeat with `until` that day, else null. */
+/** ⚑ Q329 — Done or Ack on a window reminder's ring ends it: its repeat with `until` that day, else null. */
 export function windowEnd(
   ev: { is_alarm: number; remind_random_from: string | null; recurrence: Recurrence | null },
   fire: { kind: string; occurrence_date: string | null }, action: Action,

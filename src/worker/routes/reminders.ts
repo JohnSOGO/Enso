@@ -54,7 +54,7 @@ function toEventBody(b: Record<string, unknown>, tz: string, now: string): Recor
     const w = b.window as ReminderWindow;
     return {
       ...base, startDate: utcToLocal(now, tz).date, startTime: w.from, recurrence: { freq: 'WEEKLY', byDay: windowDays(w.days) },
-      reminder: { offsetMin: 0, channels: b.channels, renotifyMin: null, maxAlerts: 1, randomFrom: w.from, randomTo: w.to }, // ⚑ Q319
+      reminder: { offsetMin: 0, channels: b.channels, renotifyMin: null, maxAlerts: 1, randomFrom: w.from, randomTo: w.to }, // ⚑ Q327
     };
   }
   const err = reminderTimeError(b.date, b.time, tz, now);

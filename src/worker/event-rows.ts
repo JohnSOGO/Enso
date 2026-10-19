@@ -121,7 +121,7 @@ export function removeFutureFires(db: D1Database, eventId: string, now: string):
       WHERE event_id = ? AND state = 'scheduled' AND due_at > ?`).bind(now, eventId, now);
 }
 
-/** §8.5c ⚑ Q321 — Done or Ack on a window reminder's ring: its repeat ends that day and its later fires go; else none. */
+/** §8.5c ⚑ Q329 — Done or Ack on a window reminder's ring: its repeat ends that day and its later fires go; else none. */
 export async function endWindowStatements(db: D1Database, fire: { kind: string; event_id: string | null; occurrence_date: string | null }, action: Action, now: string): Promise<D1PreparedStatement[]> {
   const ev = fire.event_id ? await first<{ is_alarm: number; remind_random_from: string | null; recurrence: string | null }>(db,
     'SELECT is_alarm, remind_random_from, recurrence FROM events WHERE id = ?', fire.event_id) : null;

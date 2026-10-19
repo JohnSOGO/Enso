@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.50 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.51 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -182,7 +182,7 @@ Cloudflare Tunnel + Access**.
 | Styling | CSS Modules + CSS custom properties | Follow `C:\Users\Public\git\MOJOSOGO-PREFERENCES.md` and the `phone-ui` skill |
 | Push | Web Push (VAPID) from the Worker via **`@block65/webcrypto-web-push` 2.0.0** (pinned exactly) | WebCrypto only. Sends `Content-Encoding: aes128gcm` (RFC 8291) + `Authorization: vapid t=…, k=…` (RFC 8292) — the legacy `aesgcm` that some libraries send is refused by Apple. The 2026-10-03 spike decrypted its output under Node **and** workerd, and cross-checked it with `http_ece`. |
 | House delivery | The Worker calls Home Assistant's REST API through **Cloudflare Tunnel + Access** (§9.2) | `src/worker/house.ts`; no process at home besides HA itself. |
-| Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Seven attachments, all through `src/worker/photo-store.ts`: a thing's photo (`things/…`, §7C.3), a list item's photo (`list-items/…`, §7A.3), room-area photos (`chore-areas/…`, the prefix kept from before rooms, §7B.6), mess photos (`messes/…`, §7B.7), a bounty's picture and its done photo (`bounties/…`, `earnings/…`, §7B.8) and a recipe's picture (`recipes/…`, §7E.2b, §8.12). Private: photos are served only through the API to signed-in members. |
+| Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Eight attachments, all through `src/worker/photo-store.ts`: a thing's photo (`things/…`, §7C.3), a list item's photo (`list-items/…`, §7A.3), room-area photos (`chore-areas/…`, the prefix kept from before rooms, §7B.6), mess photos (`messes/…`, §7B.7), a bounty's picture and its done photo (`bounties/…`, `earnings/…`, §7B.8), a recipe's picture (`recipes/…`, §7E.2b, §8.12) and a shared photo in my Inbox (`inbox/…`, §7H). Private: photos are served only through the API to signed-in members. |
 | Reading photos and recipes | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4, §7A.3, §7E) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). One caller of the SDK: `src/worker/claude.ts`. A snapped list item is read by SogoAI first and by Claude only when SogoAI gives no name (§7A.3). |
 | Naming a snapped item at home | **LM Studio** on SogoAI, `http://127.0.0.1:1234/v1/chat/completions` (OpenAI-compatible), the always-loaded vision model named by `IDENTIFY_MODEL` (`qwen-uncensored`) (§7A.3) | Free. Reached only by the SogoAI helper, never by the Worker directly. |
 | Recipes from videos | **YouTube Data API v3** `videos.list?part=snippet&id=…` and `commentThreads.list?part=snippet&videoId=…&order=relevance&maxResults=20&textFormat=plainText` (§7E) | Secret `YOUTUBE_API_KEY`; 1 quota unit per call, so 2 per read ⚑ Q82. Plus an **unofficial, keyless** captions attempt (YouTube's player endpoint asked as its Android app), which may be blocked — a failure is recorded and shown, never faked. |
@@ -1000,6 +1000,15 @@ Asked by MojoSOGO 2026-10-19: each member's own After work / After school time f
 Additive, plus one data row: the founder's `after_time` = `15:30`. It runs before the deploy.
 
 Schema: [`migrations/0054_after_time.sql`](migrations/0054_after_time.sql). The migration is the schema; it is not copied here. **Migration check (RM-M2,** [`test/migration-0054.test.ts`](test/migration-0054.test.ts)**):** members before 0054 come through unset, the founder at 15:30.
+
+### 4.2zzb Schema change — `migrations/0055_share_inbox.sql`
+
+Asked by MojoSOGO 2026-10-19: Send to Enso from the iPhone Share sheet (§7H). `share_keys` holds each member's one
+Send to Enso key, as its SHA-256 only (the key is shown once). `inbox_items` holds what arrived: a url, a text and a
+photo's R2 key, each optional; its kind (photo / link / text, `INBOX_KIND`) is derived from which are set, never stored,
+so there is no CHECK list. New tables only; additive; it runs before the deploy.
+
+Schema: [`migrations/0055_share_inbox.sql`](migrations/0055_share_inbox.sql). The migration is the schema; it is not copied here. **Migration check (SH-M,** [`test/migration-0055.test.ts`](test/migration-0055.test.ts)**):** earlier members come through with no key; a key and an item can be written.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -3893,6 +3902,89 @@ Private, started now. Nothing is ever scheduled for an unfinished task by itself
 | TB-M | migration check (§4.2zz) | earlier timers and fires untouched; a task session row can be written |
 
 
+## 7H. 📥 Send to Enso — the share inbox — `src/shared/inbox.ts` (pure) — asked by MojoSOGO 2026-10-19
+
+"A Share to App feature that lets you send URLs, images, and text directly from your iPhone into your application
+without manually copying and pasting … Ideally, this happens without opening your PWA." A web app's manifest cannot
+be an iOS share target, so the door is an **iOS Shortcut** in the Share sheet that posts what it was given to Ensō.
+Ensō saves it at once, in the background, to **my own 📥 Inbox** and answers with a line the Shortcut shows as a
+notification (MojoSOGO 2026-10-19 "Do it", on auto-save then process afterward). Processing an item into a to-do,
+recipe or event is not built (§12.7); the Inbox shows, opens, copies and clears what arrived.
+
+### 7H.1 My Send to Enso key
+
+- Each member may have **one key** (`share_keys`, §4.2zzb). Only its SHA-256 is stored; the key itself
+  (`enso_` + 32 random Crockford characters) is shown **once**, when made, to be pasted into the Shortcut.
+- **Make my key** (and **Make a new key**) replaces any old key: the old one stops working at once. **Turn off**
+  deletes it. A disabled member's key never works.
+- `GET /share/key` → `{ on, createdAt }` (mine). `POST /share/key` → **201 `{ key, createdAt }`**.
+  `DELETE /share/key` → 204.
+
+### 7H.2 `POST /share` — what the Shortcut calls
+
+`Authorization: Bearer <my key>`; no session cookie. In this order:
+1. A missing or unknown key (or a disabled member's) → **401 `unauthorized`** "That Send to Enso key isn't right.
+   Make a new one in Ensō: Lists → 📥 Inbox → Set up." The key and the header are never logged or echoed.
+2. **The body**, by content type:
+   - `multipart/form-data` or `application/x-www-form-urlencoded`: every field. A string field is text. A file part
+     is a **photo** when its first bytes are a JPEG, PNG, WebP or HEIC (`photoTypeOf`, by the bytes, not the
+     declared type ⚑ Q320); a file part that is not an image but whose declared type is `text/*` is read as text;
+     anything else is skipped.
+   - `application/json`: `{ url?, text? }` strings.
+   - an image type or `application/octet-stream`: the raw body, a photo if `photoTypeOf` says so.
+   - `text/*`: the raw body as text.
+3. `shareText(strings)` (pure): the trimmed, non-empty strings. The first one that is a single `http(s)` link is the
+   **url**; the rest, joined with a blank line, are the **text**. With no such string, the first link found inside the
+   text is the url and the text is kept ⚑ Q321. → `{ url, text }` or `null` when nothing is left.
+4. Nothing to save (no text, no url, no photo) → **400 `nothing_shared`** "Nothing came through to save."
+   Text over `INBOX_TEXT_MAX = 4000` ⚑ is cut to it; a url over `INBOX_URL_MAX = 2000` → 400 `invalid_input`.
+   A photo over `INBOX_PHOTO_MAX_BYTES = 12 MB` ⚑ Q322 (a full-size iPhone photo, not shrunk) → 400 `invalid_input`
+   "The photo is too large: at most 12 MB." At most `INBOX_PHOTOS_MAX = 10` photos in one share.
+5. **Hourly limit:** at `SHARE_PER_HOUR = 60` ⚑ items of mine created in the last hour → **429 `rate_limited`**,
+   nothing written.
+6. Saved: the text/url as one item, and each photo as its own item (the text goes with the first photo when both
+   came) ⚑ Q323. Photos go to R2 under `inbox/{member}/…` (`photo-store.ts`).
+7. **201 `{ saved, items: [{ id, kind }], message }`**, `kind` = `INBOX_KIND` (`photo` / `link` / `text`, `vocab.ts`), derived, never stored (§4.2zzb),
+   `message` = "✅ Saved to your Enso Inbox" (or "✅ 3 saved to your Enso Inbox"). Every error has its `message` too,
+   so the Shortcut shows the `message` either way.
+
+### 7H.3 The Inbox — `GET /inbox`, `DELETE /inbox/{id}`, `GET /inbox/{id}/photo`
+
+- Mine only ⚑ Q319: another member's item is 404, as is a missing one.
+- `GET /inbox` → `{ items: [{ id, kind, url, text, hasPhoto, createdAt }] }`, newest first, at most 200.
+- `DELETE /inbox/{id}` → 204, and its photo goes from R2.
+- `GET /inbox/{id}/photo` → the image (`private, max-age=3600`); 404 with no photo.
+- Items stay until I clear them ⚑ Q324.
+
+### 7H.4 The Shortcut (shown in the app's Set up, §8.8a)
+
+Made by hand in the Shortcuts app; a ready-made Shortcut file cannot be handed out (Apple requires them signed).
+Steps (the app fills in this server's address and shows my key with 📋 Copy):
+1. Shortcuts → ＋ → name it **Send to Enso**. ⓘ → turn on **Show in Share Sheet**; Receive **Images, URLs and Text**
+   (not Safari web pages, which would pull the page's own pictures) ⚑ Q325.
+2. **Get Images from Input** (Shortcut Input).
+3. **If** Images **has any value**:
+   **Get Contents of URL** `{origin}/api/v1/share`, Method **POST**, Header `Authorization` = `Bearer {key}`,
+   Request Body **Form**, field `photo` (File) = Images.
+   **Otherwise:** the same, with field `text` (Text) = Shortcut Input. **End If**.
+4. **Get Dictionary Value** `message` in **If Result**. **Show Notification** Dictionary Value.
+
+### 7H.5 Acceptance (M4zc — each row is a test)
+
+| # | Check | Expected |
+|---|---|---|
+| SH1 | `shareText` | `[" https://a.b/c "]` → url only; `["see https://x.y/z ok"]` → url `https://x.y/z`, the text kept; `["https://a.b", "hi"]` → both; `["", "  "]` → null; 4001 chars → cut to 4000 |
+| SH2 | `photoTypeOf` | JPEG, PNG, WebP and HEIC headers → their types; text bytes → null |
+| SH3 | POST /share with no key; a wrong key; a disabled member's key | 401 `unauthorized` ×3; nothing written |
+| SH4 | POST /share/key, then POST /share JSON `{ url }`; form `text`; text/plain; form `photo` (a JPEG declared octet-stream) | 201 ×4 with `message`; GET /inbox lists link, text, text, photo newest first; the photo serves |
+| SH5 | a new key, then the old one | the old one 401, the new one 201 |
+| SH6 | DELETE /share/key, then POST /share | 401; GET /share/key `{ on: false }` |
+| SH7 | an empty form; a 13 MB photo; 60 items in the hour then one more | 400 `nothing_shared`; 400; 429, nothing written |
+| SH8 | another member's GET /inbox, its photo and DELETE /inbox/{id} | an empty list; 404; 404 |
+| SH9 | DELETE /inbox/{id} of mine | 204; gone from the list; its R2 object deleted |
+| SH-M | migration 0055 (§4.2zzb) | earlier members come through with no key; a key and an item can be written |
+
+
 ---
 
 ## 8. Screens
@@ -4317,12 +4409,12 @@ reminder (§8.5b) can ring at random times inside a window on chosen days instea
 
 - **The form:** under When, a tick **🎲 Random times on chosen days**. Ticked, the chips and the Date / Time boxes give
   way to **Days** (Su–Sa chips, with quick **Weekdays** and **Every day**), **From** and **To**. A new window starts on
-  Weekdays, 8:00am–11:00am ⚑ Q320. Repeat until Done is hidden: each day rings once ⚑ Q319.
+  Weekdays, 8:00am–11:00am ⚑ Q328. Repeat until Done is hidden: each day rings once ⚑ Q327.
 - **How it rings:** on each chosen day from today on, once, at a time picked inside [From, To) by
   `randomTimeIn(eventId|date)` (§8.4, the same pick as an event reminder's Random time), so a different time each day.
   An unanswered ring stays silently in the Ringing bar and the next day's ring replaces it (§5.6 `superseded`). A day
   that passes with no ring (an outage) is simply skipped: a window reminder is never **missed**.
-- **Done** (or Ack) on any day's ring ends it ⚑ Q321: the server sets its repeat's `until` to that day and closes its
+- **Done** (or Ack) on any day's ring ends it ⚑ Q329: the server sets its repeat's `until` to that day and closes its
   later scheduled fires `removed`, so no day rings again, and it leaves the list. Snooze works as on any reminder.
 - **The list row:** `🎲 Weekdays 8:00am–11:00am · Book car check · John`; days read as **Every day**, **Weekdays**,
   **Weekends**, else the short day names ("Mon Wed Fri"). The time of the next ring is not shown.
@@ -4330,7 +4422,7 @@ reminder (§8.5b) can ring at random times inside a window on chosen days instea
   From, `remind_offset_min` 0, `remind_random_from` / `remind_random_to` = the window, `renotify_min` NULL,
   `max_alerts` 1. No migration. `GET /alarms` leaves out any row with a Random window; `GET /reminders` lists it.
 - **Server checks:** at least one day; From and To both HH:MM, From before To (`randomWindowError`).
-- **Editing** (PATCH) takes either shape, so a reminder can switch between a set time and a window ⚑ Q322; it re-plans
+- **Editing** (PATCH) takes either shape, so a reminder can switch between a set time and a window ⚑ Q330; it re-plans
   like any reminder edit (§8.5b).
 
 **Acceptance (RW1–RW4 tests, RW-M manual):**
@@ -4428,6 +4520,7 @@ picker is a **popup of buttons** (a titled "Lists" modal):
 
 ┌ Lists ─────────────────────── ✕ ┐
 │ [✅ Things to do (4)] [🎬 Movies & shows (6)]│
+│ [📥 Inbox (2)]                   │
 │ [🛒 Shopping (3)]  [🎁 Wish list (5)]   │
 │ [🔨 Hardware store (1)]          │
 │ [＋ New list…]                   │
@@ -4508,6 +4601,20 @@ every 30 s while visible (§10 Freshness).
   place of the assignee chip, so it stays one line):
   weekday within the last 6 days (“Sat · Shelly”), else the date (“Sep 12 · Shelly”).
 - No due dates and no reminders on any list.
+
+### 8.8a 📥 Inbox (Lists → 📥 Inbox, §7H)
+
+- In the Lists popup, **📥 Inbox (n)** comes third, after 🎬 Movies & shows ⚑ Q326; `n` = my items.
+- Newest first, one card each: when it came (weekday and time, or the date), then the **🔗 link** (its host and path,
+  tapping opens it in a new tab), the **text** (line breaks kept), and the **photo** (a thumbnail; tap for full size).
+- Each card: **📋 Copy** (the url, else the text; a photo has none) and **✓ Clear** (`DELETE /inbox/{id}`, no ask:
+  clearing is how an item is marked handled ⚑ Q324). An empty Inbox says "Nothing here yet. Share a link, text or
+  photo from your iPhone with Send to Enso."
+- At the bottom, **📲 Set up Send to Enso** (a folded section, open when I have no key) — `InboxSetup`:
+  "Your key is on (made {date})" or "No key yet", **Make my key** / **Make a new key** (asks first when one exists:
+  "The Shortcut with the old key will stop working"), **Turn off**. A key just made shows once in a read-only box with
+  📋 Copy and "Copy it now: it is not shown again." Then the §7H.4 steps, numbered, with this server's address in
+  them, each with 📋 Copy for the address and `Bearer {key}`.
 
 ### 8.10 Installed app (PWA) and always-fresh
 
@@ -5973,6 +6080,11 @@ other push stays until I hide it ⚑ Q284.
 | DELETE | `/list-items/{id}` | creator or owner | → 204 (and its photo, §7A.3) |
 | POST | `/list-items/read-photo` | member | raw image body → `{ name, via: "sogoai" \| "claude" }` (`ItemReading`); nothing stored; 400 / 429 / 503 `photo_reading_off` / 422 `photo_refused` / 502 `photo_reading_failed` / 422 `item_unknown`, in the §7A.3 order |
 | PUT/GET/DELETE | `/list-items/{id}/photo` | GET member / PUT, DELETE creator or owner | PUT raw image body (≤ 4 MB) → 204 (replaces); GET → the image (`private, max-age=3600`); DELETE → 204; 404 when the item is gone, and GET also when it has no photo (§7A.3) |
+| POST | `/share` | **Bearer my Send to Enso key**, no cookie | form / multipart fields, JSON `{ url?, text? }`, `text/*` or a raw image → **201** `{ saved, items: [{ id, kind }], message }`; 401 `unauthorized` / 400 `nothing_shared` / 400 `invalid_input` / 429 `rate_limited` (§7H.2) |
+| GET/POST/DELETE | `/share/key` | member (mine) | GET → `{ on, createdAt }`; POST → **201** `{ key, createdAt }`, replacing any old key; DELETE → 204 (§7H.1) |
+| GET | `/inbox` | member (mine) | → `{ items: [{ id, kind, url, text, hasPhoto, createdAt }] }`, newest first, ≤ 200 (§7H.3) |
+| DELETE | `/inbox/{id}` | member (mine) | → 204, and its photo; 404 not mine or gone (§7H.3) |
+| GET | `/inbox/{id}/photo` | member (mine) | → the image (`private, max-age=3600`); 404 not mine or no photo (§7H.3) |
 | POST | `/dev/tick?now=ISO` | only if `DEV_ENDPOINTS=1` | runs `tick(db, now)` → summary |
 
 **Freshness:** there are no WebSockets. The app refetches the visible calendar range
@@ -6030,7 +6142,7 @@ Captured from v1.0-draft so nothing is lost:
 - Queued offline acks
 - Photos anywhere other than Things to do (§7C.3), list items (§7A.3), a room's areas (§7B.6), a mess
   report (§7B.7, kept at most 30 days), a bounty's picture and done photo (§7B.8, kept until paid or dropped) and a recipe's picture
-  (§7E.2b, §8.12), the only seven attachments. A picture a show is looked up from (§7F.2) is read once and never stored, so it is not one. A recipe's video
+  (§7E.2b, §8.12), and a photo sent to my Inbox (§7H.2, kept until cleared), the only eight attachments. A picture a show is looked up from (§7F.2) is read once and never stored, so it is not one. A recipe's video
   thumbnail (§7E.1) is hotlinked from YouTube — not stored, not in R2, not an attachment — so it
   is not one. Transcript screenshots (§7E.2b) are read once and never stored — not in R2, not an
   attachment — so they are not one either ⚑ Q93, except the one kept as a recipe's picture (§7E.2b ⚑ Q174),
@@ -6086,6 +6198,13 @@ Captured from v1.0-draft so nothing is lost:
 - History answers: "How much time did I spend cleaning today?", "How many tasks did I finish this week?".
 - Answering a check-in by voice on a speaker (a Home Assistant Assist intent into Enso), and spoken replies.
 - An encouragement style (calm, upbeat, playful, coach-like) and a settings page for the defaults.
+
+### 12.7 Send to Enso — follow-ups (suggested 2026-10-19, not built, need MojoSOGO's word)
+
+- Turn an Inbox item into a ✅ to-do (Fill in from this link, §7C.4b), a 🍳 recipe (§7E.6), an 📅 event (§7.9) or a
+  list item, with one tap.
+- Do that by itself as it arrives (a recipe link becomes a recipe), with a push saying what it made.
+- Share to someone else's Inbox, or to a household Inbox.
 
 ### 12.1 Next — decided with MojoSOGO (2026-10-03), spec to be written before building
 

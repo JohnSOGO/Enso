@@ -1,10 +1,10 @@
-// SPEC §7C.3, §7A.3, §7B.6, §7B.7, §7B.8, §7E.2b ⚑ Q174 — private photos in R2: the key, the put, the replace order and
+// SPEC §7C.3, §7A.3, §7B.6, §7B.7, §7B.8, §7E.2b ⚑ Q174, §7H — private photos in R2: the key, the put, the replace order and
 // the private serve. Never writes a D1 row (the caller's own write is `save`), never decides who may see a photo.
 import type { Context } from 'hono';
 import { randomBase32 } from './db';
 import { fail } from './http';
 
-export type PhotoPrefix = 'things' | 'list-items' | 'recipes' | 'chore-areas' | 'messes' | 'earnings' | 'bounties';
+export type PhotoPrefix = 'things' | 'list-items' | 'recipes' | 'chore-areas' | 'messes' | 'earnings' | 'bounties' | 'inbox';
 
 /** `{prefix}/{ownerId}/{random}.jpg`. */
 export const photoKey = (prefix: PhotoPrefix, ownerId: string) => `${prefix}/${ownerId}/${randomBase32(16).toLowerCase()}.jpg`;

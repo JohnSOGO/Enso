@@ -89,7 +89,7 @@ function ReminderForm({ reminder, onClose }: { reminder: Reminder | null; onClos
     return {
       title: reminder?.title ?? '', date: at.date, time: at.time, assignedTo: reminder?.assignedTo ?? [me.id],
       ...flagsOf(reminder?.channels, founder), renotify: reminder?.renotifyMin ?? REMINDER_RENOTIFY_DEFAULT,
-      random: !!reminder?.window, window: reminder?.window ?? WINDOW_DEFAULT, // ⚑ Q320
+      random: !!reminder?.window, window: reminder?.window ?? WINDOW_DEFAULT, // ⚑ Q328
     };
   }, [reminder, me.id, me.after.time, tz, founder]);
   const [f, setF] = useState(init);
