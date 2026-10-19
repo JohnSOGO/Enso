@@ -105,12 +105,14 @@ const VOICE_ON = 'enso.voiceOn';
 const voiceOn = () => { try { return localStorage.getItem(VOICE_ON) === '1'; } catch { return false; } };
 
 /**
- * ⚑ Q342 — "🎤 Turn on voice": `show` while the phone can listen but the mic isn't allowed yet (permission 'prompt',
- * or no permissions query and voice never turned on here); `refused` once denied; `checked` once the phone has said
- * which. ask() asks on the tap (iOS needs one). One per app: App passes it to the opening screen and the header.
+ * ⚑ Q342 — the mic ask: `show` while the phone can listen but the mic isn't allowed (the browser's permission says
+ * 'prompt', which an iPhone home-screen app can say again each opening; or, with no permissions query, voice never
+ * turned on here); `refused` once denied; `checked` once the phone has said which. ask() asks on the tap (iOS needs
+ * one). One per app: App passes it to the opening screen and the header.
  */
 export function useMicAsk() {
-  const [state, setState] = useState<PermissionState | 'unknown'>(() => (recognizerCtor() === null || voiceOn() ? 'granted' : 'unknown'));
+  const [state, setState] = useState<PermissionState | 'unknown'>(() =>
+    recognizerCtor() === null || (!navigator.permissions?.query && voiceOn()) ? 'granted' : 'unknown');
   const [checked, setChecked] = useState(() => state === 'granted' || !navigator.permissions?.query);
   useEffect(() => {
     if (checked) return;
