@@ -7,6 +7,38 @@ carry its result.
 
 ---
 
+## 2026-10-19 — steward pass after v1.93.0 (code-steward)
+
+- **Run:** post-release, v1.93.0 (weather and moon as optional calendar items, migration 0058, Q348), plus v1.92.1–v1.92.2
+  (opening-screen mic popup; weather and moon bottom-right) and the other thread's v1.92.1–v1.92.3 (Ringing bar audience,
+  audienceOf in fire-rows.ts, Q347). Ran on caeaa17 with v1.93.1 (steward fixes) in flight.
+- **Verdict:** MINOR DRIFT. Typecheck green; tests green (3 event-address failures were a concurrent package.json write,
+  green on rerun); arch:audit quiet (top EventForm.tsx 200/223, engine.ts 88%). 5 code commits, 6 matching receipts, each
+  built as placed; 0 without a receipt; the 2 Ringing-bar receipts were appended at the bottom (moved in v1.93.1).
+- **Top finding:** MED: the carried ENSO_DOES / receipts order / where-things-stand items, fixed in v1.93.1 (plus the
+  "Last updated" line).
+- **Handoffs:** 0 to reorganizer. 2 to worker: the optins.ts map row and isForMe docstring (no longer the /fires rule;
+  NEW); the 4 fragment map rows (say-reading, routes/say, EventForm, auth). 2 to placement-advisor then worker (carried):
+  log fireBuild's dropped reason; where a failed Out of scope log shows. 1 at its trigger (NEW): gate the show* calendar
+  items once in Calendar.tsx's DayData build when a 5th built-in item is asked for. Still carried: isShareKey /
+  InboxSetup apiUrl; deleteEventStatements, renotifyText, updateEventStatement.
+- **Restraint:** /fires calling sourceOf per row; alerts.ts rebuilding a FireRow; DayCell churn (layout, 106 lines);
+  useMicAsk's fast-failure edge; no PWA tests for the show* hiding; EventForm at the band edge; renumbering merges from
+  parallel threads (process).
+
+## 2026-10-19 — v1.93.1: ENSO_DOES Calendar line and 🤫 Quiet the house (placement-advisor)
+
+- **Ask:** Patch v1.93.1, SPEC §8.18 (steward backlog item 1, MojoSOGO "Fix"). ENSO_DOES's Calendar line gains public
+  holidays and days off, 📈, weather and 🌑🌓🌕🌗 moon phases, each turned on or off per person in Settings → Calendar →
+  Optional calendar items; "🔇 Quiet the house" becomes "🤫" to match the UI.
+- **Verdict:** src/worker/say-reader.ts [EXISTING]
+- **Flow stage:** rules (the prompt text the say reader sends to Claude)
+- **Why:** ENSO_DOES has one home, named by SPEC §8.18. Two string literals; no new concern, import or layer change. UI
+  emoji is 🤫 (HouseQuiet.tsx); the path exists (Settings.tsx → OptionalItems.tsx). Days off is admin-only, so the
+  wording doesn't call it a per-person switch. No test pins the strings.
+- **Caps:** say-reader.ts ~108/300. No file newly in the band.
+- **Sources read:** say-reader.ts, scripts/arch.ts, test/ grep, HouseQuiet.tsx, Alarms.tsx, Settings.tsx, OptionalItems.tsx.
+
 ## 2026-10-19 — Weather and moon as optional calendar items; tighter rows (placement-advisor)
 
 - **Ask:** Minor v1.93.0 (SPEC §7.5, §7.11, §7.12, §8.6; ⚑ Q348; MojoSOGO 2026-10-19 "Reduce spacing; add weather and
@@ -513,6 +545,51 @@ carry its result.
   fire-rows ⇄ task-rows cycle); the done-check reader joins photo-reader.ts; the reply box is cross-cutting client state.
 - **Caps:** tick.ts 115/148, alerts.ts 227/300, fire-rows.ts 202/300; new files ≤ ~190; arch:audit quiet, nothing in the
   band. Built as placed; task-replies.ts also imports time.ts (for `ms`), recorded in its ownership row.
+
+## 2026-10-19 — Ringing bar rows only for their audience: audienceOf shared by tick and /fires (placement-advisor)
+
+- **Ask:** SPEC §8.2 widens to every Ringing bar row (reminder, timer, chore, thing, machine, cooking): each shows only to its alert's audience = audience(...).push as tick step 2 computes it from sourceOf; nobody named → everyone. Follows the isForMe receipt above (MojoSOGO: "no cross contamination between users on upper alert").
+- **Verdict:** src/worker/fire-rows.ts (`audienceOf(src, activeIds)`), applied in src/worker/routes/alerts.ts fireViews; tick.ts step 2 adopts it [EXISTING]
+- **Flow stage:** rules (optins.ts audience, unchanged) → mapping (fire-rows.ts) → route view (alerts.ts)
+- **Why:** The danger is the /fires filter drifting from who actually gets pushed; the Source → AudienceInput mapping goes next to sourceOf so tick and /fires share one copy. A `fireIsFor` boolean was rejected (tick needs the full audience; it would hide a query per fire). activeMemberIds is fetched once per request. The per-row isForMe/onEventIds path in fireViews is deleted. Spec edges settled: a gone source still shows (so it can be closed); all-assigned-disabled → nobody; push does not depend on channel.
+- **Caps:** fire-rows.ts about 207/300; alerts.ts about 229/300; tick.ts about 112/148. None enters the band.
+- **Sources read:** fire-rows.ts, alerts.ts, tick.ts, optins.ts, docs/module-ownership.md, scripts/arch.ts, audience/activeMemberIds callers.
+
+## 2026-10-19 — /fires hides reminders not assigned to me: isForMe in optins.ts (placement-advisor)
+
+- **Ask:** v1.92.3 patch, SPEC §8.2 Ringing bar: GET /fires also hides a reminder fire from a member outside its audience (event assigned_to is non-empty and doesn't include them), using the same "for me" rule as audience() (§5.7, §7.5).
+- **Verdict:** `src/shared/optins.ts` (new pure `isForMe`, also used by audience's narrowing) + `src/worker/routes/alerts.ts` (fireViews selects e.assigned_to, filters with isForMe) [EXISTING]
+- **Flow stage:** rules (optins.ts) + route (alerts.ts applies it at read time)
+- **Why:** optins.ts already owns "who an event/fire is for" (isOnFor + audience with its assigned-or-everyone narrowing). One predicate shared by push recipients and the Ringing bar keeps them from drifting. Inline in alerts.ts was rejected (restates the rule in a route); a new module was rejected (same concern). audience() keeps its push order and house/funhouse results; isOnFor stays for /calendar; assignedTo does not leak into the /fires shape; Away (hideOff=false) unaffected; `?state=open` narrows too. RingingBar.tsx needs no change.
+- **Caps:** optins.ts about 33/300; alerts.ts 228/300 (no ceiling). No file newly in the warning band.
+- **Sources read:** src/shared/optins.ts, src/worker/routes/alerts.ts, scripts/arch.ts, docs/module-ownership.md, SPEC.md §8.2, isOnFor/audience usages, test/optional-events.test.ts, RingingBar.tsx.
+
+## 2026-10-19 — Moon phases (placement-advisor)
+
+- **Ask:** Compute and show the four principal moon phases on the calendar: moon.ts, /calendar moonPhases, cell icon, day sheet line (SPEC §7.12, §7.2, §10).
+- **Verdict:** src/shared/moon.ts + test/moon.test.ts [NEW row]; src/worker/routes/events.ts, frontend/src/components/Calendar.tsx, DayCell.tsx, DaySheet.tsx [EXISTING]
+- **Flow stage:** rules (moon.ts); persist/route (events.ts only returns it); render (Calendar, DayCell, DaySheet)
+- **Why:** One distinct pure concern, so a focused leaf beats widening holidays.ts or weather.ts. The route fetches the tz and returns the data, and the PWA only draws it, which keeps the rule in shared. Rejected homes: holidays.ts (a different concern with a rules table), a frontend-side computation (the PWA would re-derive what the server returns), and a new route (it is part of the /calendar payload).
+- **Caps:** events.ts about 124/147 (under the warning band); Calendar.tsx 198/300; DayCell.tsx 102/300; DaySheet.tsx 66/300; moon.ts 60/300. No CEILINGS change.
+- **Sources read:** .claude/agents/placement-advisor.md, scripts/arch.ts, arch:audit output, docs/module-ownership.md, SPEC.md §7.2 and §7.12, events.ts, DayCell.tsx.
+
+## 2026-10-19 — Popups open scrolled to the top (placement-advisor)
+
+- **Ask:** Every popup opens scrolled to the top. On iPhone, when the field showModal focused sits below a big picture, focus moves to the dialog with preventScroll (SPEC §8 iPhone rules, v1.84.2 patch, ⚑ Q318).
+- **Verdict:** `frontend/src/components/Modal.tsx` + `frontend/src/components/Modal.module.css` [EXISTING]
+- **Flow stage:** render
+- **Why:** Open-time scroll and focus are part of the one `<dialog>` primitive's concern. Modal.tsx is the only `showModal` in frontend/src, so one change covers every popup. Fixing it in each picture-bearing form (edit form, recipe) was rejected: that would put copies of the same fix in several places and let them drift apart. Props are unchanged, so the high fan-in carries no risk. Logic stays in the existing mount effect, and the error scrollIntoView effect is untouched.
+- **Caps:** Modal.tsx goes from 64 to about 75 out of 300 (GLOBAL_FILE_CAP, no CEILINGS entry). No file enters the band.
+- **Sources read:** frontend/src/components/Modal.tsx, frontend/src/components/Modal.module.css, scripts/arch.ts (caps), docs/module-ownership.md (Modal row), grep of frontend/src for showModal/<dialog.
+
+## 2026-10-19 — identify payload carries LM Studio ttl (placement-advisor)
+
+- **Ask:** SPEC §7A.3 v1.84.1 (patch, Q317 ⚑ default): `identifyPayload` also sends `ttl: IDENTIFY_TTL_S` (86400), so LM Studio keeps the vision model it loaded on demand in memory for 24 h after the last photo. The spec's max_tokens 100 is corrected to IDENTIFY_MAX_TOKENS 1024 (the code already matches).
+- **Verdict:** `home/identify.ts` (+ `test/home-identify.test.ts` SN14) [EXISTING]
+- **Flow stage:** deliver
+- **Why:** The row for `home/identify.ts` already owns the one LM Studio request and its payload fields (temperature, max_tokens). ttl is one more of those fields, so this is still one concern with no new owner. It is a delivery setting, not a decision, so src/shared/ was rejected as a home. Fan-in is the helper and its test only. The value is a named constant so it is written once.
+- **Caps:** home/identify.ts about 75/300; test/home-identify.test.ts about 88/300; no file in the warning band.
+- **Sources read:** home/identify.ts, scripts/arch.ts (caps), docs/module-ownership.md (identify row), test/home-identify.test.ts (line count).
 
 ## 2026-10-16 — tick step 1 reminder planning (reorganizer)
 
@@ -2728,48 +2805,3 @@ REORG RECEIPT
   201. Day one: green, nothing in the warning band (highest 87 %).
 - **New owners:** `scripts/arch.ts`, `scripts/arch-types.ts`, `scripts/arch-audit.ts`
   (Tooling).
-
-## 2026-10-19 — identify payload carries LM Studio ttl (placement-advisor)
-
-- **Ask:** SPEC §7A.3 v1.84.1 (patch, Q317 ⚑ default): `identifyPayload` also sends `ttl: IDENTIFY_TTL_S` (86400), so LM Studio keeps the vision model it loaded on demand in memory for 24 h after the last photo. The spec's max_tokens 100 is corrected to IDENTIFY_MAX_TOKENS 1024 (the code already matches).
-- **Verdict:** `home/identify.ts` (+ `test/home-identify.test.ts` SN14) [EXISTING]
-- **Flow stage:** deliver
-- **Why:** The row for `home/identify.ts` already owns the one LM Studio request and its payload fields (temperature, max_tokens). ttl is one more of those fields, so this is still one concern with no new owner. It is a delivery setting, not a decision, so src/shared/ was rejected as a home. Fan-in is the helper and its test only. The value is a named constant so it is written once.
-- **Caps:** home/identify.ts about 75/300; test/home-identify.test.ts about 88/300; no file in the warning band.
-- **Sources read:** home/identify.ts, scripts/arch.ts (caps), docs/module-ownership.md (identify row), test/home-identify.test.ts (line count).
-
-## 2026-10-19 — Popups open scrolled to the top (placement-advisor)
-
-- **Ask:** Every popup opens scrolled to the top. On iPhone, when the field showModal focused sits below a big picture, focus moves to the dialog with preventScroll (SPEC §8 iPhone rules, v1.84.2 patch, ⚑ Q318).
-- **Verdict:** `frontend/src/components/Modal.tsx` + `frontend/src/components/Modal.module.css` [EXISTING]
-- **Flow stage:** render
-- **Why:** Open-time scroll and focus are part of the one `<dialog>` primitive's concern. Modal.tsx is the only `showModal` in frontend/src, so one change covers every popup. Fixing it in each picture-bearing form (edit form, recipe) was rejected: that would put copies of the same fix in several places and let them drift apart. Props are unchanged, so the high fan-in carries no risk. Logic stays in the existing mount effect, and the error scrollIntoView effect is untouched.
-- **Caps:** Modal.tsx goes from 64 to about 75 out of 300 (GLOBAL_FILE_CAP, no CEILINGS entry). No file enters the band.
-- **Sources read:** frontend/src/components/Modal.tsx, frontend/src/components/Modal.module.css, scripts/arch.ts (caps), docs/module-ownership.md (Modal row), grep of frontend/src for showModal/<dialog.
-
-## 2026-10-19 — Moon phases (placement-advisor)
-
-- **Ask:** Compute and show the four principal moon phases on the calendar: moon.ts, /calendar moonPhases, cell icon, day sheet line (SPEC §7.12, §7.2, §10).
-- **Verdict:** src/shared/moon.ts + test/moon.test.ts [NEW row]; src/worker/routes/events.ts, frontend/src/components/Calendar.tsx, DayCell.tsx, DaySheet.tsx [EXISTING]
-- **Flow stage:** rules (moon.ts); persist/route (events.ts only returns it); render (Calendar, DayCell, DaySheet)
-- **Why:** One distinct pure concern, so a focused leaf beats widening holidays.ts or weather.ts. The route fetches the tz and returns the data, and the PWA only draws it, which keeps the rule in shared. Rejected homes: holidays.ts (a different concern with a rules table), a frontend-side computation (the PWA would re-derive what the server returns), and a new route (it is part of the /calendar payload).
-- **Caps:** events.ts about 124/147 (under the warning band); Calendar.tsx 198/300; DayCell.tsx 102/300; DaySheet.tsx 66/300; moon.ts 60/300. No CEILINGS change.
-- **Sources read:** .claude/agents/placement-advisor.md, scripts/arch.ts, arch:audit output, docs/module-ownership.md, SPEC.md §7.2 and §7.12, events.ts, DayCell.tsx.
-
-## 2026-10-19 — /fires hides reminders not assigned to me: isForMe in optins.ts (placement-advisor)
-
-- **Ask:** v1.92.3 patch, SPEC §8.2 Ringing bar: GET /fires also hides a reminder fire from a member outside its audience (event assigned_to is non-empty and doesn't include them), using the same "for me" rule as audience() (§5.7, §7.5).
-- **Verdict:** `src/shared/optins.ts` (new pure `isForMe`, also used by audience's narrowing) + `src/worker/routes/alerts.ts` (fireViews selects e.assigned_to, filters with isForMe) [EXISTING]
-- **Flow stage:** rules (optins.ts) + route (alerts.ts applies it at read time)
-- **Why:** optins.ts already owns "who an event/fire is for" (isOnFor + audience with its assigned-or-everyone narrowing). One predicate shared by push recipients and the Ringing bar keeps them from drifting. Inline in alerts.ts was rejected (restates the rule in a route); a new module was rejected (same concern). audience() keeps its push order and house/funhouse results; isOnFor stays for /calendar; assignedTo does not leak into the /fires shape; Away (hideOff=false) unaffected; `?state=open` narrows too. RingingBar.tsx needs no change.
-- **Caps:** optins.ts about 33/300; alerts.ts 228/300 (no ceiling). No file newly in the warning band.
-- **Sources read:** src/shared/optins.ts, src/worker/routes/alerts.ts, scripts/arch.ts, docs/module-ownership.md, SPEC.md §8.2, isOnFor/audience usages, test/optional-events.test.ts, RingingBar.tsx.
-
-## 2026-10-19 — Ringing bar rows only for their audience: audienceOf shared by tick and /fires (placement-advisor)
-
-- **Ask:** SPEC §8.2 widens to every Ringing bar row (reminder, timer, chore, thing, machine, cooking): each shows only to its alert's audience = audience(...).push as tick step 2 computes it from sourceOf; nobody named → everyone. Follows the isForMe receipt above (MojoSOGO: "no cross contamination between users on upper alert").
-- **Verdict:** src/worker/fire-rows.ts (`audienceOf(src, activeIds)`), applied in src/worker/routes/alerts.ts fireViews; tick.ts step 2 adopts it [EXISTING]
-- **Flow stage:** rules (optins.ts audience, unchanged) → mapping (fire-rows.ts) → route view (alerts.ts)
-- **Why:** The danger is the /fires filter drifting from who actually gets pushed; the Source → AudienceInput mapping goes next to sourceOf so tick and /fires share one copy. A `fireIsFor` boolean was rejected (tick needs the full audience; it would hide a query per fire). activeMemberIds is fetched once per request. The per-row isForMe/onEventIds path in fireViews is deleted. Spec edges settled: a gone source still shows (so it can be closed); all-assigned-disabled → nobody; push does not depend on channel.
-- **Caps:** fire-rows.ts about 207/300; alerts.ts about 229/300; tick.ts about 112/148. None enters the band.
-- **Sources read:** fire-rows.ts, alerts.ts, tick.ts, optins.ts, docs/module-ownership.md, scripts/arch.ts, audience/activeMemberIds callers.
