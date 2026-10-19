@@ -1,4 +1,4 @@
-// SPEC §8.5b — Alarms → 📌 Reminders: one-off reminders that ring until Done. The list (state from the server, never
+// SPEC §8.5b — Alerts → 📌 Reminders: one-off reminders that ring until Done. The list (state from the server, never
 // re-derived) and the reminder form; the chip times are whenChoice (src/shared/reminders.ts).
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';

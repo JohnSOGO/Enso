@@ -312,6 +312,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q307 | Buttons on a task check-in's phone push (§7G.3) | ⚑ None; a tap opens its alert card with the five answers |
 | Q308 | Others seeing my task texts in Status → Recent deliveries (§7G.3, §8.6) | ⚑ Left out for everyone but the task's owner |
 | Q309 | How I know my task is running (§8.1, §8.5a) | ⚑ A small 💪 on the ⏰ Alarms tab icon, and the Task buddy button's note 🟢 Working / ☕ On a break / ⏸ Paused; mine only |
+| Q310 | What "rename Alarms to Alerts" covers (§8.1, §8.5) | ⚑ The tab label, its heading and the Welcome card; the ⏰ Alarms section button inside it and Settings → 🔔 Alerts keep their names |
 | Q311 | Where one-off reminders live, and their quick times (§8.5b) | ⚑ A 📌 Reminders button first on the Alerts tab menu; chips In 1 hour · After work 5:30pm · Tonight 8pm · Tomorrow morning 8am; a new form starts on After work |
 | Q312 | How a reminder repeats until Done (§8.5b) | ⚑ Every 30 min unless 15 min or every hour is picked (also when the API is given none); 12 alerts (`REMINDER_MAX_ALERTS`), then silent in the Ringing bar until Done |
 | Q313 | Who a new reminder reminds (§8.5b) | ⚑ Me; tick others, none ticked = everyone |
