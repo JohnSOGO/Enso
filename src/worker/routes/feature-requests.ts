@@ -46,6 +46,10 @@ featureRequests.post('/feature-requests/:id/build', requireMember, async (c) => 
   if (no) return fail(c, no.code, no.code === 403 ? 'forbidden' : 'invalid_state', no.message);
   const cfg = buildFireConfigOf(c.env);
   if (!cfg) return fail(c, 503, 'build_now_off', "Build now isn't set up yet. It will be built in the morning.");
-  if (!(await fireBuild(cfg, r)).ok) return fail(c, 502, 'build_failed', "The build couldn't start. It will be built in the morning.");
+  const f = await fireBuild(cfg, r);
+  if (!f.ok) { // §8.18 part 6: the reason is an HTTP status or an error's name, never the token
+    console.error('build now not started', r.id, f.reason);
+    return fail(c, 502, 'build_failed', "The build couldn't start. It will be built in the morning.");
+  }
   return c.json({ started: true }, 202);
 });
