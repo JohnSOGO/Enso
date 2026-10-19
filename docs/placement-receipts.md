@@ -7,6 +7,35 @@ carry its result.
 
 ---
 
+## 2026-10-19 — Voice first on the opening screen: Splash.tsx (placement-advisor)
+
+- **Ask:** v1.90.2, SPEC §8.10 "Voice first" ⚑ Q342 and the revised §8.1 🎤 badge bullet: signed in, on a phone that can
+  listen with the mic not yet allowed, the opening screen stays with 🎤 Turn on voice / Not now; ask() then the app
+  opens; Not now opens it with the header badge, and the next opening asks again.
+- **Verdict:** NEW row `frontend/src/components/Splash.tsx` (the remove-timer moved out of App.tsx first by the
+  reorganizer, then the portal ask) + EXISTING `useSpeech.ts` (useMicAsk gains `checked`, exports MicAsk) and `App.tsx`
+  (one useMicAsk in App(), passed to Shell and Splash).
+- **Flow stage:** render (browser permission only; no route, rule or persist).
+- **Why:** App.tsx's row is the §8.1 frame; the splash timer was an unlisted second concern and the voice ask would add
+  more. Rejected: leaving it in App(); the ask in useSpeech.ts (speech, not a screen); state.tsx (per-phone); a second
+  useMicAsk in Splash (two states that could disagree); persisting Not now (the spec asks again next opening).
+- **Caps:** App.tsx 182 → 172 / 300; Splash.tsx new ~38 / 300; useSpeech.ts 132 → ~136 / 300. Nothing in the band.
+- **Sources read:** scripts/arch.ts; docs/module-ownership.md; docs/placement-receipts.md; SPEC.md §8.1, §8.10;
+  App.tsx; useSpeech.ts.
+
+## 2026-10-19 — opening screen timer into Splash.tsx (reorganizer)
+
+- **Trigger:** placement-advisor extract-first verdict for the upcoming opening-screen change (§8.10): its code should own
+  a file of its own rather than grow App().
+- **Seam moved:** the splash-removal effect and SPLASH_MIN_MS from `frontend/src/App.tsx` to
+  `frontend/src/components/Splash.tsx` (`<Splash ready={me !== undefined} />`, rendered once at App level after every
+  branch's body) [NEW row]
+- **Room opened:** App.tsx: 182 → 171 lines; no CEILINGS pin (under GLOBAL_FILE_CAP 300), so cap 300 → 300
+- **Behavior:** preserved — typecheck, npm test and arch:audit green; same 0.8 s minimum from page start, `.gone` then
+  remove after 300 ms, timer cleared on unmount; App still renders nothing while `/me` is loading.
+- **Restraint:** only the timer moved; index.html's #splash markup and styles, and App's sign-in / join / approve
+  branches, are untouched.
+
 ## 2026-10-19 — Ask for the microphone up front: 🎤 Turn on voice (placement-advisor)
 
 - **Ask:** v1.90.1, SPEC §8.1 status badges, ⚑ Q342. A "🎤 Turn on voice" badge shows while the phone can listen but

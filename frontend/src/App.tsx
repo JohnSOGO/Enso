@@ -16,7 +16,7 @@ import { Settings } from './components/Settings';
 import { useAlertLink } from './components/MyAlerts';
 import { RingingBar } from './components/RingingBar';
 import { EnsoButton } from './components/EnsoButton';
-import { useMicAsk } from './components/useSpeech';
+import { useMicAsk, type MicAsk } from './components/useSpeech';
 import { TaskSaid } from './components/TaskSaid';
 import { MessBanner } from './components/MessBanner';
 import { SignIn } from './components/SignIn';
@@ -27,6 +27,7 @@ import { JOIN_PATH } from '../../src/shared/invite-link';
 import type { HouseState } from '../../src/shared/vocab';
 import { Modal } from './components/Modal';
 import { PointAtLayer } from './components/PointAt';
+import { Splash } from './components/Splash';
 import s from './App.module.css';
 
 /** The bottom tab bar (§8.1): the one list of tabs — id, icon, label. */
@@ -50,7 +51,7 @@ type Overlay =
   | { kind: 'explain'; title: string; text: string }
   | null;
 
-function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: () => void; justJoined: boolean; openAlert: string | null; onAlertOpened: () => void }) {
+function Shell({ onLogout, justJoined, openAlert, onAlertOpened, mic }: { onLogout: () => void; justJoined: boolean; openAlert: string | null; onAlertOpened: () => void; mic: MicAsk }) {
   const { me, status, today } = useApp();
   const [tab, setTab] = useState<Tab>(() => {
     if (openAlert) return 'settings'; // §9.5 — a tapped notification opens its card in Settings → 🔔 Alerts
@@ -63,7 +64,6 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
 
   const house = status ? HOUSE_BADGE[status.house.state] : undefined;
   const phoneOff = status !== null && status.mySubscriptions.length === 0;
-  const mic = useMicAsk();
 
   return (
     <div className={s.app}>
@@ -136,11 +136,9 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
   );
 }
 
-/** The opening screen stays at least this long from page start (§8.10). */
-const SPLASH_MIN_MS = 800;
-
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
+  const mic = useMicAsk(); // ⚑ Q342 one mic state for the opening screen and the header badge
   useEffect(() => { get<Me>('/me').then(setMe).catch(() => setMe(null)); }, []);
   const onMe = useCallback((m: Me | null) => setMe(m), []);
   // §6.2a — the join page lives at /join#CODE; leaving it (joined, chose Sign in, or already signed in — Q20) means '/'.
@@ -154,29 +152,20 @@ export function App() {
   // §9.5 — a tapped notification's /settings/alerts?alert={id}; kept across a sign-in first (⚑ Q225).
   const [openAlert, onAlertOpened] = useAlertLink();
 
-  // SPEC §8.10: the opening screen (index.html) covers loading; it leaves once we know who this is,
-  // after at least 0.8 s from page start so it never flickers.
-  useEffect(() => {
-    if (me === undefined) return;
-    const splash = document.getElementById('splash');
-    if (!splash) return;
-    const t = setTimeout(() => {
-      splash.classList.add('gone');
-      setTimeout(() => splash.remove(), 300);
-    }, Math.max(0, SPLASH_MIN_MS - performance.now()));
-    return () => clearTimeout(t);
-  }, [me]);
+  return <>{body()}<Splash ready={me !== undefined} signedIn={!!me} mic={mic} /></>;
 
-  if (me === undefined) return null;
-  if (me === null) {
-    return joining
-      ? <JoinPage onJoined={(m) => { leaveJoin(); signedIn(m, { joined: true }); }} onSignIn={leaveJoin} />
-      : <SignIn onSignedIn={signedIn} />;
+  function body() {
+    if (me === undefined) return null;
+    if (me === null) {
+      return joining
+        ? <JoinPage onJoined={(m) => { leaveJoin(); signedIn(m, { joined: true }); }} onSignIn={leaveJoin} />
+        : <SignIn onSignedIn={signedIn} />;
+    }
+    if (approveId) return <ApproveLogin id={approveId} clock24h={me.clock24h} onDone={() => { forgetApproveRequest(); setApproveId(null); }} />;
+    return (
+      <AppProvider me={me} onMe={onMe}>
+        <Shell onLogout={() => { setJustJoined(false); setMe(null); }} justJoined={justJoined} openAlert={openAlert} onAlertOpened={onAlertOpened} mic={mic} />
+      </AppProvider>
+    );
   }
-  if (approveId) return <ApproveLogin id={approveId} clock24h={me.clock24h} onDone={() => { forgetApproveRequest(); setApproveId(null); }} />;
-  return (
-    <AppProvider me={me} onMe={onMe}>
-      <Shell onLogout={() => { setJustJoined(false); setMe(null); }} justJoined={justJoined} openAlert={openAlert} onAlertOpened={onAlertOpened} />
-    </AppProvider>
-  );
 }
