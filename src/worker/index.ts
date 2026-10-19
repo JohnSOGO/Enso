@@ -33,6 +33,8 @@ import { shows } from './routes/shows';
 import { ops } from './routes/ops';
 import { myAlerts } from './routes/my-alerts';
 import { phoneLogin } from './routes/phone-login';
+import { share } from './routes/share';
+import { inbox } from './routes/inbox';
 
 const api = new Hono<AppEnv>();
 
@@ -79,6 +81,8 @@ api.route('/', recipePhotos);
 api.route('/', shows); // §7F; /shows/look-up is registered before /shows/:id in its file
 api.route('/', ops);
 api.route('/', myAlerts); // §9.5 /me/alerts
+api.route('/', share); // §7H POST /share (Bearer key) and /share/key
+api.route('/', inbox); // §7H.3 my 📥 Inbox
 
 api.post('/dev/tick', async (c) => {
   if (c.env.DEV_ENDPOINTS !== '1') return fail(c, 404, 'not_found', 'Not found.');
