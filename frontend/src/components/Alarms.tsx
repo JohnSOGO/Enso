@@ -1,4 +1,4 @@
-// SPEC §8.5 — Alarms tab: 📢 Announce (§9.3), 🤫 Quiet the house (§9.2b), then a menu of five sections (Alarms: days of
+// SPEC §8.5 — Alarms tab: 📢 Announce (§9.3), 🤫 Quiet the house (§9.2b), then a menu of six sections (📌 Reminders §8.5b, Alarms: days of
 // week + time, Rolling timers, Washing machines, Cooking machines, 💪 Task buddy with my task's state, Q309), the tapped one in a
 // Modal. Holds which section is open.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -8,6 +8,7 @@ import { TimersSection, type Timer } from './Timers';
 import { MachinesSection } from './Machines';
 import { CookingSection } from './Cooking';
 import { Tasks } from './Tasks';
+import { RemindersSection } from './Reminders';
 import { Announce } from './Announce';
 import { HouseQuiet } from './HouseQuiet';
 import { ChannelChecks, DayChips, RenotifySelect, SHORT, channelsOf, daysText, flagsOf, pickOneWay } from './AlertFields';
@@ -145,10 +146,11 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
   );
 }
 
-type Section = 'alarms' | 'timers' | 'washing' | 'cooking' | 'tasks';
+type Section = 'reminders' | 'alarms' | 'timers' | 'washing' | 'cooking' | 'tasks';
 
 /** ⚑ Q238 — the menu under Announce and Quiet the house, as on Settings (§8.6). */
 const SECTIONS: readonly { value: Section; emoji: string; label: string }[] = [
+  { value: 'reminders', emoji: '📌', label: 'Reminders' }, // §8.5b ⚑ Q311
   { value: 'alarms', emoji: '⏰', label: 'Alarms' }, { value: 'timers', emoji: '⏱', label: 'Rolling timers' },
   { value: 'washing', emoji: '🧺', label: 'Washing machines' }, { value: 'cooking', emoji: '🍳', label: 'Cooking machines' },
   { value: 'tasks', emoji: '💪', label: 'Task buddy' }, // §7G ⚑ Q306
@@ -163,6 +165,7 @@ export function Alarms({ onEditAlarm, onEditTimer }: { onEditAlarm: (a: Alarm | 
   const entries = SECTIONS.map((x) => (x.value === 'tasks' && myTask ? { ...x, note: TASK_NOTE[myTask.state] } : x));
   const shown = SECTIONS.find((x) => x.value === open);
   const body: Record<Section, () => ReactNode> = {
+    reminders: () => <RemindersSection />,
     alarms: () => <ScheduledSection onEdit={onEditAlarm} />,
     timers: () => <TimersSection onEdit={onEditTimer} />,
     washing: () => <MachinesSection />,

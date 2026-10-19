@@ -7,6 +7,30 @@ carry its result.
 
 ---
 
+## 2026-10-19 — 📌 Reminders, one-off until Done (placement-advisor)
+
+- **Ask:** v1.83.0, SPEC §8.5b, §4.2a note, §10 /reminders rows (⚑ Q311–Q314). A reminder is an is_alarm event with
+  recurrence NULL and max_alerts REMINDER_MAX_ALERTS 12, with no migration. /reminders CRUD with a derived due /
+  ringing / missed state (done not listed), and a 400 for a time not after now. /alarms stops listing reminders.
+  whenChoice for the four chips. An Alarms-tab 📌 Reminders section with a list and a form.
+- **Verdict:** NEW `src/shared/reminders.ts` (REMINDER_MAX_ALERTS, REMINDER_RENOTIFY, WHEN_CHOICE + whenChoice,
+  reminderTimeError, reminderState); NEW `src/worker/routes/reminders.ts`; NEW `frontend/src/components/Reminders.tsx`
+  (the section and the file-local form, owning the `Reminder` shape). EXISTING `routes/alarms.ts` (SELECT_ALARMS
+  `AND e.recurrence IS NOT NULL`), `event-rows.ts` (insertEventStatement gains `isAlarm = false`), `vocab.ts`
+  (REMINDER_STATE), `index.ts` (mount), `Alarms.tsx` (📌 Reminders first in SECTIONS). No engine, tick, fire-rows or
+  delivery change; no migration.
+- **Flow stage:** rules (shared reminders.ts) → route + persist (routes/reminders.ts, event-rows.ts) → render (Reminders.tsx).
+- **Why:** the alarm shape already rings, repeats and closes on Done, so the reminder adds no new pipeline. The state
+  and the time check are decisions: pure, in shared/ (bountyStatus / taskState precedent). Rejected:
+  REMINDER_MAX_ALERTS in alert-limits.ts (input limits only; TASK_MAX_ALERTS lives in tasks.ts); state in the route;
+  folding /reminders into alarms.ts; a third inline INSERT INTO events; the form in Alarms.tsx; a separate
+  ReminderForm.tsx. Spec gap named and closed before building: an absent `renotifyMin` repeats every 30 (⚑ Q312).
+- **Caps:** alarms.ts ~123/300, event-rows.ts ~153/300, Alarms.tsx ~184/300; new reminders.ts ~50, routes/reminders.ts
+  ~105, Reminders.tsx ~150. Nothing in the band; no CEILINGS change.
+- **Reorganizer:** none needed.
+
+---
+
 ## 2026-10-19 — v1.82.1: the Alarms tab's visible label becomes "Alerts" (placement-advisor)
 
 - **Ask:** v1.82.1 patch, SPEC §8.1 / §8.5 / Welcome card, ⚑ Q310. The visible label "Alarms" becomes "Alerts" in the NAV tab bar entry (App.tsx), the tab's h1 (Alarms.tsx) and the Welcome card line (Welcome.tsx). The `'alarms'` id, code names and the inner "⏰ Alarms" section button are unchanged.

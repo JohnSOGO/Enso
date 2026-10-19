@@ -10,6 +10,7 @@ import { eventPhotos } from './routes/event-photos';
 import { optins } from './routes/optins';
 import { alerts } from './routes/alerts';
 import { alarms } from './routes/alarms';
+import { reminders } from './routes/reminders';
 import { household } from './routes/household';
 import { lists } from './routes/lists';
 import { listItems } from './routes/list-items';
@@ -56,6 +57,7 @@ api.route('/', events);
 api.route('/', optins);
 api.route('/', alerts);
 api.route('/', alarms);
+api.route('/', reminders);
 api.route('/', household);
 api.route('/', itemPhotos); // §7A.3 /list-items/read-photo and /list-items/{id}/photo
 api.route('/', lists);

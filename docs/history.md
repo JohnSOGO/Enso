@@ -943,6 +943,12 @@ shows 🟢 Working / ☕ On a break / ⏸ Paused. Built as specified. Owed: his 
 **⏰ Alerts tab** (v1.82.1, SPEC 3.45, §8.1 / §8.5, Q310; MojoSOGO 2026-10-19 "Menu rename alarms to alerts"): the
 tab bar, the tab heading and the Welcome card say Alerts. Code names and the `alarms` tab id stay. Built as specified.
 
+**📌 Reminders** (v1.83.0, SPEC 3.46, §8.5b, Q311–Q314; MojoSOGO 2026-10-19 "We need simple reminders in alerts
+section … like today after work I need to get bird food"): Alerts → 📌 Reminders lists one-off reminders; the form
+has What?, When chips (In 1 hour · After work · Tonight · Tomorrow morning) with Date + Time, Remind (me
+preselected), channels and Repeat until Done. Stored as an alarm with no repeat, so it rings through the reminder
+pipeline unchanged; no migration. Built as specified. Owed: his TRY on the iPhone (RM-M).
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

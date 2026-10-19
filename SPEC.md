@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.45 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.46 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -58,6 +58,7 @@ A calendar PWA for one household. It has three kinds of alert:
 | **Scheduled alarm** | Fires at a set time on chosen **days of the week**, every week. Not a calendar entry. | **Alerts** tab, not drawn on the calendar | "Take out trash" Tue 19:00 · "Morning meds" every day 08:00 |
 | **Chore** | A job on chosen days, **rotating** weekly between people, either *at* a time (rings) or *by* a time (quiet). It can be a **loop** of steps that hand off. | **🧹 Chores** tab: Today (tick off), All chores (set up), What done looks like from its **room** (§7B.6, §8.15) | "Laundry": start the washer → move to dryer (60 min later) → fold & put away |
 | **Rolling timer** ⚑ name | A countdown that **restarts when acknowledged**, not on a fixed clock. | **Alerts** tab | "Check on the dog", 60 min |
+| **Reminder** | A one-off: rings once at a time, then **again and again until someone taps Done** (§8.5b). A scheduled alarm with no repeat. | **Alerts** tab → 📌 Reminders | "Get bird food" today after work |
 
 **Why scheduled alarms are not calendar events:** a daily alarm drawn on the
 calendar puts the same chip on every single day and buries the real events. Alarms
@@ -424,6 +425,9 @@ Notes on it:
 An alarm row always has: `start_time` set (never all-day), `recurrence =
 {"freq":"WEEKLY","byDay":[...]}` with at least one day, `remind_offset_min = 0`,
 `start_date` = the local date it was created, `end_date = start_date`.
+
+A **reminder** (§8.5b) is the same row with `recurrence` NULL: `start_date` / `start_time` = when it first rings,
+`max_alerts = REMINDER_MAX_ALERTS`. No schema change.
 
 ### 4.2b Schema change — `migrations/0003_days_off.sql`
 
@@ -4076,7 +4080,7 @@ success the box closes (there is no toast in the app). What happens is §9.3.
 Right under it, **🤫 Quiet the house** (§9.2b): 1 hour · 2 hours · 4 hours · Rest of today, or, while quiet,
 how long is left, who set it, and **Turn off now**.
 
-Then a **menu of five buttons**, the same grid as Settings (§8.6, `PickGrid`) ⚑ (Q238): **⏰ Alarms**,
+Then a **menu of six buttons**, the same grid as Settings (§8.6, `PickGrid`) ⚑ (Q238): **📌 Reminders** (§8.5b ⚑ Q311), **⏰ Alarms**,
 **⏱ Rolling timers**, **🧺 Washing machines**, **🍳 Cooking machines**, **💪 Task buddy** (§7G, §8.5a ⚑ Q306). Asked by MojoSOGO 2026-10-11 ("alarms needs its own modal";
 then "have two machines buttons; washing machines; cooking machines and move cooking to that new button"). A tap opens
 that section in a modal titled with its emoji and name; ✕, Escape or a tap outside closes it back to the tab. An
@@ -4090,16 +4094,16 @@ tab in v1.28.0 (§8.15).
 Alarms
 [ 📢 Announce ]
 🤫 Quiet the house  [1 hour] [2 hours] [4 hours] [Rest of today]
-[ ⏰ Alarms           ] [ ⏱ Rolling timers  ]
-[ 🧺 Washing machines ] [ 🍳 Cooking machines ]
-[ 💪 Task buddy      ]
+[ 📌 Reminders        ] [ ⏰ Alarms          ]
+[ ⏱ Rolling timers   ] [ 🧺 Washing machines ]
+[ 🍳 Cooking machines ] [ 💪 Task buddy      ]
 ```
 
 **Acceptance (AM1–AM3, manual on the iPhone at 320 px):** AM1 the tab shows Announce, Quiet the house and the
 four buttons; AM2 each button opens its section titled with its name, and closing returns to the tab; AM3 ＋ Add
 or a row opens its form over the section, and Save or Cancel returns to the section with the list up to date.
 
-**⏰ Alarms** (scheduled) — one row per alarm, sorted by time of day, then title:
+**⏰ Alarms** (scheduled) — one row per alarm (an alarm with days; reminders, §8.5b, are not listed here), sorted by time of day, then title:
 
 ```
 Time   Alarm                    Days            Next
@@ -4239,6 +4243,47 @@ Time      Chore            Days        This week
   - Channels (☐ Phone ☐ House) · Repeat alert every (Off / 5 / 10 / 15 / 30 min) ·
     Save / Cancel / Delete (creator or owner, like alarms). Delete asks "Delete chore "{title}" and what
     done looks like for it?" (§7B.6).
+
+### 8.5b 📌 Reminders — one-off, until Done (Alerts → 📌 Reminders) — asked by MojoSOGO 2026-10-19
+
+"We need simple reminders in alerts section. Basically something needs to get done and send reminders… like today
+after work I need to get bird food." Event reminders (§8.4, Every hour) and every day lists (§7A.4) could do it, but
+both hide inside something else. A reminder is the plain one-off.
+
+- **What it is:** a scheduled alarm (§4.2a) with no repeat, so it rings through the reminder pipeline unchanged:
+  push `"Reminder: Get bird food"`, the Ringing bar's **Done** / **Snooze**, repeats, phone first (§9.2d), Away (§9.2c),
+  Quiet (§9.2b), My alerts (§9.5). `max_alerts` = `REMINDER_MAX_ALERTS` (12 ⚑ Q312); after the last alert it stays in the
+  Ringing bar silently until Done (§5.3). Nothing new in the engine or the tick.
+- **Done** (any member, §5.4) closes the fire; the reminder leaves the list and never rings again.
+- **The list** (soonest first): `Today 5:30pm · Get bird food · Shelly`; the day is **Today**, **Tomorrow**, or the short
+  weekday and date ("Thu Oct 22"); a red **ringing** badge while it rings; a dim **missed** when its time passed with no
+  alert (an outage longer than §5.2 `MISSED_AFTER_MIN`). The names are the people it reminds, none = Everyone. A done
+  reminder is not listed. **＋ Add** at the top; tapping a row opens its form.
+- **The form** ("New reminder" / "Edit reminder"):
+  - **What?** — one line, required, up to `ALERT_TITLE_MAX` ("Get bird food").
+  - **When** — quick chips **In 1 hour** · **After work** (5:30pm) · **Tonight** (8pm) · **Tomorrow morning** (8am) ⚑ Q311,
+    then a **Date** and a **Time** box showing the pick, both editable. A chip picks its next time: today while it is
+    still ahead, else tomorrow (Tomorrow morning: always tomorrow; In 1 hour: now + 60 min, up to the next 5 minutes). A new form starts on After work.
+  - **Remind** — member chips, **me** preselected ⚑ Q313; none ticked = everyone.
+  - The channel ticks (`ChannelChecks`, defaults as an alarm's).
+  - **Repeat until Done** — Every 15 min / **Every 30 min** / Every hour ⚑ Q312. A POST with no `renotifyMin` repeats every 30 min too.
+  - Save / Cancel; on an existing one **Delete** (asks once). Creator or admin may change it (§6.3), like alarms.
+- The server refuses a time that is not after now: 400 "Pick a time later than now." ⚑ Q314. An edit re-plans like an
+  alarm edit (§5.6); editing a missed one to a later time makes it due again.
+- **Code:** the `/reminders` route and the form/list follow the placement receipt (`docs/placement-receipts.md`); the
+  chip times are `whenChoice` (§0.3 pure).
+
+**Acceptance (RM1–RM6 tests, RM-M manual):**
+
+| # | Check | Expected |
+|---|---|---|
+| RM1 | POST /reminders `{ title, date, time, channels, renotifyMin, assignedTo }` then GET /reminders and GET /alarms | 201; listed with `state: 'due'`, `dueAt` = that local time in UTC; GET /alarms leaves it out |
+| RM2 | ticks at the due time, +30 min | alert 1 `"Reminder: Get bird food"` to the reminded member only; alert 2 at +30 |
+| RM3 | Done on its fire, then a tick a day later | GET /reminders leaves it out; no new fire |
+| RM4 | POST a past time; a blank title; PATCH by another non-admin member | 400; 400; 403 |
+| RM5 | PATCH a missed reminder to a later time; DELETE | `state: 'due'` at the new time; gone from the list, its scheduled fire closed `removed` |
+| RM6 | `whenChoice` at 14:00 / 19:00 / 21:00 local | After work → today 17:30 / tomorrow 17:30; Tonight → today 20:00 / today 20:00 / tomorrow 20:00; In 1 hour 14:02 → 15:05; Tomorrow morning → tomorrow 08:00 |
+| RM-M | on the iPhone at 320 px | Alerts → 📌 Reminders → ＋ Add, After work, Save; the push comes at 5:30pm and again every 30 min; Done in the Ringing bar clears it from the list |
 
 ### 8.5a 💪 Task buddy (Alerts → 💪 Task buddy, §7G)
 
@@ -5776,6 +5821,9 @@ other push stays until I hide it ⚑ Q284.
 | GET | `/alarms` | member | → alarms: `{ id, title, time, days: Weekday[], channels, renotifyMin, assignedTo, createdBy, nextDueAt, ringing }` |
 | POST | `/alarms` | member | `{ title, time: "HH:MM", days: Weekday[], channels, renotifyMin?, assignedTo? }` → alarm |
 | PATCH/DELETE | `/alarms/{id}` | creator or owner | same fields as POST, all optional; closes future scheduled fires like an event edit |
+| GET | `/reminders` | member | → open reminders (§8.5b), soonest first: `{ id, title, date, time, channels, renotifyMin, assignedTo, createdBy, state: 'due' \| 'ringing' \| 'missed', dueAt }` (`dueAt` = the open fire's due time, else the reminder's own) |
+| POST | `/reminders` | member | `{ title, date, time: "HH:MM", channels, renotifyMin?, assignedTo? }` → reminder (201); 400 when not after now |
+| PATCH/DELETE | `/reminders/{id}` | creator or owner | POST fields, all optional, merged; re-plans like an alarm edit |
 | GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Clothes washer") and `personId` = the load's owner (a cooking timer's fire: its label, §7D.8); every fire carries `awayBy` (§9.2c) |
 | GET | `/machines` | member | → `Machine[]` in load order: `{ id, label, state: MachineState, ownerId, minutes, startedAt, doneAt, startedBy, next }` (`state` derived by the server, §7D.1; `next` = the next machine's id or null) |
 | POST | `/machines/{id}/start` | member | `{ ownerId, minutes, alertId? }` (§7D.7) → `Machine[]`; 409 `busy` when not free (§7D.2) |
