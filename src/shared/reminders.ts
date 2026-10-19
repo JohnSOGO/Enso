@@ -1,7 +1,10 @@
 // SPEC §8.5b — one-off reminders: an alarm with no repeat that rings until Done. The When chips, the "later than
-// now" check and the listed state. Pure: `now` and `tz` are always passed in.
-import { AFTER_KIND, isOneOf, type AfterKind, type ReminderState } from './vocab';
+// now" check and the listed state; §8.5c — random times in a window on chosen days. Pure: `now` and `tz` are always passed in.
+import { AFTER_KIND, WEEKDAY, isOneOf, type Action, type AfterKind, type ReminderState, type Weekday } from './vocab';
 import { addDays, addMinutes, isDate, isTime, iso, localToUtc, ms, utcToLocal } from './time';
+import { randomWindowError } from './random-time';
+import { planReminderFires, type ReminderEvent } from './engine';
+import type { Recurrence } from './recurrence';
 
 /** ⚑ Q312 — alerts before it waits silently in the Ringing bar until Done. */
 export const REMINDER_MAX_ALERTS = 12;
@@ -57,10 +60,41 @@ export function reminderTimeError(date: unknown, time: unknown, tz: string, now:
   return ms(localToUtc(date, time, tz)) > ms(now) ? null : 'Pick a time later than now.';
 }
 
-/** The listed state from the fire facts, or null for a done reminder (not listed). */
-export function reminderState(f: { done: boolean; ringing: boolean; openDueAt: string | null; startAt: string }, now: string): ReminderState | null {
+/** The listed state from the fire facts, or null for a done reminder (not listed). A window (§8.5c) is never missed. */
+export function reminderState(f: { done: boolean; ringing: boolean; openDueAt: string | null; startAt: string; window?: boolean }, now: string): ReminderState | null {
   if (f.done) return null;
   if (f.ringing) return 'ringing';
-  if (f.openDueAt || ms(f.startAt) > ms(now)) return 'due';
+  if (f.openDueAt || f.window || ms(f.startAt) > ms(now)) return 'due';
   return 'missed';
+}
+
+/** §8.5c — a window reminder's days and [from, to). */
+export interface ReminderWindow { days: Weekday[]; from: string; to: string }
+/** ⚑ Q328 — a new window: Weekdays, 8:00am–11:00am. */
+export const WINDOW_DEFAULT: ReminderWindow = { days: ['MO', 'TU', 'WE', 'TH', 'FR'], from: '08:00', to: '11:00' };
+
+/** null, or the 400 message for a window: at least one real day, then randomWindowError. */
+export function windowError(w: unknown): string | null {
+  if (!w || typeof w !== 'object') return 'Random times need days and a From and To time.';
+  const x = w as Record<string, unknown>;
+  if (!Array.isArray(x.days) || x.days.length === 0 || !x.days.every((d) => isOneOf(WEEKDAY, d))) return 'Pick at least one day.';
+  return isTime(x.from) && isTime(x.to) ? randomWindowError(x.from, x.to) : 'Random times need a From and a To time (HH:MM).';
+}
+
+/** The days in week order, each once. */
+export const windowDays = (days: Weekday[]): Weekday[] => WEEKDAY.filter((d) => days.includes(d));
+
+/** §8.5c — the next ring the tick will plan: the same planReminderFires pick, over the next 8 days; null when none. */
+export function nextWindowRing(ev: ReminderEvent, now: string, tz: string): string | null {
+  return planReminderFires(ev, tz, now, addMinutes(now, 8 * 1440))[0]?.due_at ?? null;
+}
+
+/** ⚑ Q329 — Done or Ack on a window reminder's ring ends it: its repeat with `until` that day, else null. */
+export function windowEnd(
+  ev: { is_alarm: number; remind_random_from: string | null; recurrence: Recurrence | null },
+  fire: { kind: string; occurrence_date: string | null }, action: Action,
+): Recurrence | null {
+  if (fire.kind !== 'reminder' || !ev.is_alarm || !ev.remind_random_from || !ev.recurrence || !fire.occurrence_date) return null;
+  if (action !== 'done' && action !== 'ack') return null;
+  return { ...ev.recurrence, until: fire.occurrence_date };
 }

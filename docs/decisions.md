@@ -329,3 +329,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q324 | How long Inbox items stay, and Clear (§7H.3, §8.8a) | ⚑ Until cleared; ✓ Clear deletes with no ask (clearing marks it handled) |
 | Q325 | What the Shortcut receives (§7H.4) | ⚑ Images, URLs and Text; not Safari web pages (Get Images from Input would pull the page's pictures) |
 | Q326 | Where the Inbox lives (§8.8a) | ⚑ Lists popup, third, after 🎬 Movies & shows; the set-up folded at the bottom of the Inbox |
+| Q327 | How often a window reminder rings (§8.5c) | ⚑ Once on each chosen day, at a random time inside the window; unanswered, it waits silently in the Ringing bar and the next day's ring replaces it |
+| Q328 | A new window reminder's days and window (§8.5c) | ⚑ Weekdays, 8:00am–11:00am |
+| Q329 | What Done does on a window reminder (§8.5c) | ⚑ Ends it: no more days, gone from the list |
+| Q330 | Editing a window reminder (§8.5c) | ⚑ PATCH takes either shape: change the days or window, or switch between a set time and a window |

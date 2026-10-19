@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.50 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.51 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -58,7 +58,7 @@ A calendar PWA for one household. It has three kinds of alert:
 | **Scheduled alarm** | Fires at a set time on chosen **days of the week**, every week. Not a calendar entry. | **Alerts** tab, not drawn on the calendar | "Take out trash" Tue 19:00 · "Morning meds" every day 08:00 |
 | **Chore** | A job on chosen days, **rotating** weekly between people, either *at* a time (rings) or *by* a time (quiet). It can be a **loop** of steps that hand off. | **🧹 Chores** tab: Today (tick off), All chores (set up), What done looks like from its **room** (§7B.6, §8.15) | "Laundry": start the washer → move to dryer (60 min later) → fold & put away |
 | **Rolling timer** ⚑ name | A countdown that **restarts when acknowledged**, not on a fixed clock. | **Alerts** tab | "Check on the dog", 60 min |
-| **Reminder** | A one-off: rings once at a time, then **again and again until someone taps Done** (§8.5b). A scheduled alarm with no repeat. | **Alerts** tab → 📌 Reminders | "Get bird food" today after work |
+| **Reminder** | A one-off: rings once at a time, then **again and again until someone taps Done** (§8.5b). A scheduled alarm with no repeat. Or random times inside a window on chosen days until Done (§8.5c). | **Alerts** tab → 📌 Reminders | "Get bird food" today after work |
 
 **Why scheduled alarms are not calendar events:** a daily alarm drawn on the
 calendar puts the same chip on every single day and buries the real events. Alarms
@@ -4402,6 +4402,39 @@ both hide inside something else. A reminder is the plain one-off.
 | RM6 | `whenChoice` at 14:00 / 19:00 / 21:00 local | After work → today 17:30 / tomorrow 17:30; Tonight → today 20:00 / today 20:00 / tomorrow 20:00; In 1 hour 14:02 → 15:05; Tomorrow morning → tomorrow 08:00 |
 | RM-M | on the iPhone at 320 px | Alerts → 📌 Reminders → ＋ Add, After work, Save; the push comes at 5:30pm and again every 30 min; Done in the Ringing bar clears it from the list |
 
+### 8.5c 🎲 Random times in a window — on chosen days, until Done — asked by MojoSOGO 2026-10-19
+
+"Send me random reminders on weekdays between 8 AM and 11 AM to make an appointment to get my car checked." A
+reminder (§8.5b) can ring at random times inside a window on chosen days instead of once at a set time.
+
+- **The form:** under When, a tick **🎲 Random times on chosen days**. Ticked, the chips and the Date / Time boxes give
+  way to **Days** (Su–Sa chips, with quick **Weekdays** and **Every day**), **From** and **To**. A new window starts on
+  Weekdays, 8:00am–11:00am ⚑ Q328. Repeat until Done is hidden: each day rings once ⚑ Q327.
+- **How it rings:** on each chosen day from today on, once, at a time picked inside [From, To) by
+  `randomTimeIn(eventId|date)` (§8.4, the same pick as an event reminder's Random time), so a different time each day.
+  An unanswered ring stays silently in the Ringing bar and the next day's ring replaces it (§5.6 `superseded`). A day
+  that passes with no ring (an outage) is simply skipped: a window reminder is never **missed**.
+- **Done** (or Ack) on any day's ring ends it ⚑ Q329: the server sets its repeat's `until` to that day and closes its
+  later scheduled fires `removed`, so no day rings again, and it leaves the list. Snooze works as on any reminder.
+- **The list row:** `🎲 Weekdays 8:00am–11:00am · Book car check · John`; days read as **Every day**, **Weekdays**,
+  **Weekends**, else the short day names ("Mon Wed Fri"). The time of the next ring is not shown.
+- **Stored as** an alarm event (§4.2a) with `recurrence` WEEKLY on the days, `start_date` = today, `start_time` =
+  From, `remind_offset_min` 0, `remind_random_from` / `remind_random_to` = the window, `renotify_min` NULL,
+  `max_alerts` 1. No migration. `GET /alarms` leaves out any row with a Random window; `GET /reminders` lists it.
+- **Server checks:** at least one day; From and To both HH:MM, From before To (`randomWindowError`).
+- **Editing** (PATCH) takes either shape, so a reminder can switch between a set time and a window ⚑ Q330; it re-plans
+  like any reminder edit (§8.5b).
+
+**Acceptance (RW1–RW4 tests, RW-M manual):**
+
+| # | Check | Expected |
+|---|---|---|
+| RW1 | POST /reminders `{ title, window: { days: [MO..FR], from: '08:00', to: '11:00' }, channels }` then GET /reminders and GET /alarms | 201; listed with its `window`, `state: 'due'`, `dueAt` inside 08:00–11:00 local on the next weekday still ahead; GET /alarms leaves it out |
+| RW2 | ticks across a Monday and a Tuesday | one alert each day, at a time inside the window, the two times from `randomTimeIn`; Tuesday's ring supersedes Monday's unanswered one |
+| RW3 | Done on Monday's ring, then ticks through Wednesday | GET /reminders leaves it out; the event's `until` = Monday; no new fire, Tuesday's planned fire closed `removed` |
+| RW4 | POST a window with no days; From after To | 400; 400 |
+| RW-M | on the iPhone at 320 px | Alerts → 📌 Reminders → ＋ Add, tick 🎲, Weekdays 8–11, Save; a push comes once between 8 and 11 on the next weekday; Done clears it |
+
 ### 8.5a 💪 Task buddy (Alerts → 💪 Task buddy, §7G)
 
 The modal shows **my** session only; nobody else's sessions are shown anywhere.
@@ -5953,9 +5986,9 @@ other push stays until I hide it ⚑ Q284.
 | GET | `/alarms` | member | → alarms: `{ id, title, time, days: Weekday[], channels, renotifyMin, assignedTo, createdBy, nextDueAt, ringing }` |
 | POST | `/alarms` | member | `{ title, time: "HH:MM", days: Weekday[], channels, renotifyMin?, assignedTo? }` → alarm |
 | PATCH/DELETE | `/alarms/{id}` | creator or owner | same fields as POST, all optional; closes future scheduled fires like an event edit |
-| GET | `/reminders` | member | → open reminders (§8.5b), soonest first: `{ id, title, date, time, channels, renotifyMin, assignedTo, createdBy, state: 'due' \| 'ringing' \| 'missed', dueAt }` (`dueAt` = the open fire's due time, else the reminder's own) |
-| POST | `/reminders` | member | `{ title, date, time: "HH:MM", channels, renotifyMin?, assignedTo? }` → reminder (201); 400 when not after now |
-| PATCH/DELETE | `/reminders/{id}` | creator or owner | POST fields, all optional, merged; re-plans like an alarm edit |
+| GET | `/reminders` | member | → open reminders (§8.5b), soonest first: `{ id, title, date, time, channels, renotifyMin, assignedTo, createdBy, state: 'due' \| 'ringing' \| 'missed', dueAt, window: { days: Weekday[], from, to } \| null }` (`dueAt` = the open fire's due time, else the reminder's own; a window's next ring, §8.5c) |
+| POST | `/reminders` | member | `{ title, date, time: "HH:MM", channels, renotifyMin?, assignedTo? }` or `{ title, window: { days, from, to }, channels, assignedTo? }` (§8.5c) → reminder (201); 400 when not after now, or a bad window |
+| PATCH/DELETE | `/reminders/{id}` | creator or owner | POST fields, all optional, merged; either shape (`window: null` back to a set time, §8.5c); re-plans like an alarm edit |
 | GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Clothes washer") and `personId` = the load's owner (a cooking timer's fire: its label, §7D.8); every fire carries `awayBy` (§9.2c) |
 | GET | `/machines` | member | → `Machine[]` in load order: `{ id, label, state: MachineState, ownerId, minutes, startedAt, doneAt, startedBy, next }` (`state` derived by the server, §7D.1; `next` = the next machine's id or null) |
 | POST | `/machines/{id}/start` | member | `{ ownerId, minutes, alertId? }` (§7D.7) → `Machine[]`; 409 `busy` when not free (§7D.2) |

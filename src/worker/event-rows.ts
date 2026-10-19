@@ -1,14 +1,15 @@
 // SPEC §4.2 — the event row: its shape, its wire view, input validation, and the
 // insert / remove-future-fires statements shared by the events, alarms and things routes,
 // and every read/write of event_optins (§7.5 — who has an optional event on).
-import { CHANNEL, isOneOf, type Channel, type SunEvent } from '../shared/vocab';
+import { CHANNEL, isOneOf, type Action, type Channel, type SunEvent } from '../shared/vocab';
 import { isDate, isTime } from '../shared/time';
 import { recurrenceError, type Recurrence } from '../shared/recurrence';
 import { emojiError } from '../shared/emoji';
 import { ALERT_TITLE_MAX, EVENT_ADDRESS_MAX, EVENT_BRING_ITEM_MAX, EVENT_BRING_MAX } from '../shared/alert-limits';
 import { cleanBring } from '../shared/bring';
 import { randomWindowError } from '../shared/random-time';
-import { all, parseJson } from './db';
+import { windowEnd } from '../shared/reminders';
+import { all, first, parseJson } from './db';
 import { intIn, optStr, str } from './http';
 
 export interface EventRow {
@@ -118,6 +119,18 @@ export function removeFutureFires(db: D1Database, eventId: string, now: string):
   return db.prepare(
     `UPDATE fires SET state = 'closed', close_reason = 'removed', closed_at = ?
       WHERE event_id = ? AND state = 'scheduled' AND due_at > ?`).bind(now, eventId, now);
+}
+
+/** §8.5c ⚑ Q329 — Done or Ack on a window reminder's ring: its repeat ends that day and its later fires go; else none. */
+export async function endWindowStatements(db: D1Database, fire: { kind: string; event_id: string | null; occurrence_date: string | null }, action: Action, now: string): Promise<D1PreparedStatement[]> {
+  const ev = fire.event_id ? await first<{ is_alarm: number; remind_random_from: string | null; recurrence: string | null }>(db,
+    'SELECT is_alarm, remind_random_from, recurrence FROM events WHERE id = ?', fire.event_id) : null;
+  const until = ev && windowEnd({ ...ev, recurrence: parseJson<Recurrence | null>(ev.recurrence, null) }, fire, action);
+  if (!until) return [];
+  return [
+    db.prepare('UPDATE events SET recurrence = ?, updated_at = ? WHERE id = ?').bind(JSON.stringify(until), now, fire.event_id),
+    removeFutureFires(db, fire.event_id!, now),
+  ];
 }
 
 /** One new event row — POST /events, Plan it (§7C.2) with its `thingId`, and a reminder (§8.5b) with `isAlarm`. */
