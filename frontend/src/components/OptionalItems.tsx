@@ -1,4 +1,4 @@
-// SPEC §8.6, §7.5 — Settings → 📅 Calendar: the built-in Public holidays and 📈 rows,
+// SPEC §8.6, §7.5 — Settings → 📅 Calendar: the built-in Public holidays, 📈, Weather and Moon phases rows,
 // then each optional event, how it repeats, and this member's own On switch.
 import { useEffect, useState, type ReactNode } from 'react';
 import { del, errorText, get, patch, put } from '../api';
@@ -24,14 +24,14 @@ export function OptionalItems() {
     setRows((rs) => rs && rs.map((x) => (x.id === e.id ? { ...x, on } : x)));
     refresh(); // the calendar and the Ringing bar follow at once
   });
-  const setPref = (key: 'showPublicHolidays' | 'showOptionsExpiration', on: boolean) =>
+  const setPref = (key: 'showPublicHolidays' | 'showOptionsExpiration' | 'showWeather' | 'showMoon', on: boolean) =>
     run(async () => { await patch('/me', { [key]: on }); refresh(); });
 
   const line = (key: string, label: string, title: ReactNode, on: boolean, onChange: (on: boolean) => void) => (
     <tr key={key}>
-      <th scope="row" className={s.flexible} title={label}>{title}</th>
-      <td className={s.rigid}>
-        <label className="row" style={{ minHeight: 44 }}>
+      <th scope="row" className={s.flexible} style={{ padding: '2px 6px' }} title={label}>{title}</th>
+      <td className={s.rigid} style={{ padding: '2px 6px' }}>
+        <label className="row" style={{ minHeight: 32 }}>
           <input type="checkbox" checked={on} disabled={busy} aria-label={`${label}: on for me`}
             onChange={(ev) => onChange(ev.target.checked)} /> On
         </label>
@@ -48,6 +48,8 @@ export function OptionalItems() {
         <tbody>
           {line('public', 'Public holidays', 'Public holidays', !!me.showPublicHolidays, (on) => setPref('showPublicHolidays', on))}
           {line('market', 'Monthly options expiration', '📈 Monthly options expiration', !!me.showOptionsExpiration, (on) => setPref('showOptionsExpiration', on))}
+          {line('weather', 'Weather', '🌤️ Weather', !!me.showWeather, (on) => setPref('showWeather', on))}
+          {line('moon', 'Moon phases', '🌕 Moon phases', !!me.showMoon, (on) => setPref('showMoon', on))}
           {rows?.map((e) => line(e.id, e.title, <>
             {e.emoji && `${e.emoji} `}{e.title} <span className="muted" style={{ fontWeight: 400 }}>· {repeatText(e.recurrence, e.startDate)}</span>
           </>, e.on, (on) => toggle(e, on)))}

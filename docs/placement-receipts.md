@@ -7,6 +7,23 @@ carry its result.
 
 ---
 
+## 2026-10-19 — Weather and moon as optional calendar items; tighter rows (placement-advisor)
+
+- **Ask:** Minor v1.93.0 (SPEC §7.5, §7.11, §7.12, §8.6; ⚑ Q348; MojoSOGO 2026-10-19 "Reduce spacing; add weather and
+  moon as optional"). Migration 0058 adds member_prefs.show_weather / show_moon (DEFAULT 1); PATCH /me accepts
+  showWeather / showMoon and memberView returns them; OptionalItems gets 🌤️ Weather and 🌕 Moon phases rows after 📈
+  with 32px rows; DayCell and DaySheet hide weather / moon when off. AREC: BUILD (arec-weather-moon-optional.md).
+- **Verdict:** migrations/0058 + src/worker/routes/auth.ts + frontend/src/state.tsx, components/OptionalItems.tsx,
+  DayCell.tsx, DaySheet.tsx [EXISTING]
+- **Flow stage:** persist (prefs) + route (the /me boolean loop) + render (switches and hiding)
+- **Why:** Same shape as showPublicHolidays / showOptionsExpiration: the existing loop, view and phone-side gate take it
+  with no new mechanism. A server-side /calendar filter was rejected (holidays filter on the phone; two ways would split
+  the pattern); a separate prefs module would duplicate /me. The fields stay numbers like the other show* flags. In
+  DayCell the moon shares the .wx group (Q346), so each half is gated on its own.
+- **Caps:** auth.ts ~190/300, state.tsx ~130, OptionalItems.tsx ~61, DayCell.tsx ~106, DaySheet.tsx ~68. None in band.
+- **Sources read:** the AREC, scripts/arch.ts, docs/module-ownership.md, this file (head), auth.ts, show* usages,
+  migrations/005*, the test list.
+
 ## 2026-10-19 — mic ask at opening without a tap; buttons only when no popup (placement-advisor)
 
 - **Ask:** Patch v1.92.2 (SPEC §8.10 Voice first, ⚑ Q342; MojoSOGO 2026-10-19 "I have to double tap approve for

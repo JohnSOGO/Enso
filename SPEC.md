@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.66 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.67 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1056,6 +1056,16 @@ Schema: [`migrations/0057_feature_request_outside.sql`](migrations/0057_feature_
 (SY-M3,** [`test/migration-0057.test.ts`](test/migration-0057.test.ts)**):** a row saved under 0056 is still there after
 0057, `outside` is taken, an unknown status is still refused.
 
+### 4.2zze Schema change — `migrations/0058_weather_moon_optional.sql`
+
+Asked by MojoSOGO 2026-10-19: "add weather and moon as optional". Two `member_prefs` switches beside the holiday and 📈
+ones, `show_weather` and `show_moon`, **on by default** so nobody loses what they see today (§7.5). Additive; it runs
+before the deploy.
+
+Schema: [`migrations/0058_weather_moon_optional.sql`](migrations/0058_weather_moon_optional.sql). **Checks (WM1–WM2,**
+[`test/weather-moon-optional.test.ts`](test/weather-moon-optional.test.ts)**):** a member saved before 0058 has both on
+after it; `PATCH /me { showWeather, showMoon }` saves a boolean for that member and refuses anything else.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1729,8 +1739,8 @@ it is on for the member (§7.5).
 - **Legend:** shown once, directly under the sticky month header: a yellow square
   (`--holiday-public-swatch`) "Public holiday" and "📈 Options expiration" (§7.4), each only
   while it is on for the member.
-- **Switches:** public holidays and 📈 are rows of **Optional calendar items** (§7.5), not
-  separate checkboxes.
+- **Switches:** public holidays, 📈, the weather (§7.11) and moon phases (§7.12) are rows of **Optional calendar
+  items** (§7.5), not separate checkboxes.
 - **Off means off everywhere** for that member — the cell tint and icon, the legend entry
   **and the day sheet** (a public holiday switched off is not listed there either). ⚑
 
@@ -1805,7 +1815,8 @@ options expiration"; `member_prefs.show_options_expiration`, §4.2c).
   emoji (alone there past the forecast days), never in a day-icon place (§7.2), so it pushes nothing out ⚑ Q346. No
   cell tint. The day sheet
   (§8.3) lists "🌕 Full moon" under the weather line; the cell's accessible label adds the name.
-- **Everyone sees it; there is no switch** and no legend entry (the emoji names itself) ⚑ Q345.
+- **On for everyone by default**; a member can turn **🌕 Moon phases** off in Optional calendar items (§7.5), which
+  hides it in the cell and the day sheet. No legend entry (the emoji names itself) ⚑ Q345, Q348.
 - `/calendar` always returns `moonPhases` for the range (§10).
 - **Acceptance (each row a test):**
 
@@ -1823,7 +1834,11 @@ switch on for their own calendar (decided by MojoSOGO 2026-10-03):
 1. **Public holidays** — built in, on by default (`member_prefs.show_public_holidays`);
 2. **📈 Monthly options expiration** — built in, off by default
    (`member_prefs.show_options_expiration`, §7.4);
-3. then every **optional event** (below), each with its emoji and how it repeats.
+3. **🌤️ Weather** — built in, on by default (`member_prefs.show_weather`, §7.11);
+4. **🌕 Moon phases** — built in, on by default (`member_prefs.show_moon`, §7.12);
+5. then every **optional event** (below), each with its emoji and how it repeats.
+Each row is one line with its **On** switch; the rows sit close together (32px, MojoSOGO 2026-10-19 "Reduce spacing")
+⚑ Q348.
 The old separate checkboxes in Me are gone.
 
 Some calendar items matter only to whoever wants them — street sweeping (move the car),
@@ -2127,7 +2142,7 @@ reading)` (pure, `event-reading.ts`) ⚑ Q196:
 - **`/calendar`** returns `weather: { date, emoji, words, high, low }[]` for the stored days in the range.
 - **On the calendar** (§7.1): the emoji sits in the **bottom-right corner** of the day cell at every width (MojoSOGO
   2026-10-19 "Calendar weather stuff should be bottom right including moon"), with the moon phase after it (§7.12),
-  apart from the two day icons (§7.2) so it never pushes a holiday or event emoji out ⚑ Q202, Q346. Everyone sees it; there is no switch ⚑ Q203. The cell's
+  apart from the two day icons (§7.2) so it never pushes a holiday or event emoji out ⚑ Q202, Q346. It shows unless the member turned **🌤️ Weather** off in Optional calendar items (§7.5), which hides the corner and the day sheet line ⚑ Q203, Q348. The cell's
   accessible label adds the words ("Clear, high 72°, low 58°").
 - **The high beside it** (asked by MojoSOGO 2026-10-13: "left of weather emoji post the days high temperature; blue if
   cold; white nice; red hot; two digits"): just left of the emoji, the day's high as a bare number (`72`, no °), in the
@@ -4562,7 +4577,7 @@ Settings
 
 - **🙂 Me:** name, color, **Clock: 12-hour / 24-hour** (§8.17), **After work / After school** (§8.5b), and (founder only) **🎯 Point at it** on this device (§8.16).
 - **📅 Calendar** (named "Calendar items" before v1.67.0): **Optional calendar items** — Public holidays, 📈 options
-  expiration, then one line per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); then,
+  expiration, 🌤️ Weather, 🌕 Moon phases, then one line per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); then,
   for admins only, **Days off** (§7.3) ⚑ Q267 (asked by MojoSOGO 2026-10-12: move Days off "into its own calendar section").
 - **📱 Phone alerts:** this phone's state and Turn on / Turn off / Send a test (§9.1).
 - **🔊 Speakers:** **Speak my alerts on** (§9.2a).
@@ -6171,7 +6186,7 @@ other push stays until I hide it ⚑ Q284.
 | POST | `/auth/phone-login/{id}/deny` | member (the requested one) | "This wasn't me" → `{ status: 'denied' }`; 404 / 409 as approve (§6.6) |
 | POST | `/auth/logout` | member | → 204; clears cookie |
 | GET | `/me` | member | → member + prefs |
-| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration?, houseSpeakers?: string[] \| null, clock24h?: boolean, afterKind?: 'work' \| 'school' \| null, afterTime?: "HH:MM" \| null }` (§9.2a, §8.17, §8.5b) |
+| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration?, showWeather?, showMoon?, houseSpeakers?: string[] \| null, clock24h?: boolean, afterKind?: 'work' \| 'school' \| null, afterTime?: "HH:MM" \| null }` (§9.2a, §8.17, §8.5b) |
 | GET | `/house/speakers` | member | → `{ speakers: { id, name, kind }[], mine, defaults }` asked of Home Assistant live; 503 `house_not_configured`; 502 `house_unreachable` (§9.2a) |
 | GET | `/members` | member | → `{ id, email, displayName, color, role, isFounder, disabledAt, after: { kind, time } }[]` (no hashes; `email` only for owners; `after` §8.5b) |
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |

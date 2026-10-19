@@ -74,6 +74,9 @@ The Ensō button saves what Ensō can't do yet as feature requests (Settings →
 the open ones with `GET /api/v1/ops/requests` (Bearer the ops token). Before building any, run an **AREC**
 (architecture review + verdict, saved in the project files) and the **`placement-advisor`** (and the **`code-steward`**
 when it spans several areas) to learn whether Ensō already does it, whether it fits SPEC §1.3, and where it would go.
+The AREC is **holistic**: it also lists the **similar features with the same implied requirements** (weather and moon
+each needed the per-person switch holidays and 📈 already had) and says whether to build them together or fit one
+shared piece (MojoSOGO 2026-10-19). Every AREC, not only feature requests.
 An approved one goes into the spec whole (step 1), not as a fragment. Already there → `PATCH /api/v1/ops/requests/{id} { status: 'dismissed', note: 'Already in …' }`.
 **Needs John**, or anything the advisor finds big, tangled or odd → not built: ask MojoSOGO (John) first, never
 silently. Built → `{ status: 'done', note: 'v1.x.y' }`. An ask outside what Ensō is for (SPEC §1.3) is logged as **Out of scope** (`outside`); build sessions
