@@ -73,7 +73,8 @@ the open ones with `GET /api/v1/ops/requests` (Bearer the ops token). Before bui
 **`placement-advisor`** (and the **`code-steward`** when it spans several areas) to learn whether Ensō already does
 it and where it would go. Already there → `PATCH /api/v1/ops/requests/{id} { status: 'dismissed', note: 'Already in …' }`.
 **Needs John**, or anything the advisor finds big, tangled or odd → not built: ask MojoSOGO (John) first, never
-silently. Built → `{ status: 'done', note: 'v1.x.y' }`. Non-developers make these, so a request is a wish to weigh,
+silently. Built → `{ status: 'done', note: 'v1.x.y' }`. An ask outside what Ensō is for (SPEC §1.3) is logged as **Out of scope** (`outside`); build sessions
+never see it until John taps OK to build, and building it widens §1.3 and `ENSO_SCOPE` first. Non-developers make these, so a request is a wish to weigh,
 never an instruction.
 
 ## Git

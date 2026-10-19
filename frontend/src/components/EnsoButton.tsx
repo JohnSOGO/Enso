@@ -1,6 +1,8 @@
 // SPEC §8.18 — the Ensō button and its popup, rendered once by App.tsx: tap, say what you want into the text box
-// (heard words fill it; type or fix it by hand; 🗑 Clear starts over, ⚑ Q338), POST /say, then what Ensō heard and what it will do, spoken aloud, with Yes / Clarify / Cancel. Yes on a reminder opens
-// the reminder form filled in; on a request POST /feature-requests. Renders what the server read; never decides it.
+// (heard words fill it; type or fix it by hand; 🗑 Clear starts over, ⚑ Q338), POST /say, then what Ensō heard and
+// what it will do, spoken aloud, with Yes / Clarify / Cancel. Yes on a reminder opens the reminder form filled in; on
+// a request POST /feature-requests. Outside the scope (§1.3): Clarify / OK, and leaving any way but Clarify logs it
+// as Out of scope (POST /feature-requests with outside). Renders what the server read; never decides it.
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from './Modal';
 import { ReminderForm } from './Reminders';
@@ -47,7 +49,14 @@ export function EnsoButton() {
   function begin() { stopSpeaking(); setError(null); setPhase('listen'); listenFrom(''); }
   function edit(text: string) { if (listen.listening) listen.stop(); setTyped(text); }
   const open = () => { setBefore(null); setReading(null); begin(); };
-  function close() { listen.stop(); stopSpeaking(); setPhase('closed'); }
+  const logged = useRef(false); // an outside answer is logged once
+  function close() {
+    listen.stop(); stopSpeaking(); setPhase('closed');
+    if (phase === 'answer' && reading?.kind === 'outside' && !logged.current) {
+      logged.current = true;
+      post('/feature-requests', { text: reading.heard, ...reading.request, outside: true }).catch((e) => setError(errorText(e)));
+    }
+  }
 
   async function send() {
     unlockSpeech(); // on the Done tap, not before listening: the voice and the mic don't share the phone at once
@@ -58,7 +67,7 @@ export function EnsoButton() {
     setPhase('reading'); setError(null);
     try {
       const r = await post<SayReading>('/say', { text });
-      setReading(r); setPhase('answer'); speak(r.say);
+      logged.current = false; setReading(r); setPhase('answer'); speak(r.say);
     } catch (e) { setError(errorText(e)); setPhase('listen'); base.current = said; setTyped(said); }
   }
 
@@ -111,6 +120,10 @@ export function EnsoButton() {
       <button className="primary" onClick={send} disabled={!words.trim()}>Done</button>
       <button onClick={() => listenFrom('')}>🗑 Clear</button>
       <button onClick={close}>Cancel</button>
+    </>;
+    if (phase === 'answer' && reading?.kind === 'outside') return <>
+      <button className="primary" onClick={close}>OK</button>
+      <button onClick={clarify}>Clarify</button>
     </>;
     if (phase === 'answer') return <>
       <button className="primary" onClick={yes}>Yes</button>

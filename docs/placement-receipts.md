@@ -7,6 +7,32 @@ carry its result.
 
 ---
 
+## 2026-10-19 — Out of scope: the fourth reading and the `outside` status (placement-advisor)
+
+- **Ask:** v1.88.0, SPEC 3.54: §1.3 Scope, §8.18 item 4 "Outside what Ensō is for" with Clarify / OK and logging on
+  leave, the 💡 Requests "Out of scope" badge, §4.2zzd migration 0057 (rebuild feature_requests for status `outside`),
+  the §10 rows POST /say `outside` and POST /feature-requests `outside?`, SY7 / SY8, ⚑ Q339. Also steward items 2
+  (ENSO_DOES Settings line, 💡 Requests) and 3 (one status set for the SQL).
+- **Verdict:** EXISTING. `src/shared/vocab.ts`, `src/shared/feature-requests.ts`, `src/shared/say-reading.ts`,
+  `src/worker/say-reader.ts`, `src/worker/feature-request-rows.ts`, `src/worker/routes/feature-requests.ts` (pass-through
+  only), `frontend/src/components/EnsoButton.tsx`, `frontend/src/components/FeatureRequests.tsx`, and
+  `migrations/0057_feature_request_outside.sql` with its test. No new row; row texts updated.
+- **Flow stage:** rules (feature-requests, say-reading) → the reading (say-reader) → route / persist
+  (routes/feature-requests, feature-request-rows) → render (EnsoButton, FeatureRequests).
+- **Why:** The v1.87.0 split holds and every part fits its owner's row. The one real stability threat is overloading
+  isOpen: widening it to include outside would leak outside rows into the ops build queue and closeMove, against SY8.
+  So shared/feature-requests.ts gets two named sets, OPEN_STATUSES (the build queue, closeMove) and LISTED_STATUSES
+  (always listed, Dismiss); okMove widens to needs_john | outside. The rows file builds its IN lists from those sets with
+  bound placeholders (steward DRY item 3). FeatureRequests.tsx stops re-deriving open-ness and uses the shared sets.
+  outsideSay is fixed text in say-reading.ts, like requestSay. ENSO_SCOPE sits beside ENSO_DOES as §1.3 directs.
+  Rejected: a separate out-of-scope module (too small); deciding the logging in the route (only the PWA knows the
+  person left without Clarify); a status from the route (the route only passes `outside`; statusFor decides).
+- **Caps:** feature-requests.ts ~70/300, say-reading.ts ~85/300, say-reader.ts ~90/300, feature-request-rows.ts
+  ~55/300, routes/feature-requests.ts 39/300, EnsoButton.tsx ~135/300, FeatureRequests.tsx ~63/300, vocab.ts 101/300.
+  Nothing newly in the band.
+- **Sources read:** scripts/arch.ts, docs/module-ownership.md, docs/placement-receipts.md, SPEC.md §1.3, §4.2zzd, §8.18,
+  the eight target files, and the usages of closeMove / openFeatureRequests / isOpen.
+
 ## 2026-10-19 — Ensō popup: always-on text box, Clear, 8 s hint, iOS listening, admin Requests (placement-advisor)
 
 - **Ask:** v1.87.1 patch, SPEC §8.18 "Tap it" (⚑ Q338): the box is always there and filled by heard words, 🗑 Clear

@@ -1,12 +1,12 @@
-// SPEC §8.18 SY1–SY6 — the Ensō button: POST /say reads what was said (Claude is a fake api.anthropic.com behind a
+// SPEC §8.18 SY1–SY8 — the Ensō button: POST /say reads what was said (Claude is a fake api.anthropic.com behind a
 // fetch spy that refuses every other host; the key is fake), feature requests, and the build session's queue.
 import { SELF, createExecutionContext, env } from 'cloudflare:test';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src/worker/index';
 import type { Env } from '../src/worker/env';
 import { READS_PER_DAY } from '../src/shared/things';
-import { cleanSayReading, clarified, requestSay } from '../src/shared/say-reading';
-import { closeMove, dismissMove, okMove, statusForSize } from '../src/shared/feature-requests';
+import { cleanSayReading, clarified, outsideSay, requestSay } from '../src/shared/say-reading';
+import { closeMove, dismissMove, okMove, statusFor } from '../src/shared/feature-requests';
 import { ADMIN_ROLE } from '../src/shared/roles';
 import { addDays, utcToLocal } from '../src/shared/time';
 import { BASE, Client, member, owner } from './helpers';
@@ -63,6 +63,18 @@ describe('§8.18 POST /say', () => {
     expect(await requests()).toBe(before);
   });
 
+  it('SY7 outside the scope → the fixed line, where the part that fits lives, the ask for the log; no row saved', async () => {
+    const before = await requests();
+    const r = await say(keyedEnv(), { ...none, heard: 'Order our groceries from Amazon every Friday.', kind: 'outside', say: 'x',
+      where: 'Lists → Shopping', title: 'Order groceries from Amazon', summary: 'Order the shopping list on Fridays.', size: 'big' });
+    expect(r.json).toEqual({ kind: 'outside', heard: 'Order our groceries from Amazon every Friday.', say: outsideSay('Lists → Shopping'),
+      where: 'Lists → Shopping', request: { title: 'Order groceries from Amazon', summary: 'Order the shopping list on Fridays.', size: 'big' } });
+    const bare = await say(keyedEnv(), { ...none, heard: 'What is the news?', kind: 'outside', say: 'x', title: 'News', summary: '', size: null });
+    expect(bare.json).toMatchObject({ kind: 'outside', where: null, say: outsideSay(null), request: { size: 'big' } });
+    expect(JSON.stringify(r.heard[0])).toContain('banking');
+    expect(await requests()).toBe(before);
+  });
+
   it('SY6 blank → 400; reads used up → 429; no key → 503; signed out → 401', async () => {
     expect((await say(keyedEnv(), null, '  ')).status).toBe(400);
     expect((await say({ ...keyedEnv(), ANTHROPIC_API_KEY: '' }, null)).status).toBe(503);
@@ -103,6 +115,22 @@ describe('§8.18 feature requests', () => {
   });
 });
 
+describe('§1.3 out of scope requests', () => {
+  it('SY8 logged as outside, kept listed, not in the build queue; OK widens it, Dismiss closes it', async () => {
+    const m = await member(o);
+    const out = await m.client.post('/feature-requests', { text: 'order groceries from Amazon', title: 'Amazon groceries', summary: 'Order on Fridays.', size: 'big', outside: true });
+    expect(out.json).toMatchObject({ status: 'outside', size: 'big' });
+    const two = await m.client.post('/feature-requests', { text: 'what is the news', title: 'News', summary: '', size: 'small', outside: true });
+    await env.DB.prepare(`UPDATE feature_requests SET updated_at = '2026-01-01T00:00:00.000Z' WHERE id = ?`).bind(out.json.id).run();
+    expect((await o.get('/feature-requests')).json.map((x: any) => x.id)).toEqual(expect.arrayContaining([out.json.id, two.json.id]));
+    const q = (await (await SELF.fetch(`${BASE}/ops/requests`, { headers: AUTH })).json<any>()).requests.map((x: any) => x.id);
+    expect(q).not.toContain(out.json.id);
+    expect((await SELF.fetch(`${BASE}/ops/requests/${two.json.id}`, { method: 'PATCH', headers: AUTH, body: '{"status":"done"}' })).status).toBe(409);
+    expect((await o.post(`/feature-requests/${out.json.id}/ok`)).json.status).toBe('new');
+    expect((await o.post(`/feature-requests/${two.json.id}/dismiss`)).json.status).toBe('dismissed');
+  });
+});
+
 describe('§8.18 the rules', () => {
   const tz = 'America/Los_Angeles', now = '2026-10-19T17:00:00.000Z';
   const members = [{ id: 'mem_a', name: 'MojoSOGO' }, { id: 'mem_s', name: 'Shelly' }];
@@ -119,7 +147,12 @@ describe('§8.18 the rules', () => {
     expect(cleanSayReading({ ...base, kind: 'request', title: 'T', size: null }, { tz, now, meId: 'mem_a', members })).toMatchObject({ request: { size: 'big' } });
   });
   it('the moves', () => {
-    expect(statusForSize('big')).toBe('needs_john');
+    expect(statusFor('big', false)).toBe('needs_john');
+    expect(statusFor('small', true)).toBe('outside');
+    expect(okMove('outside', true)).toEqual({ status: 'new' });
+    expect(okMove('new', true)).toMatchObject({ code: 409 });
+    expect(dismissMove('outside', true)).toEqual({ status: 'dismissed' });
+    expect(closeMove('outside', 'done')).toMatchObject({ code: 409 });
     expect(okMove('needs_john', true)).toEqual({ status: 'new' });
     expect(okMove('needs_john', false)).toMatchObject({ code: 403 });
     expect(dismissMove('done', true)).toMatchObject({ code: 409 });

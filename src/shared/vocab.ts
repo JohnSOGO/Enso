@@ -37,9 +37,9 @@ export const HOUSE_QUIET_FOR = ['1h', '2h', '4h', 'today'] as const; // §9.2b h
 export const TASK_MOOD = ['great', 'steady', 'distracted', 'struggling', 'break'] as const; // §7G.3 a check-in answer, in button order
 export const TASK_OUTCOME = ['finished', 'stopped'] as const; // §7G.6 task_sessions.outcome
 export const TASK_LOOKS = ['yes', 'no', 'unsure'] as const; // §7G.6 a done line, as the photo check read it
-export const FEATURE_REQUEST_STATUS = ['new', 'needs_john', 'done', 'dismissed'] as const; // §8.18 feature_requests.status
+export const FEATURE_REQUEST_STATUS = ['new', 'needs_john', 'outside', 'done', 'dismissed'] as const; // §8.18 feature_requests.status
 export const FEATURE_REQUEST_SIZE = ['small', 'big'] as const; // §8.18 feature_requests.size
-export const SAY_KIND = ['reminder', 'exists', 'request'] as const; // §8.18 what POST /say read — never stored
+export const SAY_KIND = ['reminder', 'exists', 'request', 'outside'] as const; // §8.18 what POST /say read — never stored
 
 export type AlertKind = (typeof ALERT_KIND)[number];
 export type Channel = (typeof CHANNEL)[number];
