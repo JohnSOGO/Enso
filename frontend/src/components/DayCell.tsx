@@ -28,7 +28,8 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
   const [y, m, d] = date.split('-').map(Number);
   const pub = me.showPublicHolidays ? data?.publicHolidays ?? [] : [];
   const market = me.showOptionsExpiration ? data?.marketDays ?? [] : [];
-  const moon = data?.moonPhases ?? []; // §7.12: everyone sees it
+  const moon = me.showMoon ? data?.moonPhases ?? [] : []; // §7.12
+  const wx = me.showWeather ? data?.weather : undefined; // §7.11
   const items = data?.items ?? [];
   const days = items.filter((o) => !isMultiDay(o)); // multi-day events are drawn as bars
   // §7.2 day icons beside the number: holiday, 📈, then unassigned events' emoji (Q277); at most two.
@@ -59,7 +60,7 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
     new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }),
     items.length ? `${items.length} event${items.length > 1 ? 's' : ''}` : '',
     ...pub.map((h) => h.name), ...market.map((m) => m.name), ...moon.map((m) => m.name),
-    data?.weather ? `${data.weather.words}, high ${data.weather.high}°, low ${data.weather.low}°` : '',
+    wx ? `${wx.words}, high ${wx.high}°, low ${wx.low}°` : '',
   ].filter(Boolean).join(', ');
   return (
     <button className={cls} aria-label={label} onClick={() => onOpen(date, data)}
@@ -77,9 +78,9 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
           <span className={s.hEmoji} aria-hidden title={[...pub.map((h) => h.name), ...market.map((m) => m.name), ...iconed.map((o) => o.title)].join(', ')}>{icons.map((x) => x.emoji).join('')}</span>
         )}
       </span>
-      {(data?.weather || moon.length > 0) && ( // §7.11, §7.12 bottom-right: the high in its heat band, the emoji, the moon
-        <span className={s.wx} aria-hidden title={[data?.weather?.words, ...moon.map((m) => m.name)].filter(Boolean).join(', ')}>
-          {data?.weather && <><span className={s[heatOf(data.weather.high)]}>{data.weather.high}</span>{data.weather.emoji}</>}
+      {(wx || moon.length > 0) && ( // §7.11, §7.12 bottom-right: the high in its heat band, the emoji, the moon
+        <span className={s.wx} aria-hidden title={[wx?.words, ...moon.map((m) => m.name)].filter(Boolean).join(', ')}>
+          {wx && <><span className={s[heatOf(wx.high)]}>{wx.high}</span>{wx.emoji}</>}
           {moon.slice(0, 1).map((m) => m.emoji)}
         </span>
       )}
