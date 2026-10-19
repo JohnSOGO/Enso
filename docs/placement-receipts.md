@@ -7,6 +7,20 @@ carry its result.
 
 ---
 
+## 2026-10-19 — Steward pass 31, since pass 30 (code-steward)
+
+- **Run:** post-release, v1.84.0 (After work / After school per person for 📌 Reminders, §8.5b: migration 0054,
+  shared/reminders.ts afterOf / afterError, vocab AFTER_KIND, routes/auth.ts + routes/members.ts `after`, state.tsx,
+  Reminders.tsx, SettingsMe.tsx).
+- **Verdict:** SOUND. Typecheck green, 925/925, arch:audit quiet; 1 code commit, 1 matching receipt, built as placed.
+- **Top finding:** none new. Carried LOW: where-things-stand.md lacks the owed device checks for v1.76–v1.84.
+- **Handoffs:** 1 to worker (the device-check lines, carried), 0 to reorganizer, 0 to placement-advisor. Still
+  carried: deleteEventStatements, renotifyText, updateEventStatement at their triggers.
+- **Restraint:** the after SELECT + afterOf in auth.ts and members.ts (two readers; a third gets a helper); the
+  migration's frozen founder subquery; whenChoice's optional afterTime; the PWA choosing whose `after` to show.
+
+---
+
 ## 2026-10-19 — After work / After school per person (placement-advisor)
 
 - **Ask:** v1.84.0, SPEC §8.5b "After work / After school is each person's own" (RM7, RM8, ⚑ Q315–Q316), §4.2zza
