@@ -2,7 +2,7 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { MEMBER_PALETTE, type Role } from '../../shared/vocab';
-import { ADMIN_ROLE } from '../../shared/roles';
+import { ADMIN_ROLE, isAdmin } from '../../shared/roles';
 import { normalizeInviteCode } from '../../shared/invite-link';
 import { all, first, newId, nowIso, run } from '../db';
 import { body, fail, str } from '../http';
@@ -10,6 +10,7 @@ import { endSession, hashPassword, requireMember, sha256hex, startSession, verif
 import { sendSignInNotice } from './phone-login';
 import { speakersError } from '../../shared/speakers';
 import { choiceOf } from '../speaker-choices';
+import { afterError, afterOf } from '../../shared/reminders';
 
 export const MIN_PASSWORD = 10;
 const FAIL_WINDOW_MIN = 15;
@@ -59,9 +60,14 @@ export async function memberView(db: D1Database, id: string) {
     `SELECT m.id, m.email, m.display_name AS displayName, m.color, m.role,
             p.show_public_holidays AS showPublicHolidays,
             p.show_options_expiration AS showOptionsExpiration,
-            p.house_speakers AS houseSpeakers, p.clock_24h AS clock24h
+            p.house_speakers AS houseSpeakers, p.clock_24h AS clock24h, p.after_kind AS afterKind, p.after_time AS afterTime
        FROM members m LEFT JOIN member_prefs p ON p.member_id = m.id WHERE m.id = ?`, id);
-  return row && { ...row, houseSpeakers: choiceOf(row.houseSpeakers), clock24h: row.clock24h === 1 };
+  if (!row) return row;
+  const { afterKind, afterTime, ...rest } = row as typeof row & { afterKind: string | null; afterTime: string | null; role: Role };
+  return {
+    ...rest, houseSpeakers: choiceOf(row.houseSpeakers), clock24h: row.clock24h === 1,
+    after: afterOf({ admin: isAdmin(rest as { role: Role }), kind: afterKind, time: afterTime }), // §8.5b
+  };
 }
 
 export const auth = new Hono<AppEnv>();
@@ -162,6 +168,12 @@ auth.patch('/me', requireMember, async (c) => {
       if (typeof b[key] !== 'boolean') return fail(c, 400, 'invalid_input', `${key} must be true or false.`);
       stmts.push(c.env.DB.prepare(`UPDATE member_prefs SET ${col} = ? WHERE member_id = ?`).bind(b[key] ? 1 : 0, id));
     }
+  }
+  if (b.afterKind !== undefined || b.afterTime !== undefined) { // §8.5b
+    const err = afterError(b.afterKind, b.afterTime);
+    if (err) return fail(c, 400, 'invalid_input', err);
+    if (b.afterKind !== undefined) stmts.push(c.env.DB.prepare('UPDATE member_prefs SET after_kind = ? WHERE member_id = ?').bind(b.afterKind, id));
+    if (b.afterTime !== undefined) stmts.push(c.env.DB.prepare('UPDATE member_prefs SET after_time = ? WHERE member_id = ?').bind(b.afterTime, id));
   }
   if (b.houseSpeakers !== undefined) {
     const err = speakersError(b.houseSpeakers);

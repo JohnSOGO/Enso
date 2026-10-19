@@ -949,6 +949,11 @@ has What?, When chips (In 1 hour · After work · Tonight · Tomorrow morning) w
 preselected), channels and Repeat until Done. Stored as an alarm with no repeat, so it rings through the reminder
 pipeline unchanged; no migration. Built as specified. Owed: his TRY on the iPhone (RM-M).
 
+**After work / After school per person** (v1.84.0, SPEC 3.47, §8.5b, migration 0054, Q315–Q316; MojoSOGO 2026-10-19
+"After work for John is 3:30 and should be specific to the account and kids as after school"): Settings → 🙂 Me →
+After work / After school (Work / School + a time). Unset: admins After work 5:30pm, kids After school 3:00pm; the
+founder starts at 3:30pm. The reminder chip follows the one person ticked, else mine. Built as specified.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

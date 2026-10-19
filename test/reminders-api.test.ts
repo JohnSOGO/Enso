@@ -70,3 +70,18 @@ it('RM5: a missed reminder moved later is due again; DELETE removes it and its f
   // DELETE runs on the real clock, before the fire's due time.
   expect((await env.DB.prepare('SELECT state, close_reason FROM fires WHERE id = ?').bind(fire.id).first<any>())).toEqual({ state: 'closed', close_reason: 'removed' });
 });
+
+it('RM8: each member sets their own After work / After school', async () => {
+  const o = await owner();
+  const m = await member(o);
+  const row = async (id: string) => (await o.get('/members')).json.find((x: any) => x.id === id).after;
+  expect(await row(m.id)).toEqual({ kind: 'school', time: '15:00' });
+  const set = await m.client.patch('/me', { afterKind: 'work', afterTime: '16:30' });
+  expect(set.status).toBe(200);
+  expect(set.json.after).toEqual({ kind: 'work', time: '16:30' });
+  expect(await row(m.id)).toEqual({ kind: 'work', time: '16:30' });
+  expect((await m.client.patch('/me', { afterTime: 'soon' })).status).toBe(400);
+  expect((await m.client.patch('/me', { afterKind: 'gym' })).status).toBe(400);
+  await m.client.patch('/me', { afterKind: null, afterTime: null });
+  expect(await row(m.id)).toEqual({ kind: 'school', time: '15:00' });
+});

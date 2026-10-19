@@ -3,9 +3,10 @@ import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { FOUNDER_SQL, all, first, newId, nowIso, randomBase32, run } from '../db';
 import { body, fail, str } from '../http';
-import { ROLE, isOneOf } from '../../shared/vocab';
+import { ROLE, isOneOf, type Role } from '../../shared/vocab';
 import { ADMIN_ROLE, isAdmin } from '../../shared/roles';
 import { requireMember, requireOwner, sha256hex } from '../session';
+import { afterOf } from '../../shared/reminders';
 import { normalizeInviteCode } from '../../shared/invite-link';
 
 const INVITE_DAYS = 7;
@@ -15,9 +16,14 @@ export const members = new Hono<AppEnv>();
 members.get('/members', requireMember, async (c) => {
   const isOwner = isAdmin(c.get('member'));
   const founder = (await first<{ id: string }>(c.env.DB, FOUNDER_SQL))?.id;
-  const rows = await all<Record<string, unknown>>(c.env.DB,
-    `SELECT id, email, display_name AS displayName, color, role, disabled_at AS disabledAt, created_at AS joinedAt FROM members ORDER BY created_at`);
-  return c.json(rows.map((r) => ({ ...r, isFounder: r.id === founder, email: isOwner ? r.email : undefined })));
+  const rows = await all<Record<string, unknown> & { role: Role; afterKind: string | null; afterTime: string | null }>(c.env.DB,
+    `SELECT m.id, m.email, m.display_name AS displayName, m.color, m.role, m.disabled_at AS disabledAt, m.created_at AS joinedAt,
+            p.after_kind AS afterKind, p.after_time AS afterTime
+       FROM members m LEFT JOIN member_prefs p ON p.member_id = m.id ORDER BY m.created_at`);
+  return c.json(rows.map(({ afterKind, afterTime, ...r }) => ({
+    ...r, isFounder: r.id === founder, email: isOwner ? r.email : undefined,
+    after: afterOf({ admin: isAdmin(r), kind: afterKind, time: afterTime }), // §8.5b
+  })));
 });
 
 members.patch('/members/:id', requireMember, requireOwner, async (c) => {

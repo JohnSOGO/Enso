@@ -7,6 +7,25 @@ carry its result.
 
 ---
 
+## 2026-10-19 — After work / After school per person (placement-advisor)
+
+- **Ask:** v1.84.0, SPEC §8.5b "After work / After school is each person's own" (RM7, RM8, ⚑ Q315–Q316), §4.2zza
+  migration 0054 (member_prefs.after_kind / after_time, founder 15:30), §10 PATCH /me afterKind / afterTime and GET
+  /members `after`.
+- **Verdict:** EXISTING owners, no new row. Rules: src/shared/reminders.ts (AFTER_DEFAULT, AFTER_LABEL, afterOf,
+  afterError, whenChoice's afterTime) and src/shared/vocab.ts (AFTER_KIND). Route/persist: migrations/0054 + test,
+  routes/auth.ts (PATCH /me, memberView `after`), routes/members.ts (GET /members `after`). Render: state.tsx
+  (Me / Member `after`), Reminders.tsx (one ticked member's after, else mine), SettingsMe.tsx (Work / School + time).
+- **Flow stage:** rules + route/persist + render.
+- **Why:** the default-by-role rule is a decision beside the When chips it feeds; it takes `admin: isAdmin(m)` and
+  does not import roles.ts. The '17:30' in WHEN_CHOICE derives from the admin default. Rejected: a new member-prefs
+  module; the default in the routes; the PWA computing it. Accepted duplicate: the after-column SELECT in auth.ts and
+  members.ts (a third reader means a shared helper).
+- **Caps:** all at GLOBAL_FILE_CAP 300; nothing new in the band.
+- **Reorganizer:** none needed.
+
+---
+
 ## 2026-10-19 — Steward pass 30, since pass 29 (code-steward)
 
 - **Run:** post-release, v1.83.0 (📌 Reminders §8.5b: shared reminders.ts, routes/reminders.ts, Reminders.tsx; touches

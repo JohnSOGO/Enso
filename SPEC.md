@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.46 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.47 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -992,6 +992,14 @@ Schema: [`migrations/0053_task_sessions.sql`](migrations/0053_task_sessions.sql)
 `checkins` is a JSON list of `{ at, mood, said }` (mood from `TASK_MOOD`, `said` = Enso's reply), at most 200.
 `done_looks` a JSON list of lines; `done_ticked` the ticked line numbers at Finish. Additive only; it runs before
 the deploy. **Migration check (TB-M):** earlier timers and fires come through unchanged; a session row can be written.
+
+### 4.2zza Schema change — `migrations/0054_after_time.sql`
+
+Asked by MojoSOGO 2026-10-19: each member's own After work / After school time for 📌 Reminders (§8.5b).
+`member_prefs.after_kind` (`'work'` / `'school'`, NULL = by role) and `after_time` (`HH:MM`, NULL = by role).
+Additive, plus one data row: the founder's `after_time` = `15:30`. It runs before the deploy.
+
+Schema: [`migrations/0054_after_time.sql`](migrations/0054_after_time.sql). The migration is the schema; it is not copied here. **Migration check (RM-M2,** [`test/migration-0054.test.ts`](test/migration-0054.test.ts)**):** members before 0054 come through unset, the founder at 15:30.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -4261,10 +4269,20 @@ both hide inside something else. A reminder is the plain one-off.
   reminder is not listed. **＋ Add** at the top; tapping a row opens its form.
 - **The form** ("New reminder" / "Edit reminder"):
   - **What?** — one line, required, up to `ALERT_TITLE_MAX` ("Get bird food").
-  - **When** — quick chips **In 1 hour** · **After work** (5:30pm) · **Tonight** (8pm) · **Tomorrow morning** (8am) ⚑ Q311,
+  - **When** — quick chips **In 1 hour** · **After work** / **After school** (that person's own time, below) · **Tonight** (8pm) · **Tomorrow morning** (8am) ⚑ Q311,
     then a **Date** and a **Time** box showing the pick, both editable. A chip picks its next time: today while it is
     still ahead, else tomorrow (Tomorrow morning: always tomorrow; In 1 hour: now + 60 min, up to the next 5 minutes). A new form starts on After work.
   - **Remind** — member chips, **me** preselected ⚑ Q313; none ticked = everyone.
+- **After work / After school is each person's own** (v1.84.0, MojoSOGO 2026-10-19: "After work for John is 3:30 and
+  should be specific to the account and kids as after school"). Each member has a kind and a time, set in Settings →
+  🙂 Me → **After work / After school**: two choices (**Work** / **School**) and a time box; a change saves at once. Not
+  set: an admin is **After work at 5:30pm**, a plain member (the kids) **After school at 3:00pm** ⚑ Q315. The founder
+  starts at After work 3:30pm (migration 0054). The chip shows and uses the time of the **one person ticked** under
+  Remind; with none or several ticked, mine ⚑ Q316. `afterOf` (`shared/reminders.ts`) is the one rule; `GET /members`
+  carries each member's resolved `after: { kind, time }`.
+  **RM7:** `afterOf` → admin unset 17:30 work, member unset 15:00 school, stored values win; `whenChoice('work', …,
+  '15:30')` at 14:00 → today 15:30, at 16:00 → tomorrow 15:30. **RM8:** PATCH /me `{ afterKind: 'school', afterTime:
+  '15:00' }` → GET /members shows it; a bad time or kind → 400; `null` clears back to the default.
   - The channel ticks (`ChannelChecks`, defaults as an alarm's).
   - **Repeat until Done** — Every 15 min / **Every 30 min** / Every hour ⚑ Q312. A POST with no `renotifyMin` repeats every 30 min too.
   - Save / Cancel; on an existing one **Delete** (asks once). Creator or admin may change it (§6.3), like alarms.
@@ -4323,7 +4341,7 @@ Settings
 [ Log out ]
 ```
 
-- **🙂 Me:** name, color, **Clock: 12-hour / 24-hour** (§8.17), and (founder only) **🎯 Point at it** on this device (§8.16).
+- **🙂 Me:** name, color, **Clock: 12-hour / 24-hour** (§8.17), **After work / After school** (§8.5b), and (founder only) **🎯 Point at it** on this device (§8.16).
 - **📅 Calendar** (named "Calendar items" before v1.67.0): **Optional calendar items** — Public holidays, 📈 options
   expiration, then one line per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); then,
   for admins only, **Days off** (§7.3) ⚑ Q267 (asked by MojoSOGO 2026-10-12: move Days off "into its own calendar section").
@@ -5801,9 +5819,9 @@ other push stays until I hide it ⚑ Q284.
 | POST | `/auth/phone-login/{id}/deny` | member (the requested one) | "This wasn't me" → `{ status: 'denied' }`; 404 / 409 as approve (§6.6) |
 | POST | `/auth/logout` | member | → 204; clears cookie |
 | GET | `/me` | member | → member + prefs |
-| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration?, houseSpeakers?: string[] \| null, clock24h?: boolean }` (§9.2a, §8.17) |
+| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration?, houseSpeakers?: string[] \| null, clock24h?: boolean, afterKind?: 'work' \| 'school' \| null, afterTime?: "HH:MM" \| null }` (§9.2a, §8.17, §8.5b) |
 | GET | `/house/speakers` | member | → `{ speakers: { id, name, kind }[], mine, defaults }` asked of Home Assistant live; 503 `house_not_configured`; 502 `house_unreachable` (§9.2a) |
-| GET | `/members` | member | → `{ id, email, displayName, color, role, isFounder, disabledAt }[]` (no hashes; `email` only for owners) |
+| GET | `/members` | member | → `{ id, email, displayName, color, role, isFounder, disabledAt, after: { kind, time } }[]` (no hashes; `email` only for owners; `after` §8.5b) |
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
 | DELETE | `/invites/{id}` | owner | revoke |

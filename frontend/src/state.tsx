@@ -5,6 +5,7 @@ import { get } from './api';
 import { clockText, utcToLocal } from '../../src/shared/time';
 import type { AlertKind, Channel, DeliveryStatus, HouseState, Role, TaskMood } from '../../src/shared/vocab';
 import type { Task, TaskState } from '../../src/shared/tasks';
+import type { After } from '../../src/shared/reminders';
 
 export interface Me {
   id: string; email: string; displayName: string; color: string; role: Role;
@@ -13,9 +14,11 @@ export interface Me {
   houseSpeakers: string[] | null;
   /** §8.17: true = 24-hour clock, false = 12-hour. */
   clock24h: boolean;
+  /** §8.5b: my After work / After school, resolved by the server. */
+  after: After;
 }
 /** §6.3: role 'owner' reads Admin; the founder (isFounder) reads Owner and is protected. */
-export interface Member { id: string; displayName: string; color: string; role: Role; isFounder: boolean; email?: string; disabledAt: string | null; joinedAt: string }
+export interface Member { id: string; displayName: string; color: string; role: Role; isFounder: boolean; email?: string; disabledAt: string | null; joinedAt: string; after: After }
 export interface Fire {
   id: string; kind: AlertKind; dueAt: string; state: string; alertCount: number;
   occurrenceDate: string | null; eventId: string | null; timerId: string | null; title: string; startTime: string | null;
