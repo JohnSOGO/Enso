@@ -28,7 +28,7 @@ import { PointAtLayer } from './components/PointAt';
 import s from './App.module.css';
 
 /** The bottom tab bar (§8.1): the one list of tabs — id, icon, label. */
-const NAV = [['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alarms'], ['chores', '🧹', 'Chores'], ['lists', '🛒', 'Lists'], ['recipes', '🍳', 'Recipes'], ['settings', '⚙', 'Settings']] as const;
+const NAV = [['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alerts'], ['chores', '🧹', 'Chores'], ['lists', '🛒', 'Lists'], ['recipes', '🍳', 'Recipes'], ['settings', '⚙', 'Settings']] as const;
 type Tab = (typeof NAV)[number][0];
 const TABS: readonly Tab[] = NAV.map(([id]) => id);
 /** §8.1 ⚑ Q38 — the House badge per server-reported state; `ok` and `untried` show none. */
