@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.44 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.45 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -55,9 +55,9 @@ A calendar PWA for one household. It has three kinds of alert:
 | Kind | What it does | Where it lives | Example |
 |------|--------------|----------------|---------|
 | **Event reminder** | Fires before/at a calendar event. | On the calendar, inside the event | "Dentist" at 14:30, remind 30 min before |
-| **Scheduled alarm** | Fires at a set time on chosen **days of the week**, every week. Not a calendar entry. | **Alarms** tab, not drawn on the calendar | "Take out trash" Tue 19:00 · "Morning meds" every day 08:00 |
+| **Scheduled alarm** | Fires at a set time on chosen **days of the week**, every week. Not a calendar entry. | **Alerts** tab, not drawn on the calendar | "Take out trash" Tue 19:00 · "Morning meds" every day 08:00 |
 | **Chore** | A job on chosen days, **rotating** weekly between people, either *at* a time (rings) or *by* a time (quiet). It can be a **loop** of steps that hand off. | **🧹 Chores** tab: Today (tick off), All chores (set up), What done looks like from its **room** (§7B.6, §8.15) | "Laundry": start the washer → move to dryer (60 min later) → fold & put away |
-| **Rolling timer** ⚑ name | A countdown that **restarts when acknowledged**, not on a fixed clock. | **Alarms** tab | "Check on the dog", 60 min |
+| **Rolling timer** ⚑ name | A countdown that **restarts when acknowledged**, not on a fixed clock. | **Alerts** tab | "Check on the dog", 60 min |
 
 **Why scheduled alarms are not calendar events:** a daily alarm drawn on the
 calendar puts the same chip on every single day and buries the real events. Alarms
@@ -1628,7 +1628,7 @@ approval (they just approved it), not after signup or setup. Push only, never ho
   events are single-day in v1.
 - **Tapping a day** opens the **day sheet** (§8.3).
 - **Scheduled alarms (`is_alarm = 1`) are never drawn on the calendar** and never
-  appear in `/calendar`. They are listed on the Alarms tab (§8.5).
+  appear in `/calendar`. They are listed on the Alerts tab (§8.5).
 
 Correct sample for Sep–Oct 2026 (2026-09-01 is a Tuesday; ▣ = public holiday):
 
@@ -3912,7 +3912,7 @@ only the grey backdrop):
 |  S   M   T   W   T   F   S          |
 |  ...continuous weeks...             |
 +-------------------------------------+
-| 📅 Calendar ⏰ Alarms 🧹 Chores 🛒 Lists 🍳 Recipes ⚙ Settings | <- tab bar
+| 📅 Calendar ⏰ Alerts 🧹 Chores 🛒 Lists 🍳 Recipes ⚙ Settings | <- tab bar
 +-------------------------------------+
 ```
 
@@ -3938,10 +3938,10 @@ only the grey backdrop):
   **Check:** on the installed iPhone app, the bar touches the bottom edge with no page showing under
   it, and the stamp under the tabs matches the opening screen's.
 - **My task is running** (asked by MojoSOGO 2026-10-19, "I need an icon on task buddy if it is running so i know",
-  v1.82.0 ⚑ Q309): while I have an open task session (§7G), the ⏰ Alarms tab shows a small 💪 on its icon (title
+  v1.82.0 ⚑ Q309): while I have an open task session (§7G), the ⏰ Alerts tab shows a small 💪 on its icon (title
   "Alarms, task running"), on every tab, from `/status` `myTask`. Only mine; nobody sees another member's.
 - The **＋** floating button appears on Calendar only and creates an event. The
-  Alarms tab has its own **＋ Add** button in each section header.
+  Alerts tab has its own **＋ Add** button in each section header.
 - **Status badges:**
   - A **red badge** appears in the header from `/status` `house.state` (§9.2), exactly as the
     server reports it — the PWA never re-derives it ⚑ (Q38):
@@ -4060,9 +4060,12 @@ Actions:
 - For a repeating event: **Delete this occurrence** (adds to `exdates`) and
   **Delete series**
 
-### 8.5 Alarms screen
+### 8.5 Alerts screen
 
-At the very top, under the "Alarms" heading: a **📢 Announce** button. It opens the
+The tab is named **⏰ Alerts** (v1.82.1, MojoSOGO 2026-10-19 "Menu rename alarms to alerts"); its **⏰ Alarms** section
+button keeps its name, since that section holds the scheduled alarms ⚑ (Q310).
+
+At the very top, under the "Alerts" heading: a **📢 Announce** button. It opens the
 **announce box** (modal, titled "📢 Announce"): a one-line **Message** input (16 px,
 `maxLength` = `ANNOUNCE_MAX`), the channel checkboxes (☑ 📱 Phone ☑ 🔊 House ☑ 🎪 FunHouse — the same
 `ChannelChecks` as the alarm form, chosen each time; the box opens with **every channel ticked, for every
@@ -4237,7 +4240,7 @@ Time      Chore            Days        This week
     Save / Cancel / Delete (creator or owner, like alarms). Delete asks "Delete chore "{title}" and what
     done looks like for it?" (§7B.6).
 
-### 8.5a 💪 Task buddy (Alarms → 💪 Task buddy, §7G)
+### 8.5a 💪 Task buddy (Alerts → 💪 Task buddy, §7G)
 
 The modal shows **my** session only; nobody else's sessions are shown anywhere.
 
@@ -4254,7 +4257,7 @@ The modal shows **my** session only; nobody else's sessions are shown anywhere.
 - **Ringing bar** (§8.2): a task check-in row is `💪 Clean the garage · check-in` with the five answer buttons
   (time up: Finished! · +15 · +30 · Stop) and Away; no Ack. An alert card (§9.5) for it shows the same.
 - **Finish** opens the done check (§7G.6) in a modal; the summary shows after Finish or Stop.
-- **Running mark** (v1.82.0 ⚑ Q309): while my session is open, the 💪 Task buddy button on the Alarms menu shows its
+- **Running mark** (v1.82.0 ⚑ Q309): while my session is open, the 💪 Task buddy button on the Alerts menu shows its
   state under the name, from `/status` `myTask.state` as the server decided it: **🟢 Working** / **☕ On a break** /
   **⏸ Paused**; and the tab bar carries the 💪 of §8.1. A Private task still shows them: `/status` is mine alone.
 
@@ -4675,7 +4678,7 @@ Sam        expired
 ```
   Welcome, Kai 👋
   📅 Calendar — what's happening
-  ⏰ Alarms — alarms and timers
+  ⏰ Alerts — alarms and timers
   🧹 Chores — your chores today and what done looks like
   🛒 Lists — shopping and the rest
             [ Got it ]
@@ -5352,7 +5355,7 @@ repeats (a machine's, a renotify) is spoken again at its first alert after quiet
   session member (setting again replaces it). 400 `invalid_input` with `quietError`'s message.
 - `DELETE /house/quiet` → `{ until: null, byName: null }`: **Turn off now** (both columns NULL).
 
-**The screen** (Alarms tab, right under 📢 Announce, §8.5):
+**The screen** (Alerts tab, right under 📢 Announce, §8.5):
 - Not quiet: a **🤫 Quiet the house** button. It shows one row of chips: **1 hour · 2 hours · 4 hours · Rest of
   today**; one tap sets it (and closes the row).
 - Quiet: a line "🤫 House is quiet until {HH:MM} · {N h M min} left · set by {name}" and **[Turn off now]**.
@@ -5443,7 +5446,7 @@ machine wording checks read the push row, which carries the same words.
 
 ### 9.3 Announcements — `src/shared/announce.ts`, `POST /announce`
 
-A member sends a house announcement **now** from the Alarms tab (§8.5; decided by MojoSOGO
+A member sends a house announcement **now** from the Alerts tab (§8.5; decided by MojoSOGO
 2026-10-03). An announcement is a **delivery with no fire** (§4.2k): it rides the house delivery
 (§9.2) and push sending (§9.1) that alerts already use. Nothing rings, nothing is done or
 acked, nothing is scheduled — **now only**.

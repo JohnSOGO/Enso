@@ -171,7 +171,7 @@ export function Alarms({ onEditAlarm, onEditTimer }: { onEditAlarm: (a: Alarm | 
   };
   return (
     <div style={{ padding: 12, overflowY: 'auto', height: '100%' }}>
-      <h1 style={{ fontSize: '1.15rem', marginBottom: 12 }}>Alarms</h1>
+      <h1 style={{ fontSize: '1.15rem', marginBottom: 12 }}>Alerts</h1>
       <Announce />
       <HouseQuiet />
       <PickGrid entries={entries} onPick={(v) => setOpen(v as Section)} />

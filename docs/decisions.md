@@ -312,3 +312,4 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q307 | Buttons on a task check-in's phone push (§7G.3) | ⚑ None; a tap opens its alert card with the five answers |
 | Q308 | Others seeing my task texts in Status → Recent deliveries (§7G.3, §8.6) | ⚑ Left out for everyone but the task's owner |
 | Q309 | How I know my task is running (§8.1, §8.5a) | ⚑ A small 💪 on the ⏰ Alarms tab icon, and the Task buddy button's note 🟢 Working / ☕ On a break / ⏸ Paused; mine only |
+| Q310 | What "rename Alarms to Alerts" covers (§8.1, §8.5) | ⚑ The tab label, its heading and the Welcome card; the ⏰ Alarms section button inside it and Settings → 🔔 Alerts keep their names |

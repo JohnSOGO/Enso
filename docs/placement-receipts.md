@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-19 — v1.82.1: the Alarms tab's visible label becomes "Alerts" (placement-advisor)
+
+- **Ask:** v1.82.1 patch, SPEC §8.1 / §8.5 / Welcome card, ⚑ Q310. The visible label "Alarms" becomes "Alerts" in the NAV tab bar entry (App.tsx), the tab's h1 (Alarms.tsx) and the Welcome card line (Welcome.tsx). The `'alarms'` id, code names and the inner "⏰ Alarms" section button are unchanged.
+- **Verdict:** EXISTING `frontend/src/App.tsx`, `frontend/src/components/Alarms.tsx`, `frontend/src/components/Welcome.tsx`. REUSE-add-nothing: no new row, no shared change, no migration.
+- **Flow stage:** render.
+- **Why:** these labels are PWA-only display text and already live with their sibling labels (NAV is "the one list of tabs"). Rejected: moving them to vocab.ts, which holds shared wire and validation vocabulary and has no UI labels. Renaming the id or components was also rejected: a visible-text patch does not need a code-wide rename.
+- **Caps:** App.tsx ~174/300, Alarms.tsx ~182/300, Welcome.tsx small; nothing in the band.
+- **Sources read:** docs/placement-receipts.md (head), frontend/src/App.tsx (1–45), src/shared/vocab.ts (searched for labels), a repo-wide search for the visible "Alarms" label in code, tests, SPEC and docs.
+
+---
+
 ## 2026-10-19 — My running task on the tab bar and the Alarms menu (placement-advisor)
 
 - **Ask:** v1.82.0, ⚑ Q309, SPEC §8.1 / §8.5a / §10. GET /status gains `myTask: { title, state } | null` (my open session only); while set, ⏰ Alarms on the tab bar shows a small 💪 and the 💪 Task buddy button shows "🟢 Working" / "☕ On a break" / "⏸ Paused". MojoSOGO: "I need an icon on task buddy if it is running so i know".

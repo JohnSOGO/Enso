@@ -940,6 +940,9 @@ only from its nudge (alert 2). Owed: MojoSOGO's TRY on the iPhone.
 is running so i know"): `/status` carries `myTask`; the ⏰ Alarms tab shows a small 💪 and the Task buddy button
 shows 🟢 Working / ☕ On a break / ⏸ Paused. Built as specified. Owed: his look on the iPhone.
 
+**⏰ Alerts tab** (v1.82.1, SPEC 3.45, §8.1 / §8.5, Q310; MojoSOGO 2026-10-19 "Menu rename alarms to alerts"): the
+tab bar, the tab heading and the Welcome card say Alerts. Code names and the `alarms` tab id stay. Built as specified.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no
