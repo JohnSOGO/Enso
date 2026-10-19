@@ -7,6 +7,23 @@ carry its result.
 
 ---
 
+## 2026-10-19 — Ask for the microphone up front: 🎤 Turn on voice (placement-advisor)
+
+- **Ask:** v1.90.1, SPEC §8.1 status badges, ⚑ Q342. A "🎤 Turn on voice" badge shows while the phone can listen but
+  the mic is not yet allowed (permission 'prompt', or no permissions query and voice never turned on). A tap asks for the
+  mic (getUserMedia, tracks stopped) and the badge goes once the mic is allowed. If refused, it stays and a tap explains.
+- **Verdict:** EXISTING. `frontend/src/components/useSpeech.ts` (new `useMicAsk()`: show / refused / ask, the
+  permission `change` listener, the `enso.voiceOn` flag) and `frontend/src/App.tsx` (the badge in the badges row, the
+  explain overlay when refused). No new row; the useSpeech.ts row text is updated.
+- **Flow stage:** render (phone-only browser permission; no route, no rule, no persist).
+- **Why:** mic permission is part of the phone's own speech, and the hook needs useSpeech's private `recognizerCtor()`.
+  A new hook file was rejected (would export or copy it); a badge component was rejected (App.tsx draws each badge
+  inline); state.tsx was rejected (per-phone, not app state). A grant through the Ensō button on a phone with no
+  permissions query not setting the flag was left out, since the spec doesn't ask for it.
+- **Caps:** useSpeech.ts 103 → ~135 / 300; App.tsx 174 → ~182 / 300. Neither enters the band.
+- **Sources read:** scripts/arch.ts; docs/module-ownership.md; docs/placement-receipts.md; SPEC.md §8.1; docs/decisions.md
+  Q342; useSpeech.ts; App.tsx.
+
 ## 2026-10-19 — steward pass after v1.89.0 (code-steward)
 
 - **Run:** post-release, v1.87.1 (useSpeech one phrase at a time with restart, EnsoButton always-on box / 🗑 Clear / 8 s

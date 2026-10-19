@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.57 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.58 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4114,6 +4114,12 @@ only the grey backdrop):
   - A **red badge** "Phone alerts off" appears when the current member has no push
     subscription.
   - Tapping either explains it and how to fix it.
+  - A **"🎤 Turn on voice"** badge appears when the phone can listen (§8.18) but has not yet been
+    allowed the microphone (the browser's microphone permission is still "ask", or the browser
+    can't say and voice was never turned on on this phone). The opening screen can't hold a tap and
+    iOS asks for the mic only on one, so the ask is this badge: tapping it asks for the microphone
+    and the badge goes away once allowed (refused: it stays, and tapping explains where to allow
+    it). ⚑ Q342
 
 ### 8.2 Ringing bar
 
