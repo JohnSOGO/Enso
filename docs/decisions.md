@@ -317,3 +317,5 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q312 | How a reminder repeats until Done (§8.5b) | ⚑ Every 30 min unless 15 min or every hour is picked (also when the API is given none); 12 alerts (`REMINDER_MAX_ALERTS`), then silent in the Ringing bar until Done |
 | Q313 | Who a new reminder reminds (§8.5b) | ⚑ Me; tick others, none ticked = everyone |
 | Q314 | A reminder time already past (§8.5b) | ⚑ Refused: "Pick a time later than now." |
+| Q315 | After work / After school when a member hasn't set it (§8.5b) | ⚑ Admins: After work 5:30pm; plain members (the kids): After school 3:00pm; the founder starts at After work 3:30pm |
+| Q316 | Whose After time the reminder chip uses (§8.5b) | ⚑ The one person ticked under Remind; with none or several ticked, mine |

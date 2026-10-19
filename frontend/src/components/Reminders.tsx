@@ -9,7 +9,7 @@ import { WEEKDAY, type Channel, type ReminderState } from '../../../src/shared/v
 import { addDays, utcToLocal, weekdayOf } from '../../../src/shared/time';
 import { canChange, cannotChangeText } from '../../../src/shared/roles';
 import { ALERT_TITLE_MAX } from '../../../src/shared/alert-limits';
-import { REMINDER_RENOTIFY, REMINDER_RENOTIFY_DEFAULT, WHEN_CHOICE, WHEN_DEFAULT, whenChoice, type WhenChoiceId } from '../../../src/shared/reminders';
+import { AFTER_LABEL, REMINDER_RENOTIFY, REMINDER_RENOTIFY_DEFAULT, WHEN_CHOICE, WHEN_DEFAULT, whenChoice, type After, type WhenChoiceId } from '../../../src/shared/reminders';
 import s from './Lists.module.css';
 
 /** GET /reminders (§10). */
@@ -76,19 +76,22 @@ export function RemindersSection() {
 function ReminderForm({ reminder, onClose }: { reminder: Reminder | null; onClose: () => void }) {
   const { me, members, tz, refresh } = useApp();
   const founder = useIsFounder();
+  /** ⚑ Q316 — the one person ticked under Remind decides After work / After school; none or several, mine. */
+  const afterFor = (ids: string[]): After => (ids.length === 1 && members.find((m) => m.id === ids[0])?.after) || me.after;
   const init = useMemo(() => {
-    const at = reminder ?? whenChoice(WHEN_DEFAULT, new Date().toISOString(), tz);
+    const at = reminder ?? whenChoice(WHEN_DEFAULT, new Date().toISOString(), tz, me.after.time);
     return {
       title: reminder?.title ?? '', date: at.date, time: at.time, assignedTo: reminder?.assignedTo ?? [me.id],
       ...flagsOf(reminder?.channels, founder), renotify: reminder?.renotifyMin ?? REMINDER_RENOTIFY_DEFAULT,
     };
-  }, [reminder, me.id, tz, founder]);
+  }, [reminder, me.id, me.after.time, tz, founder]);
   const [f, setF] = useState(init);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(f) !== JSON.stringify(init);
   const canEdit = !reminder || canChange(reminder.createdBy, me);
-  const pick = (id: WhenChoiceId) => setF({ ...f, ...whenChoice(id, new Date().toISOString(), tz) });
+  const after = afterFor(f.assignedTo);
+  const pick = (id: WhenChoiceId) => setF({ ...f, ...whenChoice(id, new Date().toISOString(), tz, after.time) });
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true); setError(null);
@@ -115,7 +118,7 @@ function ReminderForm({ reminder, onClose }: { reminder: Reminder | null; onClos
         <div className="field" role="group" aria-label="When">
           <span className="muted" style={{ fontSize: '.8rem' }}>When</span>
           <div className="row wrap" style={{ marginTop: 4 }}>
-            {WHEN_CHOICE.map((w) => <button key={w.id} type="button" onClick={() => pick(w.id)}>{w.label}</button>)}
+            {WHEN_CHOICE.map((w) => <button key={w.id} type="button" onClick={() => pick(w.id)}>{w.id === 'work' ? AFTER_LABEL[after.kind] : w.label}</button>)}
           </div>
           <div className="row" style={{ marginTop: 6 }}>
             <input type="date" aria-label="Date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} style={{ flex: 1, minWidth: 0 }} />

@@ -1,8 +1,9 @@
-// SPEC §8.6 — Settings → 🙂 Me: display name, color and the 12-/24-hour clock (§8.17) → PATCH /me; the 🎯 Point at it switch for this device, founder only (§8.16).
+// SPEC §8.6 — Settings → 🙂 Me: display name, color, the 12-/24-hour clock (§8.17) and After work / After school (§8.5b) → PATCH /me; the 🎯 Point at it switch for this device, founder only (§8.16).
 import { useState } from 'react';
 import { patch } from '../api';
 import { useApp, useIsFounder } from '../state';
-import { MEMBER_PALETTE } from '../../../src/shared/vocab';
+import { AFTER_KIND, MEMBER_PALETTE } from '../../../src/shared/vocab';
+import { AFTER_LABEL } from '../../../src/shared/reminders';
 import { useAction } from './useAction';
 import { setPointAtOn, usePointAtOn } from './PointAtButton';
 
@@ -35,6 +36,16 @@ export function SettingsMe() {
             <label key={label} className="row"><input type="radio" name="clock" checked={me.clock24h === h24} disabled={busy}
               onChange={() => save({ clock24h: h24 })} /> {label}</label>
           ))}
+        </div>
+      </div>
+      <div className="field"><span className="muted" style={{ fontSize: '.8rem' }}>After work / After school (📌 Reminders)</span>
+        <div className="row wrap" style={{ marginTop: 4 }}>
+          {AFTER_KIND.map((k) => (
+            <label key={k} className="row"><input type="radio" name="after" checked={me.after.kind === k} disabled={busy}
+              onChange={() => save({ afterKind: k })} /> {AFTER_LABEL[k]}</label>
+          ))}
+          <input type="time" aria-label="After time" value={me.after.time} disabled={busy}
+            onChange={(e) => e.target.value && save({ afterTime: e.target.value })} />
         </div>
       </div>
       {founder && <label className="row" style={{ marginTop: 12 }}>

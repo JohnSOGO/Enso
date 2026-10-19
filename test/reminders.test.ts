@@ -1,6 +1,6 @@
 // SPEC §8.5b RM6 — the When chips, the "later than now" check and the listed state (pure).
 import { expect, it } from 'vitest';
-import { reminderState, reminderTimeError, whenChoice } from '../src/shared/reminders';
+import { afterError, afterOf, reminderState, reminderTimeError, whenChoice } from '../src/shared/reminders';
 
 const TZ = 'America/Los_Angeles'; // PDT = UTC−7 on 2026-10-19
 const at = (hhmm: string) => `2026-10-19T${String(Number(hhmm.slice(0, 2)) + 7).padStart(2, '0')}:${hhmm.slice(3)}:00.000Z`;
@@ -29,4 +29,16 @@ it('reminderState: done hidden, ringing, due, missed', () => {
   expect(reminderState(base, at('14:00'))).toBe('due');
   expect(reminderState({ ...base, openDueAt: at('15:10') }, at('15:05'))).toBe('due'); // snoozed
   expect(reminderState(base, at('17:00'))).toBe('missed');
+});
+
+it('RM7 afterOf defaults by role, stored values win; whenChoice uses the After time', () => {
+  expect(afterOf({ admin: true, kind: null, time: null })).toEqual({ kind: 'work', time: '17:30' });
+  expect(afterOf({ admin: false, kind: null, time: null })).toEqual({ kind: 'school', time: '15:00' });
+  expect(afterOf({ admin: true, kind: null, time: '15:30' })).toEqual({ kind: 'work', time: '15:30' });
+  expect(afterOf({ admin: false, kind: 'work', time: '16:00' })).toEqual({ kind: 'work', time: '16:00' });
+  expect(whenChoice('work', at('14:00'), TZ, '15:30')).toEqual({ date: '2026-10-19', time: '15:30' });
+  expect(whenChoice('work', at('16:00'), TZ, '15:30')).toEqual({ date: '2026-10-20', time: '15:30' });
+  expect(afterError('gym', null)).toMatch(/afterKind/);
+  expect(afterError(null, '3pm')).toMatch(/afterTime/);
+  expect(afterError(null, null)).toBeNull();
 });
