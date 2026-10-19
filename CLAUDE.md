@@ -70,7 +70,7 @@ Go with the grain of what is already here.
 
 ## Feature requests (SPEC §8.18)
 
-The Ensō button saves what Ensō can't do yet as feature requests (Settings → 💡 Requests). A build session reads
+The Ensō button saves what Ensō can't do yet as feature requests (Settings → 💡 Requests). A scheduled build session reads, every morning (SPEC §8.18 part 6),
 the open ones with `GET /api/v1/ops/requests` (Bearer the ops token). Before building any, run an **AREC**
 (architecture review + verdict, saved in the project files) and the **`placement-advisor`** (and the **`code-steward`**
 when it spans several areas) to learn whether Ensō already does it, whether it fits SPEC §1.3, and where it would go.
