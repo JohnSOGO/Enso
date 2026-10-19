@@ -7,6 +7,35 @@ carry its result.
 
 ---
 
+## 2026-10-19 — The Ensō button, just say it, and feature requests (placement-advisor)
+
+- **Ask:** v1.87.0, SPEC §8.18 (SY1–SY6, SY-M, ⚑ Q331–Q337), §4.2zzc migration 0056 feature_requests, §10 POST /say,
+  GET/POST /feature-requests, POST /feature-requests/{id}/ok|dismiss, GET /ops/requests, PATCH /ops/requests/{id}.
+  Flagged as big to John first; he chose GO. Redesigns an earlier, uncommitted "Just say it" placement (the box moved
+  from Reminders to a global button; /say saves nothing; the popup speaks, with Yes / Clarify / Cancel).
+- **Verdict:** NEW rows: `src/shared/say-reading.ts`, `src/shared/feature-requests.ts`, `src/worker/say-reader.ts`,
+  `src/worker/routes/say.ts`, `src/worker/feature-request-rows.ts`, `src/worker/routes/feature-requests.ts`,
+  `frontend/src/components/EnsoButton.tsx`, `frontend/src/components/useSpeech.ts`,
+  `frontend/src/components/FeatureRequests.tsx`. EXISTING: `routes/ops.ts` (the ops-token surface: /ops/requests behind
+  the file-local guard), `vocab.ts` (FEATURE_REQUEST_STATUS / FEATURE_REQUEST_SIZE / SAY_KIND), `index.ts` (mount),
+  `App.tsx` (mount EnsoButton once), `Reminders.tsx` (export ReminderForm, optional `start`), `Settings.tsx` (💡
+  Requests, admins). REUSE-add-nothing: photo-reads.ts spendPhotoRead, claude.ts askClaude, shared/reminders.ts checks.
+- **Flow stage:** rules (say-reading, feature-requests) → route (say, feature-requests, ops) → persist
+  (feature-request-rows) → render (EnsoButton, useSpeech, FeatureRequests, Reminders).
+- **Why:** the same split as event-reading / event-reader / event-photos and tasks / task-rows / routes/tasks;
+  feature-request-rows.ts keeps ops.ts from importing a route; ops.ts stays one ops-token surface and its guard stays
+  private; exporting ReminderForm follows AlarmForm / TimerForm (extracting it at 177/300 would be classitis; the seam
+  stays named for 270); EnsoButton renders the form itself so App's Overlay union does not grow; the cleaner checks a
+  reminder with the reminders route's own checks so Yes → Save cannot be refused. Threats named: shared Claude spend
+  (the daily budget), and ENSO_DOES in say-reader.ts going stale (the code-steward checks it).
+- **Caps:** App.tsx ~175/300, Reminders.tsx ~190/300, Settings.tsx ~65/99, ops.ts ~100/300, index.ts ~115/300,
+  vocab.ts ~105/300; new files each under 150. Nothing in the band; no CEILINGS change.
+- **Reorganizer:** none needed.
+- **Sources read:** docs/module-ownership.md, docs/modularity.md, scripts/arch.ts, docs/placement-receipts.md, SPEC
+  §8.18, §4.2zzc and the §10 rows, App.tsx, Reminders.tsx, Settings.tsx, routes/ops.ts, photo-reads.ts, vocab.ts.
+
+---
+
 ## 2026-10-19 — steward pass after v1.85.0 (code-steward)
 
 - **Run:** post-release, v1.85.0 (📥 Send to Enso, §7H / §8.8a, migration 0055: shared/inbox.ts, routes/share.ts,

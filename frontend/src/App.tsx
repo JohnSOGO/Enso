@@ -1,4 +1,4 @@
-// SPEC §8.1 — frame: Ringing bar, status badges, the current tab, ＋ button, bottom tab bar.
+// SPEC §8.1 — frame: Ringing bar, status badges, the current tab, ＋ button, the Ensō button (§8.18), bottom tab bar.
 import { useCallback, useEffect, useState } from 'react';
 import { get } from './api';
 import { AppProvider, useApp, type Me } from './state';
@@ -15,6 +15,7 @@ import { Recipes } from './components/Recipes';
 import { Settings } from './components/Settings';
 import { useAlertLink } from './components/MyAlerts';
 import { RingingBar } from './components/RingingBar';
+import { EnsoButton } from './components/EnsoButton';
 import { TaskSaid } from './components/TaskSaid';
 import { MessBanner } from './components/MessBanner';
 import { SignIn } from './components/SignIn';
@@ -93,6 +94,7 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
       {tab === 'calendar' && (
         <button className={s.fab} aria-label="Add event" title="Add event" onClick={() => setOverlay({ kind: 'event', date: today() })}>＋</button>
       )}
+      <EnsoButton />
       <nav className={s.tabs} aria-label="Sections">
         {NAV.map(([id, icon, label]) => (
           <button key={id} className={tab === id ? s.active : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => { setTab(id); if (id === 'lists') setListsTap((n) => n + 1); }}

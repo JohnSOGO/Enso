@@ -2,7 +2,8 @@
 // /ops/pings: the dev PC's FunHouse poller lists the recent ones and the FunHouse alerts (§9.4b), marking those sent. No session:
 // a Bearer OPS_NOTIFY_TOKEN, compared in constant time (unset → 503, never open). One fire-less `push`
 // delivery with its own title, sent at once. No house row, ever. The token and the header are never
-// logged, and never put in a message or a detail.
+// logged, and never put in a message or a detail. §8.18 — GET /ops/requests and PATCH /ops/requests/{id}: a build
+// session's feature-request queue, behind the same guard.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { OPS_NOTIFY_PER_HOUR, opsNotifyError, opsTitle, opsWindowStart } from '../../shared/ops';
@@ -10,6 +11,8 @@ import { FOUNDER_SQL, all, first, nowIso } from '../db';
 import { opsPingsAfter, opsPingsSince, pushDelivery } from '../deliveries';
 import { body, fail } from '../http';
 import { sendPushDeliveries } from '../push';
+import { cleanNote, closeMove } from '../../shared/feature-requests';
+import { loadFeatureRequest, openFeatureRequests, setStatus } from '../feature-request-rows';
 
 export const ops = new Hono<AppEnv>();
 
@@ -72,4 +75,24 @@ ops.post('/ops/notify', async (c) => {
   const deliveries = await all<{ id: string; status: string; detail: string | null }>(db,
     'SELECT id, status, detail FROM deliveries WHERE id = ?', id);
   return c.json({ deliveries }, 201);
+});
+
+/** §8.18 — a build session's queue: the open feature requests, oldest first. */
+ops.get('/ops/requests', async (c) => {
+  const shut = await opsGate(c);
+  if (shut) return shut;
+  return c.json({ requests: await openFeatureRequests(c.env.DB) });
+});
+
+/** §8.18 — a build session closes one: done (built, note = the version) or dismissed (note = why). */
+ops.patch('/ops/requests/:id', async (c) => {
+  const shut = await opsGate(c);
+  if (shut) return shut;
+  const b = await body(c);
+  const r = await loadFeatureRequest(c.env.DB, c.req.param('id'));
+  if (!r) return fail(c, 404, 'not_found', 'That request no longer exists.');
+  const m = closeMove(r.status, b.status);
+  if ('code' in m) return fail(c, m.code, m.code === 400 ? 'invalid_input' : 'invalid_state', m.message);
+  if (!(await setStatus(c.env.DB, r.id, r.status, m.status, cleanNote(b.note), nowIso()))) return fail(c, 409, 'invalid_state', 'That request just changed.');
+  return c.json((await loadFeatureRequest(c.env.DB, r.id))!);
 });

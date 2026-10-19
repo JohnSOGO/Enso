@@ -969,6 +969,16 @@ chips for Days + From / To; it rings once on each chosen day at a random time in
 or Ack ends it (the repeat's `until` set to that day, later fires removed). Stored as an alarm with a Random window; no
 migration. PATCH takes either shape. Built as specified. Owed: his TRY on the iPhone (RW-M).
 
+**The Ensō button** (v1.87.0, SPEC 3.52, §8.18, migration 0056, Q331–Q337; MojoSOGO 2026-10-19 "tell it what I wanted
+and the AI processes it … if there is a required feature that I don't have the AI should make a log", "voice to text …
+for users like Michelle", "a big Ensō icon … records my voice … respond back with a natural human voice … a text pop-up
+… yes clarify cancel"; GO on the card): a round Ensō mark above the tab bar on every tab. Tap, talk (the phone's
+speech-to-text, else the keyboard 🎤), `POST /say` → Claude cleans the words and reads a reminder, "already does this"
+(where) or "can't do it yet". The popup shows it and says it in the phone's best voice, with Yes / Clarify / Cancel.
+Yes opens the reminder form filled in, or saves a feature request (Settings → 💡 Requests; big ones Needs John).
+Build sessions read `GET /ops/requests` and run the placement-advisor first (CLAUDE.md). Built as specified. Owed: his
+TRY on the iPhone (SY-M): whether the home-screen app gets browser speech-to-text, and how the voice sounds.
+
 Deviations from this spec, deliberately:
 
 - **Service worker (M5):** a plain static `sw.js` for push only — no `vite-plugin-pwa`, no

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.51 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.52 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1009,6 +1009,14 @@ photo's R2 key, each optional; its kind (photo / link / text, `INBOX_KIND`) is d
 so there is no CHECK list. New tables only; additive; it runs before the deploy.
 
 Schema: [`migrations/0055_share_inbox.sql`](migrations/0055_share_inbox.sql). The migration is the schema; it is not copied here. **Migration check (SH-M,** [`test/migration-0055.test.ts`](test/migration-0055.test.ts)**):** earlier members come through with no key; a key and an item can be written.
+
+### 4.2zzc Schema change — `migrations/0056_feature_requests.sql`
+
+Asked by MojoSOGO 2026-10-19: what Ensō can't do yet, said to the Ensō button, kept for the next build (§8.18).
+`feature_requests`: what was said, the title, summary and size Claude gave it, its status (`new`, `needs_john`, `done`,
+`dismissed`), a note, who asked and when. Additive; it runs before the deploy.
+
+Schema: [`migrations/0056_feature_requests.sql`](migrations/0056_feature_requests.sql). The migration is the schema; it is not copied here. **Migration check (SY-M2,** [`test/migration-0056.test.ts`](test/migration-0056.test.ts)**):** the table takes a request and refuses an unknown status or size.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -4051,6 +4059,7 @@ only the grey backdrop):
 - **My task is running** (asked by MojoSOGO 2026-10-19, "I need an icon on task buddy if it is running so i know",
   v1.82.0 ⚑ Q309): while I have an open task session (§7G), the ⏰ Alerts tab shows a small 💪 on its icon (title
   "Alarms, task running"), on every tab, from `/status` `myTask`. Only mine; nobody sees another member's.
+- The **Ensō button** (§8.18) sits centred just above the tab bar on every tab: tap it and say what you want.
 - The **＋** floating button appears on Calendar only and creates an event. The
   Alerts tab has its own **＋ Add** button in each section header.
 - **Status badges:**
@@ -4469,7 +4478,7 @@ Settings
 [ 📱 Phone alerts  ] [ 🔊 Speakers       ]
 [ 🔔 Alerts        ] [ 🏠 Household      ]   ← Household and Members: admins only
 [ 👥 Members       ] [ 📊 Status         ]
-[ ℹ️ About         ]
+[ ℹ️ About         ] [ 💡 Requests       ]   ← Requests: admins only (§8.18)
 [ Log out ]
 ```
 
@@ -4479,6 +4488,7 @@ Settings
   for admins only, **Days off** (§7.3) ⚑ Q267 (asked by MojoSOGO 2026-10-12: move Days off "into its own calendar section").
 - **📱 Phone alerts:** this phone's state and Turn on / Turn off / Send a test (§9.1).
 - **🔊 Speakers:** **Speak my alerts on** (§9.2a).
+- **💡 Requests (admins):** the feature requests the Ensō button saved (§8.18).
 - **🔔 Alerts** (§9.5): every push this phone's member got, newest first — tap a line for its card, a red ❌ on each
   line hides it, **Clear all** at the top. A tapped phone notification opens Settings with this area open, on its
   card.
@@ -5258,6 +5268,68 @@ switch Me → Clock to 24-hour and see the alarms list, a machine's done time an
 
 ---
 
+### 8.18 The Ensō button — just say it — asked by MojoSOGO 2026-10-19
+
+"I can just tell it what I want and the AI processes it … if there is a required feature that I don't have, the AI
+should make a log to request the feature on the next build." Then: "voice to text of what we want … for users like
+Michelle … we should just ask for what we want without needing to know if the current build is capable." And: "at the
+bottom of this screen above the bottom menu put a big Ensō icon … when I press it, it records my voice … voice to text
+and processes … correct for language … respond back with a natural human voice … also a text pop-up … with buttons like
+yes clarify cancel. I don't want to reinvent something that already exists." Photos and links keep filling things in as
+they do (§7.8, §7C.4b, §7E, §7H).
+
+**What already exists, and is reused (nothing reinvented):** the phone's own speech-to-text (the browser's
+SpeechRecognition, or the 🎤 on the iPhone keyboard), the phone's own voices for the spoken answer (speechSynthesis; on
+the iPhone, Settings → Accessibility → Spoken Content → Voices → an **Enhanced** or **Premium** voice sounds human), the
+Claude reading every other "fill it in" uses (§7.9), and the reminder form (§8.5b, §8.5c). A paid voice service is not
+used ⚑ Q331.
+
+- **The button:** a round Ensō mark (the app icon, 60 px), centred just above the tab bar on every tab ⚑ Q332.
+- **Tap it** → the **Ensō** popup listens at once: "Listening…", the words appear as they are heard, **Done** (stop and
+  send) and **Cancel**. Where the phone has no speech-to-text, or it fails or is refused, the popup shows a text box
+  instead with "Tap the 🎤 on your keyboard and talk." and **Send** ⚑ Q333. Typing always works.
+- **Send** → `POST /say { text }` → Claude cleans up the words (spelling, grammar, what was misheard) and decides one of
+  three, never saving anything:
+  1. **A reminder** (§8.5b one-off, or §8.5c 🎲 window): the fields, and one sentence of what Ensō will do
+     ("I'll remind you on weekdays between 8 and 11am to book the car check: fix the headlight, the fan stays on.").
+  2. **Ensō already does this** somewhere else: where ("Alerts → ⏱ Rolling timers") and a sentence saying so.
+  3. **Ensō can't do it yet:** a short title, a one-line summary and a size — **small** (fits beside what exists) or
+     **big** (a new area, many screens, or unclear) — and "Ensō can't do that yet. I can save it as a feature request
+     for the next build." A big one adds "It's a big one, so John will look at it first."
+- **The answer** shows in the popup: what Ensō heard (the cleaned words), the sentence, and the buttons, and the phone
+  **says the sentence aloud** in its best English voice (an Enhanced / Premium one when installed) ⚑ Q334; 🔇 stops it.
+  - **Yes** — a reminder: the reminder form opens filled in (§8.5b / §8.5c) to check and **Save** ⚑ Q335; a request:
+    saved (`POST /feature-requests`), "Saved. Thanks!"; already exists: **Open it** is not offered, Yes just closes.
+  - **Clarify** — listens again; what was said before and the new words are sent together.
+  - **Cancel** — closes; nothing saved.
+- **Who:** any member. Each send counts against the household's daily Claude reading budget (§7C.4 `READS_PER_DAY`,
+  shared with photos and links): over it → 429 "Ensō can't read any more today. Try again tomorrow." A failure says so
+  and saves nothing.
+- **Feature requests** (`feature_requests`, §4.2zzc): what was said, the title, summary and size, who, when, and a
+  status: **new** (small), **needs_john** (big) ⚑ Q336, **done** or **dismissed**, with a note.
+- **💡 Requests** (Settings, admins; §8.6): newest first: date · who · title, the summary, and a badge **Needs John** /
+  **New** / **Done** / **Dismissed** (Done and Dismissed dim; shown 30 days, never deleted). The founder sees **OK to
+  build** on a Needs John row (→ New); any admin may **Dismiss** an open one ⚑ Q337.
+- **The build gate** (CLAUDE.md "Feature requests"): a build session reads the open requests with `GET /ops/requests`
+  (the ops token, §9.4). Before building any, it runs the **placement-advisor** (and the **code-steward** when it spans
+  several areas) to learn whether Ensō already does it and where it goes. Already there → `PATCH /ops/requests/{id}
+  { status: 'dismissed', note: 'Already in …' }`. Needs John, or anything big or tangled → not built until John says so.
+  Built → `{ status: 'done', note: 'v1.x.y' }`.
+- **The "what else Ensō does" list** the reading is given lives in `src/worker/say-reader.ts`; a new tab or section
+  updates it (the code-steward checks it).
+
+**Acceptance (SY1–SY6 tests with a fake Claude, SY-M manual):**
+
+| # | Check | Expected |
+|---|---|---|
+| SY1 | POST /say, Claude answers a window reminder for "me" | 200 `{ kind: 'reminder', heard, say, reminder: { title, window: { days, from, to }, assignedTo: [my id] } }`; nothing saved; one read counted |
+| SY2 | Claude answers "exists"; a request (big) | 200 `{ kind: 'exists', where, say }`; 200 `{ kind: 'request', request: { title, summary, size: 'big' }, say }`; no row saved |
+| SY3 | POST /feature-requests `{ text, title, summary, size: 'big' }` then GET /feature-requests as admin, as a plain member | 201 status `needs_john`; listed; 403 |
+| SY4 | founder POST …/ok; an admin POST …/dismiss; a non-founder admin …/ok; …/ok on a `new` one | `new`; `dismissed`; 403; 409 |
+| SY5 | GET /ops/requests with the token; PATCH one `{ status: 'done', note: 'v1.88.0' }`; no token | the open ones, oldest first; `done` with its note; 401 |
+| SY6 | POST /say blank; the day's reads used up; no key | 400; 429; 503 |
+| SY-M | on the iPhone | tap the Ensō button, say "weekdays 8 to 11 remind me to book the car check", hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John |
+
 ## 9. Delivery
 
 ### 9.1 Web Push — phone notifications
@@ -5989,6 +6061,9 @@ other push stays until I hide it ⚑ Q284.
 | GET | `/reminders` | member | → open reminders (§8.5b), soonest first: `{ id, title, date, time, channels, renotifyMin, assignedTo, createdBy, state: 'due' \| 'ringing' \| 'missed', dueAt, window: { days: Weekday[], from, to } \| null }` (`dueAt` = the open fire's due time, else the reminder's own; a window's next ring, §8.5c) |
 | POST | `/reminders` | member | `{ title, date, time: "HH:MM", channels, renotifyMin?, assignedTo? }` or `{ title, window: { days, from, to }, channels, assignedTo? }` (§8.5c) → reminder (201); 400 when not after now, or a bad window |
 | PATCH/DELETE | `/reminders/{id}` | creator or owner | POST fields, all optional, merged; either shape (`window: null` back to a set time, §8.5c); re-plans like an alarm edit |
+| POST | `/say` | member | `{ text }` → 200 `{ kind: 'reminder', heard, say, reminder }` / `{ kind: 'exists', heard, say, where }` / `{ kind: 'request', heard, say, request: { title, summary, size } }` (§8.18); nothing saved; 400 blank, 429 reads used up, 503 no key, 502 / 422 reading failed |
+| GET/POST | `/feature-requests` | admin / member | → `FeatureRequest[]` newest first, last 30 days for done / dismissed: `{ id, text, title, summary, size, status, note, createdBy, createdAt }`; POST `{ text, title, summary, size }` → 201, status from size (§8.18) |
+| POST | `/feature-requests/{id}/ok` · `/dismiss` | founder · admin | → the request; `ok` only from `needs_john` → `new`; `dismiss` from `new` / `needs_john`; else 409 |
 | GET | `/fires?state=ringing` | member | → open fires with titles; every fire carries `startSun` (the event's `start_sun`, §7.7, else `null`); chore fires also carry `choreRunId`, `stepTitle` (only for chores with > 1 step) and `personId` (the current step's person); machine fires carry `machineId`, `title` = the machine's label ("Clothes washer") and `personId` = the load's owner (a cooking timer's fire: its label, §7D.8); every fire carries `awayBy` (§9.2c) |
 | GET | `/machines` | member | → `Machine[]` in load order: `{ id, label, state: MachineState, ownerId, minutes, startedAt, doneAt, startedBy, next }` (`state` derived by the server, §7D.1; `next` = the next machine's id or null) |
 | POST | `/machines/{id}/start` | member | `{ ownerId, minutes, alertId? }` (§7D.7) → `Machine[]`; 409 `busy` when not free (§7D.2) |
@@ -6025,6 +6100,8 @@ other push stays until I hide it ⚑ Q284.
 | POST | `/announce` | member | `{ text, channels: Channel[] }` → 201 `{ deliveries: { id, channel, memberId, status }[] }`; spoken (quiet or not, §9.2b) as "{my name} says: {text}" on every speaker and/or pushed to every member, me too, now (§9.3) |
 | POST | `/ops/notify` | bearer `OPS_NOTIFY_TOKEN` (no session) | `{ text, title? }` → 201 `{ deliveries: [{ id, status, detail }] }`, one push to the founder's phone, now (§9.4); 503 `ops_notify_off` / 401 `unauthorized` / 400 `invalid_input` / 409 `no_recipients` (no founder yet) / 429 `rate_limited`, in that order |
 | GET | `/ops/pings?after=` | bearer `OPS_NOTIFY_TOKEN` (no session) | → `{ pings: [{ id, channel, title, text, at }] }`, the founder pings and FunHouse alerts of the last hour after `after`, oldest first, for the FunHouse poller (§9.4a, §9.4b; listed `funhouse` rows become `sent`); 503 / 401 as `/ops/notify` |
+| GET | `/ops/requests` | bearer `OPS_NOTIFY_TOKEN` | → `{ requests: FeatureRequest[] }`, the open ones (`new`, `needs_john`), oldest first (§8.18); 503 / 401 as `/ops/notify` |
+| PATCH | `/ops/requests/{id}` | bearer `OPS_NOTIFY_TOKEN` | `{ status: 'done' \| 'dismissed', note? }` → the request; 404 / 400 / 409 (already closed) |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, sunOffsetMin, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek, areaCount, roomId }` (`thisWeek`/`nextWeek` = member id or null; `areaCount` §7B.6) |
 | POST | `/chores` | member | `{ title, doneMeans?, roomId?, days, timing, time, sunOffsetMin?, nudge?, people, steps, channels, renotifyMin? }` (`sunOffsetMin` null = clock time, §7B.3) → chore (201); 400 an unknown room (§7B.6) |
 | PATCH/DELETE | `/chores/{id}` | creator or owner | same fields, all optional; re-plans unstarted runs (§7B.3); its room stays (§7B.6) |
