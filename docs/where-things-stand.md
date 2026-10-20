@@ -51,6 +51,9 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 💵 Family IOUs (v1.94.0, §7B.9, §8.15c, migration 0059): Chores → 💵 IOUs → ＋ IOU "I owe Mom $1,200" shows on both
+  phones at once; one Mom adds waits for your OK; a Pay back waits for her Got it; ☐ Split the bill and ☐ Take it off
+  my tab; a weekly Payback plan pings the one who owes at 09:00 on its day, phone only. Q349–Q358 (⚑ except Q349, Q356).
 - 🌤️/🌕 on the calendar (v1.92.0–v1.93.0, §7.11, §7.12, §7.5, migration 0058): on the iPhone, the days around Oct 25
   show 🌕 bottom right after the high and the weather emoji; tap one → "🌕 Full moon" in the day sheet. Settings → 📅
   Calendar → Optional calendar items → turn 🌕 Moon phases off → the moons are gone (Weather the same). Q345–Q346, Q348

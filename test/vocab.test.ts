@@ -27,6 +27,8 @@ const EXPECTED: Record<string, readonly string[]> = {
   'member_prefs.after_kind': vocab.AFTER_KIND,
   'feature_requests.size': vocab.FEATURE_REQUEST_SIZE,
   'feature_requests.status': vocab.FEATURE_REQUEST_STATUS,
+  'iou_payments.how': vocab.IOU_PAY_HOW,
+  'iou_plans.every': vocab.IOU_PLAN_EVERY,
 };
 
 it('every CHECK IN-list in the migrated schema matches vocab.ts', async () => {

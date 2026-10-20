@@ -17,6 +17,7 @@ import { timerStartTick } from './timer-starts';
 import { weatherTick } from './weather-days';
 import { cookDayTick } from './cook-rows';
 import { listPingTick } from './list-pings';
+import { iouPingTick } from './iou-pings';
 
 export interface TickSummary { materialized: number; stepped: number; alerts: number; deliveries: number }
 
@@ -105,6 +106,8 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
   await cookDayTick(env, now);
   // 3f. Ping the owners of every day list items whose time has come (§7A.4).
   await listPingTick(env, now);
+  // 3g. Ping the one who owes on a payback plan's due day (§7B.9).
+  await iouPingTick(env, now);
   // 4. Speak the queued and stale-claimed house deliveries (§9.2).
   await sendHouseDeliveries(env, now);
   return summary;

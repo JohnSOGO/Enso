@@ -7,6 +7,41 @@ carry its result.
 
 ---
 
+## 2026-10-20 — IOUs: ledger, agree rule, fire-less payback ping (placement-advisor)
+
+- **Ask:** New feature, family IOUs (SPEC §7B.9, §8.15c, §4.2zzf; §1.3 widened). Migration 0059 (ious, iou_payments,
+  iou_plans, deliveries.iou_plan_id). Pure rules for parsing dollars, "whoever it costs agrees", the queue per direction
+  (never netted), plan due dates, behind and the 09:00 ping. Nine routes. A tick step sending one fire-less push per due
+  day to the one who owes. Ious.tsx and IouForm.tsx as a sixth 💵 entry in Chores. Vocab IOU_PAY_HOW, IOU_PLAN_EVERY.
+  ENSO_DOES and ENSO_SCOPE. Replaces the same morning's alarm-event verdict. Split the bill / off the tab (Q357–Q358)
+  landed in the same owners (ious.ts parse + tabSplit; POST /ious writes the tab payment).
+- **Verdict:** NEW rows src/shared/ious.ts, src/worker/routes/ious.ts, src/worker/iou-pings.ts,
+  frontend/src/components/Ious.tsx, IouForm.tsx. EXISTING deliveries.ts, tick.ts, index.ts, vocab.ts, say-reader.ts,
+  Chores.tsx. Reorganizer NONE (the deleteEventStatements extract is withdrawn: no event or fire).
+- **Flow stage:** rules (ious.ts), route + persist (routes/ious.ts), persist + deliver (iou-pings.ts, deliveries.ts),
+  render (Ious.tsx, IouForm.tsx).
+- **Why:** Alarms speak on the house and FunHouse follows the phone; money must never be spoken. list-pings.ts is the
+  exact shape: pushDelivery only, no fire, plus a FOUNDER_PING exclusion column, so "never spoken" holds by
+  construction. Every decision sits in one pure module the PWA shares. Plan dates reuse recurrence.ts occurrences().
+  Rejected: alarm event (speaks), the ping inside tick.ts (pinned 148), a separate plans route file. MONTHLY skips
+  months without the start day, so a monthly plan starts on the 1st–28th (Q353). Steward MED: FOUNDER_PING gains
+  `iou_plan_id IS NULL` with a test (IO11).
+- **Caps:** tick.ts 111 → 114 / 148. deliveries.ts 74 → 77. index.ts 114 → 116. vocab.ts 101 → 105. say-reader.ts
+  107 → 108. Chores.tsx 115 → 118. New: ious.ts 221, routes/ious.ts 148, iou-pings.ts 38, Ious.tsx 108,
+  IouForm.tsx 95. Nothing newly in the band.
+- **Sources read:** scripts/arch.ts, docs/module-ownership.md, docs/placement-receipts.md, src/worker/tick.ts,
+  deliveries.ts, list-pings.ts, index.ts, say-reader.ts, routes/my-alerts.ts, src/shared/recurrence.ts,
+  alert-history.ts, frontend/src/components/Chores.tsx, migrations/, SPEC.md.
+
+## 2026-10-20 — Steward pass, IOU AREC (money, §1.3 widening) (code-steward)
+
+- **Run:** on-demand, scoped AREC for the family IOU system (real USD, record-only).
+- **Verdict:** SOUND. No touched file in the warning band (hand-computed; node_modules was missing then).
+- **Top finding:** MED: deliveries.ts FOUNDER_PING excludes fire-less push sources by enumeration; a new `iou_plan_id`
+  must be added there, or IOU pushes become founder pings relayed to ops and FunHouse. Done in v1.94.0 (IO11).
+- **Handoffs:** lift messes.ts balancesOf into weighted pair netting only if netting is chosen (it was not: Q352).
+- **Restraint:** Chores menu size, tick.ts growth, per-source delivery FK columns, merging bounty and mess code.
+
 ## 2026-10-19 — log why Build now failed (placement-advisor)
 
 - **Ask:** v1.93.2 patch, SPEC §8.18 part 6 Build now (steward backlog, MojoSOGO "Fix"): when POST
