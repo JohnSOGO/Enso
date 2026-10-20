@@ -2,8 +2,8 @@
 // (heard words fill it; type or fix it by hand; 🗑 Clear starts over, ⚑ Q338), POST /say, then what Ensō heard and
 // what it will do, spoken aloud, with Yes / Clarify / Cancel. Yes on a reminder opens the reminder form filled in; on
 // a request POST /feature-requests, then for an admin's small one "Build it now?" (⚑ Q344). Outside the scope (§1.3): Clarify / OK, and leaving any way but Clarify logs it
-// as Out of scope (POST /feature-requests with outside). Tap to talk (⚑ Q360): the mark opens it; the Ensō mark inside
-// starts listening (the first tap is when the phone asks for the mic) and a second tap stops. Renders what the server
+// as Out of scope (POST /feature-requests with outside). Tap to talk (⚑ Q360): the mark opens it; the Ensō mark in its
+// footer starts listening (the first tap is when the phone asks for the mic) and a second tap stops. Renders what the server
 // read; never decides it.
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from './Modal';
@@ -118,13 +118,7 @@ export function EnsoButton() {
           {before && phase === 'listen' && <p className="muted" style={{ fontSize: '.85rem', marginBottom: 8 }}>Before: {before}</p>}
           {phase === 'listen' && (
             <div className="field" aria-live="polite">
-              <div className={s.talkRow}>
-                <button type="button" className={`${s.talk} ${listen.listening ? s.on : ''}`} onClick={talk}
-                  aria-pressed={listen.listening} aria-label={listen.listening ? 'Stop listening' : 'Talk'}>
-                  <img src="/icon.svg" alt="" draggable={false} />
-                </button>
-                <span className={s.listening}>{hint ? 'Tap the 🎤 on your keyboard and talk.' : listen.listening ? '🎤 Listening… tap Ensō to stop.' : 'Tap Ensō to talk, or type.'}</span>
-              </div>
+              <span className={s.listening}>{hint ? 'Tap the 🎤 on your keyboard and talk.' : listen.listening ? '🎤 Listening… tap Ensō to stop.' : 'Tap Ensō to talk, or type.'}</span>
               <textarea aria-label="What you want" rows={4} autoFocus={listen.unavailable} value={typed} maxLength={SAY_TEXT_MAX}
                 placeholder="Weekdays 8 to 11, remind me to book the car check" onChange={(e) => edit(e.target.value)} />
             </div>
@@ -152,6 +146,10 @@ export function EnsoButton() {
       <button className="primary" onClick={send} disabled={!words.trim()}>Done</button>
       <button onClick={() => listenFrom('', listen.listening)}>🗑 Clear</button>
       <button onClick={close}>Cancel</button>
+      <button type="button" className={`${s.talk} ${listen.listening ? s.on : ''}`} onClick={talk}
+        aria-pressed={listen.listening} aria-label={listen.listening ? 'Stop listening' : 'Talk'}>
+        <img src="/icon.svg" alt="" draggable={false} />
+      </button>
     </>;
     if (phase === 'answer' && reading?.kind === 'outside') return <>
       <button className="primary" onClick={close}>OK</button>
