@@ -7,6 +7,21 @@ carry its result.
 
 ---
 
+## 2026-10-20 — steward pass after v1.96.0 (code-steward)
+
+- **Run:** post-release, v1.95.0 (tap to talk; mic asked on the first talk tap, Q360; hold to talk, the Splash mic ask,
+  the 🎤 badge and useMicAsk removed), v1.95.1 (talk mark in the popup footer), v1.96.0 (✏️ Edit on answers, Q361).
+- **Verdict:** SOUND. Typecheck green; 983/983; arch:audit quiet (top EventForm.tsx 200/223, engine.ts 88%). 4 receipts
+  reconciled against 4 code commits; 0 without a receipt. No leftover reference to the removed mic code.
+- **Top finding:** LOW: docs/where-things-stand.md still told you to try hold to talk and the opening mic popup; fixed in
+  the same docs commit as this receipt.
+- **Handoffs:** 0 to reorganizer; 1 to worker inside the next EnsoButton change (unused `.words` CSS rule, the
+  `words = typed` alias); 0 to placement-advisor.
+- **Restraint:** EnsoButton's size and phase switch (one coherent owner); Splash.tsx at 21 lines; the redundant
+  listenFrom call in fixWords; the mic refusal lasting until reload (as the spec says); no component test for the popup.
+- **Carried:** isShareKey / InboxSetup apiUrl; deleteEventStatements, renotifyText, updateEventStatement; where a failed
+  Out of scope log shows; gating show* at a 5th calendar item.
+
 ## 2026-10-20 — Ensō answer screen ✏️ Edit back to the box (placement-advisor)
 
 - **Ask:** SPEC §8.18 part 3, v1.96.0, ⚑ Q361, MojoSOGO 2026-10-20 "Edit": on every answer (Yes / Clarify / Cancel, and
