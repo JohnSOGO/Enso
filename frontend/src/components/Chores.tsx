@@ -1,5 +1,5 @@
-// SPEC §8.15 — the 🧹 Chores tab: a menu of ✅ Today (ChoresToday), 🪙 Bounties and 🏅 Score (§8.15b), 🧽 Messes (§8.15a)
-// and 📋 All chores (one line per chore, sorted by time, §8.5, 🪙 n when it has a bounty), the tapped one in a Modal. A row opens the chore form; its 📋 opens What done looks like. Whose
+// SPEC §8.15 — the 🧹 Chores tab: a menu of ✅ Today (ChoresToday), 🪙 Bounties and 🏅 Score (§8.15b), 🧽 Messes (§8.15a),
+// 💵 IOUs (§8.15c) and 📋 All chores (one line per chore, sorted by time, §8.5, 🪙 n when it has a bounty), the tapped one in a Modal. A row opens the chore form; its 📋 opens What done looks like. Whose
 // turn it is comes from the server (thisWeek / nextWeek); nothing is computed here. Holds which section is open.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Modal } from './Modal';
@@ -9,6 +9,7 @@ import { ChoresToday, whenText } from './ChoresToday';
 import { MessesSection } from './Messes';
 import { BountiesSection } from './Bounties';
 import { ScoreSection } from './Score';
+import { IousSection } from './Ious';
 import { errorText, get } from '../api';
 import { useApp } from '../state';
 import type { Channel, ChoreTiming, Weekday } from '../../../src/shared/vocab';
@@ -22,12 +23,13 @@ export interface Chore {
   createdBy: string; thisWeek: string | null; nextWeek: string | null; areaCount: number; bounty: number | null; roomId: string | null;
 }
 
-type Section = 'today' | 'bounties' | 'messes' | 'all' | 'score';
+type Section = 'today' | 'bounties' | 'messes' | 'ious' | 'all' | 'score';
 
-/** ⚑ Q245, Q255 — the menu, as on Settings (§8.6) and Alarms (§8.5); Today first. */
+/** ⚑ Q245, Q255, Q354 — the menu, as on Settings (§8.6) and Alarms (§8.5); Today first. */
 const SECTIONS: readonly { value: Section; emoji: string; label: string }[] = [
   { value: 'today', emoji: '✅', label: 'Today' }, { value: 'bounties', emoji: '🪙', label: 'Bounties' },
-  { value: 'messes', emoji: '🧽', label: 'Messes' }, { value: 'all', emoji: '📋', label: 'All chores' },
+  { value: 'messes', emoji: '🧽', label: 'Messes' }, { value: 'ious', emoji: '💵', label: 'IOUs' },
+  { value: 'all', emoji: '📋', label: 'All chores' },
   { value: 'score', emoji: '🏅', label: 'Score' },
 ];
 
@@ -49,6 +51,7 @@ export function ChoresTab({ onEdit, onOpenAreas }: { onEdit: (c: Chore | null) =
     today: () => <ChoresToday onOpenAreas={openAreas} />,
     bounties: () => <BountiesSection chores={sorted} />,
     messes: () => <MessesSection />,
+    ious: () => <IousSection />,
     score: () => <ScoreSection />,
     all: () => <AllChoresSection sorted={sorted} error={error} turn={turn} onEdit={onEdit} onOpenAreas={onOpenAreas} />,
   };

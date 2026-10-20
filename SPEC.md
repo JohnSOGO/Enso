@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.69 · **Date:** 2026-10-19 · **Owner:** MojoSOGO
+**Version:** 3.70 · **Date:** 2026-10-20 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -116,6 +116,8 @@ household's home life turning. An ask fits when it is about:
 - the family's **calendar** and plans, and who is going;
 - **reminders, alarms and timers** for the people in the house;
 - **chores**, rooms, messes, bounties and who did what;
+- **IOUs**: money the household's members owe each other, in US dollars, and paying it back (§7B.9). Ensō **records**
+  it; it never moves money (MojoSOGO 2026-10-20 "Add to Ensos scope a family IOU system" … "This is for real money USD");
 - the **house** itself: its machines (washer, dryer, dish washer, cooking), its speakers and announcements, quiet times;
 - the household's **lists**: shopping, wishes, to-dos, every day lists, movies and shows, things shared in;
 - **recipes** and cooking;
@@ -125,7 +127,8 @@ It does not fit when it is about the list below. Ensō says so instead of offeri
 **Out of scope** for John to review (he may widen the scope; "still log the ask as out of scope for my review"):
 
 - **buying, ordering or paying** (stores, Amazon, deliveries, bills). Ensō keeps the list, not the cart;
-- **money**: banking, budgets, investing, trading;
+- **money** beyond who owes whom in the house: moving or sending money (Venmo, bank transfers, cards), banking,
+  budgets, investing, trading;
 - **work or school systems**, or other apps, websites or accounts to log into or control;
 - **general questions, chat, search or news** (Ensō is not an assistant for everything);
 - **people outside the household**, or anything to do with them that isn't the household's own plan.
@@ -386,6 +389,8 @@ This table says what each term means.
 | `expired` (login view) | A login request past its `expires_at` while still `pending` or `approved`, or one already `used`, as the waiting browser is told — derived from `now`, never stored |
 | `login` / `new_sign_in` | A sign-in notice push (§6.6): a phone-approval request / "New sign-in on …" after a password sign-in. Not an `ALERT_KIND`: no fire, no actions |
 | `paid` / `forgiven` | How a point owed for a mess was settled (§7B.7): paid back in person / let go |
+| `paid` / `let_go` / `tab` (IOU payment) | An IOU payment (§7B.9): money paid back, outside Ensō / an amount the one owed let go / a split bill taken off the payer's tab instead of a new IOU |
+| `week` / `2weeks` / `month` (payback plan) | How often a payback plan is due (§7B.9): every week, every 2 weeks, every month, from its start date |
 | `open` / `taken` / `pending` / `paid` (bounty) | A one-off bounty (§7B.8): anyone can take it / someone said I'll do it in the last 3 h / done, waiting for an admin's OK / OK'd, its points count — derived, never stored |
 | `open` / `discuss` / `owed` / `closed` / `settled` (mess) | A mess report (§7B.7): asking who left it / on To talk about / claimed or recorded, a point owed / closed as nobody's / the point paid back or let go — derived from the row |
 | `sogoai` / `claude` | Who named a snapped item (§7A.3): SogoAI's local vision model (free) / the Claude API (the fallback) |
@@ -1066,6 +1071,19 @@ Schema: [`migrations/0058_weather_moon_optional.sql`](migrations/0058_weather_mo
 [`test/weather-moon-optional.test.ts`](test/weather-moon-optional.test.ts)**):** a member saved before 0058 has both on
 after it; `PATCH /me { showWeather, showMoon }` saves a boolean for that member and refuses anything else.
 
+### 4.2zzf Schema change — `migrations/0059_ious.sql`
+
+Asked by MojoSOGO 2026-10-20: a family IOU system in real US dollars (§7B.9). Three new tables: `ious` (who owes whom
+how much, and the note), `iou_payments` (money paid back, let go or taken off a tab, with a note for a tab) and `iou_plans` (a repeating payback), each with
+who made it, when it was OK'd (NULL = waiting) and a soft delete or end. Money is **whole cents in INTEGER columns**,
+never REAL. At most one live plan per direction (a partial unique index). `deliveries.iou_plan_id` points a payback
+ping at its plan, so "pinged today" is counted from deliveries, never stored. Additive; it runs before the deploy.
+
+Schema: [`migrations/0059_ious.sql`](migrations/0059_ious.sql). **Migration check (IOU-M,**
+[`test/migration-0059.test.ts`](test/migration-0059.test.ts)**):** a delivery written before 0059 survives with
+`iou_plan_id` NULL; an IOU of 0 cents, an unknown payment `how` or plan `every`, and a second live plan for the same
+direction are refused; `tab` is taken.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1290,6 +1308,8 @@ Runs from `scheduled()` every minute, and from `POST /api/v1/dev/tick` in dev.
    3d. **Weather.** `weatherTick` (`src/worker/weather-days.ts`): the once-a-day forecast refresh (§7.11). It never
    throws; a failure is logged and retried hourly.
    3e. **Cooking timers' end of day.** Close every open cooking timer `cookExpired` names (§7D.8).
+   3f. **Ping owners.** `listPingTick` (`src/worker/list-pings.ts`): every day list items whose time has come (§7A.4).
+   3g. **Payback pings.** `iouPingTick` (`src/worker/iou-pings.ts`): each live payback plan due today (§7B.9).
 4. **Speak house.** `sendHouseDeliveries(env, now)` drains queued and stale-claimed `house`
    deliveries (§9.2).
 5. Use a D1 `batch()` per fire for the writes. D1 has no `BEGIN`/`COMMIT`.
@@ -1333,8 +1353,9 @@ For one alert of one fire:
   - from the second alert on, append `" (alert {n})"`
 
 A delivery with **no fire** is an announcement (§9.3, `POST /announce`), a sign-in notice (§6.6), a
-founder ping (§9.4, `POST /ops/notify`), a mess ask (§7B.7) or a bounty push (§7B.8). `tick` writes only mess asks, in
-step 3b (§5.6); every fire-less row is written through `src/worker/deliveries.ts`.
+founder ping (§9.4, `POST /ops/notify`), a mess ask (§7B.7), a bounty push (§7B.8), a list ping (§7A.4) or an IOU
+payback ping (§7B.9). Of these `tick` writes mess asks (step 3b, §5.6), list pings and payback pings; every
+fire-less row is written through `src/worker/deliveries.ts`.
 
 ### 5.8 Engine acceptance tables (M1 — each row is a test)
 
@@ -2850,6 +2871,123 @@ earning OK'd) or deleted ⚑ Q260.
 | BT-M3 | migration check (§4.2zs) | bounties written before 0046 survive with `photo_key` NULL; `foreign_key_check` empty |
 | BT-M2 | migration check (§4.2zr) | earnings written before 0045 survive with `photo_key` NULL; `foreign_key_check` empty |
 | BT-M | migration check (§4.2zq) | rows written before 0044 survive; `chores.bounty` and the new `deliveries` columns NULL on them; `foreign_key_check` empty |
+
+### 7B.9 Family IOUs — who owes whom, paybacks and payback plans — `src/shared/ious.ts` (pure)
+
+Asked by MojoSOGO 2026-10-20 (reviewed first as an AREC, `arec-family-iou.md`): "Add to Ensos scope a family IOU
+system. Scheduled payback, queued debt items, one off paybacks." Then: "This is for real money USD" and "This is
+mostly for adults owing each other thousands because of phone purchase kind of stuff… no limit." Ensō **records**
+money owed between household members and its paying back; no money moves through Ensō (§1.3 ⚑ Q349). It is the money
+twin of a mess point (§7B.7) and never mixed with it: mess Balances stay points, IOUs stay dollars.
+
+**The words.** An **IOU** is one debt: the one who **owes** (`owed_by`), the one **owed** (`owed_to`), an amount and
+an optional note ("Shelly's new phone"). A **direction** is one ordered pair, owes → owed. Mom → Sam and Sam → Mom are
+two directions, shown apart and **never netted** ⚑ Q352. A **payment** is money paid back (`paid`, outside Ensō) or
+let go (`let_go`) in one direction. A **payback plan** is a repeating amount due in one direction.
+
+**Whoever it costs agrees** ⚑ Q351. Anything that makes someone owe more, or be owed less, waits for that person's OK:
+
+| Made by | IOU (costs the one who owes) | Payment (costs the one owed) |
+|---|---|---|
+| the one who owes | counts at once | waits for the one owed: **Got it** |
+| the one owed | waits for the one who owes: **OK** | counts at once |
+| an admin who is neither | counts at once | counts at once |
+
+Only that person can OK it. Until then it is **waiting**: shown to both, counted in nothing.
+
+**What is owed** in a direction = the sum of its OK'd, live IOUs minus the sum of its OK'd, live payments (never below
+0). **The queue** is its OK'd IOUs oldest first; payments pay them off oldest first, so each IOU shows how much of it is
+paid ⚑ Q352. Both are derived on each read, never stored.
+
+**A payback plan** ⚑ Q353: an amount, **every** `week` / `2weeks` / `month`, and a start date (household local). Due
+dates come from the one recurrence format (§4.3: `WEEKLY` interval 1 or 2, or `MONTHLY` on the start date's day; a
+monthly start day must be 1–28 so no month is skipped). At most one live plan per direction; a new one replaces it.
+On each due date, at `PLAN_PING_TIME` (09:00 household time) or the first tick after, the one who owes gets **one
+push**, phone only: never spoken on the house speakers, never on the FunHouse, never a founder ping (§9.4) — money is
+private. It is due `min(amount, what is owed)`. A plan holds no money of its own: paying is a payment as any other.
+**Behind** = the amounts due on its due dates before today, minus the payments OK'd in that direction since its start
+date, never below 0 nor above what is owed. Missed dates are not chased again. A plan **ends** when what is owed in its
+direction reaches 0 (the write that does it sets `ended_at`), or when either of the two or an admin ends it.
+
+**Split the bill** ⚑ Q357 (MojoSOGO 2026-10-20: "split the bill where one person is paying and another has to pay their
+half"): on ＋ IOU, the amount is the bill's total and the one who owes owes **half** (rounded down to the cent; the odd
+cent stays with the one who paid). It is an IOU like any other, with the same OK.
+
+**Off the tab** ⚑ Q358 ("Take it off my tab… instead of paying half, it is reduced from debt"): when the one who paid
+(the one owed) already owes the other one, ＋ IOU can take the amount **off that tab** instead of adding an IOU. It is
+written as a payment in the other direction, `how` = `tab`, with the IOU's note, as far as that tab goes (what is owed
+there less payments still waiting); anything past it is an IOU as usual. Whoever it costs agrees: the tab payment
+costs the other one, so it waits for their **Got it** unless they recorded it. A `tab` payment is made only this way.
+
+**Who sees it** ⚑ Q350: the two people in a direction, and every admin. Nobody else, not even that a direction exists.
+
+**Records** ⚑ Q355: amounts are never edited. A mistake is fixed by deleting a waiting row (who made it, the person
+it waits on as a decline, or an admin) or, once OK'd, by an admin deleting it; a deleted row is kept (`deleted_at`). An OK'd IOU
+can't be deleted while the payments already OK'd in its direction need it (what is owed would go below 0).
+
+**The rules** (pure; imports only vocab, time and recurrence):
+
+- `IOU_NOTE_MAX` = 120. **No amount limit** ⚑ Q356: `IOU_CENTS_MAX` = 9 999 999 999 (\$99,999,999.99) only guards
+  against a slip of the thumb and whole cents staying exact. `PLAN_PING_TIME` = `'09:00'`. `PAYBACK_TITLE` = "💵 Payback due".
+- `parseAmount(v)` → whole cents, or a message: a number of dollars, or text like `"1,500.50"` / `"$20"` (commas, a
+  leading `$` and spaces ignored); at most two decimals; more than 0 and at most `IOU_CENTS_MAX`.
+- `centsText(cents)` → `"$1,500.50"`, the only formatter.
+- `parseIouInput({ owedBy, owedTo, amount, note, split?, offTab? }, activeIds)` → `{ owedBy, owedTo, cents, note,
+  offTab }` or a message: two different active members; the note trimmed, empty → null, at most 120; `split` halves
+  the amount (half of 1 cent is refused). `tabSplit(cents, tabRoom)` → `{ tab, iou }`, the part off the tab and the
+  rest. `reverse(d)` → the other direction. `parsePaymentInput` the same with `how` (`paid` / `let_go`; `tab` is
+  refused there) instead of a note. `parsePlanInput` the same with `every` (`IOU_PLAN_EVERY`) and `startDate` (a date;
+  for `month` its day 1–28).
+- `madeError(owedBy, owedTo, viewer)` → why I may not add an IOU, payment or plan in that direction (not one of the two
+  and not an admin), or null. `letGoError(owedBy, viewer)` → the one who owes can't let their own debt go.
+- `countsAtOnce(kind, row, creatorId)` → whether the new row is OK'd at once (the table above); `okError(kind, row,
+  viewerId)` → why I may not OK it (not the person it waits on; already OK'd).
+- `deleteError(kind, row, viewer)` → why I may not delete it (the Records rule), or null.
+- `owedCents(ious, payments)`, `queueOf(ious, payments)` → each OK'd IOU oldest first with `paidCents`.
+- `planDates(plan, from, to)` (through `occurrences`), `nextDue(plan, today)`, `behindCents(plan, today, owed,
+  payments)`, `pingDue(plan, today, localTime, owed)` → due today, at or after `PLAN_PING_TIME`, something owed.
+- `paybackMessage(toName, dueCents, owedCents)` → `"Pay {to} {due} today. {owed} owed in all."`.
+- `pairsOf(ious, payments, plans, viewer, today)` → `IouPair[]`, the directions the viewer may see that have something
+  owed, waiting or a live plan, most owed first. `IouPair = { owedBy, owedTo, owedCents, items: IouItem[], waiting:
+  { ious: IouItem[], payments: IouPayment[] }, payments: IouPayment[] (OK'd, newest first), plan: IouPlan | null }`;
+  `IouItem = { id, cents, note, createdBy, createdAt, okAt, paidCents }`; `IouPayment = { id, cents, how, note, createdBy,
+  createdAt, okAt }`; `IouPlan = { id, centsEach, every, startDate, nextDue, behindCents }`.
+
+**Delivery.** A payback ping is a **fire-less push** (§9.1) with `deliveries.iou_plan_id` set and the title
+`PAYBACK_TITLE`; "pinged today" is read from that column. It is not a founder ping: `FOUNDER_PING` in
+`src/worker/deliveries.ts` leaves out `iou_plan_id` rows (§9.4), so it is neither counted for the hourly limit nor
+listed for the FunHouse poller. Tick step 3g, `src/worker/iou-pings.ts`. Nothing else in IOUs pushes anyone ⚑ Q353:
+the waiting rows show in the app.
+
+**The routes** — `src/worker/routes/ious.ts` (§10): `GET /ious` → `{ pairs }`; `POST /ious` → `{ pairs }` (the
+directions it touched: the IOU's, and the tab's when it took some off), `POST /ious/{id}/ok`,
+`DELETE /ious/{id}`; `POST /iou-payments`, `POST /iou-payments/{id}/ok`, `DELETE /iou-payments/{id}`; `POST
+/iou-plans`, `DELETE /iou-plans/{id}`. Every other write answers with that direction's `IouPair` (null when nothing
+is left in it); the deletes answer 204. A row I may not see is 404. A payment above what is owed in its direction
+minus the payments still waiting there → 409 `iou_too_much` "That's more than the $X still owed.". A plan with nothing
+owed → 409 `iou_nothing_owed`. OK on an OK'd row → 409 `iou_state`.
+
+**Acceptance (IO1–IO14, `test/ious.test.ts` for the rules, `test/ious-api.test.ts` through the Worker):**
+
+| # | Given | Then |
+|---|---|---|
+| IO1 | `parseAmount`: `"1,500.50"`, `"$20"`, `20`, `"0"`, `"1.234"`, `"abc"`, `"100000000"` | 150050; 2000; 2000; a message ×4 |
+| IO2 | `centsText(150050)`, `centsText(5)`, `centsText(123456789)` | "$1,500.50", "$0.05", "$1,234,567.89" |
+| IO3 | Sam adds "Sam owes Mom $1,200 (phone)" | counts at once: Sam → Mom, $1,200.00 owed |
+| IO4 | Mom adds "Sam owes Mom $300"; Sam OKs | waiting, owed unchanged; then owed + $300; Mom can't OK it (403) |
+| IO5 | Sam records a $100 payment | waiting until Mom taps Got it; then owed − $100, paid oldest IOU first |
+| IO6 | a payment above what is owed minus waiting payments | 409 `iou_too_much` |
+| IO7 | Sam tries Let it go on his own debt | 403 |
+| IO8 | a third member (not admin) reads `/ious` | Sam → Mom is not there; an admin sees it |
+| IO9 | Mom → Sam and Sam → Mom both have IOUs | two pairs, not netted |
+| IO10 | a weekly $100 plan from a Friday; tick at 08:59 and 09:00 that Friday, again at 10:00 | no push; one push to Sam "Pay Mom $100.00 today. …", titled 💵 Payback due, push only; no second push |
+| IO11 | that push | not counted by `opsPingsSince`, not in `/ops/pings` |
+| IO12 | payments bring the direction to $0 | the plan's `ended_at` is set; no more pings; the pair leaves `/ious` |
+| IO13 | Ann adds "Bo owes Ann $80.01, Dinner", split | an IOU of $40.00 waiting for Bo's OK |
+| IO14 | Ann owes Bo $1,000; Ann adds a $100 split off her tab; then Bo adds $9,600 off the tab himself | a $50.00 `tab` payment waiting for Bo's Got it, no IOU for Bo; then the rest of Ann's tab is paid at once and the rest of the $9,600 is Bo's IOU; `how: 'tab'` on `/iou-payments` → 400 |
+
+**Status:** v1.94.0. Manual (IOU1–IOU2 on the iPhone, §8.15c).
+
 
 ---
 
@@ -5101,13 +5239,13 @@ chores** (the chore list of §8.5, with ＋ Add), and from Today or All chores, 
 
 **A menu** (v1.55.0, asked by MojoSOGO 2026-10-11: "Chores needs a modal after pressed, which chore sub category are
 we pushing into") ⚑ Q245: under the heading "Chores", the same grid as Settings and Alarms (§8.6, `PickGrid`) of
-**✅ Today**, **🪙 Bounties**, **🧽 Messes**, **📋 All chores**, **🏅 Score**, Today first (Bounties and Score
-since v1.57.0, §8.15b ⚑ Q255). A tap opens that section in a modal titled with its emoji
+**✅ Today**, **🪙 Bounties**, **🧽 Messes**, **💵 IOUs**, **📋 All chores**, **🏅 Score**, Today first (Bounties and
+Score since v1.57.0, §8.15b ⚑ Q255; IOUs since v1.94.0, §8.15c ⚑ Q354). A tap opens that section in a modal titled with its emoji
 and name; ✕, Escape or a tap outside closes it back to the tab. A chore form, What done looks like sheet or Report a
 mess sheet opens on top of its section and closing it returns there. Nothing inside a section changed; only where it
 sits. The mess banner (§8.15a) stays on every screen.
 
-Acceptance (CM1–CM3): CM1 the tab shows the five buttons and no list; CM2 each button opens its section in a modal
+Acceptance (CM1–CM3): CM1 the tab shows the six buttons and no list; CM2 each button opens its section in a modal
 and ✕ returns to the grid; CM3 ticking a Today step, tapping a chore row, and 📸 Report a mess all work from inside
 their modal.
 
@@ -5265,6 +5403,52 @@ BS2 the kid taps I'll do it, then Done with a photo from the camera, and the adm
 the photo full size and OKs it; BS3 Score shows the
 kid's points this week and the House row; BS4 an admin taps Done on a one-off and sees no 📷, only "Your points
 count at once." (Q261).
+
+### 8.15c 💵 IOUs (§7B.9)
+
+**💵 IOUs** — the modal (Chores menu, §8.15):
+
+```
+                                                   [＋ IOU]
+Sam owes Mom  $1,350.00                                   ▸
+  Waiting for OK
+    $300.00 · tickets · added by Mom              [OK] [✕]     (Sam's buttons)
+    Paid $100.00 · by Sam                    [Got it] [✕]      (Mom's buttons)
+  Plan: $100.00 every week from Fri Oct 23 · next Fri Oct 23 · behind $0.00      [End plan]
+  Queue (oldest first)
+    $1,200.00 · Shelly's phone · Oct 20 · $150.00 paid
+    $300.00 · tickets · Oct 21
+  Paid back
+    $150.00 · Oct 22 · paid
+  [Pay back] [Let it go] [Payback plan]
+```
+
+- One card per direction I may see (`GET /ious`), most owed first: "{who} owes {whom} {owed}" ("You owe Mom",
+  "Sam owes you"). A tap opens it ▾. None → "Nobody owes anybody." A direction with only waiting rows shows $0.00 owed.
+- **Waiting for OK**: each waiting IOU and payment. **OK** (an IOU, for the one who owes) / **Got it** (a payment, for
+  the one owed), and ✕ for whoever may delete it (§7B.9 Records; asks first). A dim "Waiting for {name}" for the rest.
+- **Plan**: amount, how often, start, next due, behind (only when more than $0), and **End plan** (asks first).
+- **Queue**: each OK'd IOU oldest first: amount, note, date, and "$X paid" when part is paid ("paid ✓" when all is).
+  An admin gets ✕ on each (asks first; a refusal shows inside).
+- **Paid back**: the OK'd payments newest first: amount, date, "paid", "let go" or "off the tab" with its note, and ✕
+  for an admin.
+- Buttons for the two and admins: **Pay back** and **Payback plan**; **Let it go** for the one owed and admins.
+- **＋ IOU** opens a sheet: **Who owes** and **Who is owed** (active members, me first in Who owes), **Amount** (text,
+  `inputmode="decimal"`, "$" before it), **Note** (one line, `maxLength` 120), **☐ Split the bill: {payer} paid, {other}
+  owes half**, and, only when {payer} owes {other} something, **☐ Take it off {payer}'s tab ({amount} owed to {other})**,
+  then **Add** / **Cancel**. Under the
+  buttons, dim: "Counts once {name} taps OK." when it will wait, else "Counts at once.".
+- **Pay back** / **Let it go** open a sheet: **Amount** (filled with what is owed), then **Save** / **Cancel**, with the
+  same dim line ("Counts once {name} taps Got it.").
+- **Payback plan** opens a sheet: **Amount each time**, **Every** (Week · 2 weeks · Month), **Starting** (a date,
+  today by default; for Month the 1st–28th), then **Start** / **Cancel**; "Replaces the plan now running." when there is one.
+- A refusal shows inside its sheet or card. Amounts are typed as dollars; the page sends them as typed and the server
+  parses them (`parseAmount`); every amount shown is `centsText`. Buttons ≥ 44 px; nothing red.
+
+Acceptance (IOU1–IOU2, manual on the iPhone at 320 px): IOU1 an adult adds "I owe Mom $1,200" and Mom's card shows it
+at once; Mom adds a $300 one, the adult's card shows OK, and after OK the queue shows both; IOU2 a weekly plan pings
+the one who owes at 09:00 on its day, phone only, and a payment recorded by them shows Got it on the other's phone.
+
 
 ### 8.16 🎯 Point at it — name what I tapped
 
@@ -6106,7 +6290,8 @@ other push stays until I hide it ⚑ Q284.
   `chore` → "Chore"; `thing` → "Thing to do"; `machine` → "Machine"); a `notice` → "Sign-in"; a `mess_id` →
   "Whose mess?"; a `title` → that title (a ping: "🏛️ Ozymandias", "🤖 Claude"); else "Announcement" (a timer
   start announcement too ⚑ Q223). The ping branch matches `opsPingsSince` (§9.4), except that a bounty push (§7B.8)
-  also takes the title branch ("🪙 New bounty", "🪙 Waiting for OK") but is not a founder ping.
+  also takes the title branch ("🪙 New bounty", "🪙 Waiting for OK") but is not a founder ping; an IOU payback ping
+  (§7B.9) too ("💵 Payback due").
 - `ALERTS_PATH = "/settings/alerts"`; a tap opens `/settings/alerts?alert={id}`, built in sw.js. `alertIdFrom(pathname,
   search)` → the id when the path is `ALERTS_PATH` and `alert` is set, else null. sw.js carries its own copy of
   the path (a test pins it).
@@ -6272,6 +6457,15 @@ other push stays until I hide it ⚑ Q284.
 | POST | `/messes/{id}/decide` | owner | `{ memberId: string \| null }` → `Mess`: whose it was, or nobody's (§7B.7) |
 | POST | `/messes/{id}/settle` | the one owed, or owner | `{ how: 'paid' \| 'forgiven' }` → `Mess`; 409 unless owed (§7B.7) |
 | DELETE | `/messes/{id}` | reporter while unanswered, or owner | → 204 (§7B.7) |
+| GET | `/ious` | member | → `{ pairs: IouPair[] }`, the pairs I am in, every pair for an admin (§7B.9) |
+| POST | `/ious` | member, one of the two or owner | `{ owedBy, owedTo, amount, note?, split?, offTab? }` → `{ pairs }` (201); 400 a bad amount, the same person twice, a long note (§7B.9) |
+| POST | `/ious/{id}/ok` | the one who owes | → `IouPair`; 409 `iou_state` once OK'd (§7B.9) |
+| DELETE | `/ious/{id}` | waiting: who made it or the one who owes; OK'd: owner | → 204; 409 when payments already cover it (§7B.9) |
+| POST | `/iou-payments` | member, one of the two or owner | `{ owedBy, owedTo, amount, how }` → `IouPair` (201); 409 more than is owed; 403 `let_go` by the one who owes (§7B.9) |
+| POST | `/iou-payments/{id}/ok` | the one owed | → `IouPair`; 409 `iou_state` once OK'd (§7B.9) |
+| DELETE | `/iou-payments/{id}` | waiting: who made it or the one owed; OK'd: owner | → 204 (§7B.9) |
+| POST | `/iou-plans` | member, one of the two or owner | `{ owedBy, owedTo, amount, every, startDate }` → `IouPair` (201); replaces that direction's live plan; 409 nothing owed (§7B.9) |
+| DELETE | `/iou-plans/{id}` | one of the two, or owner | → 204, the plan ends (§7B.9) |
 | GET | `/bounties` | member | → `{ bounties: Bounty[], waiting: Earning[], scores: Score[] }` (§7B.8) |
 | POST | `/bounties` | owner | `{ title, note?, points }` → `Bounty` (201); pushes everyone else once (§7B.8) |
 | POST | `/bounties/{id}/take` \| `/let-go` \| `/done` | member | → `Bounty`; 409 `bounty_state` on the wrong state (§7B.8) |
