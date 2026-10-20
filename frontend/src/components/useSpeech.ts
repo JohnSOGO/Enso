@@ -18,13 +18,13 @@ const recognizerCtor = (): RecognizerCtor | null => {
 };
 
 const join = (a: string, b: string) => `${a} ${b}`.replace(/\s+/g, ' ').trim();
-/** Errors that mean the phone won't listen at all (refused, no mic): show the keyboard hint instead. */
+/** Errors that mean this try won't listen (refused, no mic): show the keyboard hint; the next tap tries again. */
 const FATAL = new Set(['not-allowed', 'service-not-allowed', 'audio-capture', 'language-not-supported']);
 const RESTARTS = 30; // one popup's worth of phrases; stops an endless restart loop
 
 /**
- * Listen (⚑ Q338): `words` grows as it hears, `heard` once any word came in; `unavailable` once the phone has no
- * speech-to-text or it was refused. The iPhone's recognizer stops after each phrase (and drops results when
+ * Listen (⚑ Q338): `words` grows as it hears, `heard` once any word came in; `unavailable` when the phone has no
+ * speech-to-text; `refused` when this try was refused or failed (no mic, the keyboard holding it): start() tries again. The iPhone's recognizer stops after each phrase (and drops results when
  * continuous), so it runs one phrase at a time and starts again on end, keeping what was heard, until stop / reset.
  */
 export function useListen() {
@@ -37,6 +37,7 @@ export function useListen() {
   const [heard, setHeard] = useState(false);
   const [listening, setListening] = useState(false);
   const [unavailable, setUnavailable] = useState(() => recognizerCtor() === null);
+  const [refused, setRefused] = useState(false);
 
   const run = useCallback(() => {
     const Ctor = recognizerCtor();
@@ -50,7 +51,7 @@ export function useListen() {
         const all = join(kept.current, now.current);
         setWords(all); if (all) setHeard(true);
       };
-      r.onerror = (e) => { if (FATAL.has(e.error)) { want.current = false; setUnavailable(true); } };
+      r.onerror = (e) => { if (FATAL.has(e.error)) { want.current = false; setRefused(true); } };
       r.onend = () => {
         if (rec.current !== r) return; // an older recognizer, replaced by Clear
         kept.current = join(kept.current, now.current); now.current = '';
@@ -59,17 +60,17 @@ export function useListen() {
       rec.current = r;
       setListening(true);
       r.start();
-    } catch { want.current = false; setUnavailable(true); setListening(false); }
+    } catch { want.current = false; setRefused(true); setListening(false); }
   }, []);
   const start = useCallback(() => {
     rec.current?.abort();
     kept.current = ''; now.current = ''; restarts.current = 0;
-    setWords(''); setHeard(false);
+    setWords(''); setHeard(false); setRefused(false);
     want.current = true; run();
   }, [run]);
   const stop = useCallback(() => { want.current = false; rec.current?.stop(); setListening(false); }, []);
   useEffect(() => () => { want.current = false; rec.current?.abort(); }, []);
-  return { words, heard, listening, unavailable, start, stop };
+  return { words, heard, listening, unavailable, refused, start, stop };
 }
 
 /** English, Enhanced / Premium (the iPhone's human-sounding voices) first, then the phone's default English one. */

@@ -1068,3 +1068,5 @@ Built as specified. Owed: his TRY on the iPhone (make the Shortcut; share a Safa
 **🎤 Talk mark in the footer** (v1.95.1, SPEC 3.73, §8.18 part 2, Q360; MojoSOGO 2026-10-20 "Move logo" with a screenshot): the Ensō talk mark moved from beside the line to the right end of Done / 🗑 Clear / Cancel.
 
 **✏️ Edit what Ensō heard** (v1.96.0, SPEC 3.74, §8.18 part 3, Q361; MojoSOGO 2026-10-20 "Let me edit the text… voice to text gets some words wrong", "Edit"): every Ensō answer has ✏️ Edit, back to the box holding the heard words to fix and send again. AREC: arec-tap-to-talk.md (addendum). Placement: EnsoButton.tsx.
+
+**🎤 Voice not lost after one failed try** (v1.96.1, SPEC 3.75, §8.18 part 2, Q338; MojoSOGO 2026-10-20 "sometimes the text box is not selected and the VtT is not captured"): a refused or failed recognizer start (the iPhone's first mic popup, the keyboard's dictation holding the mic) used to switch voice off until the app reloaded; now it fails only that try and the next tap asks again, and the talk tap puts the keyboard away first. Steward leftovers (`.words`, `words = typed`) removed.

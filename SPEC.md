@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.74 · **Date:** 2026-10-20 · **Owner:** MojoSOGO
+**Version:** 3.75 · **Date:** 2026-10-20 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5571,7 +5571,10 @@ Ensō to talk, or type." while it isn't). The first tap is when the phone asks f
 Allow popup); nothing asks before ⚑ Q360. Heard words go after what the box already holds; it can be fixed by hand or
 typed (typing stops listening) ⚑ Q333. **Done** sends the box (enabled once it holds words), **🗑 Clear** empties it
 (still listening if it was), **Cancel** closes. With no speech-to-text, a refusal, or 8 seconds listening with nothing
-heard, the line says "Tap the 🎤 on your keyboard and talk." and the box still works ⚑ Q338. The phone's voice is woken
+heard, the line says "Tap the 🎤 on your keyboard and talk." and the box still works ⚑ Q338; a refusal or a failed try
+(the mic busy, the popup's first answer) fails only that try, and the next tap of the mark asks again. Tapping the mark
+to talk puts the keyboard away first, so the keyboard's own 🎤 never holds the mic (MojoSOGO 2026-10-20 "sometimes the
+text box is not selected and the VtT is not captured"). The phone's voice is woken
 on Done, never while listening, so the voice and the mic never fight. Admins also see **💡 Requests** here
 (part 5).
 
