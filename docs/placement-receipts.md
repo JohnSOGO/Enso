@@ -7,6 +7,20 @@ carry its result.
 
 ---
 
+## 2026-10-20 — Voice not captured after one refused try: per-try `refused` (placement-advisor)
+
+- **Ask:** v1.96.1 fix, SPEC §8.18 part 2 (⚑ Q338/Q360). MojoSOGO: "sometimes the text box is not selected and the VtT
+  is not captured". Split the sticky `unavailable` into no-recognizer `unavailable` and a per-try `refused` cleared by
+  start(); talk() blurs the focused box before listening and retries after a refusal; drop the unused `.words` CSS rule
+  and the `const words = typed` alias.
+- **Verdict:** frontend/src/components/useSpeech.ts + EnsoButton.tsx + EnsoButton.module.css [EXISTING]. Reorganizer NONE.
+- **Flow stage:** render (client capture of intent; no server change).
+- **Why:** the recognizer's state is useSpeech's one concern; the talk gesture and hint are EnsoButton's. Rejected: a
+  retry layer in state.tsx (one consumer); a new hook (classitis for ~10 lines). run()'s catch sets `refused` (the
+  constructor exists); `autoFocus` stays tied to `unavailable` so a refusal doesn't bring the keyboard's mic back.
+- **Caps:** useSpeech.ts ~106/300, EnsoButton.tsx ~175/300. Nothing in the band.
+- **Sources read:** useSpeech.ts, EnsoButton.tsx, EnsoButton.module.css, scripts/arch.ts, module-ownership.md.
+
 ## 2026-10-20 — steward pass after v1.96.0 (code-steward)
 
 - **Run:** post-release, v1.95.0 (tap to talk; mic asked on the first talk tap, Q360; hold to talk, the Splash mic ask,

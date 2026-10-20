@@ -41,8 +41,7 @@ export function EnsoButton() {
   const [saved, setSaved] = useState<FeatureRequest | null>(null); // offered Build now (⚑ Q344)
   const [building, setBuilding] = useState(false);
 
-  const words = typed;
-  const hint = listen.unavailable || quiet;
+  const hint = listen.unavailable || listen.refused || quiet;
 
   // Heard words fill the box (the last ones may come just after it stops); typing in it stops listening, so a hand
   // edit is never written over.
@@ -60,10 +59,11 @@ export function EnsoButton() {
   function begin() { stopSpeaking(); setError(null); setPhase('listen'); listenFrom('', false); }
   function edit(text: string) { edited.current = true; if (listen.listening) listen.stop(); setTyped(text); }
   const open = () => { setBefore(null); setReading(null); begin(); };
-  // ⚑ Q360 — the Ensō mark in the box: a tap listens (after what the box holds), the next tap stops.
+  // ⚑ Q360 — the Ensō mark: a tap listens (after what the box holds), the next tap stops; after a refusal a tap tries again.
   function talk() {
     if (listen.listening) { listen.stop(); return; }
     if (listen.unavailable) { setQuiet(true); return; }
+    (document.activeElement as HTMLElement | null)?.blur(); // the keyboard's own 🎤 would hold the mic
     stopSpeaking(); listenFrom(typed, true);
   }
   const logged = useRef(false); // an outside answer is logged once
@@ -78,7 +78,7 @@ export function EnsoButton() {
   async function send() {
     unlockSpeech(); // on the Done tap, not before listening: the voice and the mic don't share the phone at once
     listen.stop();
-    const said = words.trim();
+    const said = typed.trim();
     if (!said) { setError('Say or type what you want first.'); return; }
     const text = before ? clarified(before, said) : said;
     setPhase('reading'); setError(null);
@@ -144,7 +144,7 @@ export function EnsoButton() {
 
   function footer() {
     if (phase === 'listen') return <>
-      <button className="primary" onClick={send} disabled={!words.trim()}>Done</button>
+      <button className="primary" onClick={send} disabled={!typed.trim()}>Done</button>
       <button onClick={() => listenFrom('', listen.listening)}>🗑 Clear</button>
       <button onClick={close}>Cancel</button>
       <button type="button" className={`${s.talk} ${listen.listening ? s.on : ''}`} onClick={talk}
