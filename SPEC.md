@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.72 · **Date:** 2026-10-20 · **Owner:** MojoSOGO
+**Version:** 3.73 · **Date:** 2026-10-20 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5564,7 +5564,8 @@ and the reminder form (§8.5b, §8.5c). No paid voice service ⚑ Q331.
 **1. The mark.** A round Ensō mark (the app icon, 84 px), centred just above the tab bar on every tab ⚑ Q332. A **tap**
 opens the popup, not listening yet ⚑ Q360 (MojoSOGO 2026-10-20 "tap to open input… tap enso to speak and again to stop").
 
-**2. Talking.** A smaller round Ensō mark beside the line, over a **text box** that is always there. **Tap the mark** and
+**2. Talking.** A line over a **text box** that is always there, and a smaller round Ensō mark at the right end of the
+buttons under it (after Cancel; MojoSOGO 2026-10-20 "Move logo"). **Tap the mark** and
 it listens: it pulses green and the line says "🎤 Listening… tap Ensō to stop."; **tap it again** and it stops ("Tap
 Ensō to talk, or type." while it isn't). The first tap is when the phone asks for the microphone (its own Allow / Don't
 Allow popup); nothing asks before ⚑ Q360. Heard words go after what the box already holds; it can be fixed by hand or

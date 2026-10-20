@@ -7,6 +7,20 @@ carry its result.
 
 ---
 
+## 2026-10-20 — Ensō talk mark moves to the popup footer (placement-advisor)
+
+- **Ask:** v1.95.1 patch, SPEC §8.18 part 2 (⚑ Q360), MojoSOGO 2026-10-20 "Move logo": move the in-popup round Ensō
+  talk mark from the row above the text box to the far right of the popup footer, after Done / 🗑 Clear / Cancel
+  (margin-left:auto); the hint line stays above the box.
+- **Verdict:** frontend/src/components/EnsoButton.tsx + EnsoButton.module.css [EXISTING]. Reorganizer NONE.
+- **Flow stage:** render.
+- **Why:** pure relocation of an existing control inside the one owner of the Ensō popup; talk() and useListen unchanged.
+  Modal's `.foot` is already a wrapping flex row, so `margin-left:auto` right-aligns it with Modal untouched. Rejected:
+  a Modal "end slot" prop (speculative widening of a high-fan-in component for one caller). `.talkRow` deleted.
+- **Caps:** EnsoButton.tsx ~172/300; EnsoButton.module.css ~25/300. Nothing in the band.
+- **Sources read:** EnsoButton.tsx, EnsoButton.module.css, Modal.tsx, Modal.module.css, scripts/arch.ts,
+  module-ownership.md (EnsoButton row).
+
 ## 2026-10-20 — Ensō tap opens, in-popup mark talks; mic ask moved off opening (placement-advisor)
 
 - **Ask:** SPEC §8.18 parts 1–2, §8.10, §8.1; replaces ⚑ Q340 (hold to talk) and ⚑ Q342 (mic ask at opening) with
