@@ -6,13 +6,21 @@
   background: var(--surface); border: 1px solid var(--border);
   box-shadow: 0 6px 18px rgba(0, 0, 0, .45);
   z-index: 5; display: grid; place-items: center;
-  /* ⚑ Q340 hold to talk: no copy / save menu or text selection on a long press. */
-  -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; touch-action: none;
+  -webkit-touch-callout: none; user-select: none; -webkit-user-select: none;
 }
 .enso img { width: 68px; height: 68px; border-radius: 99px; pointer-events: none; -webkit-touch-callout: none; }
 .enso:active { transform: translateX(-50%) scale(.94); }
-/* ⚑ Q340 — while the mark is held the popup opens under the finger: select nothing, show no callout; the box stays editable. */
-.holding, .holding *:not(textarea) { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-.listening { font-weight: 600; margin-bottom: 8px; }
+/* ⚑ Q360 — the Ensō mark in the box: tap to talk, tap again to stop; it pulses while listening. */
+.talkRow { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.talk { flex: none; width: 56px; height: 56px; border-radius: 99px; padding: 0; display: grid; place-items: center;
+  background: var(--surface); border: 2px solid var(--border); -webkit-touch-callout: none; }
+.talk img { width: 46px; height: 46px; border-radius: 99px; pointer-events: none; }
+.talk.on { border-color: #22C55E; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, .6); }
+  50% { box-shadow: 0 0 0 12px rgba(34, 197, 94, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .talk.on { animation: none; } }
+.listening { font-weight: 600; }
 .words { font-size: 1.05rem; min-height: 3em; }
 .say { font-size: 1.1rem; line-height: 1.4; margin-bottom: 8px; }

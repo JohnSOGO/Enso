@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-20, v1.94.1, main = production.*
+*Last updated 2026-10-20, v1.95.0, main = production.*
 
 ## Running where
 
@@ -51,6 +51,8 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 🎤 Tap to talk (v1.95.0, §8.18, Q360): reopen the app → no mic ask. Tap the Ensō mark → the box opens quiet; tap
+  Ensō in the box → the iPhone asks for the mic once, then it pulses "Listening…"; talk, tap Ensō again → stops; Done.
 - 💵 Family IOUs (v1.94.0–v1.94.1, §7B.9, §8.15c, migration 0059; he said "Assume it works", so optional): Chores → 💵 IOUs → ＋ IOU "I owe Mom $1,200" shows on both
   phones at once; one Mom adds waits for your OK; a Pay back waits for her Got it; ☐ Split the bill and ☐ Take it off
   my tab; a weekly Payback plan pings the one who owes at 09:00 on its day, phone only. Q349–Q358 (⚑ except Q349, Q356).

@@ -16,7 +16,6 @@ import { Settings } from './components/Settings';
 import { useAlertLink } from './components/MyAlerts';
 import { RingingBar } from './components/RingingBar';
 import { EnsoButton } from './components/EnsoButton';
-import { useMicAsk, type MicAsk } from './components/useSpeech';
 import { TaskSaid } from './components/TaskSaid';
 import { MessBanner } from './components/MessBanner';
 import { SignIn } from './components/SignIn';
@@ -51,7 +50,7 @@ type Overlay =
   | { kind: 'explain'; title: string; text: string }
   | null;
 
-function Shell({ onLogout, justJoined, openAlert, onAlertOpened, mic }: { onLogout: () => void; justJoined: boolean; openAlert: string | null; onAlertOpened: () => void; mic: MicAsk }) {
+function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: () => void; justJoined: boolean; openAlert: string | null; onAlertOpened: () => void }) {
   const { me, status, today } = useApp();
   const [tab, setTab] = useState<Tab>(() => {
     if (openAlert) return 'settings'; // §9.5 — a tapped notification opens its card in Settings → 🔔 Alerts
@@ -70,7 +69,7 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened, mic }: { onLogo
       <RingingBar />
       <TaskSaid />
       <MessBanner />
-      {(house || phoneOff || mic.show) && (
+      {(house || phoneOff) && (
         <div className={s.badges}>
           {house && (
             <button className="badge bad" onClick={() => setOverlay({ kind: 'explain', title: house.title, text: house.text })}>
@@ -81,12 +80,6 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened, mic }: { onLogo
             <button className="badge bad" onClick={() => setOverlay({ kind: 'explain', title: 'Phone alerts off',
               text: 'This account has no phone subscribed for push alerts, so “Phone” alerts cannot reach you. Turn them on in Settings → 📱 Phone alerts (on iPhone: from the Ensō app on the Home Screen). See Settings → 📊 Status for each delivery.' })}>
               📵 Phone alerts off
-            </button>
-          )}
-          {mic.show && (
-            <button className="badge" onClick={() => (mic.refused ? setOverlay({ kind: 'explain', title: 'Voice is off',
-              text: 'This phone said no to the microphone, so the Ensō button can’t listen. Allow it in the phone’s settings (on iPhone: Settings → Safari → Microphone, or the website settings for enso.sogodojo.com), then tap again.' }) : void mic.ask())}>
-              🎤 Turn on voice
             </button>
           )}
         </div>
@@ -138,7 +131,6 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened, mic }: { onLogo
 
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
-  const mic = useMicAsk(); // ⚑ Q342 one mic state for the opening screen and the header badge
   useEffect(() => { get<Me>('/me').then(setMe).catch(() => setMe(null)); }, []);
   const onMe = useCallback((m: Me | null) => setMe(m), []);
   // §6.2a — the join page lives at /join#CODE; leaving it (joined, chose Sign in, or already signed in — Q20) means '/'.
@@ -152,7 +144,7 @@ export function App() {
   // §9.5 — a tapped notification's /settings/alerts?alert={id}; kept across a sign-in first (⚑ Q225).
   const [openAlert, onAlertOpened] = useAlertLink();
 
-  return <>{body()}<Splash ready={me !== undefined} signedIn={!!me} mic={mic} /></>;
+  return <>{body()}<Splash ready={me !== undefined} /></>;
 
   function body() {
     if (me === undefined) return null;
@@ -164,7 +156,7 @@ export function App() {
     if (approveId) return <ApproveLogin id={approveId} clock24h={me.clock24h} onDone={() => { forgetApproveRequest(); setApproveId(null); }} />;
     return (
       <AppProvider me={me} onMe={onMe}>
-        <Shell onLogout={() => { setJustJoined(false); setMe(null); }} justJoined={justJoined} openAlert={openAlert} onAlertOpened={onAlertOpened} mic={mic} />
+        <Shell onLogout={() => { setJustJoined(false); setMe(null); }} justJoined={justJoined} openAlert={openAlert} onAlertOpened={onAlertOpened} />
       </AppProvider>
     );
   }

@@ -2,8 +2,9 @@
 // (heard words fill it; type or fix it by hand; 🗑 Clear starts over, ⚑ Q338), POST /say, then what Ensō heard and
 // what it will do, spoken aloud, with Yes / Clarify / Cancel. Yes on a reminder opens the reminder form filled in; on
 // a request POST /feature-requests, then for an admin's small one "Build it now?" (⚑ Q344). Outside the scope (§1.3): Clarify / OK, and leaving any way but Clarify logs it
-// as Out of scope (POST /feature-requests with outside). Hold to talk (⚑ Q340): press opens it listening, letting go
-// after HOLD_MS sends. Renders what the server read; never decides it.
+// as Out of scope (POST /feature-requests with outside). Tap to talk (⚑ Q360): the mark opens it; the Ensō mark inside
+// starts listening (the first tap is when the phone asks for the mic) and a second tap stops. Renders what the server
+// read; never decides it.
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from './Modal';
 import { ReminderForm } from './Reminders';
@@ -22,9 +23,6 @@ const SAVED = 'Saved. Thanks!';
 const SAVED_BUILD = 'Saved. Build it now?'; // ⚑ Q344, to an admin when the request is small
 const BUILDING = "Building now. John gets a ping when it's live.";
 const QUIET_MS = 8000; // nothing heard this long → the keyboard-🎤 hint (⚑ Q338)
-const HOLD_MS = 500; // ⚑ Q340 — held at least this long, letting go sends
-const LAST_WORDS_MS = 400; // after letting go, the phone's last words still arrive
-const HOLDING = s.holding; // on <html> while the mark is held: nothing on screen is selected (⚑ Q340)
 
 export function EnsoButton() {
   const listen = useListen();
@@ -33,8 +31,6 @@ export function EnsoButton() {
   const [quiet, setQuiet] = useState(false);
   const base = useRef(''); // what the box held when listening began; heard words go after it
   const edited = useRef(false); // typed by hand since listening began: heard words no longer fill the box
-  const pressed = useRef<number | null>(null); // when the mark was pressed, while held
-  const release = useRef<() => void>(() => {}); // the latest "let go": reads this render's box
   const [phase, setPhase] = useState<Phase>('closed');
   const [typed, setTyped] = useState('');
   const [before, setBefore] = useState<string | null>(null); // Clarify: what was said before
@@ -57,33 +53,19 @@ export function EnsoButton() {
     return () => clearTimeout(t);
   }, [phase, listen.listening, listen.heard]);
 
-  function listenFrom(text: string) {
+  function listenFrom(text: string, on: boolean) {
     base.current = text; edited.current = false; setTyped(text); setQuiet(false);
-    if (!listen.unavailable) listen.start();
+    if (on && !listen.unavailable) listen.start(); else listen.stop();
   }
-  function begin() { stopSpeaking(); setError(null); setPhase('listen'); listenFrom(''); }
+  function begin() { stopSpeaking(); setError(null); setPhase('listen'); listenFrom('', false); }
   function edit(text: string) { edited.current = true; if (listen.listening) listen.stop(); setTyped(text); }
   const open = () => { setBefore(null); setReading(null); begin(); };
-
-  // Hold to talk: the press opens it listening; letting go after HOLD_MS sends, or shows the hint if nothing was heard.
-  release.current = () => { if (words.trim()) void send(); else setQuiet(true); };
-  function press(e: React.PointerEvent<HTMLButtonElement>) {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    pressed.current = Date.now();
-    document.documentElement.classList.add(HOLDING);
-    open();
+  // ⚑ Q360 — the Ensō mark in the box: a tap listens (after what the box holds), the next tap stops.
+  function talk() {
+    if (listen.listening) { listen.stop(); return; }
+    if (listen.unavailable) { setQuiet(true); return; }
+    stopSpeaking(); listenFrom(typed, true);
   }
-  function letGo(cancelled: boolean) {
-    const at = pressed.current;
-    pressed.current = null;
-    document.documentElement.classList.remove(HOLDING);
-    window.getSelection()?.removeAllRanges();
-    if (at === null || cancelled || Date.now() - at < HOLD_MS) return; // a tap: stays open and listening
-    unlockSpeech(); // in the gesture, so the answer can be spoken
-    listen.stop();
-    setTimeout(() => release.current(), LAST_WORDS_MS);
-  }
-  useEffect(() => () => document.documentElement.classList.remove(HOLDING), []);
   const logged = useRef(false); // an outside answer is logged once
   function close() {
     listen.stop(); stopSpeaking(); setPhase('closed');
@@ -128,20 +110,24 @@ export function EnsoButton() {
 
   return (
     <>
-      <button className={s.enso} aria-label="Ensō: say what you want (hold to talk)" title="Say what you want, or hold to talk"
-        onPointerDown={press} onPointerUp={() => letGo(false)} onPointerCancel={() => letGo(true)}
-        onClick={(e) => { if (e.detail === 0) open(); }} onContextMenu={(e) => e.preventDefault()}>
+      <button className={s.enso} aria-label="Ensō: say what you want" title="Say what you want" onClick={open}>
         <img src="/icon.svg" alt="" draggable={false} />
       </button>
       {phase !== 'closed' && (
         <Modal title="Ensō" onClose={close} error={error} footer={footer()}>
           {before && phase === 'listen' && <p className="muted" style={{ fontSize: '.85rem', marginBottom: 8 }}>Before: {before}</p>}
           {phase === 'listen' && (
-            <label className="field" aria-live="polite">
-              <span className={s.listening}>{hint ? 'Tap the 🎤 on your keyboard and talk.' : listen.listening ? '🎤 Listening…' : '🎤 Tap Done to send, or Cancel.'}</span>
-              <textarea rows={4} autoFocus={listen.unavailable} value={typed} maxLength={SAY_TEXT_MAX}
+            <div className="field" aria-live="polite">
+              <div className={s.talkRow}>
+                <button type="button" className={`${s.talk} ${listen.listening ? s.on : ''}`} onClick={talk}
+                  aria-pressed={listen.listening} aria-label={listen.listening ? 'Stop listening' : 'Talk'}>
+                  <img src="/icon.svg" alt="" draggable={false} />
+                </button>
+                <span className={s.listening}>{hint ? 'Tap the 🎤 on your keyboard and talk.' : listen.listening ? '🎤 Listening… tap Ensō to stop.' : 'Tap Ensō to talk, or type.'}</span>
+              </div>
+              <textarea aria-label="What you want" rows={4} autoFocus={listen.unavailable} value={typed} maxLength={SAY_TEXT_MAX}
                 placeholder="Weekdays 8 to 11, remind me to book the car check" onChange={(e) => edit(e.target.value)} />
-            </label>
+            </div>
           )}
           {phase === 'listen' && isAdmin(me) && <button className="plain" onClick={() => setRequests(true)}>💡 Requests</button>}
           {phase === 'reading' && <p className={s.listening}>Ensō is thinking…</p>}
@@ -164,7 +150,7 @@ export function EnsoButton() {
   function footer() {
     if (phase === 'listen') return <>
       <button className="primary" onClick={send} disabled={!words.trim()}>Done</button>
-      <button onClick={() => listenFrom('')}>🗑 Clear</button>
+      <button onClick={() => listenFrom('', listen.listening)}>🗑 Clear</button>
       <button onClick={close}>Cancel</button>
     </>;
     if (phase === 'answer' && reading?.kind === 'outside') return <>
