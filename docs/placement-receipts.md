@@ -7,6 +7,19 @@ carry its result.
 
 ---
 
+## 2026-10-20 — Ensō answer screen ✏️ Edit back to the box (placement-advisor)
+
+- **Ask:** SPEC §8.18 part 3, v1.96.0, ⚑ Q361, MojoSOGO 2026-10-20 "Edit": on every answer (Yes / Clarify / Cancel, and
+  OK / Clarify for outside) add ✏️ Edit, back to the listen phase with the box holding `reading.heard`, Before cleared,
+  not listening; Done re-reads.
+- **Verdict:** frontend/src/components/EnsoButton.tsx [EXISTING]. Reorganizer NONE.
+- **Flow stage:** render (capture intent); re-reading goes through the existing POST /say.
+- **Why:** EnsoButton owns the reading phases, `clarify()` and `footer()`; Edit is a third way out of `answer` reusing
+  `begin()` and `listenFrom(text, false)`. `edit` is already the textarea's handler, so the new one is `fixWords`.
+  Leaving an outside answer by Edit, like Clarify, logs nothing (only `close()` does); the spec says so.
+- **Caps:** EnsoButton.tsx 170 → ~173/300. Nothing in the band.
+- **Sources read:** scripts/arch.ts, module-ownership.md, placement-receipts.md, EnsoButton.tsx, SPEC.md.
+
 ## 2026-10-20 — Ensō talk mark moves to the popup footer (placement-advisor)
 
 - **Ask:** v1.95.1 patch, SPEC §8.18 part 2 (⚑ Q360), MojoSOGO 2026-10-20 "Move logo": move the in-popup round Ensō

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.73 · **Date:** 2026-10-20 · **Owner:** MojoSOGO
+**Version:** 3.74 · **Date:** 2026-10-20 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5584,7 +5584,7 @@ reads one of four. Nothing is saved by the reading itself.
 | **Event** | something on the calendar: a plan at a date, with a time or all day, and who is going (§8.4) | one sentence of what it will add ("I'll add dinner on Friday the 23rd at 8pm for you and Michelle.") | **Yes** opens the new-event form filled in (title, date, time or all day, who), to check and Save ⚑ Q341 · Clarify · Cancel |
 | **Already there** | Ensō already does it elsewhere, and it is not a reminder or an event | where ("Alerts → ⏱ Rolling timers") in a sentence | **Yes** closes · Clarify · Cancel |
 | **Not yet** | fits what Ensō is for (§1.3), but it can't do it | "Ensō can't do that yet. I can save it as a feature request for the next build." + "It's a big one, so John will look at it first." when big | **Yes** saves it as a request ("Saved. Thanks!"; to an admin, when small: "Saved. Build it now?" with **Build now** · Later, part 6) · Clarify · Cancel (nothing saved) |
-| **Outside** | does not fit what Ensō is for (§1.3) | "That's outside what Ensō is for. Ensō keeps the family's calendar, reminders, chores, lists, recipes and house." + where the part that fits lives, when one does | **OK** · Clarify. Leaving any way but Clarify logs it as **Out of scope** for John ⚑ Q339 |
+| **Outside** | does not fit what Ensō is for (§1.3) | "That's outside what Ensō is for. Ensō keeps the family's calendar, reminders, chores, lists, recipes and house." + where the part that fits lives, when one does | **OK** · Clarify · ✏️ Edit. Leaving any way but Clarify or ✏️ Edit logs it as **Out of scope** for John ⚑ Q339 |
 
 A request (Not yet or Outside) carries Claude's short title, one-line summary and size: **small** (fits beside what
 exists in one screen) or **big** (a new area, many screens, outside services, or unclear; unsure = big).
@@ -5596,7 +5596,9 @@ time that is not a real time is left out, so the form opens all day for the spea
 
 **4. The answer.** The popup shows what Ensō heard, the sentence and the buttons, and the phone **says the sentence
 aloud** in its best English voice ⚑ Q334; 🔇 stops it. **Clarify** opens the box again (tap Ensō to talk) and sends what was said
-before with the new words. **Who:** any member. Each send counts against the household's daily Claude reading budget (§7C.4
+before with the new words. **✏️ Edit** (after the other buttons on every answer) opens the box again filled with what
+Ensō heard, not listening, to fix words the phone got wrong and send again with Done ⚑ Q361 (MojoSOGO 2026-10-20 "Let me
+edit the text… voice to text gets some words wrong", "Edit"). **Who:** any member. Each send counts against the household's daily Claude reading budget (§7C.4
 `READS_PER_DAY`, shared with photos and links): over it → 429 "Ensō can't read any more today. Try again tomorrow." A
 failure says so and saves nothing.
 
@@ -5655,7 +5657,7 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
 | SY10 | POST /say as a member whose After is school at 15:00; as an admin with no After set | the prompt gives "after school" = 15:00; "after work" = 17:30 |
 | SY11 | POST /feature-requests/{id}/build as an admin on a new request (fire answered 200); as a plain member; on a needs_john one; with BUILD_FIRE_TOKEN unset; fire answered 500 | 202 `{ started: true }`, one POST to BUILD_FIRE_URL with the Bearer and the id + title in `text`; 403; 409; 503 `build_now_off`, no fire; 502 `build_failed` and one log line naming the id and `HTTP 500`, never the token |
 | SY8 | POST /feature-requests `{ …, outside: true }`; GET /ops/requests; founder …/ok on it; an admin …/dismiss on another | 201 status `outside`, listed in GET /feature-requests after 30 days too; not in /ops/requests; `new`; `dismissed` |
-| SY-M | on the iPhone | tap the Ensō button, tap Ensō in the box, say "weekdays 8 to 11 remind me to book the car check", hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; tap the mark → the box opens quiet; tap Ensō in it → the phone asks for the mic once, then "Listening…"; say "remind me tomorrow at 9 to call mom", tap Ensō again → it stops, Done → the answer; a fresh opening of the app never asks for the mic; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests |
+| SY-M | on the iPhone | tap the Ensō button, tap Ensō in the box, say "weekdays 8 to 11 remind me to book the car check", hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; tap the mark → the box opens quiet; tap Ensō in it → the phone asks for the mic once, then "Listening…"; say "remind me tomorrow at 9 to call mom", tap Ensō again → it stops, Done → the answer; a fresh opening of the app never asks for the mic; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests; on any answer ✏️ Edit → the box holds what was heard, fix a word, Done → the new answer |
 
 ## 9. Delivery
 
