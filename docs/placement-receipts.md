@@ -7,6 +7,24 @@ carry its result.
 
 ---
 
+## 2026-10-20 — Ensō tap opens, in-popup mark talks; mic ask moved off opening (placement-advisor)
+
+- **Ask:** SPEC §8.18 parts 1–2, §8.10, §8.1; replaces ⚑ Q340 (hold to talk) and ⚑ Q342 (mic ask at opening) with
+  ⚑ Q360. MojoSOGO 2026-10-20: the mark above the tab bar only opens the popup. A round Ensō mark in the popup starts
+  listening on a tap (the first one is when the phone asks for the mic, through the recognizer's start) and stops on the
+  next tap, pulsing while it listens. Splash's mic ask, the "🎤 Turn on voice" badge and useMicAsk are removed.
+- **Verdict:** frontend/src/components/EnsoButton.tsx (+ .module.css) [EXISTING]; deletions in Splash.tsx, App.tsx,
+  useSpeech.ts [EXISTING]; Splash.module.css deleted (voice styles only). Reorganizer NONE.
+- **Flow stage:** render.
+- **Why:** EnsoButton already owns the mark, the popup and useListen's start/stop. The new mark is a second trigger for
+  the same state, so no new owner is needed. The recognizer's start() asks for the mic by itself, so useMicAsk and its
+  permission query, localStorage flag and NO_POPUP_MS timing are deleted with nothing taking their place. Rejected: a
+  separate MicButton component (one button, one handler); keeping useMicAsk "in case" (§0.5 dead code).
+- **Caps:** EnsoButton.tsx 186 → ~178/300; useSpeech.ts 148 → ~102/300; Splash.tsx 49 → 21/300; App.tsx shrinks.
+  None in the band.
+- **Sources read:** scripts/arch.ts, module-ownership.md rows (App, Splash, EnsoButton, useSpeech), placement-receipts.md
+  (head), EnsoButton.tsx, EnsoButton.module.css, useSpeech.ts, Splash.tsx, Splash.module.css, App.tsx, index.html.
+
 ## 2026-10-20 — Status hides others' IOU payback pings; IOU comment and prefill fixes (placement-advisor)
 
 - **Ask:** v1.94.1 patch (steward HIGH). GET /status recentDeliveries showed every member the household's last 20

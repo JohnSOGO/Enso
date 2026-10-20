@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.71 · **Date:** 2026-10-20 · **Owner:** MojoSOGO
+**Version:** 3.72 · **Date:** 2026-10-20 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4295,10 +4295,6 @@ only the grey backdrop):
   - A **red badge** "Phone alerts off" appears when the current member has no push
     subscription.
   - Tapping either explains it and how to fix it.
-  - A **"🎤 Turn on voice"** badge appears while the phone can listen (§8.18) but has not yet been
-    allowed the microphone, after the opening screen's ask was answered no (§8.10): tapping it asks
-    for the microphone and it goes away once allowed; refused, it stays, and tapping explains where
-    to allow it. ⚑ Q342
 
 ### 8.2 Ringing bar
 
@@ -4894,8 +4890,7 @@ least 0.8 s so it never flickers:
   the tagline **"Closing the loop. Peace of mind, every day."** (MojoSOGO's exact words,
   2026-10-11) in small light text on two lines, one sentence each (as in ℹ About),
   then the **full address the app is served from** (`location.origin`, so the home-network server
-  shows its own) in small dim text, and last, at the bottom of it all (under the voice ask when
-  there is one), the **build stamp** — `v{version} ·
+  shows its own) in small dim text, and last, at the bottom of it all the **build stamp** — `v{version} ·
   {commit}` (decided by MojoSOGO 2026-10-03): the app version from `package.json` and the
   short git commit the page was built from, written into the page **at build time** (never
   typed by hand). A build from a tree with uncommitted changes shows `{commit}-dirty`; a
@@ -4905,16 +4900,9 @@ least 0.8 s so it never flickers:
   version lives only in `package.json` (the stamp reads it); the spec's own version line is
   separate and counts spec revisions.
   Nothing else — no spinner.
-- **Voice first** ⚑ Q342 (MojoSOGO 2026-10-19 "Request to use the microphone when it opens on the splash screen
-  before the rest of the app opens"; "user must approve or deny at open screen"; "just ask at open with system popup"):
-  signed in, on a phone that can listen (§8.18) whose microphone is not allowed (the browser's permission says "ask",
-  which an iPhone home-screen app can say again at each opening; or the browser can't say and voice was never turned on
-  on this phone), the opening screen stays and asks **by itself**: the phone's own Allow / Don't Allow popup shows over
-  it, with nothing to tap first, and the app opens once the person has answered. Only a phone that refuses at once
-  without showing a popup (it wants a tap first) gets **🎤 Allow microphone** (a green button that pulses) and **Deny**
-  under the address, above the stamp; Allow is that tap. Don't Allow or Deny opens the app without the mic, with the
-  header badge (§8.1) to ask later; the next opening asks again. When the phone already allows or refuses it, the
-  opening screen never asks. There is one opening screen: the launch image is the same screen (below).
+- **No mic ask here** ⚑ Q360 (MojoSOGO 2026-10-20 "Ask for mic access here and not startup"): the opening screen never
+  asks for the microphone, and no header badge does; the phone asks on the first tap of the Ensō mark in the Ensō popup
+  (§8.18 part 2). There is one opening screen: the launch image is the same screen (below).
 - One source: the screen is plain HTML in `index.html`, outside the React root, so it
   appears before any script loads; the app removes it when ready (signed in or not).
 - iPhone shows its own launch image before the page exists: `apple-touch-startup-image`
@@ -5573,16 +5561,17 @@ iPhone keyboard), the phone's own voices (speechSynthesis; on the iPhone, Settin
 Voices → an **Enhanced** or **Premium** voice sounds human), the Claude reading every other "fill it in" uses (§7.9),
 and the reminder form (§8.5b, §8.5c). No paid voice service ⚑ Q331.
 
-**1. The mark.** A round Ensō mark (the app icon, 84 px), centred just above the tab bar on every tab ⚑ Q332. **Tap**
-it and the popup opens listening. **Hold** it and talk: let go after at least half a second and it sends what it heard
-(as Done); let go with nothing heard and it stays open with the keyboard hint. While it is held nothing on screen is
-selected and no copy / save menu shows (the popup opens under the finger); the text box stays editable ⚑ Q340.
+**1. The mark.** A round Ensō mark (the app icon, 84 px), centred just above the tab bar on every tab ⚑ Q332. A **tap**
+opens the popup, not listening yet ⚑ Q360 (MojoSOGO 2026-10-20 "tap to open input… tap enso to speak and again to stop").
 
-**2. Listening.** "🎤 Listening…" over a **text box** that is always there. Heard words fill the box; it can be fixed by
-hand or typed (typing stops listening) ⚑ Q333. **Done** sends the box (enabled once it holds words), **🗑 Clear**
-empties it and listens again, **Cancel** closes. With no speech-to-text, a refusal, or 8 seconds with nothing heard, the
-line says "Tap the 🎤 on your keyboard and talk." and the box still works ⚑ Q338. The phone's voice is woken on Done or
-the hold release, never before listening, so the voice and the mic never fight. Admins also see **💡 Requests** here
+**2. Talking.** A smaller round Ensō mark beside the line, over a **text box** that is always there. **Tap the mark** and
+it listens: it pulses green and the line says "🎤 Listening… tap Ensō to stop."; **tap it again** and it stops ("Tap
+Ensō to talk, or type." while it isn't). The first tap is when the phone asks for the microphone (its own Allow / Don't
+Allow popup); nothing asks before ⚑ Q360. Heard words go after what the box already holds; it can be fixed by hand or
+typed (typing stops listening) ⚑ Q333. **Done** sends the box (enabled once it holds words), **🗑 Clear** empties it
+(still listening if it was), **Cancel** closes. With no speech-to-text, a refusal, or 8 seconds listening with nothing
+heard, the line says "Tap the 🎤 on your keyboard and talk." and the box still works ⚑ Q338. The phone's voice is woken
+on Done, never while listening, so the voice and the mic never fight. Admins also see **💡 Requests** here
 (part 5).
 
 **3. The reading.** `POST /say { text }`: Claude fixes the words (spelling, grammar, what was misheard) into "heard" and
@@ -5605,8 +5594,8 @@ event means just the speaker. An event with no real date is not read (the speake
 time that is not a real time is left out, so the form opens all day for the speaker to fix.
 
 **4. The answer.** The popup shows what Ensō heard, the sentence and the buttons, and the phone **says the sentence
-aloud** in its best English voice ⚑ Q334; 🔇 stops it. **Clarify** listens again and sends what was said before with
-the new words. **Who:** any member. Each send counts against the household's daily Claude reading budget (§7C.4
+aloud** in its best English voice ⚑ Q334; 🔇 stops it. **Clarify** opens the box again (tap Ensō to talk) and sends what was said
+before with the new words. **Who:** any member. Each send counts against the household's daily Claude reading budget (§7C.4
 `READS_PER_DAY`, shared with photos and links): over it → 429 "Ensō can't read any more today. Try again tomorrow." A
 failure says so and saves nothing.
 
@@ -5665,7 +5654,7 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
 | SY10 | POST /say as a member whose After is school at 15:00; as an admin with no After set | the prompt gives "after school" = 15:00; "after work" = 17:30 |
 | SY11 | POST /feature-requests/{id}/build as an admin on a new request (fire answered 200); as a plain member; on a needs_john one; with BUILD_FIRE_TOKEN unset; fire answered 500 | 202 `{ started: true }`, one POST to BUILD_FIRE_URL with the Bearer and the id + title in `text`; 403; 409; 503 `build_now_off`, no fire; 502 `build_failed` and one log line naming the id and `HTTP 500`, never the token |
 | SY8 | POST /feature-requests `{ …, outside: true }`; GET /ops/requests; founder …/ok on it; an admin …/dismiss on another | 201 status `outside`, listed in GET /feature-requests after 30 days too; not in /ops/requests; `new`; `dismissed` |
-| SY-M | on the iPhone | tap the Ensō button, say "weekdays 8 to 11 remind me to book the car check", hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; hold the mark, say "remind me tomorrow at 9 to call mom", let go → the answer comes without tapping Done; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests |
+| SY-M | on the iPhone | tap the Ensō button, tap Ensō in the box, say "weekdays 8 to 11 remind me to book the car check", hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; tap the mark → the box opens quiet; tap Ensō in it → the phone asks for the mic once, then "Listening…"; say "remind me tomorrow at 9 to call mom", tap Ensō again → it stops, Done → the answer; a fresh opening of the app never asks for the mic; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests |
 
 ## 9. Delivery
 
