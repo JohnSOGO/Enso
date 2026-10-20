@@ -1,6 +1,6 @@
 // SPEC §8.18 — the Ensō button and its popup, rendered once by App.tsx: tap, say what you want into the text box
 // (heard words fill it; type or fix it by hand; 🗑 Clear starts over, ⚑ Q338), POST /say, then what Ensō heard and
-// what it will do, spoken aloud, with Yes / Clarify / Cancel. Yes on a reminder opens the reminder form filled in; on
+// what it will do, spoken aloud, with Yes / Clarify / Cancel / ✏️ Edit (back to the box with what was heard, ⚑ Q361). Yes on a reminder opens the reminder form filled in; on
 // a request POST /feature-requests, then for an admin's small one "Build it now?" (⚑ Q344). Outside the scope (§1.3): Clarify / OK, and leaving any way but Clarify logs it
 // as Out of scope (POST /feature-requests with outside). Tap to talk (⚑ Q360): the mark opens it; the Ensō mark in its
 // footer starts listening (the first tap is when the phone asks for the mic) and a second tap stops. Renders what the server
@@ -107,6 +107,7 @@ export function EnsoButton() {
     catch (e) { setError(errorText(e)); }
   }
   function clarify() { setBefore(reading?.heard ?? before); setReading(null); begin(); }
+  function fixWords() { const heard = reading?.heard ?? ''; begin(); setBefore(null); setReading(null); listenFrom(heard, false); } // ⚑ Q361
 
   return (
     <>
@@ -154,11 +155,13 @@ export function EnsoButton() {
     if (phase === 'answer' && reading?.kind === 'outside') return <>
       <button className="primary" onClick={close}>OK</button>
       <button onClick={clarify}>Clarify</button>
+      <button onClick={fixWords}>✏️ Edit</button>
     </>;
     if (phase === 'answer') return <>
       <button className="primary" onClick={yes}>Yes</button>
       <button onClick={clarify}>Clarify</button>
       <button onClick={close}>Cancel</button>
+      <button onClick={fixWords}>✏️ Edit</button>
     </>;
     if (phase === 'saved' && saved) return <>
       <button className="primary" onClick={buildNow}>Build now</button>
