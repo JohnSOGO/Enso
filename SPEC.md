@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.70 · **Date:** 2026-10-20 · **Owner:** MojoSOGO
+**Version:** 3.71 · **Date:** 2026-10-20 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2920,6 +2920,8 @@ there less payments still waiting); anything past it is an IOU as usual. Whoever
 costs the other one, so it waits for their **Got it** unless they recorded it. A `tab` payment is made only this way.
 
 **Who sees it** ⚑ Q350: the two people in a direction, and every admin. Nobody else, not even that a direction exists.
+A payback ping is the one who owes's alone ⚑ Q359: Settings → 📊 Status (§8.6) leaves other members' payback pings out
+of Recent deliveries, as it does their task check-ins (Q308).
 
 **Records** ⚑ Q355: amounts are never edited. A mistake is fixed by deleting a waiting row (who made it, the person
 it waits on as a decline, or an admin) or, once OK'd, by an admin deleting it; a deleted row is kept (`deleted_at`). An OK'd IOU
@@ -2967,7 +2969,7 @@ is left in it); the deletes answer 204. A row I may not see is 404. A payment ab
 minus the payments still waiting there → 409 `iou_too_much` "That's more than the $X still owed.". A plan with nothing
 owed → 409 `iou_nothing_owed`. OK on an OK'd row → 409 `iou_state`.
 
-**Acceptance (IO1–IO14, `test/ious.test.ts` for the rules, `test/ious-api.test.ts` through the Worker):**
+**Acceptance (IO1–IO15, `test/ious.test.ts` for the rules, `test/ious-api.test.ts` through the Worker):**
 
 | # | Given | Then |
 |---|---|---|
@@ -2984,6 +2986,7 @@ owed → 409 `iou_nothing_owed`. OK on an OK'd row → 409 `iou_state`.
 | IO11 | that push | not counted by `opsPingsSince`, not in `/ops/pings` |
 | IO12 | payments bring the direction to $0 | the plan's `ended_at` is set; no more pings; the pair leaves `/ious` |
 | IO13 | Ann adds "Bo owes Ann $80.01, Dinner", split | an IOU of $40.00 waiting for Bo's OK |
+| IO15 | a payback ping to Sam; `/status` as Sam, as Kai, as an admin | Sam's Recent deliveries list it; Kai's and the admin's do not |
 | IO14 | Ann owes Bo $1,000; Ann adds a $100 split off her tab; then Bo adds $9,600 off the tab himself | a $50.00 `tab` payment waiting for Bo's Got it, no IOU for Bo; then the rest of Ann's tab is paid at once and the rest of the $9,600 is Bo's IOU; `how: 'tab'` on `/iou-payments` → 400 |
 
 **Status:** v1.94.0. Manual (IOU1–IOU2 on the iPhone, §8.15c).

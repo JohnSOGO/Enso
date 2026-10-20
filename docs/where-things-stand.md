@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-19, v1.93.2, main = production.*
+*Last updated 2026-10-20, v1.94.1, main = production.*
 
 ## Running where
 
@@ -51,7 +51,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
-- 💵 Family IOUs (v1.94.0, §7B.9, §8.15c, migration 0059): Chores → 💵 IOUs → ＋ IOU "I owe Mom $1,200" shows on both
+- 💵 Family IOUs (v1.94.0–v1.94.1, §7B.9, §8.15c, migration 0059; he said "Assume it works", so optional): Chores → 💵 IOUs → ＋ IOU "I owe Mom $1,200" shows on both
   phones at once; one Mom adds waits for your OK; a Pay back waits for her Got it; ☐ Split the bill and ☐ Take it off
   my tab; a weekly Payback plan pings the one who owes at 09:00 on its day, phone only. Q349–Q358 (⚑ except Q349, Q356).
 - 🌤️/🌕 on the calendar (v1.92.0–v1.93.0, §7.11, §7.12, §7.5, migration 0058): on the iPhone, the days around Oct 25

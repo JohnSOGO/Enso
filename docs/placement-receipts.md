@@ -7,6 +7,36 @@ carry its result.
 
 ---
 
+## 2026-10-20 — Status hides others' IOU payback pings; IOU comment and prefill fixes (placement-advisor)
+
+- **Ask:** v1.94.1 patch (steward HIGH). GET /status recentDeliveries showed every member the household's last 20
+  deliveries, IOU payback pings included, against SPEC §7B.9 "Who sees it". Add `(d.iou_plan_id IS NULL OR
+  d.member_id = ?)` as Q308 did for task check-ins (⚑ Q359). Plus the alertSource docstring, the deliveries.ts map row
+  rewritten whole, IouForm prefill via centsText. Test IO15.
+- **Verdict:** src/worker/routes/household.ts [EXISTING]; alert-history.ts (comment), IouForm.tsx, test/ious-api.test.ts
+  [EXISTING]. Reorganizer NONE.
+- **Flow stage:** route (a read filter), render (form prefill).
+- **Why:** household.ts `/status` already owns the recentDeliveries visibility filter (Q308); same shape over one more
+  column. The WHERE is parenthesized because the Q308 clause is an OR. Rejected: a shared visibility helper for two
+  clauses in one query.
+- **Caps:** household.ts ~109/300, alert-history.ts 48/300, IouForm.tsx 95/300. None in the band.
+- **Sources read:** household.ts, scripts/arch.ts, module-ownership.md rows, alert-history.ts, ious.ts, IouForm.tsx,
+  migrations/0059, deliveries.ts, SPEC §7B.9, decisions.md Q308.
+
+## 2026-10-20 — steward pass after v1.94.0 (code-steward)
+
+- **Run:** post-release, v1.94.0 (family IOUs, §7B.9, §8.15c, migration 0059, Q349–Q358), plus v1.93.1–v1.93.2. Ran on
+  bcacfee.
+- **Verdict:** MINOR DRIFT. Typecheck green; 982/982; arch:audit quiet (top EventForm.tsx 200/223, engine.ts 88%,
+  ious.ts 221/300). 3 code commits, 3 matching receipts; 0 without a receipt.
+- **Top finding:** HIGH: `GET /status` recentDeliveries showed every member IOU payback pings, against §7B.9. Fixed in
+  v1.94.1 (Q359, IO15), with the LOW items: where-things-stand "Last updated", the alertSource docstring and
+  deliveries.ts row, the IouForm prefill.
+- **Restraint:** iou-pings per-plan queries each tick (family scale, indexed); the repeated plan-ending UPDATE and
+  direction SELECT; Ious.tsx sharing Messes.module.css; UI label maps; the 6-entry Chores menu; tick.ts length.
+- **Carried:** isShareKey / InboxSetup apiUrl; deleteEventStatements, renotifyText, updateEventStatement; where a
+  failed Out of scope log shows; gating show* at a 5th calendar item.
+
 ## 2026-10-20 — IOUs: ledger, agree rule, fire-less payback ping (placement-advisor)
 
 - **Ask:** New feature, family IOUs (SPEC §7B.9, §8.15c, §4.2zzf; §1.3 widened). Migration 0059 (ious, iou_payments,

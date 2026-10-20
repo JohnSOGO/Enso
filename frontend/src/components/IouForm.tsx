@@ -19,7 +19,7 @@ export function IouForm({ sheet, pairs, onClose }: { sheet: IouSheet; pairs: rea
   const others = active.filter((m) => m.id !== me.id);
   const [owedBy, setOwedBy] = useState(pair?.owedBy ?? me.id);
   const [owedTo, setOwedTo] = useState(pair?.owedTo ?? others[0]?.id ?? '');
-  const [amount, setAmount] = useState(sheet.kind === 'paid' || sheet.kind === 'let_go' ? (pair!.owedCents / 100).toFixed(2) : '');
+  const [amount, setAmount] = useState(sheet.kind === 'paid' || sheet.kind === 'let_go' ? centsText(pair!.owedCents) : '');
   const [note, setNote] = useState('');
   const [split, setSplit] = useState(false);
   const [offTab, setOffTab] = useState(false);

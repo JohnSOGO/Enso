@@ -109,4 +109,15 @@ describe('§7B.9 family IOUs', () => {
     expect(big.find((p: any) => p.owedBy === B).owedCents).toBe(4000 + 960000 - 95000);
     expect((await bo.post('/iou-payments', { owedBy: A, owedTo: B, amount: 1, how: 'tab' })).status).toBe(400);
   });
+
+  it('IO15 Status shows a payback ping only to the one who got it', async () => {
+    const plan = (await env.DB.prepare('SELECT id FROM iou_plans WHERE owed_by = ? LIMIT 1').bind(S).first<{ id: string }>())!.id;
+    const now = new Date().toISOString();
+    await env.DB.prepare(`INSERT INTO deliveries (id, alert_number, channel, member_id, message, title, iou_plan_id, status, created_at, updated_at)
+      VALUES ('dlv_io15', 1, 'push', ?, 'Pay Mom $1.00 today.', ?, ?, 'sent', ?, ?)`).bind(S, PAYBACK_TITLE, plan, now, now).run();
+    const has = async (c: Client) => (await c.get('/status')).json.recentDeliveries.some((d: any) => d.id === 'dlv_io15');
+    expect(await has(sam)).toBe(true);
+    expect(await has(kai)).toBe(false);
+    expect(await has(o)).toBe(false);
+  });
 });
