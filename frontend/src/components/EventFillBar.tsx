@@ -5,7 +5,7 @@
 // Hands the result to the form; holds no form state, never saves, keeps no photo or text.
 import { useRef, useState } from 'react';
 import { errorText, post, upload } from '../api';
-import { EVENT_TEXT_MAX, readingOverForm, readingToForm, type EventFill, type EventReading } from '../../../src/shared/event-reading';
+import { EVENT_TEXT_MAX, fieldsChanged, readingOverForm, readingToForm, type EventFill, type EventReading } from '../../../src/shared/event-reading';
 import { matchPlace, placeOverForm } from '../../../src/shared/places';
 import { shrinkPicked, usePhotoPick } from './usePhotoPick';
 import { usePlaces } from './PlacePicker';
@@ -61,8 +61,8 @@ export function EventFillBar<F extends EventFill>({ form, opened, onFill }: Prop
       const reading = await ask();
       const got = opened ? readingToForm(latest.current, opened, reading) : readingOverForm(latest.current, reading);
       const place = matchPlace(places, [copied, reading.title, reading.location, reading.notes]);
-      const { form: next, filled } = place ? placeOverForm(got.form, place) : got;
-      const total = got.filled + (place ? filled : 0);
+      const next = place ? placeOverForm(got.form, place).form : got.form;
+      const total = fieldsChanged(latest.current, next); // a field the reading and the place both set counts once
       onFill(next);
       const n = `${total} field${total > 1 ? 's' : ''} from ${from}`;
       const used = place ? ` 📍 Used ${place.name}.` : '';

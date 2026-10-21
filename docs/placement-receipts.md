@@ -9,7 +9,7 @@ carry its result.
 
 ## 2026-10-21 — Listen again on iPhone, one recognizer (placement-advisor)
 
-- **Ask:** v1.98.1 patch, SPEC §8.18 part 2 (⚑ Q338/Q360). MojoSOGO after v1.97.1: "Only first set still", "Microphone
+- **Ask:** v1.98.2 patch, SPEC §8.18 part 2 (⚑ Q338/Q360). MojoSOGO after v1.97.1: "Only first set still", "Microphone
   symbol is on, but is not generating text". The iPhone's webkitSpeechRecognition only gives results to the first
   instance in the page; useListen keeps ONE recognizer, made on the first start with its handlers set once, and calls
   start() on it again for each listen and phrase restart, never while it is still ending.
@@ -19,6 +19,16 @@ carry its result.
   Return shape unchanged, so EnsoButton.tsx is untouched. No vocab, shared rule, fetch or module-level `let`.
 - **Caps:** useSpeech.ts 133/300. Nothing in the band.
 - **Sources read:** .claude/agents/placement-advisor.md, useSpeech.ts (diff), module-ownership.md, scripts/arch.ts.
+## 2026-10-21 — v1.98.1 "Filled N fields" counts once (placement-advisor)
+
+- **Ask:** steward finding after v1.98.0 (§7.9, §7.9b), MojoSOGO picked FIX: EventFillBar summed the reading's and the
+  place's counts, so a field both set counted twice.
+- **Verdict:** EXISTING owners. src/shared/event-reading.ts exports its private `changed` as `fieldsChanged(a, b)`
+  (readingToForm / readingOverForm use it); EventFillBar.tsx counts `fieldsChanged(latest.current, next)` after the
+  place. Docs: ThingForm.tsx header rewritten whole; the event-reading, EventFillBar and ThingForm map rows updated
+  (ThingForm names PlacePicker; EventFillBar's pasted sentence rewritten). One test (EF-C). Reorganizer NONE.
+- **Why:** the count belongs with the fill rules in shared, so the PWA reuses it instead of working it out again.
+- **Caps:** event-reading.ts ~86/300, EventFillBar.tsx ~96/300.
 
 ## 2026-10-21 — steward pass after v1.98.0 (code-steward)
 

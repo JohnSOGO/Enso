@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.79 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
+**Version:** 3.80 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2131,7 +2131,7 @@ place Ensō can't read from a link or an invite, with how to arrive, filled into
   - **📷 Screenshot / 📋 Paste** (§7.8, §7.9, §7.9a), new and existing events: after the reading fills the form,
     `matchPlace` over what was copied (the text or link), the reading's title, location and notes. A match is used on
     top: **the saved place wins over the address that was read** ("always true"), and the status line adds
-    " 📍 Used {name}." ("Filled 4 fields from what you copied — check them. 📍 Used Incognito SD.").
+    " 📍 Used {name}." ("Filled 4 fields from what you copied — check them. 📍 Used Incognito SD."). The count is the fields that differ from the form before the reading (`fieldsChanged`), so one the reading and the place both set counts once.
   - **Typing:** when the Title matches a place and the Address is not already that place's, a **📍 Use {name}**
     button shows under the Address; a tap uses it. Nothing fills by itself while typing, so a cleared Address stays
     cleared.
@@ -2161,6 +2161,7 @@ place Ensō can't read from a link or an invite, with how to arrive, filled into
 | PL4 | GET /places on a new household | the seeded Incognito SD with its address, notes and word "Incognito", `createdBy` null |
 | PL5 | a member POSTs a place; PATCHes `{ notes: null }`; another member PATCHes it; an admin deletes it; GET | 201 trimmed; notes cleared, the rest kept; 403; 204; gone |
 | PL6 | POST with a bad body; PATCH / DELETE an unknown id; without a session | 400 `invalid_input`; 404; 401 |
+| EF-C | `fieldsChanged` from an empty form to one where a reading set title, address and notes and a place then replaced address and notes | 3 |
 | PL-M | migration 0060 | the seeded row is there; a second place with the same id is refused |
 | PL-UI | manual, on the iPhone: new event, 📋 Paste an incognitosd.com event link | Address "2335 Mirador, Vista, CA 92084", the parking notes under the notes, "📍 Used Incognito SD." |
 
