@@ -45,7 +45,7 @@ export function cleanPlace(b: Record<string, unknown>, current?: PlaceInput): Pl
 }
 
 /** The place an event names: one of its words or its name anywhere in a text, ignoring case; the longest matching
- *  word wins, then the name A–Z (⚑ Q363). */
+ *  word wins, then the name A–Z (⚑ Q366). */
 export function matchPlace<P extends Pick<Place, 'name' | 'words'>>(places: readonly P[], texts: readonly (string | null | undefined)[]): P | null {
   const hay = texts.filter((t): t is string => !!t).map((t) => t.toLowerCase());
   let best: { place: P; len: number } | null = null;

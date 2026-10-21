@@ -1,4 +1,4 @@
-// SPEC §7.9b — saved places, the household's address book. Anyone may read them and add one (⚑ Q362); the place's
+// SPEC §7.9b — saved places, the household's address book. Anyone may read them and add one (⚑ Q365); the place's
 // creator or an admin changes or deletes it (§6.3). Validates and persists; every rule is src/shared/places.ts.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';

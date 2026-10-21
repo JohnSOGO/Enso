@@ -14,6 +14,7 @@ import { FromThing } from './ThingPhoto';
 import { EventFillBar } from './EventFillBar';
 import { AddressField } from './AddressField';
 import { BringField } from './BringField';
+import { NotesField } from './NotesSheet';
 import { RepeatFields, ownWeek, repeatOf, toRecurrence, weeksOf, type RepeatValue } from './RepeatFields';
 import { ReminderFields, reminderError, reminderOf, toReminder, type ReminderValue } from './ReminderFields';
 
@@ -179,11 +180,9 @@ export function EventForm({ eventId, date, start, onClose }: Props) {
           <label className="row" style={{ marginBottom: 12, minHeight: 44 }}>
             <input type="checkbox" checked={form.optional} onChange={(e) => set('optional', e.target.checked)} /> Optional — each person turns it on
           </label>
-          <label className="field"><span>Notes</span>
-            <textarea rows={2} value={form.notes} maxLength={EVENT_NOTES_MAX} onChange={(e) => set('notes', e.target.value)} />
-          </label>
         </fieldset>
       )}
+      {form && <NotesField label="Notes" title={form.title || 'New event'} value={form.notes} max={EVENT_NOTES_MAX} canChange={canEdit && !busy} onChange={(v) => set('notes', v)} />}
       {form && meta?.optional && (
         <label className="row" style={{ marginBottom: 12, minHeight: 44 }}>
           <input type="checkbox" checked={meta.on} disabled={busy} onChange={(e) => setOn(e.target.checked)} /> On for me

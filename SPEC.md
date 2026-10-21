@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.76 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
+**Version:** 3.77 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2118,16 +2118,16 @@ place Ensō can't read from a link or an invite, with how to arrive, filled into
   repeats dropped ignoring case). At most `PLACES_MAX` = 100. `cleanPlace(body)` (pure) checks and trims; anything
   else → 400 `invalid_input` naming the field. The migration saves the first one: **Incognito SD**, 2335 Mirador,
   Vista, CA 92084, its parking notes, match word "Incognito".
-- **Who** ⚑ Q362: every member sees them and may add one (it is the household's address book); the place's creator
+- **Who** ⚑ Q365: every member sees them and may add one (it is the household's address book); the place's creator
   or an admin changes or deletes it (§6.3, `canChange`). The seeded place has no creator, so admins change it.
-- **Which place an event names** — `matchPlace(places, texts)` ⚑ Q363: a place matches when one of its match words
+- **Which place an event names** — `matchPlace(places, texts)` ⚑ Q366: a place matches when one of its match words
   or its name appears in one of the texts, ignoring case, anywhere (so "Incognito" matches "Incognito: Masquerade
   Night" and a pasted `incognitosd.com/events/…` link). Several match → the longest matching word wins, then the name
   in A–Z order. No place → null.
 - **Using a place on an event** — `placeOverForm(form, place)`: the Address ← the place's address; its arrival notes
   are **added** as a new paragraph under the event's notes (never replacing them, as §7.9a), unless the notes already
   hold them; the total cut to `EVENT_NOTES_MAX`. → the form and how many fields changed. Nothing is saved until Save.
-- **When it is used** ⚑ Q364:
+- **When it is used** ⚑ Q367:
   - **📷 Screenshot / 📋 Paste** (§7.8, §7.9, §7.9a), new and existing events: after the reading fills the form,
     `matchPlace` over what was copied (the text or link), the reading's title, location and notes. A match is used on
     top: **the saved place wins over the address that was read** ("always true"), and the status line adds
@@ -4408,7 +4408,8 @@ It contains, in order:
 2. The holiday line(s).
 3. All-day events.
 4. Timed events in time order, each showing time, title, creator chip, assigned
-   chips and 🔔 if it has a reminder.
+   chips, 🔔 if it has a reminder and 📝 if it has notes (§8.4a). The 📝 shows only on a row the member may open:
+   `/calendar` sends `hasNotes` true only then, so a 🔒 event never tells that it has notes ⚑ Q362.
 
 **Who it's for** (v1.73.0, MojoSOGO 2026-10-12: "One person mentioned twice; just mention once. If
 everyone; make one green bubble with words family"): each person shows **once**. A creator who
@@ -4446,6 +4447,8 @@ Fields:
   Last** (at least one; the date's own week is pre-ticked), e.g. "Thursdays: 1st · 3rd" /
   Yearly, plus an optional end date
 - Assigned to (member chips, none = everyone)
+- **Notes** (optional, ≤ `EVENT_NOTES_MAX`), last: the box with **⤢** that opens the notes sheet (§8.4a). The ⤢ works
+  for a member who can't change the event too; for them the sheet is read only.
 - **Emoji** (optional, §7.6): one emoji — typed with the phone's emoji keyboard — shown
   beside the title.
 - **☐ Optional — each person turns it on** (creator or admin, §7.5). On an optional event
@@ -4479,6 +4482,45 @@ Actions:
 - Delete (owner or creator)
 - For a repeating event: **Delete this occurrence** (adds to `exdates`) and
   **Delete series**
+
+### 8.4a Notes sheet — asked by MojoSOGO 2026-10-21
+
+MojoSOGO: "In Calendar, let me tap to see the notes and then expand the notes with like a full screen pop-up with basic
+edit features" and "in the notes auto highlight pertinent information". One piece, `NotesField` + `NotesSheet`
+(`components/NotesSheet.tsx`), serves every long note that has the same need: an **event's notes** (§8.4) and a **list
+item's note** (§8.8). The notes stay plain text in the same column and limit; nothing new is stored or sent.
+
+- **The box:** the form's notes textarea, with a **⤢** button (accessible name "Open notes full screen") at its
+  label. ⤢ opens the sheet; it stays usable for a member who can't change the entry (read only for them).
+- **The sheet** is a full-screen modal (`Modal` with `full`: the whole screen inside the iPhone's safe areas), titled
+  "📝 Notes: {title}". It opens in **read mode**: the notes at 17 px, line breaks kept, with what matters
+  **highlighted** (below). Empty notes read "No notes yet." A **☐ / ☑** line ticks or unticks on tap when the member
+  can change the entry ⚑ Q363. Footer: **✏️ Edit** (only when they can change it) and **Done**.
+- **Edit mode:** the notes in a textarea filling the sheet, a toolbar above it: **• List** and **☐ Box** put the mark
+  on every line the selection touches (on the cursor's line when nothing is selected), or take it off when every one
+  of those lines has it; ☐ Box turns a • line into a box line. **Enter** on a • or ☐ line starts the next line with the
+  same mark (after ☑ a ☐); Enter on a line that is only the mark removes it and ends the list. The marks are the plain
+  characters `• `, `☐ `, `☑ ` and count toward the limit; a toolbar change that would pass it does nothing. **👁 View**
+  goes back to read mode.
+- **Done** (or ✕) closes the sheet and hands the text back to the form, which saves it on its own **Save** as before
+  (closing the form without saving still asks). The sheet saves nothing itself ⚑ Q363.
+- **Highlights** (`markNotes`, `frontend/src/notes-marks.ts`, pure): times (`6pm`, `18:30`, noon), dates (`Oct 25th`,
+  `10/26`, weekdays, today / tomorrow / tonight), phone numbers, `$` amounts, links, emails, street addresses (a
+  number, up to four words, a street word: St, Ave, Rd, Blvd, Dr, Ln, Way, Ct, Pl, Pkwy, Hwy, Cir, Ter) and a **key
+  line**: from *bring, don't forget, remember to, RSVP, deadline, due, important, gate code, door code, password,
+  confirmation* to the end of its line. Overlaps: the first to start wins, then the longer. Patterns, not AI ⚑ Q364:
+  instant, offline, and the notes never leave Ensō. A tapped **phone** rings (`tel:`), a tapped **link** opens
+  (only through §7C.1 `webLink`); the other highlights are text.
+- The line editing is `frontend/src/notes-edit.ts` (pure).
+
+**Acceptance** (`test/notes-marks.test.ts`, `test/notes-edit.test.ts`, `test/event-access-api.test.ts`):
+NH1 the pieces join back into the notes; plain notes are one plain piece. NH2 times and dates. NH3 phone, money, email,
+link. NH4 a street address. NH5 a key line is marked to its end, holding what is on it. NH6 a phone → `tel:` digits, a
+link → `webLink`, anything else → nothing. NE1 • List on a selection marks every line, again unmarks; with no selection
+only the cursor's line. NE2 ☐ Box swaps a bullet for a box; ☐ and ☑ lines unbox together. NE3 a tap flips ☐ ↔ ☑ on
+that line only. NE4 Enter continues the list, ☑ → ☐. NE5 Enter on a bare mark ends the list. NE6 Enter on a plain line
+is a plain Enter. NS1 `/calendar` gives `hasNotes` true for an event with notes the member may open, false for one
+without, and false for a 🔒 event with notes.
 
 ### 8.5 Alerts screen
 
@@ -4894,7 +4936,7 @@ every 30 s while visible (§10 Freshness).
   photo (§7A.3, "Has a photo") ⚑ Q121, and the
   **assignee's chip** when there is one (the chip truncates; the row stays one line).
 - **✎** on each row (accessible name "Edit Milk") opens the **item form** (modal): text,
-  note (multi-line), **Assigned to** (member chips, single choice, plus **Nobody**), Save /
+  note (multi-line, with ⤢ for the notes sheet, §8.4a), **Assigned to** (member chips, single choice, plus **Nobody**), Save /
   Cancel / **Delete** (asks first). The old ✕ quick-remove is gone: ticking is the quick
   action, and deleting lives in the form. ⚑
 - The item form shows the item's **photo** (§7A.3) when it has one — tap for full size — with
@@ -6449,7 +6491,7 @@ other push stays until I hide it ⚑ Q284.
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
 | DELETE | `/invites/{id}` | owner | revoke |
-| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[], moonPhases[], weather[] }` (each occurrence carries `emoji`; `moonPhases` is `{ date, name, emoji }[]` for the range (§7.12); `weather` is the stored forecast days in the range, §7.11); recurring events expanded server-side with `recurrence.ts`; alarms and sun-timed events (§7.7) excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
+| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[], moonPhases[], weather[] }` (each occurrence carries `emoji`, and `hasNotes`: true only when it has notes and the member may open it, §8.4a; `moonPhases` is `{ date, name, emoji }[]` for the range (§7.12); `weather` is the stored forecast days in the range, §7.11); recurring events expanded server-side with `recurrence.ts`; alarms and sun-timed events (§7.7) excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
 | GET | `/optional-events` | member | → `{ id, title, emoji, recurrence, startDate, on }[]` — every optional event, with this member's switch |
 | PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |
