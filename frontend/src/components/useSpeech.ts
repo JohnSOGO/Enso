@@ -21,77 +21,83 @@ const join = (a: string, b: string) => `${a} ${b}`.replace(/\s+/g, ' ').trim();
 /** Errors that mean this try won't listen (refused, no mic): show the keyboard hint; the next tap tries again. */
 const FATAL = new Set(['not-allowed', 'service-not-allowed', 'audio-capture', 'language-not-supported']);
 const RESTARTS = 30; // one popup's worth of phrases; stops an endless restart loop
-const END_WAIT_MS = 600; // a new listen waits this long at most for the old recognizer's end (the iPhone hears nothing before)
+const END_WAIT_MS = 600; // a new listen waits this long at most for the last one's end
 
 /**
  * Listen (⚑ Q338): `words` grows as it hears, `heard` once any word came in; `unavailable` when the phone has no
- * speech-to-text; `refused` when this try was refused or failed (no mic, the keyboard holding it): start() tries again. The iPhone's recognizer stops after each phrase (and drops results when
- * continuous), so it runs one phrase at a time and starts again on end, keeping what was heard, until stop / reset.
- * It also hears nothing with a new recognizer while the old one is still ending, so start() waits for that end.
+ * speech-to-text; `refused` when this try was refused or failed (no mic, the keyboard holding it): start() tries again.
+ * The iPhone's recognizer stops after each phrase (and drops results when continuous), so it runs one phrase at a time
+ * and starts again on end, keeping what was heard, until stop / reset. It hears nothing with a second recognizer, so
+ * there is one, made on the first start and started again each time, never while it is still ending.
  */
 export function useListen() {
-  const rec = useRef<Recognizer | null>(null);
+  const rec = useRef<Recognizer | null>(null); // the one recognizer
+  const live = useRef(false); // started and not yet ended
   const want = useRef(false);
   const kept = useRef(''); // finished phrases
   const now = useRef(''); // the phrase being heard
   const restarts = useRef(0);
-  const live = useRef<Recognizer | null>(null); // started and not yet ended
-  const pending = useRef<ReturnType<typeof setTimeout> | null>(null); // a start waiting for the old one's end
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null); // a start waiting for the last one's end
   const [words, setWords] = useState('');
   const [heard, setHeard] = useState(false);
   const [listening, setListening] = useState(false);
   const [unavailable, setUnavailable] = useState(() => recognizerCtor() === null);
   const [refused, setRefused] = useState(false);
 
-  const run = useCallback(() => {
-    const Ctor = recognizerCtor();
-    if (!Ctor) { setUnavailable(true); want.current = false; setListening(false); return; }
-    try {
-      const r = new Ctor();
-      r.lang = navigator.language || 'en-US'; r.interimResults = true; r.continuous = false;
-      r.onresult = (e) => {
-        if (rec.current !== r || pending.current) return; // an old one's late words, after a new start
-        now.current = Array.from(e.results).map((x) => x[0].transcript).join(' ');
-        const all = join(kept.current, now.current);
-        setWords(all); if (all) setHeard(true);
-      };
-      r.onerror = (e) => { if (FATAL.has(e.error)) { want.current = false; setRefused(true); } };
-      r.onend = () => {
-        if (live.current === r) live.current = null;
-        if (pending.current && rec.current === r) { fresh(); return; } // the old one ended: the waiting start goes now
-        if (rec.current !== r) return; // an older recognizer, replaced
-        kept.current = join(kept.current, now.current); now.current = '';
-        if (want.current && restarts.current++ < RESTARTS) run(); else setListening(false);
-      };
-      rec.current = r;
-      setListening(true);
-      live.current = r;
-      r.start();
-    } catch { live.current = null; want.current = false; setRefused(true); setListening(false); }
+  const begin = useCallback((r: Recognizer) => {
+    try { live.current = true; setListening(true); r.start(); }
+    catch { live.current = false; want.current = false; setRefused(true); setListening(false); }
   }, []);
-  /** Runs the waiting start once (the old recognizer's end or the timeout, whichever comes first). */
-  const fresh = useCallback(() => {
+  /** The waiting start, once: on the last one's end or after END_WAIT_MS, whichever comes first. */
+  const resume = useCallback((r: Recognizer) => {
     if (!pending.current) return;
     clearTimeout(pending.current); pending.current = null;
-    if (want.current) run();
-  }, [run]);
+    live.current = false;
+    if (want.current) begin(r); else setListening(false);
+  }, [begin]);
+  const recognizer = useCallback((): Recognizer | null => {
+    if (rec.current) return rec.current;
+    const Ctor = recognizerCtor();
+    if (!Ctor) { setUnavailable(true); return null; }
+    const r = new Ctor();
+    r.lang = navigator.language || 'en-US'; r.interimResults = true; r.continuous = false;
+    r.onresult = (e) => {
+      if (pending.current) return; // the last listen's late words, after a new start
+      now.current = Array.from(e.results).map((x) => x[0].transcript).join(' ');
+      const all = join(kept.current, now.current);
+      setWords(all); if (all) setHeard(true);
+    };
+    r.onerror = (e) => { if (FATAL.has(e.error)) { want.current = false; setRefused(true); } };
+    r.onend = () => {
+      if (pending.current) { resume(r); return; }
+      live.current = false;
+      kept.current = join(kept.current, now.current); now.current = '';
+      if (want.current && restarts.current++ < RESTARTS) begin(r); else setListening(false);
+    };
+    rec.current = r;
+    return r;
+  }, [begin, resume]);
+
   const start = useCallback(() => {
     kept.current = ''; now.current = ''; restarts.current = 0;
     setWords(''); setHeard(false); setRefused(false);
+    let r: Recognizer | null;
+    try { r = recognizer(); } catch { setRefused(true); return; }
+    if (!r) return;
     want.current = true;
-    const old = live.current;
-    if (!old) { run(); return; }
+    if (!live.current) { begin(r); return; }
     setListening(true);
-    if (pending.current) return; // already waiting for it
-    pending.current = setTimeout(fresh, END_WAIT_MS);
-    old.abort();
-  }, [run, fresh]);
+    if (pending.current) return; // already waiting for its end
+    const waiting = r;
+    pending.current = setTimeout(() => resume(waiting), END_WAIT_MS);
+    r.abort();
+  }, [recognizer, begin, resume]);
   const stop = useCallback(() => {
     want.current = false;
     if (pending.current) { clearTimeout(pending.current); pending.current = null; }
     const r = rec.current;
     r?.stop(); setListening(false); // its last words still come…
-    setTimeout(() => { if (r && live.current === r) r.abort(); }, END_WAIT_MS); // …but it must end, freeing the mic
+    setTimeout(() => { if (r && live.current && !want.current) r.abort(); }, END_WAIT_MS); // …but it must end, freeing the mic
   }, []);
   useEffect(() => () => { want.current = false; if (pending.current) clearTimeout(pending.current); rec.current?.abort(); }, []);
   return { words, heard, listening, unavailable, refused, start, stop };

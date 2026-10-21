@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.78 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
+**Version:** 3.79 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5687,8 +5687,9 @@ typed (typing stops listening) ⚑ Q333. **Done** sends the box (enabled once it
 (still listening if it was), **Cancel** closes. With no speech-to-text, a refusal, or 8 seconds listening with nothing
 heard, the line says "Tap the 🎤 on your keyboard and talk." and the box still works ⚑ Q338; a refusal or a failed try
 (the mic busy, the popup's first answer) fails only that try, and the next tap of the mark asks again. Talking a second time
-works like the first: a new listen waits for the last one to finish (the iPhone hears nothing until it has; MojoSOGO
-2026-10-21 "it works the first time, but when I do it a second time the text doesn't show up"). Tapping the mark
+works like the first (MojoSOGO 2026-10-21 "it works the first time, but when I do it a second time the text doesn't
+show up"): the iPhone hears only with the first listener a page makes, so there is one, started again each time, never
+while it is still finishing. Tapping the mark
 to talk puts the keyboard away first, so the keyboard's own 🎤 never holds the mic (MojoSOGO 2026-10-20 "sometimes the
 text box is not selected and the VtT is not captured"). The phone's voice is woken
 on Done, never while listening, so the voice and the mic never fight. Admins also see **💡 Requests** here
