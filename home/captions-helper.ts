@@ -2,22 +2,27 @@
 // 127.0.0.1:8790 (loopback only; the `sogoai` Cloudflare Tunnel behind Access is its only way in) answering
 // GET /captions?v=… with the CaptionsResult that the SAME youtube-captions.ts reads from the home IP (the
 // Worker asks it in-line when YouTube blocks the Worker), and POST /identify (an image) with the IdentifyReport
-// identify.ts gets from LM Studio's local vision model. Bearer CAPTIONS_TOKEN, compared in constant time.
-// One log line per request; the token is never logged. youtube-captions.ts, item-reading.ts, identify.ts, node:http
-// and Node globals only (§2.5) — `npm run build:home` bundles it into home/dist/captions-helper.mjs. Config:
+// identify.ts gets from LM Studio's local vision model, and POST /note-marks (JSON { text }) with the NoteMarksReport
+// note-marks.ts gets after asking the PC model manager (§8.4a). Bearer CAPTIONS_TOKEN, compared in constant time.
+// One log line per request; the token and the notes are never logged. youtube-captions.ts, item-reading.ts,
+// note-marks.ts (both), identify.ts, node:http and Node globals only (§2.5) — `npm run build:home` bundles it into home/dist/captions-helper.mjs. Config:
 // CAPTIONS_TOKEN and IDENTIFY_MODEL from the environment (captions-helper.env, via node --env-file).
 import { createServer } from 'node:http';
 import { readCaptions } from '../src/worker/youtube-captions';
 import { IDENTIFY_BODY_MAX } from '../src/shared/item-reading';
 import { identify } from './identify';
+import { NOTE_MARKS_TEXT_MAX } from '../src/shared/note-marks';
+import { noteMarks } from './note-marks';
 
 export const HOST = '127.0.0.1';
 export const PORT = 8790;
 const VIDEO_ID = /^[A-Za-z0-9_-]{1,64}$/;
+/** POST /note-marks's body cap: the longest notes as UTF-8 (≤ 4 bytes a character), escaped in JSON, with room. */
+export const NOTE_MARKS_BODY_MAX = NOTE_MARKS_TEXT_MAX * 8 + 64;
 
 export interface HelperRequest {
   method: string; url: string; authorization?: string;
-  /** POST /identify only: the Content-Type, and the body as main() read it ('too_large' past IDENTIFY_BODY_MAX). */
+  /** POST only: the Content-Type, and the body as main() read it ('too_large' past IDENTIFY_BODY_MAX). */
   contentType?: string; body?: Uint8Array | 'too_large';
 }
 export interface HelperDeps { token: string; fetch: typeof fetch; /** IDENTIFY_MODEL (§7A.3). */ model?: string }
@@ -44,7 +49,7 @@ export async function handle(req: HelperRequest, deps: HelperDeps): Promise<Help
 }
 
 /** Each path and the one method it answers. */
-const METHOD: Record<string, string> = { '/captions': 'GET', '/identify': 'POST' };
+const METHOD: Record<string, string> = { '/captions': 'GET', '/identify': 'POST', '/note-marks': 'POST' };
 
 async function answerFor(req: HelperRequest, deps: HelperDeps): Promise<HelperAnswer> {
   const url = new URL(req.url, `http://${HOST}`);
@@ -54,6 +59,7 @@ async function answerFor(req: HelperRequest, deps: HelperDeps): Promise<HelperAn
   const given = /^Bearer (.+)$/.exec(req.authorization ?? '')?.[1] ?? '';
   if (!(await sameSecret(given, deps.token))) return { status: 401, body: { error: 'unauthorized' } };
   if (url.pathname === '/identify') return identifyAnswer(req, deps);
+  if (url.pathname === '/note-marks') return noteMarksAnswer(req, deps);
   const v = url.searchParams.get('v') ?? '';
   if (!VIDEO_ID.test(v)) return { status: 400, body: { error: 'invalid_video_id' } };
   return { status: 200, body: await readCaptions(v, { fetch: deps.fetch }) };
@@ -68,8 +74,26 @@ async function identifyAnswer(req: HelperRequest, deps: HelperDeps): Promise<Hel
   return { status: 200, body: await identify(req.body, type, { model: deps.model, fetch: deps.fetch }) };
 }
 
-/** What one log line says came of a request: never the token, never a header, never the image. */
+/** §8.4a — after the bearer: JSON (400), within the cap (413), a non-empty text (400) no longer than
+ *  NOTE_MARKS_TEXT_MAX (413), then note-marks. */
+async function noteMarksAnswer(req: HelperRequest, deps: HelperDeps): Promise<HelperAnswer> {
+  const type = (req.contentType ?? '').split(';')[0].trim().toLowerCase();
+  if (type !== 'application/json') return { status: 400, body: { error: 'not_json' } };
+  if (req.body === 'too_large' || (req.body?.length ?? 0) > NOTE_MARKS_BODY_MAX) return { status: 413, body: { error: 'too_large' } };
+  let text: unknown;
+  try { text = (JSON.parse(new TextDecoder().decode(req.body)) as { text?: unknown } | null)?.text; } catch { /* not JSON */ }
+  if (typeof text !== 'string' || !text.trim()) return { status: 400, body: { error: 'no_text' } };
+  if (text.length > NOTE_MARKS_TEXT_MAX) return { status: 413, body: { error: 'too_large' } };
+  return { status: 200, body: await noteMarks(text, { model: deps.model, fetch: deps.fetch }) };
+}
+
+/** What one log line says came of a request: never the token, never a header, never the image, never the notes. */
 function outcome(req: HelperRequest, answer: HelperAnswer): string {
+  if (new URL(req.url, `http://${HOST}`).pathname === '/note-marks') {
+    const r = answer.body as { ok?: boolean; marks?: unknown[]; kind?: string; reason?: string; error?: string };
+    if (answer.status !== 200) return `${req.method} note-marks → ${answer.status} ${r.error ?? ''}`.trim();
+    return `note-marks → ${r.ok ? `${r.marks?.length ?? 0} marks` : `${r.kind}: ${r.reason}`}`;
+  }
   if (new URL(req.url, `http://${HOST}`).pathname === '/identify') {
     const r = answer.body as { ok?: boolean; text?: string; kind?: string; reason?: string; error?: string };
     if (answer.status !== 200) return `${req.method} identify → ${answer.status} ${r.error ?? ''}`.trim();
@@ -111,7 +135,7 @@ export function main(token: string, model: string | undefined): void {
   });
   server.listen(PORT, HOST, () => {
     console.log(stamp(`captions helper listening on http://${HOST}:${PORT}`));
-    console.log(stamp(model ? `identify: model ${model}` : 'identify: off (IDENTIFY_MODEL is not set)'));
+    console.log(stamp(model ? `identify and note-marks: model ${model}` : 'identify and note-marks: off (IDENTIFY_MODEL is not set)'));
   });
 }
 

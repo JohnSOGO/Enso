@@ -7,6 +7,44 @@ carry its result.
 
 ---
 
+## 2026-10-21 — LM Studio chat-completions call (reorganizer)
+
+- **Trigger:** v1.99.0 §8.4a notes highlights via SogoAI needs a second LM Studio call. The placement-advisor said
+  extract first, on cohesion not cap: identify.ts mixed naming an item with the LM Studio call.
+- **Seam moved:** LM_STUDIO_URL and the POST / HTTP status / choices[0] content and finish_reason parse / reason strings,
+  from `home/identify.ts` to `home/lm-studio.ts` (`chatCompletion(payload, { timeoutMs, fetch })`) [NEW row]. Commit 52b872c.
+- **Room opened:** home/identify.ts 75 → 53 lines; no pin before or after (under GLOBAL_FILE_CAP 300).
+- **Behavior:** preserved. typecheck, npm test (151 files / 1004 tests) and arch:audit green; build:home succeeds. Request
+  URL, headers, body, the 15 s timeout and all four failure reasons unchanged; LM_STUDIO_URL still importable from identify.ts.
+- **Restraint:** only the transport moved; the prompt, payload, IDENTIFY_* constants, the 'off' check and the IdentifyReport
+  shape stay in identify.ts.
+
+## 2026-10-21 — Notes highlights: home AI first, patterns as the fallback (placement-advisor)
+
+- **Ask:** v1.99.0, SPEC §8.4a Highlights rewritten to AI first with a pattern fallback (MojoSOGO 2026-10-21: "AI with
+  PAT fallback; make sure you interface with model manager"; confirms Q364 the other way). POST /note-marks on the SogoAI
+  helper, which goes ahead only when the PC model manager (127.0.0.1:8793 /state) is idle with IDENTIFY_MODEL already
+  loaded (no lease); POST /api/v1/notes/marks; the PWA shows patterns at once and swaps in AI marks, with a source line.
+- **Verdict:** NEW home/lm-studio.ts (reorganizer first), home/model-manager.ts, home/note-marks.ts,
+  src/shared/note-marks.ts, src/worker/routes/notes.ts, frontend/src/components/useNoteMarks.ts. EXISTING
+  home/captions-helper.ts (the route), src/shared/vocab.ts (NOTE_MARK, NOTE_MARKS_FAILURE, NOTE_MARKS_WHY, NOTE_MARKS_VIA),
+  scripts/arch.ts (home/ allow-list + src/shared/note-marks.ts), src/worker/home-captions.ts (noteMarksFromHome, keeps the
+  kind), src/worker/index.ts (mount), frontend/src/notes-marks.ts (Mark from vocab; mergeMarks), NotesSheet.tsx (wiring
+  and source line). Reorganizer REQUIRED (small, cohesion and not the cap).
+- **Flow stage:** deliver (home, home-captions), rules (shared/note-marks, vocab), route (routes/notes), render (PWA).
+- **Why:** the manager is a contract between processes, so it gets its own leaf, as access.ts does for Access. A second
+  LM Studio caller would have copied identify's URL and response parse, so the seam opened first. The wire shape and the
+  substring check live in one pure module both sides import (the parseIdentifyReport precedent); the kinds in vocab.ts.
+  The Worker decides which marks stand (validMarks), as with cleanItemName. A new routes file: notes belong to neither
+  events (events.ts pinned) nor list items. A fetch-state hook keeps NotesSheet the part that renders; api.ts stays
+  transport. Rejected: one home file doing manager and LM Studio; taking a manager lease (it starts ComfyUI and sets its
+  lastModel); the Mark kinds staying in the frontend; identifyFromHome's kind-dropping failure shape.
+- **Spec settled (⚑):** every place an AI phrase appears is marked, a phrase across a line break dropped, AI leads and
+  patterns fill (Q368); the source line wording (Q369); 2 s / 15 s / 20 s (Q370); `unset` when the Worker has no helper settings.
+- **Caps:** identify.ts 53/300; lm-studio.ts 37, model-manager.ts ~30, note-marks.ts (home) ~45, src/shared/note-marks.ts
+  ~100, routes/notes.ts ~25, useNoteMarks.ts ~40 (all /300); captions-helper.ts ~150/300; home-captions.ts ~85/300;
+  index.ts ~120/300; notes-marks.ts ~90/300; NotesSheet.tsx ~120/300. Nothing pinned touched.
+
 ## 2026-10-21 — v1.98.1 "Filled N fields" counts once (placement-advisor)
 
 - **Ask:** steward finding after v1.98.0 (§7.9, §7.9b), MojoSOGO picked FIX: EventFillBar summed the reading's and the

@@ -1,17 +1,21 @@
-// SPEC §7E.2c, §7A.3 — asking the SogoAI helper, in-line, through Cloudflare Access and the `sogoai` tunnel: one
-// video's captions (GET /captions, checked by parseCaptionsReport) and a snapped item's name (POST /identify with
-// the image, checked by parseIdentifyReport). Each is one request with Bearer CAPTIONS_TOKEN through access.ts (the
+// SPEC §7E.2c, §7A.3, §8.4a — asking the SogoAI helper, in-line, through Cloudflare Access and the `sogoai` tunnel:
+// one video's captions (GET /captions, checked by parseCaptionsReport), a snapped item's name (POST /identify with
+// the image, checked by parseIdentifyReport) and a notes text's marks (POST /note-marks, checked by
+// parseNoteMarksReport). Each is one request with Bearer CAPTIONS_TOKEN through access.ts (the
 // Access headers, redirect 'manual', 2xx only, a timeout). Never throws, never names a secret, never decides whether
 // to ask or what is saved (the routes do). No D1, no Hono. A leaf sibling of house.ts.
 import type { Env } from './env';
 import { parseCaptionsReport } from '../shared/recipe-reading';
 import { parseIdentifyReport } from '../shared/item-reading';
+import { parseNoteMarksReport, type NoteMarksReport } from '../shared/note-marks';
 import { callThroughAccess } from './access';
 
 /** ⚑ Q96 — how long the Worker waits for SogoAI. */
 export const HOME_CAPTIONS_TIMEOUT_MS = 20_000;
 /** ⚑ Q114 — how long the Worker waits for SogoAI to name a snapped item. */
 export const HOME_IDENTIFY_TIMEOUT_MS = 20_000;
+/** ⚑ Q370 — how long the Worker waits for SogoAI to mark a notes text: more than its 2 s + 15 s. */
+export const HOME_NOTE_MARKS_TIMEOUT_MS = 20_000;
 
 export interface HomeCaptionsConfig { url: string; accessId: string; accessSecret: string; token: string }
 
@@ -58,4 +62,20 @@ export async function identifyFromHome(cfg: HomeCaptionsConfig, photo: ArrayBuff
   const report = parseIdentifyReport(body);
   if (typeof report === 'string') return { ok: false, reason: report };
   return report.ok ? { ok: true, text: report.text } : { ok: false, reason: report.reason };
+}
+
+/** One POST of the notes to `{url}/note-marks` → the helper's NoteMarksReport, its kind kept (the sheet tells busy
+ *  from off); the transport or a bad answer → `failed` with the reason. The marks are as the model gave them
+ *  (validMarks decides). */
+export async function noteMarksFromHome(cfg: HomeCaptionsConfig, text: string,
+  opts: { fetch?: typeof fetch } = {}): Promise<NoteMarksReport> {
+  const res = await callThroughAccess(cfg, `${cfg.url}/note-marks`, {
+    method: 'POST', timeoutMs: HOME_NOTE_MARKS_TIMEOUT_MS, body: JSON.stringify({ text }), fetch: opts.fetch,
+    headers: { Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) return { ok: false, kind: 'failed', reason: res.reason };
+  let body: unknown;
+  try { body = JSON.parse(res.text); } catch { return { ok: false, kind: 'failed', reason: 'The helper answered something that is not JSON.' }; }
+  const report = parseNoteMarksReport(body);
+  return typeof report === 'string' ? { ok: false, kind: 'failed', reason: report } : report;
 }

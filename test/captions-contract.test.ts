@@ -7,8 +7,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readCaptions, type CaptionsResult } from '../src/worker/youtube-captions';
 import { parseCaptionsReport } from '../src/shared/recipe-reading';
 import { handle } from '../home/captions-helper';
-import { identifyFromHome, readCaptionsFromHome } from '../src/worker/home-captions';
-import { CAPTIONS_FAILURE, IDENTIFY_FAILURE } from '../src/shared/vocab';
+import { identifyFromHome, noteMarksFromHome, readCaptionsFromHome } from '../src/worker/home-captions';
+import { CAPTIONS_FAILURE, IDENTIFY_FAILURE, NOTE_MARKS_FAILURE } from '../src/shared/vocab';
+import { noteMarks } from '../home/note-marks';
+import { parseNoteMarksReport } from '../src/shared/note-marks';
 import { identify } from '../home/identify';
 import { parseIdentifyReport } from '../src/shared/item-reading';
 import { TRACKS, VIDEO_ID, json3, playerAnswer } from './recipe-fakes';
@@ -122,5 +124,53 @@ describe('SN15 identify → handle() → the wire → identifyFromHome', () => {
       expect(got, what).toEqual(report.ok ? { ok: true, text: report.text } : { ok: false, reason: (parsed as { reason: string }).reason });
     }
     expect([...kinds].sort(), 'the fakes must reach every outcome').toEqual(['ok', ...IDENTIFY_FAILURE].sort());
+  });
+});
+
+// NA5 (SPEC §8.4a) — the same wire for POST /note-marks: every report noteMarks() can produce, found by CALLING it over
+// a fake PC model manager and LM Studio (and without a model), goes through handle() and the faked tunnel into the
+// Worker's noteMarksFromHome, which must accept it unchanged. The kinds seen are checked against NOTE_MARKS_FAILURE.
+describe('NA5 noteMarks → handle() → the wire → noteMarksFromHome', () => {
+  const MODEL = 'photo-polish';
+  const LOADED = { busy: null, mem: { lmStudio: [{ identifier: MODEL }] } };
+  const pc = (manager: object | 'throw', lm: (() => Response) | 'throw'): typeof fetch => async (input) => {
+    const url = input instanceof Request ? input.url : String(input);
+    const a = url.endsWith(':8793/state') ? manager : lm;
+    if (a === 'throw') throw new Error('connect ECONNREFUSED');
+    return typeof a === 'function' ? a() : Response.json(a);
+  };
+  const chat = (content: unknown) => () => Response.json({ choices: [{ message: { content } }] });
+  const PC_WORLDS: [string, typeof fetch, string | undefined][] = [
+    ['marks', pc(LOADED, chat(JSON.stringify({ marks: [{ text: 'Gate code 4471', kind: 'key' }] }))), MODEL],
+    ['no marks', pc(LOADED, chat('{"marks":[]}')), MODEL],
+    ['no model set', pc(LOADED, chat('{}')), undefined],
+    ['no manager', pc('throw', chat('{}')), MODEL],
+    ['changing models', pc({ ...LOADED, busy: { action: 'load' } }, chat('{}')), MODEL],
+    ['not loaded', pc({ busy: null, mem: { lmStudio: [] } }, chat('{}')), MODEL],
+    ['LM Studio is down', pc(LOADED, 'throw'), MODEL],
+    ['not JSON', pc(LOADED, chat('here you go')), MODEL],
+  ];
+
+  it("every report handle answers /note-marks with is accepted by the Worker's side", async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const token = 'contract-token';
+    const cfg = { url: 'https://sogoai.test', accessId: 'id', accessSecret: 'secret', token };
+    const kinds = new Set<string>();
+    for (const [what, pcFetch, model] of PC_WORLDS) {
+      const report = await noteMarks('Gate code 4471', { model, fetch: pcFetch });
+      kinds.add(report.ok ? 'ok' : report.kind);
+      const tunnel: typeof fetch = async (input, init) => {
+        const req = new Request(input, init);
+        const u = new URL(req.url);
+        const answer = await handle({
+          method: req.method, url: `${u.pathname}${u.search}`, authorization: req.headers.get('authorization') ?? undefined,
+          contentType: req.headers.get('content-type') ?? undefined, body: new Uint8Array(await req.arrayBuffer()),
+        }, { token, fetch: pcFetch, model });
+        return new Response(JSON.stringify(answer.body), { status: answer.status });
+      };
+      const got = await noteMarksFromHome(cfg, 'Gate code 4471', { fetch: tunnel });
+      expect(got, what).toEqual(parseNoteMarksReport(JSON.parse(JSON.stringify(report))));
+    }
+    expect([...kinds].sort(), 'the fakes must reach every outcome').toEqual(['ok', ...NOTE_MARKS_FAILURE].sort());
   });
 });
