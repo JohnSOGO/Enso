@@ -7,6 +7,29 @@ carry its result.
 
 ---
 
+## 2026-10-21 — Notes full-screen sheet, highlights, list tools, 📝 in the day sheet (placement-advisor)
+
+- **Ask:** v1.97.0, SPEC §8.4a (with §8.3, §8.4, §8.8, §10 `/calendar`). MojoSOGO: "In Calendar, let me tap to see the
+  notes and then expand the notes with like a full screen pop-up with basic edit features" and "auto highlight
+  pertinent information". 📝 after an event title in the day sheet (`hasNotes`); ⤢ on the Notes box opens a full-screen
+  sheet: read mode with highlights and ☐/☑ tap to tick; ✏️ Edit with • List, ☐ Box and the list going on at Enter; Done
+  hands the text back. Read only for members who can't change it. The list item note uses the same piece.
+- **Verdict:** NEW rows frontend/src/notes-marks.ts, frontend/src/notes-edit.ts, frontend/src/components/NotesSheet.tsx
+  (NotesField + NotesSheet). EXISTING: Modal.tsx (`full` prop); one-line wiring in routes/events.ts, Calendar.tsx,
+  DaySheet.tsx, EventForm.tsx, HouseholdListItemForm.tsx. Reorganizer NONE.
+- **Flow stage:** render (plus one derived boolean on the /calendar summary).
+- **Why:** only the PWA highlights or edits notes, so the helpers sit in frontend/src beside day-lines.ts, not in
+  src/shared; highlighting and line editing are two concerns, so two leaf files. One NotesField serves both forms and
+  keeps EventForm (200/223) from growing. `full` on Modal, not a second dialog (would copy portal, dirty-close,
+  focus-return, iPhone rules). Links only through `webLink`. Found: the forms' `<fieldset disabled>` would disable ⤢ for
+  read-only members, so NotesField sits outside it; `hasNotes` would reveal a 🔒 event has notes, so it is sent true
+  only when canOpenEvent passes (Q362); asking the local AI is a separate flow (own spec + AREC), not in notes-marks.ts.
+- **Caps:** EventForm.tsx 199/223, events.ts 125/147, Calendar.tsx 200/300, DaySheet.tsx 67/300, Modal.tsx 79/300,
+  HouseholdListItemForm.tsx 99/300, NotesSheet.tsx ~125/300. Nothing in the band.
+- **Sources read:** placement-advisor.md, CLAUDE.md, scripts/arch.ts, module-ownership.md, placement-receipts.md,
+  EventForm.tsx, Modal.tsx, Modal.module.css, HouseholdListItemForm.tsx, DaySheet.tsx, Calendar.tsx, routes/events.ts,
+  vocab.ts, things.ts (webLink), ThingForm.tsx.
+
 ## 2026-10-20 — Voice not captured after one refused try: per-try `refused` (placement-advisor)
 
 - **Ask:** v1.96.1 fix, SPEC §8.18 part 2 (⚑ Q338/Q360). MojoSOGO: "sometimes the text box is not selected and the VtT

@@ -36,4 +36,12 @@ describe('§6.3 who opens an event', () => {
     const e = (await ev(o, [])).json;
     expect((await k.get(`/events/${e.id}`)).status).toBe(200);
   });
+
+  it('NS1 (§8.4a) hasNotes only for an event with notes the member may open', async () => {
+    const mine = (await ev(o, [K])).json, locked = (await ev(o, [A])).json;
+    const bare = (await o.post('/events', { title: 'No notes', startDate: '2030-03-07', startTime: '08:00', assignedTo: [K] })).json;
+    const occ = (await k.get('/calendar?from=2030-03-07&to=2030-03-07')).json.occurrences;
+    const has = (id: string) => occ.find((x: any) => x.eventId === id).hasNotes;
+    expect([has(mine.id), has(bare.id), has(locked.id)]).toEqual([true, false, false]);
+  });
 });

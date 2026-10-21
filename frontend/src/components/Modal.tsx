@@ -13,10 +13,12 @@ interface Props {
   confirmCloseText?: string;
   error?: string | null;
   footer?: ReactNode;
+  /** The whole screen inside the iPhone's safe areas (§8.4a notes sheet). */
+  full?: boolean;
   children: ReactNode;
 }
 
-export function Modal({ title, onClose, dirty = false, confirmCloseText = 'Discard your changes?', error, footer, children }: Props) {
+export function Modal({ title, onClose, dirty = false, confirmCloseText = 'Discard your changes?', error, footer, full = false, children }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const errRef = useRef<HTMLDivElement>(null);
@@ -53,7 +55,7 @@ export function Modal({ title, onClose, dirty = false, confirmCloseText = 'Disca
     <dialog
       ref={ref}
       tabIndex={-1}
-      className={s.dialog}
+      className={full ? `${s.dialog} ${s.full}` : s.dialog}
       aria-label={title}
       onCancel={(e) => { e.preventDefault(); requestClose(); }}
       onClick={(e) => { if (e.target === ref.current) requestClose(); }}
