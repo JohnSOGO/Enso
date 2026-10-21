@@ -1,6 +1,6 @@
 // SPEC §7.8 EP4–EP6, §7.9a EU1–EU5 — the reading's pure rules: cleanEventReading, readingToForm and readingOverForm.
 import { describe, expect, it } from 'vitest';
-import { cleanEventReading, readingOverForm, readingToForm, type EventFill, type EventReading } from '../src/shared/event-reading';
+import { cleanEventReading, fieldsChanged, readingOverForm, readingToForm, type EventFill, type EventReading } from '../src/shared/event-reading';
 import { ALERT_TITLE_MAX } from '../src/shared/alert-limits';
 
 const none: EventReading = { title: null, startDate: null, endDate: null, startTime: null, endTime: null, location: null, notes: null };
@@ -74,5 +74,15 @@ describe('§7.9a readingOverForm — an existing event updated from later info',
   it('EU5 notes already there are not repeated; an empty reading changes nothing', () => {
     expect(readingOverForm(timed, { ...none, notes: 'Bring socks' })).toEqual({ form: timed, filled: 0 });
     expect(readingOverForm(timed, none)).toEqual({ form: timed, filled: 0 });
+  });
+});
+
+describe('§7.9b the "Filled N fields" count (EF-C)', () => {
+  it('EF-C a field the reading and a saved place both set counts once', () => {
+    const before: EventFill = { title: '', date: '2026-10-25', allDay: false, startTime: '09:00', endTime: '', endDate: '2026-10-25', address: '', notes: '' };
+    const read = { ...before, title: 'Incognito night', address: 'Vista, CA', notes: 'RSVP' };
+    const placed = { ...read, address: '2335 Mirador, Vista, CA 92084', notes: 'RSVP\n\nPark in the lower drive.' };
+    expect(fieldsChanged(before, placed)).toBe(3);
+    expect(fieldsChanged(before, before)).toBe(0);
   });
 });
