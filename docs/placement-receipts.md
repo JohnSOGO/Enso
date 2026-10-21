@@ -7,6 +7,29 @@ carry its result.
 
 ---
 
+## 2026-10-21 — steward pass after v1.99.0 (code-steward)
+
+- **Run:** post-release, v1.98.1 (fill count once, EF-C), v1.98.2 (useSpeech: one reused recognizer), v1.99.0 (§8.4a notes
+  by the home AI: helper POST /note-marks gated by the PC model manager, Worker POST /notes/marks, useNoteMarks/mergeMarks;
+  lm-studio.ts seam out of identify.ts; live fixes 0ce2f79 manager 5 s / Worker 25 s and fb91c06 prompt opt-out dropped).
+- **Verdict:** MINOR DRIFT. Typecheck green; 1024/1024 (154 files, main tree); arch:audit quiet (top EventForm 199/223,
+  engine 88%). 5 receipts reconciled against 6 code commits, all landed as verdicts said; 1 without a receipt (fb91c06,
+  a one-line prompt patch in its owner, clean). Both v1.98.0-pass worker handoffs taken in v1.98.1.
+- **Top finding:** MED: the model id and helper facts were half-updated. SPEC §5 and where-things-stand say `photo-polish`;
+  SPEC §2 line 220, Q115 and README (setup commands included) still say `qwen-uncensored`. README's start-up log line, SPEC
+  HOME_CAPTIONS_URL row, §7A.3 404 path list and §7E.2c helper env/imports paragraph are stale too.
+- **Handoffs:** 0 to reorganizer; 4 to worker (docs fix #1; history entry plus a NOTE_MARKS_PROMPT guard comment #2 — the
+  history half done in the same commit as this receipt; delete dead NOTE_MARKS_VIA and ITEM_READ_VIA with the next vocab.ts
+  touch; drop identify.ts's LM_STUDIO_URL re-export with the next identify.ts change); 1 to placement-advisor after
+  MojoSOGO decides whether identify.ts consults the model manager (sibling of note-marks: it still JIT-loads with ttl Q317;
+  gating it trades loads for paid Claude reads, IDENTIFY_FAILURE gains `busy`). For MojoSOGO: wording when the AI answers
+  with no marks that stand (it currently reads "✨ Highlights by the home AI" over patterns only, which is how the
+  empty-answer bug looked like success).
+- **Restraint:** the §8.4a module split (deep leaves, no classitis); NA5 contract (calls the producer, already correct);
+  useNoteMarks' ref cache; display copy in NotesSheet; captions-helper outcome() path checks; receipt-spacing nits;
+  EventForm/engine under the band. Carried: isShareKey / InboxSetup apiUrl; deleteEventStatements, renotifyText,
+  updateEventStatement; failed Out of scope log; show* gating at a 5th calendar item.
+
 ## 2026-10-21 — LM Studio chat-completions call (reorganizer)
 
 - **Trigger:** v1.99.0 §8.4a notes highlights via SogoAI needs a second LM Studio call. The placement-advisor said
