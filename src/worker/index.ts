@@ -6,6 +6,7 @@ import { tick } from './tick';
 import { auth } from './routes/auth';
 import { members } from './routes/members';
 import { events } from './routes/events';
+import { places } from './routes/places';
 import { eventPhotos } from './routes/event-photos';
 import { optins } from './routes/optins';
 import { alerts } from './routes/alerts';
@@ -59,6 +60,7 @@ api.route('/', phoneLogin); // §6.6 /auth/phone-login
 api.route('/', members);
 api.route('/', eventPhotos); // before events: a later POST /events/:id must not capture /events/read-photo
 api.route('/', events);
+api.route('/', places); // §7.9b saved places
 api.route('/', optins);
 api.route('/', alerts);
 api.route('/', alarms);

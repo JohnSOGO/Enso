@@ -10,6 +10,7 @@ import { Modal } from './Modal';
 import { PickGrid } from './PickGrid';
 import { OptionalItems } from './OptionalItems';
 import { DaysOff } from './DaysOff';
+import { Places } from './Places';
 import { SettingsMe } from './SettingsMe';
 import { PhoneAlerts } from './PhoneAlerts';
 import { HouseSpeakers } from './HouseSpeakers';
@@ -42,7 +43,7 @@ export function Settings({ onLogout, openAlert, onAlertOpened }: { onLogout: () 
 
   const body: Record<Area, () => ReactNode> = {
     me: () => <SettingsMe />,
-    calendar: () => <><OptionalItems />{isAdmin(me) && <DaysOff />}</>,
+    calendar: () => <><OptionalItems />{isAdmin(me) && <DaysOff />}<Places /></>,
     phone: () => <PhoneAlerts />,
     speakers: () => <HouseSpeakers />,
     alerts: () => <MyAlerts openId={openAlert} onOpened={onAlertOpened} />,

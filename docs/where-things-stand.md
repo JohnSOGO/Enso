@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-21, v1.97.1, main = production.*
+*Last updated 2026-10-21, v1.98.0, main = production.*
 
 ## Running where
 
@@ -51,6 +51,9 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 📍 Saved places (v1.98.0, §7.9b, migration 0060): on the iPhone, Settings → 📅 Calendar → 📍 Saved places shows Incognito SD.
+  New event → 📋 Paste an incognitosd.com event link → Address "2335 Mirador, Vista, CA 92084", the parking notes under
+  the notes, "📍 Used Incognito SD."; typing a title with "Incognito" shows 📍 Use Incognito SD. Q365–Q367 are ⚑ defaults.
 - 📝 Notes full screen (v1.97.0, §8.4a, Q362–Q364 ⚑): on the iPhone, Calendar → tap a day → an event with 📝 → tap it →
   ⤢ by Notes → the notes fill the screen with times, dates, phones and addresses lit up; tap a phone → it rings; ✏️ Edit →
   • List / ☐ Box; Enter keeps the list going; 👁 View → tap a ☐ to tick it; Done → Save. Same ⤢ on a list item's Note.
