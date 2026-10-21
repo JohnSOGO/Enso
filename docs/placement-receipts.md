@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-21 — v1.98.1 "Filled N fields" counts once (placement-advisor)
+
+- **Ask:** steward finding after v1.98.0 (§7.9, §7.9b), MojoSOGO picked FIX: EventFillBar summed the reading's and the
+  place's counts, so a field both set counted twice.
+- **Verdict:** EXISTING owners. src/shared/event-reading.ts exports its private `changed` as `fieldsChanged(a, b)`
+  (readingToForm / readingOverForm use it); EventFillBar.tsx counts `fieldsChanged(latest.current, next)` after the
+  place. Docs: ThingForm.tsx header rewritten whole; the event-reading, EventFillBar and ThingForm map rows updated
+  (ThingForm names PlacePicker; EventFillBar's pasted sentence rewritten). One test (EF-C). Reorganizer NONE.
+- **Why:** the count belongs with the fill rules in shared, so the PWA reuses it instead of working it out again.
+- **Caps:** event-reading.ts ~86/300, EventFillBar.tsx ~96/300.
+
 ## 2026-10-21 — steward pass after v1.98.0 (code-steward)
 
 - **Run:** post-release, v1.96.1 (per-try `refused`), v1.97.0 (notes full screen, §8.4a), v1.97.1 (second talk heard on

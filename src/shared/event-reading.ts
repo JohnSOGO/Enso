@@ -41,7 +41,8 @@ export function cleanEventReading(raw: Partial<Record<keyof EventReading, unknow
 export interface EventFill { title: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string; address: string; notes: string }
 
 const FILL_KEYS: (keyof EventFill)[] = ['title', 'date', 'allDay', 'startTime', 'endTime', 'endDate', 'address', 'notes'];
-const changed = (a: EventFill, b: EventFill) => FILL_KEYS.filter((k) => a[k] !== b[k]).length;
+/** How many of the form's fillable fields differ between two forms (the "Filled N fields" count, §7.9, §7.9b). */
+export const fieldsChanged = (a: EventFill, b: EventFill) => FILL_KEYS.filter((k) => a[k] !== b[k]).length;
 
 /** §7.8 — fills only the fields still as they were when the form opened; → the form and how many fields changed. */
 export function readingToForm<F extends EventFill>(form: F, opened: EventFill, r: EventReading): { form: F; filled: number } {
@@ -60,7 +61,7 @@ export function readingToForm<F extends EventFill>(form: F, opened: EventFill, r
   if (next.endDate < next.date) next.endDate = next.date;
   if (r.location && open('address')) next.address = r.location;
   if (r.notes && open('notes')) next.notes = r.notes;
-  return { form: next, filled: changed(form, next) };
+  return { form: next, filled: fieldsChanged(form, next) };
 }
 
 /** §7.9a — an existing event updated from later info: what the reading names wins, except the title (kept) and
@@ -81,5 +82,5 @@ export function readingOverForm<F extends EventFill>(form: F, r: EventReading): 
   if (r.notes && !form.notes.includes(r.notes)) {
     next.notes = (form.notes.trim() ? `${form.notes.trimEnd()}\n\n${r.notes}` : r.notes).slice(0, EVENT_NOTES_MAX);
   }
-  return { form: next, filled: changed(form, next) };
+  return { form: next, filled: fieldsChanged(form, next) };
 }
