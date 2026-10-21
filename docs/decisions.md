@@ -114,7 +114,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q112 | SogoAI can't tell what a snapped item is (§7A.3) | ⚑ When SogoAI says UNKNOWN, Claude is asked, and that counts against the cap. If Claude can't tell either → 422 "Couldn't tell what that is — type it in." |
 | Q113 | Which snaps count against the daily cap | ⚑ Only Claude fallbacks count, sharing the 40-a-day `photo_reads` budget with Things; a name from SogoAI is free and uncounted |
 | Q114 | How long a snap may wait | ⚑ 20 s from the Worker to the helper (`HOME_IDENTIFY_TIMEOUT_MS`); 15 s from the helper to LM Studio |
-| Q115 | Which local model names items | ⚑ `IDENTIFY_MODEL=qwen-uncensored`, the always-loaded vision model on SogoAI. Unset → SogoAI counts as off and Claude is asked |
+| Q115 | Which local model names items | ⚑ `IDENTIFY_MODEL=photo-polish`, the small vision chat model SogoAI keeps loaded (was `qwen-uncensored` until v1.99.0). Unset → SogoAI counts as off and Claude is asked |
 | Q116 | How long a name | ⚑ The prompt asks for at most 60 characters (`ITEM_NAME_ASK`); the name is cut at 120 (`TEXT_MAX`) |
 | Q117 | The hint under a snapped name | ⚑ "Read from your photo — check it." `via` is always in the answer, but the UI doesn't show it |
 | Q118 | Snapping with text already in the box | ⚑ The name replaces whatever text is in the box |
@@ -371,5 +371,5 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q366 | Which saved place an event names (§7.9b) | ⚑ One of its match words or its name anywhere in the title, the copied text or link, or the reading's location and notes, ignoring case; the longest matching word wins, then the name A–Z |
 | Q367 | When a saved place is used (§7.9b) | MojoSOGO 2026-10-21 "This is always true for an Incognito event": ⚑ after 📷 / 📋 a matching place wins over the address that was read and its arrival notes go under the event's notes; typing a title only offers 📍 Use {name}; the 📍 Saved places picker in the event and thing forms |
 | Q368 | How the AI's marks and the patterns combine (§8.4a) | ⚑ the AI's marks lead and the patterns fill the gaps between them (so a phone the AI missed still rings); every place an AI phrase appears is marked; a phrase across a line break is dropped |
-| Q369 | Saying which highlights show (§8.4a) | ⚑ a muted line under the notes: "✨ Asking the home AI…", "✨ Highlights by the home AI", or "Highlights by patterns · home AI isn't set up / is off / is busy / didn't answer" |
+| Q369 | Saying which highlights show (§8.4a) | ⚑ a muted line under the notes: "✨ Asking the home AI…", "✨ Highlights by the home AI" (or, when it answered with no marks, "✨ Home AI found nothing more", MojoSOGO 2026-10-21 picked steward item 3), or "Highlights by patterns · home AI isn't set up / is off / is busy / didn't answer" |
 | Q370 | How long the home AI may take (§8.4a) | ⚑ 5 s for the model manager (its /state takes ~2.7 s), 15 s for LM Studio, 25 s for the Worker's wait on the helper; meanwhile the patterns show |

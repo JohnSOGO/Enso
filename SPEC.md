@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.81 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
+**Version:** 3.82 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -217,7 +217,7 @@ Cloudflare Tunnel + Access**.
 | House delivery | The Worker calls Home Assistant's REST API through **Cloudflare Tunnel + Access** (§9.2) | `src/worker/house.ts`; no process at home besides HA itself. |
 | Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Eight attachments, all through `src/worker/photo-store.ts`: a thing's photo (`things/…`, §7C.3), a list item's photo (`list-items/…`, §7A.3), room-area photos (`chore-areas/…`, the prefix kept from before rooms, §7B.6), mess photos (`messes/…`, §7B.7), a bounty's picture and its done photo (`bounties/…`, `earnings/…`, §7B.8), a recipe's picture (`recipes/…`, §7E.2b, §8.12) and a shared photo in my Inbox (`inbox/…`, §7H). Private: photos are served only through the API to signed-in members. |
 | Reading photos and recipes | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4, §7A.3, §7E) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). One caller of the SDK: `src/worker/claude.ts`. A snapped list item is read by SogoAI first and by Claude only when SogoAI gives no name (§7A.3). |
-| Naming a snapped item at home | **LM Studio** on SogoAI, `http://127.0.0.1:1234/v1/chat/completions` (OpenAI-compatible), the always-loaded vision model named by `IDENTIFY_MODEL` (`qwen-uncensored`) (§7A.3) | Free. Reached only by the SogoAI helper, never by the Worker directly. |
+| Naming a snapped item at home | **LM Studio** on SogoAI, `http://127.0.0.1:1234/v1/chat/completions` (OpenAI-compatible), the small vision chat model SogoAI keeps loaded, named by `IDENTIFY_MODEL` (`photo-polish`) (§7A.3) | Free. Reached only by the SogoAI helper, never by the Worker directly. |
 | Recipes from videos | **YouTube Data API v3** `videos.list?part=snippet&id=…` and `commentThreads.list?part=snippet&videoId=…&order=relevance&maxResults=20&textFormat=plainText` (§7E) | Secret `YOUTUBE_API_KEY`; 1 quota unit per call, so 2 per read ⚑ Q82. Plus an **unofficial, keyless** captions attempt (YouTube's player endpoint asked as its Android app), which may be blocked — a failure is recorded and shown, never faked. |
 | QR codes | `uqr` (MIT, zero dependencies, renders SVG) | **Loaded lazily** (dynamic `import()`) only when an invite card opens — never in the main bundle. |
 | Tests | **Vitest**; `@cloudflare/vitest-pool-workers` for API tests | API tests apply `migrations/` via `readD1Migrations` / `applyD1Migrations` |
@@ -326,7 +326,7 @@ against the deployed Worker. On iPhone, push works only after
 | `HA_URL`, `ECHO_TARGETS` (JSON array), `ECHO_TYPE`, `SATELLITE_ENTITY` (vars, `wrangler.toml`) | Worker | Where House speaks (§9.2). `ECHO_TARGETS` + `SATELLITE_ENTITY` are the **default speakers**: what a house delivery uses when someone it is for has not chosen their own (§9.2a). |
 | `YOUTUBE_API_KEY` (secret) | Worker | A Google Cloud API key with the YouTube Data API v3 enabled, for reading a recipe video's title and description (§7E). Set it with `npx wrangler secret put YOUTUBE_API_KEY` **in a real PowerShell window**. Never logged, never in an error message. Reading recipes also needs `ANTHROPIC_API_KEY`; without either, `POST /recipes/from-video` is 503 `recipe_reading_off` and typed recipes still work. Tests pin it empty. |
 | `CAPTIONS_TOKEN` (secret) | Worker **and** SogoAI's `C:\Enso\captions-helper.env` | The bearer the Worker sends to the SogoAI helper (`Authorization: Bearer …`, §7E.2c), checked by the helper in constant time — a second lock behind Access. A long random string, set with `npx wrangler secret put CAPTIONS_TOKEN` in a real PowerShell window and the same value in the helper's env file (never in the repo). Unset or empty on the Worker → captions from home are not set up (§7E.2c) and a snapped item goes straight to Claude (§7A.3); unset on SogoAI → the helper does not start. The same bearer guards `/identify` (§7A.3). Never logged, by the Worker or the helper. Tests pin a test-only value. |
-| `HOME_CAPTIONS_URL` (var, `wrangler.toml`) | Worker | Where the SogoAI helper is reached: `https://sogoai.sogodojo.com` (§7E.2c), for `/captions` and `/identify` (§7A.3) alike. Tests pin `https://sogoai.test`, which only a fetch spy answers. |
+| `HOME_CAPTIONS_URL` (var, `wrangler.toml`) | Worker | Where the SogoAI helper is reached: `https://sogoai.sogodojo.com` (§7E.2c), for `/captions`, `/identify` (§7A.3) and `/note-marks` (§8.4a) alike. Tests pin `https://sogoai.test`, which only a fetch spy answers. |
 | `IDENTIFY_MODEL` (SogoAI's `C:\Enso\captions-helper.env`, not a Worker setting) | SogoAI helper | The LM Studio model id `/identify` and `/note-marks` ask (§7A.3, §8.4a): `photo-polish`, the one small vision chat model SogoAI keeps loaded ⚑ Q115. `/note-marks` asks it only while the PC model manager shows it loaded. Unset or empty → `/identify` answers `{ ok: false, kind: "off" }` (the Worker then asks Claude) and `/note-marks` answers `off` (patterns); captions keep working and the helper still starts. Not a secret. |
 | `OPS_NOTIFY_TOKEN` (secret) | Worker **and** MojoSOGO's machines (`%USERPROFILE%\.enso\ops-notify-token`) | The bearer a Claude Code session sends to `POST /ops/notify` to push a message to the founder's phone (§9.4), checked in constant time. A long random string, set with `npx wrangler secret put OPS_NOTIFY_TOKEN` in a real PowerShell window and the same value in the token file (never in the repo). Unset or empty → `/ops/notify` is 503 `ops_notify_off` (never open). Never logged, never in a message or a delivery's detail. Tests pin a test-only value. |
 | `BUILD_FIRE_URL` (var, `wrangler.toml`), `BUILD_FIRE_TOKEN` (secret) | Worker | Build now (§8.18 part 6): the "Enso daily feature requests" routine's API fire address (`https://api.anthropic.com/v1/claude_code/routines/{id}/fire`) and its bearer, made once at claude.ai/code/routines → the routine → Edit → Add another trigger → API → Generate token, set with `npx wrangler secret put BUILD_FIRE_TOKEN` in a real PowerShell window. Either empty → `/feature-requests/{id}/build` is 503 `build_now_off`. Never logged or shown. |
@@ -349,7 +349,7 @@ Source files are everything under `src/`, `frontend/src/`, `scripts/` and `home/
   imports only its own siblings (no packages, no I/O); the worker and the frontend
   never import each other; nothing imports `scripts/` or `home/`; `home/` (the SogoAI
   helper, §7E.2c, §7A.3) imports nothing from the repo **except** `src/worker/youtube-captions.ts`
-  and `src/shared/item-reading.ts` (and its own siblings), and no package **except** `node:http`
+  `src/shared/item-reading.ts` and `src/shared/note-marks.ts` (and its own siblings), and no package **except** `node:http`
   (the helper's one server) — a layer may name exact repo
   paths, or `package:<name>`, in `allowed`, which the ban then skips;
 - a `src/shared/` file uses `Date.now(`, `new Date()`, `fetch(` or `D1Database`
@@ -2402,7 +2402,7 @@ Why SogoAI gave no name, in that 502: "it isn't set up", its failure reason, or 
 secret, and never decides; the route runs `cleanItemName`.
 
 **The helper** — `POST /identify` on the same `home/captions-helper.ts` server (§7E.2c), the same tunnel,
-Access application and bearer. Its check order: a path other than `/captions` or `/identify` → 404; a
+Access application and bearer. Its check order: a path other than `/captions`, `/identify` or `/note-marks` (§8.4a) → 404; a
 method other than POST → **405**; the bearer (constant time) → **401**; `Content-Type` not `image/*` →
 **400**; a body over `IDENTIFY_BODY_MAX` → **413** (the body is read in `main()`, which keeps no bytes past
 the cap); an empty body → 400; then `identify` (`home/identify.ts`) → **200** with the `IdentifyReport` as
@@ -3738,8 +3738,9 @@ secret, and never decides whether to ask or what is saved. No D1, no Hono.
 
 **The helper** — `home/captions-helper.ts`, bundled by `npm run build:home` (esbuild, Node 24, ESM) into
 one file, `home/dist/captions-helper.mjs`, copied to `C:\Enso\` on SogoAI with
-`home/captions-helper.cmd` and a `captions-helper.env` holding **`CAPTIONS_TOKEN` only** (never in the
-repo; README). It imports only `src/worker/youtube-captions.ts`, `node:http` and Node's globals (§2.5).
+`home/captions-helper.cmd` and a `captions-helper.env` holding **`CAPTIONS_TOKEN`** and **`IDENTIFY_MODEL`** (never
+in the repo; README). It imports only `src/worker/youtube-captions.ts`, `src/shared/item-reading.ts`,
+`src/shared/note-marks.ts`, its own siblings in `home/`, `node:http` and Node's globals (§2.5).
 
 - `handle(req: { method, url, authorization? }, deps: { token, fetch })` → `{ status, body }` (no
   `node:http` in it): a path other than `/captions` → **404**; a method other than GET → **405**; the
@@ -4540,7 +4541,7 @@ highlighted, the text on screen goes to the home AI and nowhere else (below).
     most `NOTE_MARKS_MAX` are kept. **Every** place the text appears is marked. In read mode the AI's marks lead and
     the patterns fill the gaps between them, so a phone the AI missed still rings ⚑ Q368.
   - **Which one shows, said in a muted line under the notes** ⚑ Q369: "✨ Asking the home AI…" while it asks (the
-    patterns are already drawn); "✨ Highlights by the home AI" when it answered; otherwise "Highlights by patterns ·
+    patterns are already drawn); "✨ Highlights by the home AI" when it answered with marks, "✨ Home AI found nothing more" when it answered with none (so an empty answer never looks like AI highlights); otherwise "Highlights by patterns ·
     home AI {why}": *isn't set up* (`unset`: the Worker has no helper settings), *is off* (`off`), *is busy* (`busy`),
     *didn't answer* (`failed`, or the request itself failed). The fallback is never silent.
   - The notes are sent only from the sheet that already shows them to that member. Nothing is stored or counted (no
