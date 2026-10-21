@@ -36,7 +36,7 @@ interface SheetProps { title: string; value: string; max: number; canChange: boo
 const WHY = { unset: "isn't set up", off: 'is off', busy: 'is busy', failed: "didn't answer" } as const;
 const sourceLine = (v: NoteMarksView) =>
   v.state === 'asking' ? '✨ Asking the home AI…'
-    : v.state === 'ai' ? '✨ Highlights by the home AI'
+    : v.state === 'ai' ? (v.marks.length ? '✨ Highlights by the home AI' : '✨ Home AI found nothing more')
       : `Highlights by patterns · home AI ${WHY[v.why]}`;
 
 export function NotesSheet({ title, value, max, canChange, onDone }: SheetProps) {

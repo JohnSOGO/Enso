@@ -7,6 +7,19 @@ carry its result.
 
 ---
 
+## 2026-10-21 — "found nothing more" source line (placement-advisor)
+
+- **Ask:** v1.99.1 patch, SPEC §8.4a ⚑ Q369 (steward item 3, MojoSOGO "1,3"): when the home AI answered (`state: 'ai'`)
+  with zero marks, the muted line says "✨ Home AI found nothing more" instead of "✨ Highlights by the home AI".
+- **Verdict:** frontend/src/components/NotesSheet.tsx `sourceLine` [EXISTING], one branch on `v.marks.length === 0`
+  (the AI's raw marks, as the request says). Reorganizer NONE.
+- **Flow stage:** render; display copy for a state the PWA already holds. Not vocab.ts (display copy, not vocabulary).
+- **Why:** the NotesSheet row already owns the line saying which highlights show (Q369). Rejected: useNoteMarks.ts
+  (fetches, not copy), src/shared/note-marks.ts (pure rules, no decision changes).
+- **Caps:** NotesSheet.tsx ~120/300. Nothing in the band.
+- **Sources read:** placement-advisor.md, placement-receipts.md, module-ownership.md, scripts/arch.ts, NotesSheet.tsx,
+  useNoteMarks.ts, SPEC §8.4a, decisions.md Q369.
+
 ## 2026-10-21 — steward pass after v1.99.0 (code-steward)
 
 - **Run:** post-release, v1.98.1 (fill count once, EF-C), v1.98.2 (useSpeech: one reused recognizer), v1.99.0 (§8.4a notes
