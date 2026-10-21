@@ -23,7 +23,7 @@ export const NOTE_MARKS_PROMPT =
   'parent would need to see at a glance: times, dates, phone numbers, money, links, emails, addresses, and key facts ' +
   '(what to bring, codes, allergies, who picks up or drives, deadlines). Copy each phrase EXACTLY as it appears in ' +
   'the notes, character for character, on one line, a few words at most, never a whole paragraph. ' +
-  `kind is one of: ${NOTE_MARK.join(', ')}. If nothing stands out, return no marks.`;
+  `kind is one of: ${NOTE_MARK.join(', ')}.`;
 
 /** LM Studio's response_format: the answer must be { marks: [{ text, kind }] }. */
 export const NOTE_MARKS_SCHEMA = {
