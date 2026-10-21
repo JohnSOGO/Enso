@@ -7,6 +7,21 @@ carry its result.
 
 ---
 
+## 2026-10-21 — steward pass after v1.98.0 (code-steward)
+
+- **Run:** post-release, v1.96.1 (per-try `refused`), v1.97.0 (notes full screen, §8.4a), v1.97.1 (second talk heard on
+  iPhone), v1.98.0 (📍 saved places, §7.9b, migration 0060).
+- **Verdict:** SOUND. Typecheck green; 1003/1003; arch:audit quiet (top EventForm.tsx 199/223, engine.ts 88%). 4 receipts
+  reconciled against 4 code commits; 0 without a receipt; the v1.96.0 EnsoButton handoff was taken in v1.96.1.
+- **Top finding:** LOW: EventFillBar's "Filled N fields" counts Address/Notes twice when a reading fills them and a saved
+  place then replaces them (sum of two counts, not fields changed).
+- **Handoffs:** 0 to reorganizer; 2 to worker (the fill-bar count, a patch; ThingForm's map row and header line to name
+  PlacePicker, with the next ThingForm change); 0 to placement-advisor.
+- **Restraint:** two GET /places per event form; usePlaces living in PlacePicker.tsx; ThingForm's three set calls on a
+  pick; no component test for the place UI (rules are pure and tested); EventForm and engine just under the band.
+- **Carried:** isShareKey / InboxSetup apiUrl; deleteEventStatements, renotifyText, updateEventStatement; where a failed
+  Out of scope log shows; gating show* at a 5th calendar item.
+
 ## 2026-10-21 — Saved places, the address book (placement-advisor)
 
 - **Ask:** SPEC §7.9b, v1.98.0, migration 0060. A `places` table, an API, a Settings section, and a picker in the event
