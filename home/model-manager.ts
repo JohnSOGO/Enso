@@ -4,8 +4,8 @@
 // sets its shared last model), never loads or unloads. Never throws. Node globals only (§2.5); no node:http.
 
 export const MODEL_MANAGER_URL = 'http://127.0.0.1:8793';
-/** ⚑ Q370 — how long the helper waits for the manager. */
-export const MODEL_MANAGER_TIMEOUT_MS = 2_000;
+/** ⚑ Q370 — how long the helper waits for the manager: its /state takes ~2.7 s on SogoAI (measured 2026-10-21). */
+export const MODEL_MANAGER_TIMEOUT_MS = 5_000;
 
 export type ModelReady = { ok: true } | { ok: false; kind: 'off' | 'busy'; reason: string };
 

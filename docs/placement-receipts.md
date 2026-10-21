@@ -40,7 +40,7 @@ carry its result.
   transport. Rejected: one home file doing manager and LM Studio; taking a manager lease (it starts ComfyUI and sets its
   lastModel); the Mark kinds staying in the frontend; identifyFromHome's kind-dropping failure shape.
 - **Spec settled (⚑):** every place an AI phrase appears is marked, a phrase across a line break dropped, AI leads and
-  patterns fill (Q368); the source line wording (Q369); 2 s / 15 s / 20 s (Q370); `unset` when the Worker has no helper settings.
+  patterns fill (Q368); the source line wording (Q369); 5 s / 15 s / 25 s (Q370; 2 s first, raised after the live /state measured ~2.7 s); `unset` when the Worker has no helper settings.
 - **Caps:** identify.ts 53/300; lm-studio.ts 37, model-manager.ts ~30, note-marks.ts (home) ~45, src/shared/note-marks.ts
   ~100, routes/notes.ts ~25, useNoteMarks.ts ~40 (all /300); captions-helper.ts ~150/300; home-captions.ts ~85/300;
   index.ts ~120/300; notes-marks.ts ~90/300; NotesSheet.tsx ~120/300. Nothing pinned touched.
