@@ -1,9 +1,10 @@
 // SPEC §8.8 — the list item form modal: the item's photo (§7A.3, PhotoField; saved on Save, after the fields), text,
-// note, Time on an every day list (§7A.4), Assigned to (one member or Nobody), Save / Cancel / Delete. Owns the `Item` shape; HouseholdLists imports
+// note (NotesField, §8.4a), Time on an every day list (§7A.4), Assigned to (one member or Nobody), Save / Cancel / Delete. Owns the `Item` shape; HouseholdLists imports
 // both from here, never the reverse. Someone else's item is read-only (§6.3); ticking it stays on the list.
 import { useMemo, useState } from 'react';
 import { Modal } from './Modal';
 import { PhotoField } from './PhotoField';
+import { NotesField } from './NotesSheet';
 import { apiUrl, del, errorText, patch, upload } from '../api';
 import { useApp } from '../state';
 import { NOTE_MAX, TEXT_MAX } from '../../../src/shared/lists';
@@ -71,9 +72,9 @@ export function ItemForm({ item, daily, onClose, onSaved }: { item: Item; daily:
         {daily && <label className="field"><span>Time (empty = none)</span>
           <input type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} />
         </label>}
-        <label className="field"><span>Note</span>
-          <textarea rows={4} value={f.note} maxLength={NOTE_MAX} onChange={(e) => setF({ ...f, note: e.target.value })} />
-        </label>
+      </fieldset>
+      <NotesField label="Note" title={f.text || item.text} value={f.note} max={NOTE_MAX} rows={4} canChange={canEdit && !busy} onChange={(note) => setF({ ...f, note })} />
+      <fieldset disabled={busy || !canEdit}>
         <div className="field" role="radiogroup" aria-label="Assigned to">
           <span className="muted" style={{ fontSize: '.8rem' }}>Assigned to</span>
           <div className="row wrap" style={{ marginTop: 4 }}>

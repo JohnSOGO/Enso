@@ -38,7 +38,7 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
           <span className={s.when}>{o.allDay ? (o.continued ? 'cont.' : 'All day') : clock(o.startTime!)}</span>
           <span className={s.bar} style={{ background: o.color }} />
           <span className={s.what}>
-            <span className={s.title}>{o.emoji && `${o.emoji} `}{o.title}{o.hasReminder && <span aria-label="has reminder" title="Has a reminder"> 🔔</span>}{o.recurring && <span aria-label="repeats" title="Repeats"> 🔁</span>}{!open && <span aria-label="only the people going can open it" title="Only the people going can open it"> 🔒</span>}</span>
+            <span className={s.title}>{o.emoji && `${o.emoji} `}{o.title}{o.hasReminder && <span aria-label="has reminder" title="Has a reminder"> 🔔</span>}{o.recurring && <span aria-label="repeats" title="Repeats"> 🔁</span>}{o.hasNotes && <span aria-label="has notes" title="Has notes"> 📝</span>}{!open && <span aria-label="only the people going can open it" title="Only the people going can open it"> 🔒</span>}</span>
             <span className={s.meta}>
               {who.family ? <span className="chip" style={{ borderColor: 'var(--good)', background: 'var(--good)', color: '#0F172A', fontWeight: 600 }}>Family</span> : <>
                 {!who.ids.includes(o.createdBy) && <span className="chip" style={{ borderColor: o.color }}>{o.creatorName}</span>}
