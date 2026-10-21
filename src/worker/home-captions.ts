@@ -14,8 +14,8 @@ import { callThroughAccess } from './access';
 export const HOME_CAPTIONS_TIMEOUT_MS = 20_000;
 /** ⚑ Q114 — how long the Worker waits for SogoAI to name a snapped item. */
 export const HOME_IDENTIFY_TIMEOUT_MS = 20_000;
-/** ⚑ Q370 — how long the Worker waits for SogoAI to mark a notes text: more than its 2 s + 15 s. */
-export const HOME_NOTE_MARKS_TIMEOUT_MS = 20_000;
+/** ⚑ Q370 — how long the Worker waits for SogoAI to mark a notes text: more than its 5 s + 15 s. */
+export const HOME_NOTE_MARKS_TIMEOUT_MS = 25_000;
 
 export interface HomeCaptionsConfig { url: string; accessId: string; accessSecret: string; token: string }
 

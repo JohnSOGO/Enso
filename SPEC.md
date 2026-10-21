@@ -4526,8 +4526,8 @@ highlighted, the text on screen goes to the home AI and nowhere else (below).
     ("Sam's allergy is peanuts", "Grandma drives us home"). Each time read mode shows a text it hasn't asked about,
     the sheet (`useNoteMarks`) sends it to `POST /notes/marks` (§10). The route asks the SogoAI helper's
     `POST /note-marks` through Access with the `CAPTIONS_TOKEN` bearer (`noteMarksFromHome`, the §7A.3 path), waiting
-    `HOME_NOTE_MARKS_TIMEOUT_MS` (20 s) ⚑ Q370. The helper first asks the **PC model manager** (SogoAI's
-    `127.0.0.1:8793`, `GET /state`, 2 s; `home/model-manager.ts`). It goes ahead only when the manager answers, no
+    `HOME_NOTE_MARKS_TIMEOUT_MS` (25 s) ⚑ Q370. The helper first asks the **PC model manager** (SogoAI's
+    `127.0.0.1:8793`, `GET /state`, 5 s; `home/model-manager.ts`). It goes ahead only when the manager answers, no
     model action is running (`busy` null), and `IDENTIFY_MODEL`, the one small chat model SogoAI keeps loaded, is
     already in `mem.lmStudio`. Ensō never takes a lease (a lease starts ComfyUI and sets its shared last model), and
     never makes LM Studio load or unload a model: no `ttl`, unlike §7A.3's photo naming. Then it makes one
