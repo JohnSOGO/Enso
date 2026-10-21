@@ -35,17 +35,19 @@ events.get('/calendar', requireMember, async (c) => {
   const rows = await all<EventRow & { color: string; creator_name: string }>(c.env.DB,
     `SELECT e.*, m.color, m.display_name AS creator_name FROM events e JOIN members m ON m.id = e.created_by
       WHERE e.deleted_at IS NULL AND e.is_alarm = 0 AND e.start_sun IS NULL AND e.start_date <= ? AND (e.recurrence IS NOT NULL OR e.end_date >= ?)`, to, from);
-  const me = c.get('member').id, on = await onEventIds(c.env.DB, me);
+  const me = c.get('member').id, on = await onEventIds(c.env.DB, me), viewer = { id: me, admin: isAdmin(c.get('member')) };
   const occ = [];
   for (const e of rows) {
     if (!isOnFor(e, me, on.has(e.id) ? [me] : [])) continue; // §7.5: an optional event exists only for who has it on
     const span = diffDays(e.end_date, e.start_date);
+    const assignedTo = parseJson<string[]>(e.assigned_to, []);
+    const hasNotes = e.notes !== null && canOpenEvent({ assignedTo, createdBy: e.created_by }, viewer); // §8.4a: a 🔒 event never tells
     const ev = { start_date: e.start_date, recurrence: parseJson<Recurrence | null>(e.recurrence, null), exdates: parseJson<string[]>(e.exdates, []) };
     for (const date of occurrences(ev, addDays(from, -span), to)) {
       occ.push({
         eventId: e.id, date, endDate: addDays(date, span), startTime: e.start_time, endTime: e.end_time,
         title: e.title, allDay: e.start_time === null, color: e.color, createdBy: e.created_by, creatorName: e.creator_name,
-        assignedTo: parseJson<string[]>(e.assigned_to, []), hasReminder: e.remind_offset_min !== null, recurring: e.recurrence !== null, emoji: e.emoji,
+        assignedTo, hasReminder: e.remind_offset_min !== null, hasNotes, recurring: e.recurrence !== null, emoji: e.emoji,
       });
     }
   }

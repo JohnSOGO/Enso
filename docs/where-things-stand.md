@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-20, v1.96.1, main = production.*
+*Last updated 2026-10-21, v1.97.0, main = production.*
 
 ## Running where
 
@@ -51,6 +51,9 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 📝 Notes full screen (v1.97.0, §8.4a, Q362–Q364 ⚑): on the iPhone, Calendar → tap a day → an event with 📝 → tap it →
+  ⤢ by Notes → the notes fill the screen with times, dates, phones and addresses lit up; tap a phone → it rings; ✏️ Edit →
+  • List / ☐ Box; Enter keeps the list going; 👁 View → tap a ☐ to tick it; Done → Save. Same ⤢ on a list item's Note.
 - 🎤 Tap to talk + ✏️ Edit (v1.95.0–v1.96.0, §8.18, Q360–Q361; the talk mark is right of Cancel; ✏️ Edit on an answer refills the box with what was heard): reopen the app → no mic ask. Tap the Ensō mark → the box opens quiet; tap
   Ensō in the box → the iPhone asks for the mic once, then it pulses "Listening…"; talk, tap Ensō again → stops; Done.
 - 💵 Family IOUs (v1.94.0–v1.94.1, §7B.9, §8.15c, migration 0059; he said "Assume it works", so optional): Chores → 💵 IOUs → ＋ IOU "I owe Mom $1,200" shows on both
