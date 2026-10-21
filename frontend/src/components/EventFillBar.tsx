@@ -1,11 +1,14 @@
 // SPEC §7.8, §7.9, §7.9a, §8.4 — the event form's fill bar: 📷 Screenshot (pick and shrink a picture, POST
 // /events/read-photo) and 📋 Paste (the clipboard's picture the same way, its text or link to /events/read-text). A new
-// event fills by readingToForm against the form as it opened; an existing one is updated by readingOverForm.
+// event fills by readingToForm against the form as it opened; an existing one is updated by readingOverForm; a saved
+// place the reading or the copied text names is used on top (§7.9b).
 // Hands the result to the form; holds no form state, never saves, keeps no photo or text.
 import { useRef, useState } from 'react';
 import { errorText, post, upload } from '../api';
 import { EVENT_TEXT_MAX, readingOverForm, readingToForm, type EventFill, type EventReading } from '../../../src/shared/event-reading';
+import { matchPlace, placeOverForm } from '../../../src/shared/places';
 import { shrinkPicked, usePhotoPick } from './usePhotoPick';
+import { usePlaces } from './PlacePicker';
 
 interface Props<F extends EventFill> {
   form: F;
@@ -45,19 +48,25 @@ async function clipboard(): Promise<{ image: Blob | null; text: string } | null>
 export function EventFillBar<F extends EventFill>({ form, opened, onFill }: Props<F>) {
   const [busy, setBusy] = useState<string | null>(null);
   const [said, setSaid] = useState<string | null>(null);
+  const places = usePlaces();
   const latest = useRef(form); // what was typed while it was being read is kept
   latest.current = form;
   const { input, open } = usePhotoPick(([file]) => read('the screenshot', async () =>
     upload<EventReading>('POST', '/events/read-photo', await shrinkPicked(file))));
 
-  async function read(from: string, ask: () => Promise<EventReading>) {
+  /** `copied`: the pasted text or link, also looked in for a saved place's words. */
+  async function read(from: string, ask: () => Promise<EventReading>, copied = '') {
     setBusy(`Reading ${from}…`); setSaid(null);
     try {
       const reading = await ask();
-      const { form: next, filled } = opened ? readingToForm(latest.current, opened, reading) : readingOverForm(latest.current, reading);
+      const got = opened ? readingToForm(latest.current, opened, reading) : readingOverForm(latest.current, reading);
+      const place = matchPlace(places, [copied, reading.title, reading.location, reading.notes]);
+      const { form: next, filled } = place ? placeOverForm(got.form, place) : got;
+      const total = got.filled + (place ? filled : 0);
       onFill(next);
-      const n = `${filled} field${filled > 1 ? 's' : ''} from ${from}`;
-      setSaid(!filled ? `Nothing new in ${from}.` : opened ? `Filled ${n} — check them.` : `Updated ${n} — check them, then Save.`);
+      const n = `${total} field${total > 1 ? 's' : ''} from ${from}`;
+      const used = place ? ` 📍 Used ${place.name}.` : '';
+      setSaid((!total ? `Nothing new in ${from}.` : opened ? `Filled ${n} — check them.` : `Updated ${n} — check them, then Save.`) + used);
     } catch (e) {
       setSaid(errorText(e));
     } finally {
@@ -72,7 +81,7 @@ export function EventFillBar<F extends EventFill>({ form, opened, onFill }: Prop
     if (!got.image && !text) return setSaid('Nothing to paste — copy a message, an address or a screenshot first.');
     await read('what you copied', async () => got.image
       ? upload<EventReading>('POST', '/events/read-photo', await shrinkPicked(got.image))
-      : post<EventReading>('/events/read-text', { text }));
+      : post<EventReading>('/events/read-text', { text }), text);
   }
 
   return (

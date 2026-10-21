@@ -1,9 +1,11 @@
-// SPEC §8.11 — the thing form (modal): photo, title, From / To, place, address, phone, cost, link, note,
+// SPEC §8.11 — the thing form (modal): photo, title, From / To, place, address, phone, cost, link, note, A saved place (§7.9b) fills place, address and note.
 // reminders and channels; ↗ / 🗺️ / 📞 beside Link / Address / Phone open them; every text field but phone grows to fit its text; Plan it / Done / Let it go / Put back by status; Save / Cancel / Delete. A photo or link
 // reading (ThingPhoto / ThingLinkFill) fills only empty fields, each marked "from photo" / "from link — check it". The photo (new, replaced or removed)
 // goes to the server on Save, after the thing itself. Someone else's thing is read-only (§6.3). Rules and validation are the server's (§7C).
 import { useRef, useState, type ReactNode } from 'react';
 import { Modal } from './Modal';
+import { PlacePicker } from './PlacePicker';
+import { placeOverForm } from '../../../src/shared/places';
 import { Grow } from './Grow';
 import { ChannelChecks, channelsOf, flagsOf, pickOneWay } from './AlertFields';
 import { ThingPhoto, photoSrc } from './ThingPhoto';
@@ -169,6 +171,10 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
               <Grow value={f.address} maxLength={ADDRESS_MAX} autoComplete="off" onChange={(e) => set('address', e.target.value)} />
             </WithGo>
           </label>
+          <PlacePicker title={f.title} address={f.address} onPick={(p) => { // §7.9b
+            const { form } = placeOverForm({ address: f.address, notes: f.note }, p, NOTE_MAX);
+            set('place', p.name); set('address', form.address); set('note', form.notes);
+          }} />
           <label className="field"><span>Phone{mark('phone')}</span>
             <WithGo href={telHref(f.phone)} icon="📞" label="Call">
               <input type="tel" value={f.phone} maxLength={PHONE_MAX} autoComplete="off" onChange={(e) => set('phone', e.target.value)} />

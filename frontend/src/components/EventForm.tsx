@@ -154,7 +154,7 @@ export function EventForm({ eventId, date, start, onClose }: Props) {
             </div>
           )}
 
-          <AddressField value={form.address} onChange={(v) => set('address', v)} />
+          <AddressField value={form} onChange={(c) => setForm((f) => (f ? { ...f, ...c } : f))} />
           <BringField value={form.bring} onChange={(v) => set('bring', v)} />
 
           <RepeatFields value={form} date={form.date} onChange={(c) => setForm((f) => (f ? { ...f, ...c } : f))} />

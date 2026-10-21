@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.75 · **Date:** 2026-10-20 · **Owner:** MojoSOGO
+**Version:** 3.76 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1084,6 +1084,16 @@ Schema: [`migrations/0059_ious.sql`](migrations/0059_ious.sql). **Migration chec
 `iou_plan_id` NULL; an IOU of 0 cents, an unknown payment `how` or plan `every`, and a second live plan for the same
 direction are refused; `tab` is taken.
 
+### 4.2zzg Schema change — `migrations/0060_places.sql`
+
+Asked by MojoSOGO 2026-10-21: saved places, the household's address book (§7.9b). One new table, `places` (name,
+address, arrival notes, match words as a JSON list, who made it), seeded with **Incognito SD** (2335 Mirador, Vista,
+CA 92084, its parking notes, match word "Incognito"; no creator). Events keep their own `address`: a place fills it,
+it never points at the place. Additive; it runs before the deploy.
+
+Schema: [`migrations/0060_places.sql`](migrations/0060_places.sql). **Migration check (PL-M,**
+[`test/migration-0060.test.ts`](test/migration-0060.test.ts)**):** the seeded row is there; a second row with its id is refused.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -2094,6 +2104,65 @@ reading)` (pure, `event-reading.ts`) ⚑ Q196:
 | EA6 | read-text with only a link, a fake page and a fake Claude (look-up, then fill) | 200 with the cleaned reading; the page fetched once; the fill request carries the page and the notes; one `photo_reads` row |
 | EA7 | read-text with a link that Claude refuses / that fails | 422 `link_refused` / 502 `link_reading_failed` |
 | EA-M | migration 0034 over events written before it | rows unchanged, `address` NULL |
+
+### 7.9b 📍 Saved places — the household's address book — `src/shared/places.ts` (pure) — asked by MojoSOGO 2026-10-21
+
+"INCOGNITO SD ADDRESS — 2335 Mirador, Vista, CA 92084. Please park in the lower drive, and walk up the stairs to the
+sliding door entrance. This is always true for an Incognito event and the address won't be in the link so you have to
+remember it on the side … Ensō needs some kind of a small address book." The household keeps **saved places**: a
+place Ensō can't read from a link or an invite, with how to arrive, filled into an event when the event names it.
+
+- **A place** (`places`, migration 0060, §4.2zzg): a **name** (1–`PLACE_NAME_MAX` = 60), an **address** (1–200, the
+  event Address's `EVENT_ADDRESS_MAX`), **arrival notes** (optional, up to `PLACE_NOTES_MAX` = 500: where to park,
+  which door) and **match words** (up to `PLACE_WORDS_MAX` = 5, each 3–`PLACE_WORD_MAX` = 40 characters; trimmed,
+  repeats dropped ignoring case). At most `PLACES_MAX` = 100. `cleanPlace(body)` (pure) checks and trims; anything
+  else → 400 `invalid_input` naming the field. The migration saves the first one: **Incognito SD**, 2335 Mirador,
+  Vista, CA 92084, its parking notes, match word "Incognito".
+- **Who** ⚑ Q362: every member sees them and may add one (it is the household's address book); the place's creator
+  or an admin changes or deletes it (§6.3, `canChange`). The seeded place has no creator, so admins change it.
+- **Which place an event names** — `matchPlace(places, texts)` ⚑ Q363: a place matches when one of its match words
+  or its name appears in one of the texts, ignoring case, anywhere (so "Incognito" matches "Incognito: Masquerade
+  Night" and a pasted `incognitosd.com/events/…` link). Several match → the longest matching word wins, then the name
+  in A–Z order. No place → null.
+- **Using a place on an event** — `placeOverForm(form, place)`: the Address ← the place's address; its arrival notes
+  are **added** as a new paragraph under the event's notes (never replacing them, as §7.9a), unless the notes already
+  hold them; the total cut to `EVENT_NOTES_MAX`. → the form and how many fields changed. Nothing is saved until Save.
+- **When it is used** ⚑ Q364:
+  - **📷 Screenshot / 📋 Paste** (§7.8, §7.9, §7.9a), new and existing events: after the reading fills the form,
+    `matchPlace` over what was copied (the text or link), the reading's title, location and notes. A match is used on
+    top: **the saved place wins over the address that was read** ("always true"), and the status line adds
+    " 📍 Used {name}." ("Filled 4 fields from what you copied — check them. 📍 Used Incognito SD.").
+  - **Typing:** when the Title matches a place and the Address is not already that place's, a **📍 Use {name}**
+    button shows under the Address; a tap uses it. Nothing fills by itself while typing, so a cleared Address stays
+    cleared.
+  - **By hand:** a **📍 Saved places** picker under the Address (shown when there is at least one place) lists them
+    by name; picking one uses it.
+  - **Things to do** (§8.11): the thing form's **📍 Saved places** picker sets **Place** ← the name, **Address** ←
+    the address, and adds the arrival notes under **Note** the same way (`placeOverForm` with the thing's note limit); each field it sets loses its *from photo / from link* mark, as a hand edit does. Plan it (§7C.2) already
+    copies the address to the event.
+- **Managing** — Settings → 📅 Calendar → **📍 Saved places** (§8.6), after Optional calendar items and Days off:
+  one line per place (name, then its address muted), **＋ Add place**; a tap opens the place form (Name, Address,
+  Arrival notes, Match words as one comma-separated box, "Events whose title or link has one of these words use this
+  place."), with Save / Cancel and, for who may change it, **Delete place** (asks first). Deleting a place changes
+  no event: the address it filled stays on them.
+- **Routes** — `src/worker/routes/places.ts`: `GET /places` → `Place[]` by name (A–Z, ignoring case). `POST /places`
+  `{ name, address, notes?, words? }` → 201 place; at 100 → 400 "A household keeps at most 100 places.". `PATCH
+  /places/{id}` (the same fields; what is left out is kept) → the place; `DELETE /places/{id}` → 204. Unknown → 404
+  "That place no longer exists."; not the creator or an admin → 403 "Only the creator or an admin can change this
+  place.". A place on the wire: `{ id, name, address, notes, words, createdBy, updatedAt }` (`notes` null when none).
+
+**Acceptance (each row a test):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| PL1 | `cleanPlace` with padded name/address, `notes: " "`, `words: [" Incognito ", "incognito", "SD Venue"]`; with an empty name; a 201-character address; 6 words; a 2-character word; `words: "x"` | trimmed, notes null, words `["Incognito", "SD Venue"]`; then a message naming name, address, words, words, words |
+| PL2 | `matchPlace` with places Incognito SD (word "Incognito") and Vista Park (word "Vista"): texts "Incognito: Masquerade", "https://incognitosd.com/events/x", "Park day in Vista at Incognito", "Soccer" | Incognito SD; Incognito SD; Incognito SD (longer word); null |
+| PL3 | `placeOverForm` on a form with notes "Bring ID" and another address; again on its result; on empty notes | address replaced, notes "Bring ID\n\n{arrival}", count 2; count 0; notes = arrival |
+| PL4 | GET /places on a new household | the seeded Incognito SD with its address, notes and word "Incognito", `createdBy` null |
+| PL5 | a member POSTs a place; PATCHes `{ notes: null }`; another member PATCHes it; an admin deletes it; GET | 201 trimmed; notes cleared, the rest kept; 403; 204; gone |
+| PL6 | POST with a bad body; PATCH / DELETE an unknown id; without a session | 400 `invalid_input`; 404; 401 |
+| PL-M | migration 0060 | the seeded row is there; a second place with the same id is refused |
+| PL-UI | manual, on the iPhone: new event, 📋 Paste an incognitosd.com event link | Address "2335 Mirador, Vista, CA 92084", the parking notes under the notes, "📍 Used Incognito SD." |
 
 ### 7.10 Things to bring — asked by MojoSOGO 2026-10-10
 
@@ -4368,7 +4437,8 @@ Fields:
 - All-day toggle
 - Start / end time (hidden when all-day)
 - End date (all-day only)
-- **Address** (optional, §7.9) with **Open in Maps**
+- **Address** (optional, §7.9) with **Open in Maps**; under it the **📍 Saved places** picker and, when the Title names a
+  saved place, **📍 Use {name}** (§7.9b)
 - **Things to bring** (optional, §7.10): one line each, ✕ to remove, an add box with **＋ Add**
 - Repeat: Never / Daily / Weekly (day checkboxes) / Every 2 weeks / Monthly on day N /
   Monthly on the nth weekday (e.g. "Monthly on the 3rd Friday", derived from the date) /
@@ -4715,7 +4785,8 @@ Settings
 - **🙂 Me:** name, color, **Clock: 12-hour / 24-hour** (§8.17), **After work / After school** (§8.5b), and (founder only) **🎯 Point at it** on this device (§8.16).
 - **📅 Calendar** (named "Calendar items" before v1.67.0): **Optional calendar items** — Public holidays, 📈 options
   expiration, 🌤️ Weather, 🌕 Moon phases, then one line per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); then,
-  for admins only, **Days off** (§7.3) ⚑ Q267 (asked by MojoSOGO 2026-10-12: move Days off "into its own calendar section").
+  for admins only, **Days off** (§7.3) ⚑ Q267 (asked by MojoSOGO 2026-10-12: move Days off "into its own calendar section");
+  then **📍 Saved places** for everyone (§7.9b).
 - **📱 Phone alerts:** this phone's state and Turn on / Turn off / Send a test (§9.1).
 - **🔊 Speakers:** **Speak my alerts on** (§9.2a).
 - **💡 Requests (admins):** the feature requests the Ensō button saved (§8.18).
@@ -4952,7 +5023,8 @@ Pumpkin patch        📅 Sat Oct 12
     **Link**, shown when the field holds a link `webLink` accepts ⚑ Q142. Tapping it shows "Reading the
     link…", then the empty fields fill in, each marked *from link — check it*; nothing filled → "Nothing
     new found at that link."; a failure shows its message. Nothing is saved until Save.
-  - Title · From / To dates (both optional) · Place · Address · Phone · Cost · Link · Note.
+  - Title · From / To dates (both optional) · Place · Address · Phone · Cost · Link · Note. Under Address, the
+    **📍 Saved places** picker (§7.9b) fills Place, Address and Note from a saved place.
   - **Every text field grows to fit its text** (auto-sizing, no inner scrolling), so all of a
     long title, address, cost or note is visible at once (decided by MojoSOGO). Phone is a
     single line (`type="tel"`); the others wrap. In **Title** and **Link** Enter does nothing
@@ -6442,6 +6514,8 @@ other push stays until I hide it ⚑ Q284.
 | GET | `/chores/today` | member | → `{ date, runs: Run[] }`; `Run = { id, choreId, title, doneMeans, timing, time, sunOffsetMin, step, steps, assigneeId, personId, doneAt, doneBy, nextDueAt, ringing, areaCount }` (`personId` = the current step's person) |
 | POST | `/chore-runs/{id}/done` | member | advances one step (§7B.3) → run; 409 `already_done` when finished |
 | POST | `/chore-runs/{id}/undo` | member | → run; 409 `nothing_to_undo` at step 0 |
+| GET/POST | `/places` | member | GET → `Place[]` by name; POST `{ name, address, notes?, words? }` → place (201); 400 at 100 places (§7.9b) |
+| PATCH/DELETE | `/places/{id}` | the place's creator or an admin | PATCH (fields left out are kept) → place; DELETE → 204, events keep their address (§7.9b) |
 | GET/POST | `/rooms` | GET member / POST owner | GET → `Room[]` by position; POST `{ name }` → room (201); 400 at 30 rooms (§7B.6) |
 | PATCH/DELETE | `/rooms/{id}` | the room's creator or owner | PATCH `{ name }` → room; DELETE → 204 with its areas and photos, its chores' room cleared (§7B.6) |
 | GET/POST | `/rooms/{id}/areas` | GET member / POST the room's creator or owner | GET → `RoomArea[]` by position; POST `{ name, expectations? }` → area (201); 400 at 8 areas; 404 when the room is gone (§7B.6) |

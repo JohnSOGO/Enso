@@ -7,6 +7,25 @@ carry its result.
 
 ---
 
+## 2026-10-21 — Saved places, the address book (placement-advisor)
+
+- **Ask:** SPEC §7.9b, v1.97.0, migration 0060. A `places` table, an API, a Settings section, and a picker in the event
+  and thing forms, plus place matching on 📷/📋 readings.
+- **Verdict:** NEW src/shared/places.ts, src/worker/routes/places.ts, frontend/src/components/Places.tsx, PlacePicker.tsx.
+  EXISTING Settings.tsx, AddressField.tsx, EventFillBar.tsx, ThingForm.tsx, index.ts. Reorganizer NONE.
+- **Flow stage:** rules, route/persist, render.
+- **Why:** the matching and filling rule is shared by the event form, the fill bar and the thing form, so it lives in one
+  pure module, never in the components. Rejected: the limits in alert-limits.ts (places don't ring); any growth in
+  EventForm (200/223, on the band's edge: the picker goes in AddressField through a `value={form}` partial `onChange`,
+  one line rewritten); place logic in things.ts; a hook in state.tsx (only two pickers read it; both GETs per form are fine).
+- **Caps:** EventForm 200/223 unchanged; ThingForm 232/300; Settings 66/99; EventFillBar ~97/300; AddressField ~30/300;
+  index.ts 118/300. Nothing newly in the band.
+- **Sources read:** placement-advisor.md, scripts/arch.ts, modularity.md, module-ownership.md, placement-receipts.md,
+  Settings.tsx, AddressField.tsx, EventFillBar.tsx, EventForm.tsx, ThingForm.tsx, roles.ts, event-reading.ts, things.ts,
+  src/worker/index.ts.
+- **Steward (AREC check):** no existing address book; fits §1.3; share one matcher + picker with things now; the
+  household's sun place (coordinates) later, not merged; rooms left alone; ENSO_DOES learns places.
+
 ## 2026-10-20 — Voice not captured after one refused try: per-try `refused` (placement-advisor)
 
 - **Ask:** v1.96.1 fix, SPEC §8.18 part 2 (⚑ Q338/Q360). MojoSOGO: "sometimes the text box is not selected and the VtT
