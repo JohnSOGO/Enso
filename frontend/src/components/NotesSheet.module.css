@@ -16,3 +16,5 @@
 
 .edit { display: flex; flex-direction: column; gap: 8px; height: 100%; }
 .area { flex: 1 1 auto; min-height: 50dvh; font-size: 17px; line-height: 1.5; resize: none; }
+
+.source { margin-top: 16px; font-size: .8rem; }

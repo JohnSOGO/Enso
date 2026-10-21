@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-21, v1.98.2, main = production.*
+*Last updated 2026-10-21, v1.99.0, main = production.*
 
 ## Running where
 
@@ -13,7 +13,7 @@ the working agreement in `CLAUDE.md`.
 |---|---|---|
 | App (Worker + PWA) | https://enso.sogodojo.com | Cloudflare Worker `enso`, D1 `enso`, R2 photos. The opening screen shows the live version and commit. |
 | Home Assistant voice | ha.sogodojo.com → HA (192.168.0.123) | Cloudflare tunnel `haosdojo` (HA Cloudflared add-on), Access service token `enso-worker`. SPEC §9.2. |
-| Home helper | sogoai.sogodojo.com → SogoAI 127.0.0.1:8790 | Tunnel `sogoai` (Cloudflared service on SogoAI), the same Access token plus Bearer `CAPTIONS_TOKEN`. It fetches YouTube captions (§7E.2c) and names item photos with LM Studio's `qwen-uncensored` (§7A.3). Built from `home/` with `npm run build:home`. Its notes on SogoAI: `C:\Users\Public\git\SogolAI\ENSO-HOME-HELPER.md`. |
+| Home helper | sogoai.sogodojo.com → SogoAI 127.0.0.1:8790 | Tunnel `sogoai` (Cloudflared service on SogoAI), the same Access token plus Bearer `CAPTIONS_TOKEN`. It fetches YouTube captions (§7E.2c), names item photos (§7A.3) and marks notes (§8.4a) with LM Studio's `photo-polish` (`IDENTIFY_MODEL`). Notes are asked only while the PC model manager (127.0.0.1:8793 `/state`, no lease) shows that model loaded and idle. Built from `home/` with `npm run build:home`. Its notes on SogoAI: `C:\Users\Public\git\SogolAI\ENSO-HOME-HELPER.md`. |
 | Weather forecast | api.open-meteo.com (free, no key) | `WEATHER_URL` var in wrangler.toml; fetched once a day by the tick (§7.11). Empty turns weather off. |
 | Claude → MojoSOGO's phone | `POST /api/v1/ops/notify` | Bearer `OPS_NOTIFY_TOKEN` (README "Ping MojoSOGO's phone"). Always goes to the founder, John Redman, who is MojoSOGO. |
 | Claude → the FunHouse | `GET /api/v1/ops/pings`, polled by the dev PC | Scheduled task "Enso FunHouse poller" on SogoGamerPC runs `home/funhouse-poller.cmd` (README "The same pings on the FunHouse"); hands Claude's pings and 🎪 FunHouse alerts (§9.4b) to the bridge on 127.0.0.1:8765. Cloud threads ping with `ENSO_OPS_NOTIFY_TOKEN` from the project's cloud environment. |
@@ -51,6 +51,10 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- ✨ Notes by the home AI (v1.99.0, §8.4a, Q364 confirmed, Q368–Q370 ⚑): on the iPhone, open an event's notes with ⤢.
+  The patterns light up at once, the line under the notes reads "✨ Asking the home AI…", then "✨ Highlights by the home
+  AI" with things like an allergy or who drives lit up too. With SogoAI busy or off the line says "Highlights by patterns ·
+  home AI is busy / is off".
 - 📍 Saved places (v1.98.0, §7.9b, migration 0060): on the iPhone, Settings → 📅 Calendar → 📍 Saved places shows Incognito SD.
   New event → 📋 Paste an incognitosd.com event link → Address "2335 Mirador, Vista, CA 92084", the parking notes under
   the notes, "📍 Used Incognito SD."; typing a title with "Incognito" shows 📍 Use Incognito SD. Q365–Q367 are ⚑ defaults.

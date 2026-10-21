@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.80 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
+**Version:** 3.81 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -162,6 +162,7 @@ dismisses an open request that does not fit.
             |    https://ha.sogodojo.com              + Bearer HA_TOKEN        (House, §9.2)
             |    https://sogoai.sogodojo.com/captions + Bearer CAPTIONS_TOKEN  (in-line, §7E.2c)
             |    https://sogoai.sogodojo.com/identify + Bearer CAPTIONS_TOKEN  (in-line, §7A.3)
+            |    https://sogoai.sogodojo.com/note-marks + Bearer CAPTIONS_TOKEN (in-line, §8.4a)
             v
   +---------------------------+  Cloudflare Tunnel +-------------------------+
   |  Cloudflare Access         | -----------------> |  Home Assistant          |
@@ -177,6 +178,9 @@ dismisses an open request that does not fit.
   |                                          |   POST /identify (an image) -> LM Studio's
   |                                          |   local vision model at 127.0.0.1:1234 ->
   |                                          |   an IdentifyReport as JSON (§7A.3)
+  |                                          |   POST /note-marks (notes text) -> the PC
+  |                                          |   model manager (127.0.0.1:8793 /state),
+  |                                          |   then LM Studio -> a NoteMarksReport (§8.4a)
   +-----------------------------------------+
 ```
 
@@ -272,8 +276,11 @@ Enso/
 │   ├── vite.config.ts
 │   └── src/
 ├── home/                   # runs on SogoAI, not in the Worker (§7E.2c)
-│   ├── captions-helper.ts  # 127.0.0.1:8790 GET /captions?v=… → readCaptions from the home IP; POST /identify → identify.ts
+│   ├── captions-helper.ts  # 127.0.0.1:8790 GET /captions?v=… → readCaptions from the home IP; POST /identify → identify.ts; POST /note-marks → note-marks.ts
 │   ├── identify.ts         # §7A.3 one photo → LM Studio's local vision model → an IdentifyReport
+│   ├── note-marks.ts       # §8.4a a notes text → model-manager.ts, then LM Studio → a NoteMarksReport
+│   ├── model-manager.ts    # §8.4a may the loaded model be used now? (the PC model manager's GET /state)
+│   ├── lm-studio.ts        # §7A.3, §8.4a the one LM Studio chat-completions call
 │   ├── captions-helper.cmd # the Task Scheduler launcher (node --env-file, appends to a log)
 │   ├── tsconfig.json       # Node types; part of `npm run typecheck`
 │   └── dist/               # `npm run build:home` output (gitignored)
@@ -320,7 +327,7 @@ against the deployed Worker. On iPhone, push works only after
 | `YOUTUBE_API_KEY` (secret) | Worker | A Google Cloud API key with the YouTube Data API v3 enabled, for reading a recipe video's title and description (§7E). Set it with `npx wrangler secret put YOUTUBE_API_KEY` **in a real PowerShell window**. Never logged, never in an error message. Reading recipes also needs `ANTHROPIC_API_KEY`; without either, `POST /recipes/from-video` is 503 `recipe_reading_off` and typed recipes still work. Tests pin it empty. |
 | `CAPTIONS_TOKEN` (secret) | Worker **and** SogoAI's `C:\Enso\captions-helper.env` | The bearer the Worker sends to the SogoAI helper (`Authorization: Bearer …`, §7E.2c), checked by the helper in constant time — a second lock behind Access. A long random string, set with `npx wrangler secret put CAPTIONS_TOKEN` in a real PowerShell window and the same value in the helper's env file (never in the repo). Unset or empty on the Worker → captions from home are not set up (§7E.2c) and a snapped item goes straight to Claude (§7A.3); unset on SogoAI → the helper does not start. The same bearer guards `/identify` (§7A.3). Never logged, by the Worker or the helper. Tests pin a test-only value. |
 | `HOME_CAPTIONS_URL` (var, `wrangler.toml`) | Worker | Where the SogoAI helper is reached: `https://sogoai.sogodojo.com` (§7E.2c), for `/captions` and `/identify` (§7A.3) alike. Tests pin `https://sogoai.test`, which only a fetch spy answers. |
-| `IDENTIFY_MODEL` (SogoAI's `C:\Enso\captions-helper.env`, not a Worker setting) | SogoAI helper | The LM Studio model id `/identify` asks (§7A.3): `qwen-uncensored`, the always-loaded vision model ⚑ Q115. Unset or empty → `/identify` answers `{ ok: false, kind: "off" }` (the Worker then asks Claude); captions keep working and the helper still starts. Not a secret. |
+| `IDENTIFY_MODEL` (SogoAI's `C:\Enso\captions-helper.env`, not a Worker setting) | SogoAI helper | The LM Studio model id `/identify` and `/note-marks` ask (§7A.3, §8.4a): `photo-polish`, the one small vision chat model SogoAI keeps loaded ⚑ Q115. `/note-marks` asks it only while the PC model manager shows it loaded. Unset or empty → `/identify` answers `{ ok: false, kind: "off" }` (the Worker then asks Claude) and `/note-marks` answers `off` (patterns); captions keep working and the helper still starts. Not a secret. |
 | `OPS_NOTIFY_TOKEN` (secret) | Worker **and** MojoSOGO's machines (`%USERPROFILE%\.enso\ops-notify-token`) | The bearer a Claude Code session sends to `POST /ops/notify` to push a message to the founder's phone (§9.4), checked in constant time. A long random string, set with `npx wrangler secret put OPS_NOTIFY_TOKEN` in a real PowerShell window and the same value in the token file (never in the repo). Unset or empty → `/ops/notify` is 503 `ops_notify_off` (never open). Never logged, never in a message or a delivery's detail. Tests pin a test-only value. |
 | `BUILD_FIRE_URL` (var, `wrangler.toml`), `BUILD_FIRE_TOKEN` (secret) | Worker | Build now (§8.18 part 6): the "Enso daily feature requests" routine's API fire address (`https://api.anthropic.com/v1/claude_code/routines/{id}/fire`) and its bearer, made once at claude.ai/code/routines → the routine → Edit → Add another trigger → API → Generate token, set with `npx wrangler secret put BUILD_FIRE_TOKEN` in a real PowerShell window. Either empty → `/feature-requests/{id}/build` is 503 `build_now_off`. Never logged or shown. |
 
@@ -4489,7 +4496,8 @@ Actions:
 MojoSOGO: "In Calendar, let me tap to see the notes and then expand the notes with like a full screen pop-up with basic
 edit features" and "in the notes auto highlight pertinent information". One piece, `NotesField` + `NotesSheet`
 (`components/NotesSheet.tsx`), serves every long note that has the same need: an **event's notes** (§8.4) and a **list
-item's note** (§8.8). The notes stay plain text in the same column and limit; nothing new is stored or sent.
+item's note** (§8.8). The notes stay plain text in the same column and limit; nothing new is stored. To be
+highlighted, the text on screen goes to the home AI and nowhere else (below).
 
 - **The box:** the form's notes textarea, with a **⤢** button (accessible name "Open notes full screen") at its
   label. ⤢ opens the sheet; it stays usable for a member who can't change the entry (read only for them).
@@ -4505,13 +4513,40 @@ item's note** (§8.8). The notes stay plain text in the same column and limit; n
   goes back to read mode.
 - **Done** (or ✕) closes the sheet and hands the text back to the form, which saves it on its own **Save** as before
   (closing the form without saving still asks). The sheet saves nothing itself ⚑ Q363.
-- **Highlights** (`markNotes`, `frontend/src/notes-marks.ts`, pure): times (`6pm`, `18:30`, noon), dates (`Oct 25th`,
-  `10/26`, weekdays, today / tomorrow / tonight), phone numbers, `$` amounts, links, emails, street addresses (a
-  number, up to four words, a street word: St, Ave, Rd, Blvd, Dr, Ln, Way, Ct, Pl, Pkwy, Hwy, Cir, Ter) and a **key
-  line**: from *bring, don't forget, remember to, RSVP, deadline, due, important, gate code, door code, password,
-  confirmation* to the end of its line. Overlaps: the first to start wins, then the longer. Patterns, not AI ⚑ Q364:
-  instant, offline, and the notes never leave Ensō. A tapped **phone** rings (`tel:`), a tapped **link** opens
-  (only through §7C.1 `webLink`); the other highlights are text.
+- **Highlights: the home AI first, patterns as the fallback** (MojoSOGO 2026-10-21: "AI with PAT fallback; make sure
+  you interface with model manager", Q364). Each mark has a kind from `NOTE_MARK` (`vocab.ts`): time, date, phone,
+  money, link, email, address, key.
+  - **Patterns** (`markNotes`, `frontend/src/notes-marks.ts`, pure) draw at once, with no network: times (`6pm`,
+    `18:30`, noon), dates (`Oct 25th`, `10/26`, weekdays, today / tomorrow / tonight), phone numbers, `$` amounts,
+    links, emails, street addresses (a number, up to four words, a street word: St, Ave, Rd, Blvd, Dr, Ln, Way, Ct, Pl,
+    Pkwy, Hwy, Cir, Ter) and a **key line**: from *bring, don't forget, remember to, RSVP, deadline, due, important,
+    gate code, door code, password, confirmation* to the end of its line. Overlaps: the first to start wins, then the
+    longer.
+  - **The home AI** reads the same text and marks what a busy parent needs at a glance, including what no pattern sees
+    ("Sam's allergy is peanuts", "Grandma drives us home"). Each time read mode shows a text it hasn't asked about,
+    the sheet (`useNoteMarks`) sends it to `POST /notes/marks` (§10). The route asks the SogoAI helper's
+    `POST /note-marks` through Access with the `CAPTIONS_TOKEN` bearer (`noteMarksFromHome`, the §7A.3 path), waiting
+    `HOME_NOTE_MARKS_TIMEOUT_MS` (20 s) ⚑ Q370. The helper first asks the **PC model manager** (SogoAI's
+    `127.0.0.1:8793`, `GET /state`, 2 s; `home/model-manager.ts`). It goes ahead only when the manager answers, no
+    model action is running (`busy` null), and `IDENTIFY_MODEL`, the one small chat model SogoAI keeps loaded, is
+    already in `mem.lmStudio`. Ensō never takes a lease (a lease starts ComfyUI and sets its shared last model), and
+    never makes LM Studio load or unload a model: no `ttl`, unlike §7A.3's photo naming. Then it makes one
+    LM Studio chat call (`home/lm-studio.ts`, 15 s): `NOTE_MARKS_PROMPT`, temperature 0, a `json_schema` answer
+    `{ marks: [{ text, kind }] }` (`src/shared/note-marks.ts`). The answer comes back as a `NoteMarksReport`: ok with
+    the model's marks, or `off` (no `IDENTIFY_MODEL`, or no manager), `busy` (a model action is running, or the model
+    isn't loaded) or `failed`, each with a reason.
+  - **What stands** (`validMarks`, Worker side): a mark only when its kind is in `NOTE_MARK` and its text is a
+    non-empty exact copy of part of the notes, on one line, at most `NOTE_MARK_TEXT_MAX`; repeats are dropped and at
+    most `NOTE_MARKS_MAX` are kept. **Every** place the text appears is marked. In read mode the AI's marks lead and
+    the patterns fill the gaps between them, so a phone the AI missed still rings ⚑ Q368.
+  - **Which one shows, said in a muted line under the notes** ⚑ Q369: "✨ Asking the home AI…" while it asks (the
+    patterns are already drawn); "✨ Highlights by the home AI" when it answered; otherwise "Highlights by patterns ·
+    home AI {why}": *isn't set up* (`unset`: the Worker has no helper settings), *is off* (`off`), *is busy* (`busy`),
+    *didn't answer* (`failed`, or the request itself failed). The fallback is never silent.
+  - The notes are sent only from the sheet that already shows them to that member. Nothing is stored or counted (no
+    `photo_reads` budget), and no side logs the text: the helper logs the outcome and the number of marks.
+  - A tapped **phone** rings (`tel:`), a tapped **link** opens (only through §7C.1 `webLink`); the other highlights
+    are text.
 - The line editing is `frontend/src/notes-edit.ts` (pure).
 
 **Acceptance** (`test/notes-marks.test.ts`, `test/notes-edit.test.ts`, `test/event-access-api.test.ts`):
@@ -4522,6 +4557,21 @@ only the cursor's line. NE2 ☐ Box swaps a bullet for a box; ☐ and ☑ lines 
 that line only. NE4 Enter continues the list, ☑ → ☐. NE5 Enter on a bare mark ends the list. NE6 Enter on a plain line
 is a plain Enter. NS1 `/calendar` gives `hasNotes` true for an event with notes the member may open, false for one
 without, and false for a 🔒 event with notes.
+
+**Acceptance, the home AI** (`test/note-marks.test.ts`, `test/home-note-marks.test.ts`, `test/notes-api.test.ts`,
+`test/captions-contract.test.ts`): NA1 `validMarks` keeps exact copies on one line, drops a mark not in the text, one
+across a line break, an empty one, an unknown kind and a repeat, and caps the count. NA2 `mergeMarks`: the pieces join
+back into the line; the AI's marks lead, patterns fill the gaps; every place an AI phrase appears is marked; with no AI
+marks it is `markNotes`. NA3 the helper over a fake manager and LM Studio: no `IDENTIFY_MODEL` → `off`, nothing called;
+manager unreachable → `off`; manager `busy` → `busy`; model not loaded → `busy`, LM Studio not called; ready → one LM
+Studio POST with the model, temperature 0, the json_schema and no `ttl` → ok with the marks; LM Studio non-2xx or bad
+JSON → `failed`. Never a lease, load or unload call. NA4 the helper's `/note-marks`: no / a wrong bearer → 401; GET →
+405; not JSON or no text → 400; over the cap → 413; a good request → 200 with the report; its log line holds no note
+text. NA5 every report the helper's note-marks produces (found by **calling** it) passes the wire into
+`noteMarksFromHome`, and every kind `markNotes` can emit is in `NOTE_MARK`. NA6 `POST /notes/marks`: signed out → 401;
+blank or over `NOTE_MARKS_TEXT_MAX` → 400; no helper settings → `{ via: 'patterns', why: 'unset' }`; the home answers →
+`{ via: 'sogoai', marks }` with only the marks that stand; the home is busy / fails → `{ via: 'patterns', why, reason }`,
+200 every time.
 
 ### 8.5 Alerts screen
 
@@ -6500,6 +6550,7 @@ other push stays until I hide it ⚑ Q284.
 | PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |
 | POST | `/events/read-photo` | member | raw image body → `{ title, startDate, endDate, startTime, endTime, location, notes }` (each nullable); 503 / 502 / 422 / 429 per §7.8 |
+| POST | `/notes/marks` | member | `{ text }` (1–`NOTE_MARKS_TEXT_MAX`, else 400) → 200 `{ via: 'sogoai', marks: [{ text, kind }] }` or `{ via: 'patterns', why, reason }` (`why` in `NOTE_MARKS_WHY`), never a 5xx for the home; nothing stored or counted (§8.4a) |
 | POST | `/events/read-text` | member | `{ text }` → the same reading as read-photo; 400 / 503 / 502 / 422 / 429 per §7.9 |
 | GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes; GET only for who may open it, else 403 (§6.3) (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6). A sun-timed event (§7.7) is 404 here and on `/exdates` |
 | POST | `/events/{id}/exdates` | creator or owner | `{ date }` |

@@ -1,9 +1,10 @@
 // SPEC §8.4a — the notes sheet: NotesField (a form's notes box with ⤢) and NotesSheet (a `full` Modal that reads the
-// notes with markNotes highlights and ☐/☑ tap to tick, or edits them with • List / ☐ Box and the list going on at Enter).
+// notes highlighted, the home AI's marks over the patterns with a line saying which, and ☐/☑ tap to tick, or edits them with • List / ☐ Box and the list going on at Enter).
 // Saves nothing: Done hands the text back to the form, whose Save stays the only save. Used by EventForm and ItemForm.
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Modal } from './Modal';
-import { markHref, markNotes } from '../notes-marks';
+import { markHref, mergeMarks } from '../notes-marks';
+import { useNoteMarks, type NoteMarksView } from './useNoteMarks';
 import { continueList, tickLine, toggleBox, toggleBullet, BOX, TICKED, type Edit } from '../notes-edit';
 import s from './NotesSheet.module.css';
 
@@ -31,11 +32,19 @@ export function NotesField({ label, title, value, max, rows = 2, canChange, onCh
 
 interface SheetProps { title: string; value: string; max: number; canChange: boolean; onDone: (v: string) => void }
 
+/** ⚑ Q369 — which highlights show; the fallback is never silent. */
+const WHY = { unset: "isn't set up", off: 'is off', busy: 'is busy', failed: "didn't answer" } as const;
+const sourceLine = (v: NoteMarksView) =>
+  v.state === 'asking' ? '✨ Asking the home AI…'
+    : v.state === 'ai' ? '✨ Highlights by the home AI'
+      : `Highlights by patterns · home AI ${WHY[v.why]}`;
+
 export function NotesSheet({ title, value, max, canChange, onDone }: SheetProps) {
   const [text, setText] = useState(value);
   const [editing, setEditing] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
   const sel = useRef<{ start: number; end: number } | null>(null);
+  const ai = useNoteMarks(text, !editing);
 
   // Puts the selection back after a toolbar or Enter change re-renders the text.
   useLayoutEffect(() => {
@@ -54,7 +63,7 @@ export function NotesSheet({ title, value, max, canChange, onDone }: SheetProps)
     if (el) { apply(fn(text, el.selectionStart, el.selectionEnd)); el.focus(); }
   };
 
-  const marks = (t: string) => markNotes(t).map((seg, i) => {
+  const marks = (t: string) => mergeMarks(t, ai?.marks ?? []).map((seg, i) => {
     if (!seg.mark) return seg.text;
     const href = markHref(seg), cls = `${s.mark} ${s[seg.mark]}`;
     return href
@@ -101,7 +110,10 @@ export function NotesSheet({ title, value, max, canChange, onDone }: SheetProps)
             }} />
         </div>
       ) : (
-        <div className={s.read}>{text ? text.split('\n').map(line) : <p className="muted">No notes yet.</p>}</div>
+        <div className={s.read}>
+          {text ? text.split('\n').map(line) : <p className="muted">No notes yet.</p>}
+          {ai && <p className={`muted ${s.source}`} role="status">{sourceLine(ai)}</p>}
+        </div>
       )}
     </Modal>
   );
