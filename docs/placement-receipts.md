@@ -45,6 +45,18 @@ carry its result.
   ~100, routes/notes.ts ~25, useNoteMarks.ts ~40 (all /300); captions-helper.ts ~150/300; home-captions.ts ~85/300;
   index.ts ~120/300; notes-marks.ts ~90/300; NotesSheet.tsx ~120/300. Nothing pinned touched.
 
+## 2026-10-21 — Listen again on iPhone, one recognizer (placement-advisor)
+
+- **Ask:** v1.98.2 patch, SPEC §8.18 part 2 (⚑ Q338/Q360). MojoSOGO after v1.97.1: "Only first set still", "Microphone
+  symbol is on, but is not generating text". The iPhone's webkitSpeechRecognition only gives results to the first
+  instance in the page; useListen keeps ONE recognizer, made on the first start with its handlers set once, and calls
+  start() on it again for each listen and phrase restart, never while it is still ending.
+- **Verdict:** frontend/src/components/useSpeech.ts (useListen) [EXISTING]. Reorganizer NONE.
+- **Flow stage:** render (how the PWA listens).
+- **Why:** the map row already gives useSpeech the recognizer in a ref; an instance per run becomes one lazy instance.
+  Return shape unchanged, so EnsoButton.tsx is untouched. No vocab, shared rule, fetch or module-level `let`.
+- **Caps:** useSpeech.ts 133/300. Nothing in the band.
+- **Sources read:** .claude/agents/placement-advisor.md, useSpeech.ts (diff), module-ownership.md, scripts/arch.ts.
 ## 2026-10-21 — v1.98.1 "Filled N fields" counts once (placement-advisor)
 
 - **Ask:** steward finding after v1.98.0 (§7.9, §7.9b), MojoSOGO picked FIX: EventFillBar summed the reading's and the
