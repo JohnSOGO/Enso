@@ -25,6 +25,22 @@ carry its result.
   src/worker/index.ts.
 - **Steward (AREC check):** no existing address book; fits §1.3; share one matcher + picker with things now; the
   household's sun place (coordinates) later, not merged; rooms left alone; ENSO_DOES learns places.
+## 2026-10-21 — Second listen hears nothing on iPhone: wait for the old recognizer's end (placement-advisor)
+
+- **Ask:** v1.97.1 fix, SPEC §8.18 part 2 (⚑ Q338/Q360). MojoSOGO, with a screenshot: "it works the first time, but
+  when I do it a second time the text doesn't show up in the box". useListen.start() aborted the live recognizer and
+  started a new one at once; iOS webkitSpeechRecognition gives a new recognizer nothing until the old one has ended
+  (stop() only calls rec.stop(), so the first one is still ending). Fix: track whether a recognizer is live; start()
+  while one is live aborts it and runs the new one from its onend, ignoring its late results, with a short timeout
+  fallback.
+- **Verdict:** frontend/src/components/useSpeech.ts [EXISTING]. Reorganizer NONE.
+- **Flow stage:** render (client capture of intent; no server change).
+- **Why:** the recognizer's lifecycle is useSpeech's one concern; fan-in is 1 (EnsoButton.tsx), whose contract doesn't
+  change. Rejected: delaying the talk tap in EnsoButton (a recognizer quirk in the screen) and a separate hook. The live
+  flag and timer are refs; stop() and unmount cancel a pending start; exactly one of onend and the timeout launches it.
+- **Caps:** useSpeech.ts ~120/300. Nothing in the band.
+- **Sources read:** .claude/agents/placement-advisor.md, useSpeech.ts, EnsoButton.tsx, module-ownership.md,
+  scripts/arch.ts, placement-receipts.md.
 ## 2026-10-21 — Notes full-screen sheet, highlights, list tools, 📝 in the day sheet (placement-advisor)
 
 - **Ask:** v1.97.0, SPEC §8.4a (with §8.3, §8.4, §8.8, §10 `/calendar`). MojoSOGO: "In Calendar, let me tap to see the
