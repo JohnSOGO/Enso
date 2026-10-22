@@ -1,16 +1,16 @@
-// SPEC §7B.9 — family IOUs, the pure rules (IO1–IO2 and the rules behind IO3–IO12; the API rows are ious-api.test.ts).
+// SPEC §7B.9 — family IOUs, the pure rules (IO1–IO2 and the rules behind IO3–IO12 and IO16–IO18; the API rows are ious-api.test.ts).
 import { describe, expect, it } from 'vitest';
 import {
-  IOU_CENTS_MAX, behindCents, centsText, countsAtOnce, deleteError, okError, owedCents, pairsOf, parseAmount, parsePlanInput,
+  IOU_CENTS_MAX, askAgainError, behindCents, declineError, declinedMessage, centsText, countsAtOnce, deleteError, okError, owedCents, pairsOf, parseAmount, parsePlanInput,
   pingDue, planDates, queueOf, type IouPaymentRow, type IouPlanRow, type IouRow,
 } from '../src/shared/ious';
 
 const T = '2026-10-20T16:00:00.000Z';
 const iou = (id: string, cents: number, x: Partial<IouRow> = {}): IouRow => ({
-  id, owed_by: 'sam', owed_to: 'mom', cents, note: null, created_by: 'sam', ok_at: T, ok_by: 'sam', deleted_at: null, created_at: T, ...x,
+  id, owed_by: 'sam', owed_to: 'mom', cents, note: null, created_by: 'sam', ok_at: T, ok_by: 'sam', declined_at: null, declined_by: null, deleted_at: null, created_at: T, ...x,
 });
 const pay = (id: string, cents: number, x: Partial<IouPaymentRow> = {}): IouPaymentRow => ({
-  id, owed_by: 'sam', owed_to: 'mom', cents, how: 'paid', note: null, created_by: 'mom', ok_at: T, ok_by: 'mom', deleted_at: null, created_at: T, ...x,
+  id, owed_by: 'sam', owed_to: 'mom', cents, how: 'paid', note: null, created_by: 'mom', ok_at: T, ok_by: 'mom', declined_at: null, declined_by: null, deleted_at: null, created_at: T, ...x,
 });
 const plan = (x: Partial<IouPlanRow> = {}): IouPlanRow => ({
   id: 'ipl_1', owed_by: 'sam', owed_to: 'mom', cents_each: 10000, every: 'week', start_date: '2026-10-23', created_by: 'sam', ended_at: null, created_at: T, ...x,
@@ -41,7 +41,7 @@ describe('§7B.9 IOU rules', () => {
     expect(okError('iou', waiting, 'sam')).toBeNull();
     expect(okError('iou', waiting, 'mom')?.status).toBe(403);
     expect(okError('iou', iou('b', 100), 'sam')?.status).toBe(409);
-    expect(deleteError('iou', waiting, { id: 'sam', admin: false })).toBeNull();
+    expect(deleteError('iou', waiting, { id: 'mom', admin: false })).toBeNull();
     expect(deleteError('iou', iou('b', 100), { id: 'mom', admin: false })).not.toBeNull();
     expect(deleteError('iou', iou('b', 100), { id: 'dad', admin: true })).toBeNull();
   });
@@ -70,5 +70,27 @@ describe('§7B.9 IOU rules', () => {
     expect(pingDue(plan(), '2026-10-23', '09:00', 100)).toBe(true);
     expect(pingDue(plan(), '2026-10-24', '09:00', 100)).toBe(false);
     expect(pingDue(plan(), '2026-10-23', '09:00', 0)).toBe(false);
+  });
+
+  it('IO16–IO18 declined: only the one it waits on declines; only the maker asks again; counted in nothing, listed newest first', () => {
+    const waiting = iou('w', 30000, { created_by: 'mom', ok_at: null, ok_by: null, note: 'tickets' });
+    expect(declineError('iou', waiting, 'sam')).toBeNull();
+    expect(declineError('iou', waiting, 'mom')).toEqual({ status: 403, text: 'Only the one it waits on can decline it.' });
+    expect(deleteError('iou', waiting, { id: 'sam', admin: false })).not.toBeNull();
+    const no = { ...waiting, declined_at: T, declined_by: 'sam' };
+    expect(declineError('iou', no, 'sam')?.status).toBe(409);
+    expect(okError('iou', no, 'sam')?.status).toBe(409);
+    expect(askAgainError(no, 'mom')).toBeNull();
+    expect(askAgainError(no, 'sam')?.status).toBe(403);
+    expect(askAgainError(waiting, 'mom')?.status).toBe(409);
+    expect(deleteError('iou', no, { id: 'mom', admin: false })).toBeNull();
+    expect(declinedMessage('iou', 'Sam', 30000, 'tickets')).toBe('Sam declined your $300.00 IOU · tickets.');
+    expect(declinedMessage('payment', 'Mom', 10000, null)).toBe('Mom declined your $100.00 payment.');
+    const older = { ...no, id: 'o', declined_at: '2026-10-19T00:00:00.000Z' };
+    const p = pairsOf([no, older], [pay('p', 100, { ok_at: null, declined_at: T, declined_by: 'mom', created_by: 'sam' })], [], { id: 'mom', admin: false }, '2026-10-20', 'UTC');
+    expect(p).toHaveLength(1);
+    expect(p[0]).toMatchObject({ owedCents: 0, waiting: { ious: [], payments: [] }, items: [] });
+    expect(p[0].declined.ious.map((x) => x.id)).toEqual(['w', 'o']);
+    expect(p[0].declined.payments[0]).toMatchObject({ id: 'p', declinedBy: 'mom' });
   });
 });

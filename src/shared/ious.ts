@@ -1,5 +1,5 @@
 // SPEC §7B.9 — family IOUs: who owes whom how much (whole US cents), the amounts as typed and shown, whoever it costs
-// agrees, the queue in each direction (never netted), payback plans (their due dates, behind, the ping), who may see
+// agrees (or declines, and the one who made it may ask again), the queue in each direction (never netted), payback plans (their due dates, behind, the ping), who may see
 // or do what, and the wire types. Ensō records money; it never moves it. Pure; imports only vocab, time and recurrence.
 import { IOU_PAY_HOW, IOU_PLAN_EVERY, isOneOf, type IouPayHow, type IouPlanEvery } from './vocab';
 import { occurrences, type Recurrence } from './recurrence';
@@ -10,16 +10,17 @@ export const IOU_NOTE_MAX = 120;
 export const IOU_CENTS_MAX = 9_999_999_999;
 export const PLAN_PING_TIME = '09:00';
 export const PAYBACK_TITLE = '💵 Payback due';
+export const DECLINED_TITLE = '💵 Declined';
 
 /** An `ious` row (§4.2zzf). */
 export interface IouRow {
   id: string; owed_by: string; owed_to: string; cents: number; note: string | null; created_by: string;
-  ok_at: string | null; ok_by: string | null; deleted_at: string | null; created_at: string;
+  ok_at: string | null; ok_by: string | null; declined_at: string | null; declined_by: string | null; deleted_at: string | null; created_at: string;
 }
 /** An `iou_payments` row. */
 export interface IouPaymentRow {
   id: string; owed_by: string; owed_to: string; cents: number; how: IouPayHow; note: string | null; created_by: string;
-  ok_at: string | null; ok_by: string | null; deleted_at: string | null; created_at: string;
+  ok_at: string | null; ok_by: string | null; declined_at: string | null; declined_by: string | null; deleted_at: string | null; created_at: string;
 }
 /** An `iou_plans` row. */
 export interface IouPlanRow {
@@ -27,19 +28,21 @@ export interface IouPlanRow {
   created_by: string; ended_at: string | null; created_at: string;
 }
 
-export interface IouItem { id: string; cents: number; note: string | null; createdBy: string; createdAt: string; okAt: string | null; paidCents: number }
-export interface IouPayment { id: string; cents: number; how: IouPayHow; note: string | null; createdBy: string; createdAt: string; okAt: string | null }
+interface Declinable { declinedAt: string | null; declinedBy: string | null }
+export interface IouItem extends Declinable { id: string; cents: number; note: string | null; createdBy: string; createdAt: string; okAt: string | null; paidCents: number }
+export interface IouPayment extends Declinable { id: string; cents: number; how: IouPayHow; note: string | null; createdBy: string; createdAt: string; okAt: string | null }
 export interface IouPlan { id: string; centsEach: number; every: IouPlanEvery; startDate: string; nextDue: string | null; behindCents: number }
 /** One direction: `owedBy` owes `owedTo`. */
 export interface IouPair {
   owedBy: string; owedTo: string; owedCents: number; items: IouItem[];
-  waiting: { ious: IouItem[]; payments: IouPayment[] }; payments: IouPayment[]; plan: IouPlan | null;
+  waiting: { ious: IouItem[]; payments: IouPayment[] }; declined: { ious: IouItem[]; payments: IouPayment[] };
+  payments: IouPayment[]; plan: IouPlan | null;
 }
 
 export interface Direction { owedBy: string; owedTo: string }
 export interface IouViewer { id: string; admin: boolean }
 export type IouKind = 'iou' | 'payment';
-type Okable = Pick<IouRow, 'owed_by' | 'owed_to' | 'created_by' | 'ok_at'>;
+type Okable = Pick<IouRow, 'owed_by' | 'owed_to' | 'created_by' | 'ok_at' | 'declined_at'>;
 
 export const dirOf = (r: Pick<IouRow, 'owed_by' | 'owed_to'>): Direction => ({ owedBy: r.owed_by, owedTo: r.owed_to });
 /** The other way: the one owed owes the one who owes. */
@@ -135,20 +138,35 @@ export const waitsOn = (kind: IouKind, d: Direction): string => (kind === 'iou' 
 export const countsAtOnce = (kind: IouKind, d: Direction, creatorId: string): boolean =>
   creatorId !== (kind === 'iou' ? d.owedTo : d.owedBy);
 
-/** Why I may not OK this row, with its status, or null. */
-export function okError(kind: IouKind, r: Okable, viewerId: string): { status: 403 | 409; text: string } | null {
+type Refusal = { status: 403 | 409; text: string } | null;
+
+/** Why I may not OK (or, with `verb`, decline) this row, with its status, or null: it must be waiting, and I the one it waits on. */
+export function okError(kind: IouKind, r: Okable, viewerId: string, verb = 'OK'): Refusal {
   if (r.ok_at) return { status: 409, text: 'That is already OK\'d.' };
-  if (viewerId !== waitsOn(kind, dirOf(r))) return { status: 403, text: 'Only the one it waits on can OK it.' };
+  if (r.declined_at) return { status: 409, text: 'That was declined.' };
+  if (viewerId !== waitsOn(kind, dirOf(r))) return { status: 403, text: `Only the one it waits on can ${verb} it.` };
   return null;
 }
+/** Declining is the OK's other answer (⚑ Q371): the same person, the same waiting row. */
+export const declineError = (kind: IouKind, r: Okable, viewerId: string): Refusal => okError(kind, r, viewerId, 'decline');
 
-/** Why I may not delete this row (⚑ Q355), or null: waiting → who made it, the one it waits on, or an admin; OK'd → an admin. */
-export function deleteError(kind: IouKind, r: Okable, v: IouViewer): string | null {
+/** Only the one who made a declined row may ask again (⚑ Q373). */
+export function askAgainError(r: Okable, viewerId: string): Refusal {
+  if (!r.declined_at) return { status: 409, text: 'That isn\'t declined.' };
+  return viewerId === r.created_by ? null : { status: 403, text: 'Only the one who added it can ask again.' };
+}
+
+/** Why I may not delete this row (⚑ Q355), or null: waiting or declined → who made it or an admin (the one it waits on
+ *  declines instead); OK'd → an admin. */
+export function deleteError(_kind: IouKind, r: Okable, v: IouViewer): string | null {
   if (v.admin) return null;
   if (r.ok_at) return 'Only an admin can delete it once it is OK\'d.';
-  if (v.id === r.created_by || v.id === waitsOn(kind, dirOf(r))) return null;
-  return 'Only the one who added it, the one it waits on, or an admin can delete it.';
+  return v.id === r.created_by ? null : 'Only the one who added it or an admin can delete it.';
 }
+
+/** The declined notice to the one who made it (⚑ Q372). */
+export const declinedMessage = (kind: IouKind, byName: string, cents: number, note: string | null) =>
+  `${byName} declined your ${centsText(cents)} ${kind === 'iou' ? 'IOU' : 'payment'}${note ? ` · ${note}` : ''}.`;
 
 type Counted = { cents: number; ok_at: string | null; deleted_at: string | null };
 const counted = <T extends Counted>(rows: readonly T[]) => rows.filter((r) => r.ok_at && !r.deleted_at);
@@ -160,12 +178,14 @@ export const rawOwed = (ious: readonly Counted[], payments: readonly Counted[]):
 export const owedCents = (ious: readonly Counted[], payments: readonly Counted[]): number => Math.max(0, rawOwed(ious, payments));
 
 /** The money still waiting to be paid back in one direction: payments not yet OK'd. */
-export const waitingPaid = (payments: readonly IouPaymentRow[]): number => sum(payments.filter((p) => !p.ok_at && !p.deleted_at));
+const isWaiting = (r: IouRow | IouPaymentRow) => !r.ok_at && !r.declined_at && !r.deleted_at;
+export const waitingPaid = (payments: readonly IouPaymentRow[]): number => sum(payments.filter(isWaiting));
 
+const declinable = (r: IouRow | IouPaymentRow): Declinable => ({ declinedAt: r.declined_at, declinedBy: r.declined_by });
 const itemOf = (r: IouRow, paidCents: number): IouItem =>
-  ({ id: r.id, cents: r.cents, note: r.note, createdBy: r.created_by, createdAt: r.created_at, okAt: r.ok_at, paidCents });
+  ({ id: r.id, cents: r.cents, note: r.note, createdBy: r.created_by, createdAt: r.created_at, okAt: r.ok_at, paidCents, ...declinable(r) });
 const paymentOf = (r: IouPaymentRow): IouPayment =>
-  ({ id: r.id, cents: r.cents, how: r.how, note: r.note, createdBy: r.created_by, createdAt: r.created_at, okAt: r.ok_at });
+  ({ id: r.id, cents: r.cents, how: r.how, note: r.note, createdBy: r.created_by, createdAt: r.created_at, okAt: r.ok_at, ...declinable(r) });
 
 /** One direction's OK'd IOUs oldest first, payments paying them off oldest first. */
 export function queueOf(ious: readonly IouRow[], payments: readonly IouPaymentRow[]): IouItem[] {
@@ -200,7 +220,7 @@ export const pingDue = (p: PlanFacts & Pick<IouPlanRow, 'ended_at'>, today: stri
 export const paybackMessage = (toName: string, dueCents: number, owed: number) =>
   `Pay ${toName} ${centsText(dueCents)} today. ${centsText(owed)} owed in all.`;
 
-/** The directions the viewer may see with something owed, waiting or a live plan, most owed first. */
+/** The directions the viewer may see with something owed, waiting, declined or a live plan, most owed first. */
 export function pairsOf(ious: readonly IouRow[], payments: readonly IouPaymentRow[], plans: readonly IouPlanRow[], v: IouViewer, today: string, tz: string): IouPair[] {
   const keys = new Map<string, Direction>();
   for (const r of [...ious, ...payments, ...plans]) if (canSee(dirOf(r), v)) keys.set(`${r.owed_by}|${r.owed_to}`, dirOf(r));
@@ -210,10 +230,12 @@ export function pairsOf(ious: readonly IouRow[], payments: readonly IouPaymentRo
     const is = mine(ious).filter((r) => !r.deleted_at), ps = mine(payments).filter((r) => !r.deleted_at);
     const owed = owedCents(is, ps);
     const p = mine(plans).find((x) => !x.ended_at);
-    const waiting = { ious: is.filter((r) => !r.ok_at).sort(byAge).map((r) => itemOf(r, 0)), payments: ps.filter((r) => !r.ok_at).sort(byAge).map(paymentOf) };
-    if (owed === 0 && !waiting.ious.length && !waiting.payments.length && !p) continue;
+    const waiting = { ious: is.filter(isWaiting).sort(byAge).map((r) => itemOf(r, 0)), payments: ps.filter(isWaiting).sort(byAge).map(paymentOf) };
+    const newest = <T extends IouRow | IouPaymentRow>(rows: T[]) => rows.filter((r) => r.declined_at).sort((a, b) => b.declined_at!.localeCompare(a.declined_at!));
+    const declined = { ious: newest(is).map((r) => itemOf(r, 0)), payments: newest(ps).map(paymentOf) };
+    if (owed === 0 && !waiting.ious.length && !waiting.payments.length && !declined.ious.length && !declined.payments.length && !p) continue;
     out.push({
-      ...d, owedCents: owed, items: queueOf(is, ps), waiting, payments: counted(ps).sort(byAge).reverse().map(paymentOf),
+      ...d, owedCents: owed, items: queueOf(is, ps), waiting, declined, payments: counted(ps).sort(byAge).reverse().map(paymentOf),
       plan: p ? { id: p.id, centsEach: p.cents_each, every: p.every, startDate: p.start_date, nextDue: nextDue(p, today), behindCents: behindCents(p, today, tz, owed, ps) } : null,
     });
   }

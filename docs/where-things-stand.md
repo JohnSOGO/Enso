@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-21, v1.99.1, main = production.*
+*Last updated 2026-10-22, v1.100.0, main = production.*
 
 ## Running where
 
@@ -51,6 +51,10 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 💵 Declined IOUs (v1.100.0, §7B.9, migration 0061, a 💡 request, AREC arec-iou-declined.md, Q371–Q373 ⚑): Chores → 💵
+  IOUs → ＋ IOU someone owes you $1 → on their phone tap **Decline** → your phone gets "💵 Declined" and your card shows it
+  under Declined → **Ask again** puts it back in their Waiting for OK. Payments work the same. 🪙 bounty Not yet has the
+  same gap (the doer isn't told); John's call.
 - ✨ Notes by the home AI (v1.99.0, §8.4a, Q364 confirmed, Q368–Q370 ⚑): on the iPhone, open an event's notes with ⤢.
   The patterns light up at once, the line under the notes reads "✨ Asking the home AI…", then "✨ Highlights by the home
   AI" with things like an allergy or who drives lit up too. With SogoAI busy or off the line says "Highlights by patterns ·

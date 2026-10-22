@@ -1,11 +1,11 @@
 // SPEC §8.15c — the 💵 IOUs section of the 🧹 Chores tab: one card per direction I may see (GET /ious), its waiting
-// rows (OK / Got it), plan, queue and payments, and the sheets (IouForm). The server decides what is owed, the queue and
+// rows (OK / Got it / Decline), declined rows (Ask again), plan, queue and payments, and the sheets (IouForm). The server decides what is owed, the queue and
 // behind (§7B.9); who may OK or delete is the shared rule. Amounts are only shown with centsText.
 import { useCallback, useEffect, useState } from 'react';
 import { IouForm, type IouSheet } from './IouForm';
 import { del, errorText, get, post } from '../api';
 import { useApp } from '../state';
-import { centsText, deleteError, letGoError, okError, type IouItem, type IouKind, type IouPair, type IouPayment } from '../../../src/shared/ious';
+import { askAgainError, centsText, declineError, deleteError, letGoError, okError, type IouItem, type IouKind, type IouPair, type IouPayment } from '../../../src/shared/ious';
 import { isAdmin } from '../../../src/shared/roles';
 import s from './Messes.module.css';
 
@@ -36,17 +36,22 @@ export function IousSection() {
   const keyOf = (p: IouPair) => `${p.owedBy}|${p.owedTo}`;
   const path = (kind: IouKind) => (kind === 'iou' ? '/ious' : '/iou-payments');
 
-  /** A waiting row's buttons: OK / Got it for the one it waits on, ✕ for whoever may delete it. */
+  /** A waiting row's buttons: OK / Got it and Decline for the one it waits on, ✕ for whoever may delete it; a declined
+   *  row's: Ask again for the one who made it, ✕. */
   const waitingRow = (p: IouPair, kind: IouKind, x: IouItem | IouPayment) => {
-    const r = { owed_by: p.owedBy, owed_to: p.owedTo, created_by: x.createdBy, ok_at: x.okAt };
-    const what = kind === 'iou' ? `${centsText(x.cents)}${(x as IouItem).note ? ` · ${(x as IouItem).note}` : ''} · added by ${name(x.createdBy)}`
-      : `${HOW_TEXT[(x as IouPayment).how]} ${centsText(x.cents)}${(x as IouPayment).note ? ` · ${(x as IouPayment).note}` : ''} · by ${name(x.createdBy)}`;
+    const r = { owed_by: p.owedBy, owed_to: p.owedTo, created_by: x.createdBy, ok_at: x.okAt, declined_at: x.declinedAt };
+    const what = (kind === 'iou' ? `${centsText(x.cents)}${x.note ? ` · ${x.note}` : ''} · added by ${name(x.createdBy)}`
+      : `${HOW_TEXT[(x as IouPayment).how]} ${centsText(x.cents)}${x.note ? ` · ${x.note}` : ''} · by ${name(x.createdBy)}`)
+      + (x.declinedAt ? ` · declined by ${name(x.declinedBy!)} ${date(x.declinedAt)}` : '');
     return (
       <li key={x.id} className={s.body}>
         <div>{what}</div>
         <div className={s.actions}>
-          {!okError(kind, r, me.id) ? <button className="primary" disabled={busy} onClick={() => act(() => post(`${path(kind)}/${x.id}/ok`))}>{kind === 'iou' ? 'OK' : 'Got it'}</button>
+          {x.declinedAt ? !askAgainError(r, me.id) && <button disabled={busy} onClick={() => act(() => post(`${path(kind)}/${x.id}/again`))}>Ask again</button>
+            : !okError(kind, r, me.id) ? <button className="primary" disabled={busy} onClick={() => act(() => post(`${path(kind)}/${x.id}/ok`))}>{kind === 'iou' ? 'OK' : 'Got it'}</button>
             : <span className="muted">Waiting for {name(kind === 'iou' ? p.owedBy : p.owedTo)}</span>}
+          {!x.declinedAt && !declineError(kind, r, me.id) && <button disabled={busy}
+            onClick={() => act(() => post(`${path(kind)}/${x.id}/decline`), `Decline this? ${cap(name(x.createdBy))} will be told.`)}>Decline</button>}
           {!deleteError(kind, r, viewer) && <button className="plain" aria-label={`Delete ${what}`} disabled={busy}
             onClick={() => act(() => del(`${path(kind)}/${x.id}`), 'Delete this?')}>✕</button>}
         </div>
@@ -67,6 +72,8 @@ export function IousSection() {
         {open === k && <div className={s.body} style={{ paddingLeft: 8 }}>
           {(p.waiting.ious.length > 0 || p.waiting.payments.length > 0) && <><h3 className={s.sub}>Waiting for OK</h3>
             <ul className={s.list}>{p.waiting.ious.map((x) => waitingRow(p, 'iou', x))}{p.waiting.payments.map((x) => waitingRow(p, 'payment', x))}</ul></>}
+          {(p.declined.ious.length > 0 || p.declined.payments.length > 0) && <><h3 className={s.sub}>Declined</h3>
+            <ul className={s.list}>{p.declined.ious.map((x) => waitingRow(p, 'iou', x))}{p.declined.payments.map((x) => waitingRow(p, 'payment', x))}</ul></>}
           {p.plan && <div className={s.actions}>
             <span>Plan: {centsText(p.plan.centsEach)} {EVERY_TEXT[p.plan.every]} from {day(p.plan.startDate)}{p.plan.nextDue ? ` · next ${day(p.plan.nextDue)}` : ''}{p.plan.behindCents > 0 ? ` · behind ${centsText(p.plan.behindCents)}` : ''}</span>
             <button disabled={busy} onClick={() => act(() => del(`/iou-plans/${p.plan!.id}`), 'End this payback plan?')}>End plan</button>

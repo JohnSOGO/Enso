@@ -64,7 +64,8 @@ household.get('/status', requireMember, async (c) => {
          FROM deliveries d LEFT JOIN members m ON m.id = d.member_id LEFT JOIN fires f ON f.id = d.fire_id
          LEFT JOIN task_sessions ts ON ts.id = f.timer_id
         WHERE (ts.member_id IS NULL OR ts.member_id = ?) AND (d.iou_plan_id IS NULL OR d.member_id = ?)
-        ORDER BY d.created_at DESC LIMIT 20`, me, me), // §7G.3 Q308, §7B.9 Q359: my task check-ins and payback pings only
+          AND (d.iou_row_id IS NULL OR d.member_id = ?)
+        ORDER BY d.created_at DESC LIMIT 20`, me, me, me), // §7G.3 Q308, §7B.9 Q359: my task check-ins and IOU pushes only
     myTask: task ? { title: task.timer.title, state: taskState(task.session) } : null, // §8.5a ⚑ Q309: my running task, mine only
   });
 });
