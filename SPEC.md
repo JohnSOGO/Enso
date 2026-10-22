@@ -1101,6 +1101,17 @@ it never points at the place. Additive; it runs before the deploy.
 Schema: [`migrations/0060_places.sql`](migrations/0060_places.sql). **Migration check (PL-M,**
 [`test/migration-0060.test.ts`](test/migration-0060.test.ts)**):** the seeded row is there; a second row with its id is refused.
 
+### 4.2zzh Schema change — `migrations/0061_iou_declined.sql`
+
+Asked in a 💡 request 2026-10-21 (AREC `arec-iou-declined.md`): a declined IOU or payment stays on the record, and the
+one who made it is told (§7B.9). `ious` and `iou_payments` each get `declined_at` / `declined_by` (NULL = not declined),
+so a declined row is neither waiting, counted nor deleted. `deliveries.iou_row_id` points a "declined" push at its IOU
+or payment (either table, so no foreign key), which keeps that push private and out of the founder pings the way
+`iou_plan_id` does. Additive; every existing row reads as not declined; it runs before the deploy.
+
+Schema: [`migrations/0061_iou_declined.sql`](migrations/0061_iou_declined.sql). **Migration check (IOU-M2,**
+[`test/migration-0061.test.ts`](test/migration-0061.test.ts)**):** an IOU, a payment and a delivery written before 0061
+survive with the new columns NULL.
 ### 4.2zzi Schema change — `migrations/0062_note_marks.sql`
 
 Asked by MojoSOGO 2026-10-22: the home AI's highlights are remembered, so a notes text opened again shows them at once
@@ -1382,8 +1393,8 @@ For one alert of one fire:
   - from the second alert on, append `" (alert {n})"`
 
 A delivery with **no fire** is an announcement (§9.3, `POST /announce`), a sign-in notice (§6.6), a
-founder ping (§9.4, `POST /ops/notify`), a mess ask (§7B.7), a bounty push (§7B.8), a list ping (§7A.4) or an IOU
-payback ping (§7B.9). Of these `tick` writes mess asks (step 3b, §5.6), list pings and payback pings; every
+founder ping (§9.4, `POST /ops/notify`), a mess ask (§7B.7), a bounty push (§7B.8), a list ping (§7A.4), or an IOU
+payback ping or declined notice (§7B.9). Of these `tick` writes mess asks (step 3b, §5.6), list pings and payback pings; every
 fire-less row is written through `src/worker/deliveries.ts`.
 
 ### 5.8 Engine acceptance tables (M1 — each row is a test)
@@ -2972,7 +2983,8 @@ twin of a mess point (§7B.7) and never mixed with it: mess Balances stay points
 **The words.** An **IOU** is one debt: the one who **owes** (`owed_by`), the one **owed** (`owed_to`), an amount and
 an optional note ("Shelly's new phone"). A **direction** is one ordered pair, owes → owed. Mom → Sam and Sam → Mom are
 two directions, shown apart and **never netted** ⚑ Q352. A **payment** is money paid back (`paid`, outside Ensō) or
-let go (`let_go`) in one direction. A **payback plan** is a repeating amount due in one direction.
+let go (`let_go`) in one direction. A **payback plan** is a repeating amount due in one direction. An IOU or payment is
+**waiting** (not yet OK'd), **OK'd**, **declined** or **deleted**.
 
 **Whoever it costs agrees** ⚑ Q351. Anything that makes someone owe more, or be owed less, waits for that person's OK:
 
@@ -2983,6 +2995,13 @@ let go (`let_go`) in one direction. A **payback plan** is a repeating amount due
 | an admin who is neither | counts at once | counts at once |
 
 Only that person can OK it. Until then it is **waiting**: shown to both, counted in nothing.
+
+**Declined** ⚑ Q371 (💡 request 2026-10-21: "the person who issued the IOU should be notified, and the bill should stay on
+the records in case we need to reactivate it"). The person a waiting row waits on may **Decline** it instead of OK.
+It is kept, counted in nothing, and shown under **Declined** to the two and admins. The one who made it gets **one
+push** ⚑ Q372, phone only and private like a payback ping: "💵 Declined", `declinedMessage`. Only the one who made it
+may **Ask again** ⚑ Q373: the row is waiting again, with no push (waiting rows show in the app); a payment asked again
+must still fit what is owed (409 `iou_too_much`). The one who made it, or an admin, may ✕ a declined row (deleted).
 
 **What is owed** in a direction = the sum of its OK'd, live IOUs minus the sum of its OK'd, live payments (never below
 0). **The queue** is its OK'd IOUs oldest first; payments pay them off oldest first, so each IOU shows how much of it is
@@ -3012,8 +3031,9 @@ costs the other one, so it waits for their **Got it** unless they recorded it. A
 A payback ping is the one who owes's alone ⚑ Q359: Settings → 📊 Status (§8.6) leaves other members' payback pings out
 of Recent deliveries, as it does their task check-ins (Q308).
 
-**Records** ⚑ Q355: amounts are never edited. A mistake is fixed by deleting a waiting row (who made it, the person
-it waits on as a decline, or an admin) or, once OK'd, by an admin deleting it; a deleted row is kept (`deleted_at`). An OK'd IOU
+**Records** ⚑ Q355: amounts are never edited. A mistake is fixed by deleting a waiting or declined row (who made it,
+or an admin; the person it waits on declines it instead) or, once OK'd, by an admin deleting it; a deleted row is kept
+(`deleted_at`). An OK'd IOU
 can't be deleted while the payments already OK'd in its direction need it (what is owed would go below 0).
 
 **The rules** (pure; imports only vocab, time and recurrence):
@@ -3033,32 +3053,39 @@ can't be deleted while the payments already OK'd in its direction need it (what 
   and not an admin), or null. `letGoError(owedBy, viewer)` → the one who owes can't let their own debt go.
 - `countsAtOnce(kind, row, creatorId)` → whether the new row is OK'd at once (the table above); `okError(kind, row,
   viewerId)` → why I may not OK it (not the person it waits on; already OK'd).
-- `deleteError(kind, row, viewer)` → why I may not delete it (the Records rule), or null.
+- `deleteError(kind, row, viewer)` → why I may not delete it (the Records rule), or null. `declineError(kind, row,
+  viewerId)` → why I may not decline it (not waiting; not the person it waits on). `askAgainError(row, viewerId)` → why
+  I may not ask again (not declined; not the one who made it). `DECLINED_TITLE` = "💵 Declined";
+  `declinedMessage(kind, byName, cents, note)` → "{by} declined your {amount} IOU · {note}." / "… your {amount}
+  payment." (the note only when there is one).
 - `owedCents(ious, payments)`, `queueOf(ious, payments)` → each OK'd IOU oldest first with `paidCents`.
 - `planDates(plan, from, to)` (through `occurrences`), `nextDue(plan, today)`, `behindCents(plan, today, owed,
   payments)`, `pingDue(plan, today, localTime, owed)` → due today, at or after `PLAN_PING_TIME`, something owed.
 - `paybackMessage(toName, dueCents, owedCents)` → `"Pay {to} {due} today. {owed} owed in all."`.
 - `pairsOf(ious, payments, plans, viewer, today)` → `IouPair[]`, the directions the viewer may see that have something
-  owed, waiting or a live plan, most owed first. `IouPair = { owedBy, owedTo, owedCents, items: IouItem[], waiting:
-  { ious: IouItem[], payments: IouPayment[] }, payments: IouPayment[] (OK'd, newest first), plan: IouPlan | null }`;
+  owed, waiting, declined or a live plan, most owed first. `IouPair = { owedBy, owedTo, owedCents, items: IouItem[], waiting:
+  { ious: IouItem[], payments: IouPayment[] }, declined: { ious: IouItem[], payments: IouPayment[] } (newest first),
+  payments: IouPayment[] (OK'd, newest first), plan: IouPlan | null }`;
   `IouItem = { id, cents, note, createdBy, createdAt, okAt, paidCents }`; `IouPayment = { id, cents, how, note, createdBy,
   createdAt, okAt }`; `IouPlan = { id, centsEach, every, startDate, nextDue, behindCents }`.
 
 **Delivery.** A payback ping is a **fire-less push** (§9.1) with `deliveries.iou_plan_id` set and the title
 `PAYBACK_TITLE`; "pinged today" is read from that column. It is not a founder ping: `FOUNDER_PING` in
 `src/worker/deliveries.ts` leaves out `iou_plan_id` rows (§9.4), so it is neither counted for the hourly limit nor
-listed for the FunHouse poller. Tick step 3g, `src/worker/iou-pings.ts`. Nothing else in IOUs pushes anyone ⚑ Q353:
-the waiting rows show in the app.
+listed for the FunHouse poller. Tick step 3g, `src/worker/iou-pings.ts`. A **declined notice** is the same kind of push
+with `deliveries.iou_row_id` set to the declined row and the title `DECLINED_TITLE`, sent by the decline itself (Q372).
+Nothing else in IOUs pushes anyone ⚑ Q353: the waiting rows show in the app. Both are the receiver's alone in Status (Q359).
 
 **The routes** — `src/worker/routes/ious.ts` (§10): `GET /ious` → `{ pairs }`; `POST /ious` → `{ pairs }` (the
 directions it touched: the IOU's, and the tab's when it took some off), `POST /ious/{id}/ok`,
 `DELETE /ious/{id}`; `POST /iou-payments`, `POST /iou-payments/{id}/ok`, `DELETE /iou-payments/{id}`; `POST
-/iou-plans`, `DELETE /iou-plans/{id}`. Every other write answers with that direction's `IouPair` (null when nothing
+…/{id}/decline` and `POST …/{id}/again` on both; `POST /iou-plans`, `DELETE /iou-plans/{id}`. Every other write answers with that direction's `IouPair` (null when nothing
 is left in it); the deletes answer 204. A row I may not see is 404. A payment above what is owed in its direction
 minus the payments still waiting there → 409 `iou_too_much` "That's more than the $X still owed.". A plan with nothing
-owed → 409 `iou_nothing_owed`. OK on an OK'd row → 409 `iou_state`.
+owed → 409 `iou_nothing_owed`. OK or Decline on a row that is not waiting, or Ask again on one not declined → 409
+`iou_state`.
 
-**Acceptance (IO1–IO15, `test/ious.test.ts` for the rules, `test/ious-api.test.ts` through the Worker):**
+**Acceptance (IO1–IO18, `test/ious.test.ts` for the rules, `test/ious-api.test.ts` through the Worker):**
 
 | # | Given | Then |
 |---|---|---|
@@ -3076,9 +3103,12 @@ owed → 409 `iou_nothing_owed`. OK on an OK'd row → 409 `iou_state`.
 | IO12 | payments bring the direction to $0 | the plan's `ended_at` is set; no more pings; the pair leaves `/ious` |
 | IO13 | Ann adds "Bo owes Ann $80.01, Dinner", split | an IOU of $40.00 waiting for Bo's OK |
 | IO15 | a payback ping to Sam; `/status` as Sam, as Kai, as an admin | Sam's Recent deliveries list it; Kai's and the admin's do not |
+| IO16 | Mom adds "Sam owes Mom $300 · tickets"; Sam declines it | 200, the pair's `declined.ious` has it, not waiting, owed unchanged; one push to Mom "💵 Declined" "Sam declined your $300.00 IOU · tickets.", `iou_row_id` set, not in `/ops/pings`; Mom can't decline it (403); Sam can't ✕ it (403); a second decline → 409 |
+| IO17 | Mom asks again; Sam OKs | waiting again, no new push; Sam can't ask again (403); then owed + $300 |
+| IO18 | Sam records $100 paid, Mom declines; Sam pays the rest; Sam asks the $100 again | Sam gets "Mom declined your $100.00 payment."; ask again → 409 `iou_too_much`; Sam ✕ deletes it (204, gone from the card) |
 | IO14 | Ann owes Bo $1,000; Ann adds a $100 split off her tab; then Bo adds $9,600 off the tab himself | a $50.00 `tab` payment waiting for Bo's Got it, no IOU for Bo; then the rest of Ann's tab is paid at once and the rest of the $9,600 is Bo's IOU; `how: 'tab'` on `/iou-payments` → 400 |
 
-**Status:** v1.94.0. Manual (IOU1–IOU2 on the iPhone, §8.15c).
+**Status:** v1.94.0; declined v1.100.0. Manual (IOU1–IOU3 on the iPhone, §8.15c).
 
 
 ---
@@ -5591,8 +5621,10 @@ count at once." (Q261).
                                                    [＋ IOU]
 Sam owes Mom  $1,350.00                                   ▸
   Waiting for OK
-    $300.00 · tickets · added by Mom              [OK] [✕]     (Sam's buttons)
-    Paid $100.00 · by Sam                    [Got it] [✕]      (Mom's buttons)
+    $300.00 · tickets · added by Mom         [OK] [Decline]     (Sam's buttons)
+    Paid $100.00 · by Sam               [Got it] [Decline]      (Mom's buttons)
+  Declined
+    $40.00 · pizza · declined by Sam Oct 21     [Ask again] [✕] (Mom's buttons)
   Plan: $100.00 every week from Fri Oct 23 · next Fri Oct 23 · behind $0.00      [End plan]
   Queue (oldest first)
     $1,200.00 · Shelly's phone · Oct 20 · $150.00 paid
@@ -5605,7 +5637,10 @@ Sam owes Mom  $1,350.00                                   ▸
 - One card per direction I may see (`GET /ious`), most owed first: "{who} owes {whom} {owed}" ("You owe Mom",
   "Sam owes you"). A tap opens it ▾. None → "Nobody owes anybody." A direction with only waiting rows shows $0.00 owed.
 - **Waiting for OK**: each waiting IOU and payment. **OK** (an IOU, for the one who owes) / **Got it** (a payment, for
-  the one owed), and ✕ for whoever may delete it (§7B.9 Records; asks first). A dim "Waiting for {name}" for the rest.
+  the one owed) and **Decline** beside it (asks first), and ✕ for whoever may delete it (§7B.9 Records; asks first). A
+  dim "Waiting for {name}" for the rest.
+- **Declined** (only when there is one): each declined row newest first, "declined by {name} {date}", **Ask again** for
+  the one who made it and ✕ for them or an admin (asks first; a refusal shows inside).
 - **Plan**: amount, how often, start, next due, behind (only when more than $0), and **End plan** (asks first).
 - **Queue**: each OK'd IOU oldest first: amount, note, date, and "$X paid" when part is paid ("paid ✓" when all is).
   An admin gets ✕ on each (asks first; a refusal shows inside).
@@ -5626,7 +5661,9 @@ Sam owes Mom  $1,350.00                                   ▸
 
 Acceptance (IOU1–IOU2, manual on the iPhone at 320 px): IOU1 an adult adds "I owe Mom $1,200" and Mom's card shows it
 at once; Mom adds a $300 one, the adult's card shows OK, and after OK the queue shows both; IOU2 a weekly plan pings
-the one who owes at 09:00 on its day, phone only, and a payment recorded by them shows Got it on the other's phone.
+the one who owes at 09:00 on its day, phone only, and a payment recorded by them shows Got it on the other's phone;
+IOU3 Mom adds an IOU, Sam taps Decline, Mom's phone gets "💵 Declined" and her card shows it under Declined; Ask again
+puts it back in Sam's Waiting for OK.
 
 
 ### 8.16 🎯 Point at it — name what I tapped
@@ -6480,7 +6517,7 @@ other push stays until I hide it ⚑ Q284.
   "Whose mess?"; a `title` → that title (a ping: "🏛️ Ozymandias", "🤖 Claude"); else "Announcement" (a timer
   start announcement too ⚑ Q223). The ping branch matches `opsPingsSince` (§9.4), except that a bounty push (§7B.8)
   also takes the title branch ("🪙 New bounty", "🪙 Waiting for OK") but is not a founder ping; an IOU payback ping
-  (§7B.9) too ("💵 Payback due").
+  (§7B.9) too ("💵 Payback due", "💵 Declined").
 - `ALERTS_PATH = "/settings/alerts"`; a tap opens `/settings/alerts?alert={id}`, built in sw.js. `alertIdFrom(pathname,
   search)` → the id when the path is `ALERTS_PATH` and `alert` is set, else null. sw.js carries its own copy of
   the path (a test pins it).
@@ -6651,11 +6688,15 @@ other push stays until I hide it ⚑ Q284.
 | DELETE | `/messes/{id}` | reporter while unanswered, or owner | → 204 (§7B.7) |
 | GET | `/ious` | member | → `{ pairs: IouPair[] }`, the pairs I am in, every pair for an admin (§7B.9) |
 | POST | `/ious` | member, one of the two or owner | `{ owedBy, owedTo, amount, note?, split?, offTab? }` → `{ pairs }` (201); 400 a bad amount, the same person twice, a long note (§7B.9) |
-| POST | `/ious/{id}/ok` | the one who owes | → `IouPair`; 409 `iou_state` once OK'd (§7B.9) |
-| DELETE | `/ious/{id}` | waiting: who made it or the one who owes; OK'd: owner | → 204; 409 when payments already cover it (§7B.9) |
+| POST | `/ious/{id}/ok` | the one who owes | → `IouPair`; 409 `iou_state` once OK'd or declined (§7B.9) |
+| POST | `/ious/{id}/decline` | the one who owes | → `IouPair`; pushes the one who made it once; 409 `iou_state` when not waiting (§7B.9) |
+| POST | `/ious/{id}/again` | the one who made it | → `IouPair`, waiting again; 409 `iou_state` when not declined (§7B.9) |
+| DELETE | `/ious/{id}` | waiting or declined: who made it; OK'd: owner | → 204; 409 when payments already cover it (§7B.9) |
 | POST | `/iou-payments` | member, one of the two or owner | `{ owedBy, owedTo, amount, how }` → `IouPair` (201); 409 more than is owed; 403 `let_go` by the one who owes (§7B.9) |
-| POST | `/iou-payments/{id}/ok` | the one owed | → `IouPair`; 409 `iou_state` once OK'd (§7B.9) |
-| DELETE | `/iou-payments/{id}` | waiting: who made it or the one owed; OK'd: owner | → 204 (§7B.9) |
+| POST | `/iou-payments/{id}/ok` | the one owed | → `IouPair`; 409 `iou_state` once OK'd or declined (§7B.9) |
+| POST | `/iou-payments/{id}/decline` | the one owed | → `IouPair`; pushes the one who made it once; 409 `iou_state` when not waiting (§7B.9) |
+| POST | `/iou-payments/{id}/again` | the one who made it | → `IouPair`, waiting again; 409 `iou_state` when not declined, `iou_too_much` past what is owed (§7B.9) |
+| DELETE | `/iou-payments/{id}` | waiting or declined: who made it; OK'd: owner | → 204 (§7B.9) |
 | POST | `/iou-plans` | member, one of the two or owner | `{ owedBy, owedTo, amount, every, startDate }` → `IouPair` (201); replaces that direction's live plan; 409 nothing owed (§7B.9) |
 | DELETE | `/iou-plans/{id}` | one of the two, or owner | → 204, the plan ends (§7B.9) |
 | GET | `/bounties` | member | → `{ bounties: Bounty[], waiting: Earning[], scores: Score[] }` (§7B.8) |

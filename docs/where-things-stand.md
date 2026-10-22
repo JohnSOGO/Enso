@@ -54,6 +54,10 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 - 💾 Remembered highlights (v1.101.0, §8.4a, migration 0062, Q374 ⚑): open an event's notes with ⤢ once and wait for
   "✨ Highlights by the home AI"; close it and open it again (or on another phone) → the same AI highlights show at once,
   with no "Asking…". Edit the notes → it asks again.
+- 💵 Declined IOUs (v1.100.0, §7B.9, migration 0061, a 💡 request, AREC arec-iou-declined.md, Q371–Q373 ⚑): Chores → 💵
+  IOUs → ＋ IOU someone owes you $1 → on their phone tap **Decline** → your phone gets "💵 Declined" and your card shows it
+  under Declined → **Ask again** puts it back in their Waiting for OK. Payments work the same. 🪙 bounty Not yet has the
+  same gap (the doer isn't told); John's call.
 - ✨ Notes by the home AI (v1.99.0, §8.4a, Q364 confirmed, Q368–Q370 ⚑): on the iPhone, open an event's notes with ⤢.
   The patterns light up at once, the line under the notes reads "✨ Asking the home AI…", then "✨ Highlights by the home
   AI" with things like an allergy or who drives lit up too. With SogoAI busy or off the line says "Highlights by patterns ·
