@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.84 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
+**Version:** 3.85 · **Date:** 2026-10-22 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1115,9 +1115,10 @@ survive with the new columns NULL.
 ### 4.2zzi Schema change — `migrations/0062_note_marks.sql`
 
 Asked by MojoSOGO 2026-10-22: the home AI's highlights are remembered, so a notes text opened again shows them at once
-without asking SogoAI (§8.4a). One new table, `note_marks`: the hex SHA-256 of the exact notes text, the marks that
+without asking SogoAI (§8.4a). One new table, `note_marks`: the hex SHA-256 of what SogoAI is asked about a text
+(`noteMarksKey`: the prompt, the answer's schema and the exact notes text, since v1.102.0 ⚑ Q375), the marks that
 stood (validMarks' JSON) and when they were stored. It holds no notes text and points at no event or item: the same
-text in two places shares one answer, and an edited text simply has another hash. Rows older than
+text in two places shares one answer, and an edited text, or a changed prompt, simply has another hash. Rows older than
 `NOTE_MARKS_KEEP_DAYS` are deleted when a new one is stored. Additive; it runs before the deploy.
 
 Schema: [`migrations/0062_note_marks.sql`](migrations/0062_note_marks.sql). **Migration check (NM-M,**
@@ -3029,7 +3030,9 @@ costs the other one, so it waits for their **Got it** unless they recorded it. A
 
 **Who sees it** ⚑ Q350: the two people in a direction, and every admin. Nobody else, not even that a direction exists.
 A payback ping is the one who owes's alone ⚑ Q359: Settings → 📊 Status (§8.6) leaves other members' payback pings out
-of Recent deliveries, as it does their task check-ins (Q308).
+of Recent deliveries, as it does their task check-ins (Q308). Which pushes are private is one rule
+(`privatePush` in `src/worker/deliveries.ts`: a row with `iou_plan_id` or `iou_row_id`), read both by Status and
+by the founder-ping filter that keeps money off the FunHouse (§9.4a); a later private push adds its column there.
 
 **Records** ⚑ Q355: amounts are never edited. A mistake is fixed by deleting a waiting or declined row (who made it,
 or an admin; the person it waits on declines it instead) or, once OK'd, by an admin deleting it; a deleted row is kept
@@ -3103,6 +3106,7 @@ owed → 409 `iou_nothing_owed`. OK or Decline on a row that is not waiting, or 
 | IO12 | payments bring the direction to $0 | the plan's `ended_at` is set; no more pings; the pair leaves `/ious` |
 | IO13 | Ann adds "Bo owes Ann $80.01, Dinner", split | an IOU of $40.00 waiting for Bo's OK |
 | IO15 | a payback ping to Sam; `/status` as Sam, as Kai, as an admin | Sam's Recent deliveries list it; Kai's and the admin's do not |
+| IO15b | a declined notice to Ann (`iou_row_id`); `/status` as Ann and as another member; `opsPingsSince` | Ann's Recent deliveries list it; the other's do not; not counted as a founder ping |
 | IO16 | Mom adds "Sam owes Mom $300 · tickets"; Sam declines it | 200, the pair's `declined.ious` has it, not waiting, owed unchanged; one push to Mom "💵 Declined" "Sam declined your $300.00 IOU · tickets.", `iou_row_id` set, not in `/ops/pings`; Mom can't decline it (403); Sam can't ✕ it (403); a second decline → 409 |
 | IO17 | Mom asks again; Sam OKs | waiting again, no new push; Sam can't ask again (403); then owed + $300 |
 | IO18 | Sam records $100 paid, Mom declines; Sam pays the rest; Sam asks the $100 again | Sam gets "Mom declined your $100.00 payment."; ask again → 409 `iou_too_much`; Sam ✕ deletes it (204, gone from the card) |
@@ -4568,8 +4572,12 @@ goes to the home AI and nowhere else, and the AI's highlights are remembered for
   - **The home AI** reads the same text and marks what a busy parent needs at a glance, including what no pattern sees
     ("Sam's allergy is peanuts", "Grandma drives us home"). Each time read mode shows a text it hasn't asked about,
     the sheet (`useNoteMarks`) sends it to `POST /notes/marks` (§10). **Remembered** (MojoSOGO 2026-10-22: "Have it
-    remember previous highlight on subsequent opens"): the route first looks up the text's SHA-256 in `note_marks`
-    (§4.2zzi). A hit answers with those marks at once, for anyone in the household, without asking SogoAI, even when
+    remember previous highlight on subsequent opens"): the route first looks up `note_marks` (§4.2zzi) by the SHA-256
+    of what SogoAI would be asked: `NOTE_MARKS_PROMPT`, `NOTE_MARKS_SCHEMA` and the text (`noteMarksKey`). So a change
+    to the prompt or the answer's shape asks every text afresh, and the old answers age out (MojoSOGO 2026-10-22,
+    ⚑ Q375). A model change on SogoAI is not seen: on a hit the Worker never asks the home, so it can't know the
+    model, and neither are the home-only settings (max tokens, temperature, timeouts). Each remembered answer is
+    still re-checked against the text, and ages out within `NOTE_MARKS_KEEP_DAYS`. A hit answers with those marks at once, for anyone in the household, without asking SogoAI, even when
     it is busy, off or not set up. An answer with at least one mark that stands is stored for its text; an empty
     answer or a failure never is, so the next open asks again. Notes that change are a different text and are asked
     afresh. A remembered answer is kept `NOTE_MARKS_KEEP_DAYS` (180) after it was stored; older ones are dropped
@@ -4624,7 +4632,7 @@ blank or over `NOTE_MARKS_TEXT_MAX` → 400; no helper settings → `{ via: 'pat
 200 every time. NA8 remembered: a text whose answer had marks is answered again from `note_marks` with the same marks
 and no call to the home, also with no helper settings; an empty answer, a failure and a changed text ask the home
 again; a row past `NOTE_MARKS_KEEP_DAYS` is gone after the next store; a stored row whose marks no longer stand
-against the text is not used.
+against the text is not used; a row keyed by the text alone (a different asking) is a miss and asks the home.
 
 ### 8.5 Alerts screen
 

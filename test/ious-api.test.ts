@@ -121,6 +121,19 @@ describe('§7B.9 family IOUs', () => {
     expect(await has(o)).toBe(false);
   });
 
+  it('IO15b Status shows a declined notice only to the one who got it; it is never a founder ping', async () => {
+    const row = (await env.DB.prepare('SELECT id FROM ious LIMIT 1').first<{ id: string }>())!.id;
+    const before = new Date(Date.now() - 1000).toISOString(), now = new Date().toISOString();
+    const pings = await opsPingsSince(env.DB, before);
+    await env.DB.prepare(`INSERT INTO deliveries (id, alert_number, channel, member_id, message, title, iou_row_id, status, created_at, updated_at)
+      VALUES ('dlv_io15b', 1, 'push', ?, 'Sam declined your $1.00 IOU.', ?, ?, 'sent', ?, ?)`).bind(M, DECLINED_TITLE, row, now, now).run();
+    const has = async (c: Client) => (await c.get('/status')).json.recentDeliveries.some((d: any) => d.id === 'dlv_io15b');
+    expect(await has(mom)).toBe(true);
+    expect(await has(kai)).toBe(false);
+    expect(await has(sam)).toBe(false);
+    expect(await opsPingsSince(env.DB, before)).toBe(pings);
+  });
+
   it('IO16 + IO17 + IO18 a declined IOU or payment is kept, its maker told once, and can be asked again', async () => {
     const { client: lee, id: L } = await member(o);
     const { client: ma, id: A } = await member(o);

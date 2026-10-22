@@ -7,6 +7,28 @@ carry its result.
 
 ---
 
+## 2026-10-22 — private-push predicate, session.ts row, note_marks asking key (placement-advisor)
+
+- **Ask:** v1.102.0, from the v1.101.0 steward backlog (MojoSOGO "Yes": 1, 3, 4c). (1) One IOU-notice privacy rule shared
+  by FOUNDER_PING and `/status`, plus a test (§7B.9 Q359, §9.4). (3) The session.ts map row names sha256hex (docs only).
+  (4c) The note_marks key is derived from the prompt and schema too, so a change to the question re-asks (§8.4a,
+  §4.2zzi, Q375). No migration.
+- **Verdict:** (1) EXISTING `src/worker/deliveries.ts`: export `privatePush(t)` =
+  `(${t}.iou_plan_id IS NOT NULL OR ${t}.iou_row_id IS NOT NULL)`; FOUNDER_PING uses `NOT privatePush('deliveries')`;
+  `/status` in EXISTING `src/worker/routes/household.ts` uses `(NOT privatePush('d') OR d.member_id = ?)`, one bind
+  fewer. Test IO15b in `test/ious-api.test.ts`. (3) map wording only. (4c) EXISTING `src/worker/note-marks-rows.ts`:
+  export `noteMarksKey(text)` = sha256hex(JSON.stringify([NOTE_MARKS_PROMPT, NOTE_MARKS_SCHEMA, text])), used by both the
+  read and the store; NA8 seeds with it, and a new case shows a bare-text-hash row is a miss. Model swaps accepted and
+  written into the spec. Reorganizer NONE.
+- **Flow stage:** persist (the delivery predicates; the note_marks key); route (only applies the predicate).
+- **Why:** (1) a fixed string can't serve both readers (FOUNDER_PING uses bare columns, `/status` needs the `d.` alias);
+  an alias-taking predicate leaves one copy, and a later bounty "Not yet" column goes in one place. Rejected the
+  steward's `MINE_ONLY` with `d.` built in. (4c) Rejected a shared `noteMarksKeyText` (shared/note-marks.ts is imported
+  by the PWA and home/; the key is a Worker storage concern); exported from the leaf so NA8 seeds with the real key.
+  Rejected reporting the model from the helper: on a hit nothing calls the home. (3) 4 of 5 sha256hex callers hash
+  credentials; no crypto leaf.
+- **Caps:** deliveries.ts ~80/300, household.ts ~109/300, note-marks-rows.ts ~37/300. None in the band.
+
 ## 2026-10-22 — steward pass after v1.101.0 (code-steward)
 
 - **Run:** post-release, covering v1.99.1 ("found nothing more" plus photo-polish docs), v1.100.0 (declined IOUs,
