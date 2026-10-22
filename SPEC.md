@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.83 · **Date:** 2026-10-22 · **Owner:** MojoSOGO
+**Version:** 3.84 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1112,6 +1112,17 @@ or payment (either table, so no foreign key), which keeps that push private and 
 Schema: [`migrations/0061_iou_declined.sql`](migrations/0061_iou_declined.sql). **Migration check (IOU-M2,**
 [`test/migration-0061.test.ts`](test/migration-0061.test.ts)**):** an IOU, a payment and a delivery written before 0061
 survive with the new columns NULL.
+### 4.2zzi Schema change — `migrations/0062_note_marks.sql`
+
+Asked by MojoSOGO 2026-10-22: the home AI's highlights are remembered, so a notes text opened again shows them at once
+without asking SogoAI (§8.4a). One new table, `note_marks`: the hex SHA-256 of the exact notes text, the marks that
+stood (validMarks' JSON) and when they were stored. It holds no notes text and points at no event or item: the same
+text in two places shares one answer, and an edited text simply has another hash. Rows older than
+`NOTE_MARKS_KEEP_DAYS` are deleted when a new one is stored. Additive; it runs before the deploy.
+
+Schema: [`migrations/0062_note_marks.sql`](migrations/0062_note_marks.sql). **Migration check (NM-M,**
+[`test/migration-0062.test.ts`](test/migration-0062.test.ts)**):** the table takes a row; a second row with the same
+hash is refused.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -4528,8 +4539,8 @@ Actions:
 MojoSOGO: "In Calendar, let me tap to see the notes and then expand the notes with like a full screen pop-up with basic
 edit features" and "in the notes auto highlight pertinent information". One piece, `NotesField` + `NotesSheet`
 (`components/NotesSheet.tsx`), serves every long note that has the same need: an **event's notes** (§8.4) and a **list
-item's note** (§8.8). The notes stay plain text in the same column and limit; nothing new is stored. To be
-highlighted, the text on screen goes to the home AI and nowhere else (below).
+item's note** (§8.8). The notes stay plain text in the same column and limit. To be highlighted, the text on screen
+goes to the home AI and nowhere else, and the AI's highlights are remembered for that exact text (below).
 
 - **The box:** the form's notes textarea, with a **⤢** button (accessible name "Open notes full screen") at its
   label. ⤢ opens the sheet; it stays usable for a member who can't change the entry (read only for them).
@@ -4556,7 +4567,13 @@ highlighted, the text on screen goes to the home AI and nowhere else (below).
     longer.
   - **The home AI** reads the same text and marks what a busy parent needs at a glance, including what no pattern sees
     ("Sam's allergy is peanuts", "Grandma drives us home"). Each time read mode shows a text it hasn't asked about,
-    the sheet (`useNoteMarks`) sends it to `POST /notes/marks` (§10). The route asks the SogoAI helper's
+    the sheet (`useNoteMarks`) sends it to `POST /notes/marks` (§10). **Remembered** (MojoSOGO 2026-10-22: "Have it
+    remember previous highlight on subsequent opens"): the route first looks up the text's SHA-256 in `note_marks`
+    (§4.2zzi). A hit answers with those marks at once, for anyone in the household, without asking SogoAI, even when
+    it is busy, off or not set up. An answer with at least one mark that stands is stored for its text; an empty
+    answer or a failure never is, so the next open asks again. Notes that change are a different text and are asked
+    afresh. A remembered answer is kept `NOTE_MARKS_KEEP_DAYS` (180) after it was stored; older ones are dropped
+    whenever a new one is stored ⚑ Q374. On a miss the route asks the SogoAI helper's
     `POST /note-marks` through Access with the `CAPTIONS_TOKEN` bearer (`noteMarksFromHome`, the §7A.3 path), waiting
     `HOME_NOTE_MARKS_TIMEOUT_MS` (25 s) ⚑ Q370. The helper first asks the **PC model manager** (SogoAI's
     `127.0.0.1:8793`, `GET /state`, 5 s; `home/model-manager.ts`). It goes ahead only when the manager answers, no
@@ -4575,8 +4592,9 @@ highlighted, the text on screen goes to the home AI and nowhere else (below).
     patterns are already drawn); "✨ Highlights by the home AI" when it answered with marks, "✨ Home AI found nothing more" when it answered with none (so an empty answer never looks like AI highlights); otherwise "Highlights by patterns ·
     home AI {why}": *isn't set up* (`unset`: the Worker has no helper settings), *is off* (`off`), *is busy* (`busy`),
     *didn't answer* (`failed`, or the request itself failed). The fallback is never silent.
-  - The notes are sent only from the sheet that already shows them to that member. Nothing is stored or counted (no
-    `photo_reads` budget), and no side logs the text: the helper logs the outcome and the number of marks.
+  - The notes are sent only from the sheet that already shows them to that member. Only the AI's marks are stored,
+    under the text's hash (the notes themselves stay where they are); nothing is counted (no `photo_reads` budget),
+    and no side logs the text: the helper logs the outcome and the number of marks.
   - A tapped **phone** rings (`tel:`), a tapped **link** opens (only through §7C.1 `webLink`); the other highlights
     are text.
 - The line editing is `frontend/src/notes-edit.ts` (pure).
@@ -4603,7 +4621,10 @@ text. NA5 every report the helper's note-marks produces (found by **calling** it
 `noteMarksFromHome`, and every kind `markNotes` can emit is in `NOTE_MARK`. NA6 `POST /notes/marks`: signed out → 401;
 blank or over `NOTE_MARKS_TEXT_MAX` → 400; no helper settings → `{ via: 'patterns', why: 'unset' }`; the home answers →
 `{ via: 'sogoai', marks }` with only the marks that stand; the home is busy / fails → `{ via: 'patterns', why, reason }`,
-200 every time.
+200 every time. NA8 remembered: a text whose answer had marks is answered again from `note_marks` with the same marks
+and no call to the home, also with no helper settings; an empty answer, a failure and a changed text ask the home
+again; a row past `NOTE_MARKS_KEEP_DAYS` is gone after the next store; a stored row whose marks no longer stand
+against the text is not used.
 
 ### 8.5 Alerts screen
 
@@ -6589,7 +6610,7 @@ other push stays until I hide it ⚑ Q284.
 | PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |
 | POST | `/events/read-photo` | member | raw image body → `{ title, startDate, endDate, startTime, endTime, location, notes }` (each nullable); 503 / 502 / 422 / 429 per §7.8 |
-| POST | `/notes/marks` | member | `{ text }` (1–`NOTE_MARKS_TEXT_MAX`, else 400) → 200 `{ via: 'sogoai', marks: [{ text, kind }] }` or `{ via: 'patterns', why, reason }` (`why` in `NOTE_MARKS_WHY`), never a 5xx for the home; nothing stored or counted (§8.4a) |
+| POST | `/notes/marks` | member | `{ text }` (1–`NOTE_MARKS_TEXT_MAX`, else 400) → 200 `{ via: 'sogoai', marks: [{ text, kind }] }` or `{ via: 'patterns', why, reason }` (`why` in `NOTE_MARKS_WHY`), never a 5xx for the home; a remembered answer (`note_marks`, by the text's SHA-256) answers without asking the home, and an answer with ≥ 1 mark is remembered; nothing counted (§8.4a) |
 | POST | `/events/read-text` | member | `{ text }` → the same reading as read-photo; 400 / 503 / 502 / 422 / 429 per §7.9 |
 | GET/PATCH/DELETE | `/events/{id}` | creator or owner for writes; GET only for who may open it, else 403 (§6.3) (GET includes `thingId`, §7C.2) | PATCH/DELETE close future scheduled fires (§5.6). A sun-timed event (§7.7) is 404 here and on `/exdates` |
 | POST | `/events/{id}/exdates` | creator or owner | `{ date }` |

@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-22, v1.100.0, main = production.*
+*Last updated 2026-10-22, v1.101.0, main = production.*
 
 ## Running where
 
@@ -51,6 +51,9 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 💾 Remembered highlights (v1.101.0, §8.4a, migration 0062, Q374 ⚑): open an event's notes with ⤢ once and wait for
+  "✨ Highlights by the home AI"; close it and open it again (or on another phone) → the same AI highlights show at once,
+  with no "Asking…". Edit the notes → it asks again.
 - 💵 Declined IOUs (v1.100.0, §7B.9, migration 0061, a 💡 request, AREC arec-iou-declined.md, Q371–Q373 ⚑): Chores → 💵
   IOUs → ＋ IOU someone owes you $1 → on their phone tap **Decline** → your phone gets "💵 Declined" and your card shows it
   under Declined → **Ask again** puts it back in their Waiting for OK. Payments work the same. 🪙 bounty Not yet has the

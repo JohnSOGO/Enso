@@ -1,16 +1,19 @@
-// NA6 (SPEC §8.4a) — POST /notes/marks through the real Worker: signed out → 401; blank or too long → 400; no helper
-// settings → patterns 'unset'; SogoAI's marks → only the ones that stand; SogoAI busy or failing → patterns with why
-// and reason; 200 every time. A fake helper at the pinned https://sogoai.test; a fetch spy refuses every other host.
-import { SELF, createExecutionContext } from 'cloudflare:test';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+// NA6, NA8 (SPEC §8.4a) — POST /notes/marks through the real Worker: signed out → 401; blank or too long → 400; no
+// helper settings → patterns 'unset'; SogoAI's marks → only the ones that stand; SogoAI busy or failing → patterns with
+// why and reason; 200 every time. NA8: an answer with marks is remembered by the text's hash and answers again with no
+// home call; empty answers, failures and changed texts ask again; old rows are pruned; a bad row is a miss. A fake helper at the pinned https://sogoai.test; a fetch spy refuses every other host.
+import { SELF, createExecutionContext, env } from 'cloudflare:test';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src/worker/index';
 import type { Env } from '../src/worker/env';
-import { NOTE_MARKS_TEXT_MAX } from '../src/shared/note-marks';
+import { NOTE_MARKS_KEEP_DAYS, NOTE_MARKS_TEXT_MAX } from '../src/shared/note-marks';
+import { sha256hex } from '../src/worker/session';
 import { BASE, Client, owner } from './helpers';
 import { homeEnv, keyedEnv } from './recipe-fakes';
 
 let o: Client;
 beforeAll(async () => { o = await owner(); }, 60_000);
+beforeEach(async () => { await env.DB.exec('DELETE FROM note_marks'); });
 afterEach(() => { vi.restoreAllMocks(); });
 
 type Reply = { status?: number; body: object | string };
@@ -80,6 +83,51 @@ describe('NA6 POST /notes/marks', () => {
       expect(r.status).toBe(200);
       expect(r.json, JSON.stringify(home)).toMatchObject({ via: 'patterns', why });
       expect(r.json.reason.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('NA8 remembered highlights', () => {
+  const MARKED = { body: { ok: true, marks: [{ text: 'Gate code 4471', kind: 'key' }] } };
+  const rows = async () => (await env.DB.prepare('SELECT COUNT(*) AS n FROM note_marks').first<{ n: number }>())!.n;
+
+  it('an answer with marks is remembered; the same text answers again with no call to the home, even with no helper settings', async () => {
+    const first = await ask(homeEnv(), MARKED, { text: 'NA8 one. Gate code 4471.' });
+    expect(first.json).toEqual({ via: 'sogoai', marks: [{ text: 'Gate code 4471', kind: 'key' }] });
+    expect(await rows()).toBe(1);
+    for (const e of [homeEnv(), keyedEnv()]) {
+      const again = await ask(e, null, { text: 'NA8 one. Gate code 4471.' });
+      expect(again.json).toEqual(first.json);
+      expect(again.heard).toHaveLength(0);
+    }
+  });
+
+  it('an empty answer and a failure are not remembered; a changed text asks again', async () => {
+    await ask(homeEnv(), { body: { ok: true, marks: [] } }, { text: 'NA8 two, nothing here.' });
+    await ask(homeEnv(), { body: { ok: false, kind: 'busy', reason: 'busy' } }, { text: 'NA8 three. Gate code 4471.' });
+    expect(await rows()).toBe(0);
+    await ask(homeEnv(), MARKED, { text: 'NA8 four. Gate code 4471.' });
+    const changed = await ask(homeEnv(), MARKED, { text: 'NA8 four. Gate code 4471!' });
+    expect(changed.heard).toHaveLength(1);
+    expect(await rows()).toBe(2);
+  });
+
+  it(`a row stored over ${NOTE_MARKS_KEEP_DAYS} days ago is gone after the next store`, async () => {
+    await env.DB.prepare('INSERT INTO note_marks (text_hash, marks, created_at) VALUES (?, ?, ?)')
+      .bind('old', '[{"text":"x","kind":"key"}]', '2020-01-01T00:00:00.000Z').run();
+    await ask(homeEnv(), MARKED, { text: 'NA8 five. Gate code 4471.' });
+    expect(await env.DB.prepare("SELECT text_hash FROM note_marks WHERE text_hash = 'old'").first()).toBeNull();
+    expect(await rows()).toBe(1);
+  });
+
+  it('a stored row whose marks no longer stand (or bad JSON) is a miss and asks the home', async () => {
+    for (const [i, marks] of ['[{"text":"Grandma drives","kind":"key"}]', 'not json'].entries()) {
+      const text = `NA8 six ${i}. Gate code 4471.`;
+      await env.DB.prepare('INSERT INTO note_marks (text_hash, marks, created_at) VALUES (?, ?, ?)')
+        .bind(await sha256hex(text), marks, new Date().toISOString()).run();
+      const r = await ask(homeEnv(), MARKED, { text });
+      expect(r.heard, marks).toHaveLength(1);
+      expect(r.json.marks).toEqual([{ text: 'Gate code 4471', kind: 'key' }]);
     }
   });
 });

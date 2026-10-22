@@ -7,6 +7,28 @@ carry its result.
 
 ---
 
+## 2026-10-22 — remembered note marks (placement-advisor)
+
+- **Ask:** v1.101.0, SPEC §8.4a "Remembered" + §4.2zzi (MojoSOGO 2026-10-22: "Have it remember previous highlight on
+  subsequent opens"): POST /notes/marks looks up the text's SHA-256 in a new `note_marks` table (migration 0062). A hit
+  answers `{ via: 'sogoai', marks }` with no home call, even when the helper is not set up. A sogoai answer with ≥1 mark
+  that stands is stored (INSERT OR REPLACE), and rows older than NOTE_MARKS_KEEP_DAYS (⚑ Q374, 180) are pruned on each
+  store. An empty answer or a failure is never stored.
+- **Verdict:** NEW row `src/worker/note-marks-rows.ts` (rememberedMarks / rememberMarks: hash via session.ts sha256hex,
+  stored JSON re-checked with rawMarksOf + validMarks on read, a miss when none stand, the prune in the store's batch,
+  never throws on write); EXISTING `src/worker/routes/notes.ts` (wiring: lookup after the 400s and before the unset check,
+  store after validMarks when non-empty); EXISTING `src/shared/note-marks.ts` (NOTE_MARKS_KEEP_DAYS, and rawMarksOf
+  pulled out of parseNoteMarksReport so the shape filter is not copied); `migrations/0062_note_marks.sql` +
+  `test/migration-0062.test.ts`. Reorganizer NONE.
+- **Flow stage:** persist (the leaf), with route wiring. The keep window is a shared limit. No render change.
+- **Why:** one D1 table per leaf (weather-days.ts, *-rows.ts); a route owning the table, its key, (de)serialization and
+  pruning would be four concerns. Rejected: a new hash helper (session.ts already exports sha256hex); home-captions.ts (no
+  D1 by contract); shared/note-marks.ts for the store (pure, shared with home/). Re-validation on read keeps a stale or
+  bad row from leaking marks not in the text. The answer shape is unchanged, so useNoteMarks and NotesSheet stay as they
+  are. The acceptance gap it flagged is NA8 in SPEC (test/notes-api.test.ts).
+- **Caps:** routes/notes.ts ~30/300; note-marks-rows.ts ~35/300 (new); shared/note-marks.ts ~110/300. Nothing in the band.
+- **Steward note:** sha256hex lives in session.ts while most of its importers are not about sessions; a small crypto leaf
+  is a seam for a later steward pass, not a reorganizer before this feature.
 ## 2026-10-22 — Declined IOUs: decline, tell the maker, ask again (placement-advisor)
 
 - **Ask:** 💡 request req_4yjr3bp1kvm32y44, AREC arec-iou-declined.md; SPEC 3.83 §7B.9 / §8.15c / §4.2zzh, Q371–Q373,
