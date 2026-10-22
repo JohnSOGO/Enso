@@ -7,6 +7,27 @@ carry its result.
 
 ---
 
+## 2026-10-22 — steward pass after v1.101.0 (code-steward)
+
+- **Run:** post-release, covering v1.99.1 ("found nothing more" plus photo-polish docs), v1.100.0 (declined IOUs,
+  migration 0061) and v1.101.0 (remembered note highlights, migration 0062, note-marks-rows.ts).
+- **Verdict:** SOUND. Typecheck green; 1032/1032 (156 files, main tree); arch:audit quiet (top EventForm 199/223, engine
+  88%, ious.ts 81%). 3 receipts checked against 3 code commits, all landed as their verdicts said; 0 code commits without
+  a receipt.
+- **Top finding:** LOW-MED: whether an IOU push is private is decided twice, in FOUNDER_PING (deliveries.ts) and again in
+  the household.ts `/status` clause (iou_plan_id, now iou_row_id). Export one fragment from deliveries.ts and use it in
+  `/status`. No test checks that `/status` hides other members' declined notices. The bounty "Not yet" push will need the same.
+- **Handoffs:** 0 to reorganizer. 3 to worker: the private-push fragment plus its test (#1); delete NOTE_MARKS_VIA and
+  NoteMarksVia and drop identify.ts's LM_STUDIO_URL re-export with the next touch of those files (#2; correction:
+  ITEM_READ_VIA is not dead, ItemReadVia types ItemReading.via); reword the session.ts map row to credential hashing
+  including sha256hex (#3). 0 to placement-advisor unless MojoSOGO picks a cache-clearing rule for note_marks after a
+  prompt or model change (#4).
+- **Restraint:** no crypto leaf out of session.ts (4 of 5 sha256hex callers are credential hashing, the concern
+  session.ts already owns); the sameSecret copy in ops.ts / captions-helper.ts (a recorded 2026-10-04 decision, home/
+  isolation); the note_marks prune index; ious.ts at 81% (seam already named); the SPEC header date nit. Still carried:
+  isShareKey / InboxSetup apiUrl; deleteEventStatements, renotifyText, updateEventStatement; the failed Out of scope log;
+  show* gating at a 5th calendar item; the identify-through-model-manager decision (with MojoSOGO).
+
 ## 2026-10-22 — remembered note marks (placement-advisor)
 
 - **Ask:** v1.101.0, SPEC §8.4a "Remembered" + §4.2zzi (MojoSOGO 2026-10-22: "Have it remember previous highlight on
