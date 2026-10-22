@@ -1,6 +1,6 @@
 // SPEC §8.4a — what stands out in a notes text, asked of SogoAI (pure): the prompt and the json_schema the helper
-// sends LM Studio, the helper's report and its check, which of the model's marks stand (validMarks), and the answer
-// of POST /notes/marks. Imports vocab and alert-limits only. Shared by the Worker, the PWA and home/ (§2.5).
+// sends LM Studio, the helper's report and its check, which of the model's marks stand (validMarks), how long an
+// answer is remembered, and the answer of POST /notes/marks. Imports vocab and alert-limits only. Shared by the Worker, the PWA and home/ (§2.5).
 import { EVENT_NOTES_MAX } from './alert-limits';
 import {
   NOTE_MARK, NOTE_MARKS_FAILURE, isOneOf, type NoteMark, type NoteMarksFailure, type NoteMarksWhy,
@@ -16,6 +16,8 @@ export const NOTE_MARKS_MAX = 60;
 export const NOTE_MARKS_REASON_MAX = 200;
 /** How many raw marks a report may carry before validMarks looks at them. */
 const RAW_MARKS_MAX = 200;
+/** ⚑ Q374 — how long a remembered answer is kept after it was stored (note_marks, §4.2zzi). */
+export const NOTE_MARKS_KEEP_DAYS = 180;
 
 /** The system message the helper sends with the notes as the user message. */
 export const NOTE_MARKS_PROMPT =
@@ -61,6 +63,16 @@ export type NoteMarks = { via: 'sogoai'; marks: FoundMark[] } | { via: 'patterns
 
 const cut = (s: string, max: number) => s.trim().slice(0, max);
 
+/** A list (from the helper, or a remembered row) → its { text, kind } string marks, at most RAW_MARKS_MAX; anything
+ *  else dropped. Not a list → none. */
+export function rawMarksOf(list: unknown): RawMark[] {
+  if (!Array.isArray(list)) return [];
+  return list.slice(0, RAW_MARKS_MAX)
+    .filter((m): m is RawMark =>
+      !!m && typeof m === 'object' && typeof (m as RawMark).text === 'string' && typeof (m as RawMark).kind === 'string')
+    .map(({ text, kind }) => ({ text, kind }));
+}
+
 /** The helper's answer (through JSON) → checked, or a message saying what is wrong with it. Marks that aren't
  *  { text, kind } strings are dropped here; validMarks decides the rest. */
 export function parseNoteMarksReport(body: unknown): NoteMarksReport | string {
@@ -68,9 +80,7 @@ export function parseNoteMarksReport(body: unknown): NoteMarksReport | string {
   const r = body as Record<string, unknown>;
   if (r.ok === true) {
     if (!Array.isArray(r.marks)) return 'marks must be a list.';
-    const marks = r.marks.slice(0, RAW_MARKS_MAX).filter((m): m is RawMark =>
-      !!m && typeof m === 'object' && typeof (m as RawMark).text === 'string' && typeof (m as RawMark).kind === 'string');
-    return { ok: true, marks: marks.map(({ text, kind }) => ({ text, kind })) };
+    return { ok: true, marks: rawMarksOf(r.marks) };
   }
   if (r.ok !== false) return 'ok must be true or false.';
   if (!isOneOf(NOTE_MARKS_FAILURE, r.kind)) return `kind must be one of: ${NOTE_MARKS_FAILURE.join(', ')}.`;
