@@ -7,6 +7,27 @@ carry its result.
 
 ---
 
+## 2026-10-22 — Declined IOUs: decline, tell the maker, ask again (placement-advisor)
+
+- **Ask:** 💡 request req_4yjr3bp1kvm32y44, AREC arec-iou-declined.md; SPEC 3.83 §7B.9 / §8.15c / §4.2zzh, Q371–Q373,
+  v1.100.0. The one a waiting IOU or payment waits on can Decline it: kept, shown under Declined, one private push to the
+  maker (`deliveries.iou_row_id`); the maker can Ask again (a payment re-checked against what is owed). Migration 0061.
+- **Verdict:** src/shared/ious.ts (rules), src/worker/routes/ious.ts (validate and persist), src/worker/deliveries.ts and
+  src/worker/routes/household.ts (the `iou_row_id` private push), frontend/src/components/Ious.tsx (render),
+  src/worker/say-reader.ts (ENSO_DOES), migrations/0061 [EXISTING]. Reorganizer NONE.
+- **Flow stage:** rules ious.ts → route/persist routes/ious.ts + migration → deliver deliveries.ts + `/status` filter →
+  render Ious.tsx.
+- **Why:** Declined is a fourth state of the existing OK step (waitsOn / okError / deleteError / pairsOf), so "counts in
+  nothing" is enforced once in ious.ts. The private push copies the `iou_plan_id` shape (PushRow field, FOUNDER_PING
+  exclusion, `/status` privacy clause). Rejected: a new iou-decline module (splits one concern), decline rules in the
+  route (layer leak), a new channel or FunHouse row (money stays private).
+- **Caps:** ious.ts ~245/300 (watch: band at 270; seam if needed = the plan half → src/shared/iou-plans.ts),
+  routes/ious.ts ~180, deliveries.ts ~78, household.ts ~110, Ious.tsx ~120, say-reader.ts ~108. Nothing in the band.
+- **Siblings:** iou-pings.ts reads owed through ious.ts (declined rows never OK'd, so excluded); alert-history.ts
+  alertSource falls through to the title; tab payments covered; 🪙 bounty Not yet has the same need, left for John.
+- **Sources read:** placement-advisor.md, arec-iou-declined.md, scripts/arch.ts, module-ownership.md,
+  placement-receipts.md, deliveries.ts, household.ts, iou-pings.ts, alert-history.ts, SPEC.md, migrations/.
+
 ## 2026-10-21 — "found nothing more" source line (placement-advisor)
 
 - **Ask:** v1.99.1 patch, SPEC §8.4a ⚑ Q369 (steward item 3, MojoSOGO "1,3"): when the home AI answered (`state: 'ai'`)

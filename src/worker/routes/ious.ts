@@ -1,15 +1,18 @@
-// SPEC §7B.9 — family IOUs: adding IOUs, paying back or letting go, OK / Got it, deleting, and payback plans. Every
+// SPEC §7B.9 — family IOUs: adding IOUs, paying back or letting go, OK / Got it, declining (one push to the one who made
+// it) and asking again, deleting, and payback plans. Every
 // rule (amounts, who agrees, who sees, the queue, behind) is src/shared/ious.ts; this file validates and persists.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import {
-  countsAtOnce, deleteError, dirOf, reverse, tabSplit, letGoError, madeError, okError, owedCents, pairsOf, parseIouInput, parsePaymentInput,
+  askAgainError, countsAtOnce, declineError, declinedMessage, DECLINED_TITLE, deleteError, dirOf, reverse, tabSplit, letGoError, madeError, okError, owedCents, pairsOf, parseIouInput, parsePaymentInput,
   parsePlanInput, rawOwed, waitingPaid, canSee, centsText, type Direction, type IouKind, type IouPaymentRow, type IouPlanRow,
   type IouRow, type IouViewer,
 } from '../../shared/ious';
 import { isAdmin } from '../../shared/roles';
 import { utcToLocal } from '../../shared/time';
 import { activeMemberIds, all, first, householdTz, newId, nowIso } from '../db';
+import { pushDelivery } from '../deliveries';
+import { sendPushDeliveries } from '../push';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
 
@@ -106,6 +109,35 @@ for (const [kind, path] of [['iou', '/ious'], ['payment', '/iou-payments']] as c
     await c.env.DB.prepare(`UPDATE ${TABLE[kind]} SET ok_at = ?, ok_by = ? WHERE id = ?`).bind(nowIso(), v.id, row.id).run();
     if (kind === 'payment') await endPlanIfPaid(c.env.DB, dirOf(row));
     return pairAnswer(c, dirOf(row));
+  });
+
+  ious.post(`${path}/:id/decline`, requireMember, async (c) => {
+    const row = await loadRow(c, kind);
+    if (row instanceof Response) return row;
+    const db = c.env.DB, me = c.get('member'), no = declineError(kind, row, me.id);
+    if (no) return fail(c, no.status, no.status === 409 ? 'iou_state' : 'forbidden', no.text);
+    const now = nowIso();
+    const done = await db.prepare(`UPDATE ${TABLE[kind]} SET declined_at = ?, declined_by = ? WHERE id = ? AND ok_at IS NULL AND declined_at IS NULL`).bind(now, me.id, row.id).run();
+    if (!done.meta.changes) return fail(c, 409, 'iou_state', 'That is no longer waiting.'); // a second tap at the same moment
+    if ((await activeMemberIds(db)).includes(row.created_by)) {
+      const push = pushDelivery(db, { memberId: row.created_by, title: DECLINED_TITLE, message: declinedMessage(kind, me.display_name, row.cents, row.note), iouRowId: row.id }, now);
+      await push.stmt.run();
+      await sendPushDeliveries(c.env, [push.id], now);
+    }
+    return pairAnswer(c, dirOf(row));
+  });
+
+  ious.post(`${path}/:id/again`, requireMember, async (c) => {
+    const row = await loadRow(c, kind);
+    if (row instanceof Response) return row;
+    const db = c.env.DB, d = dirOf(row), no = askAgainError(row, viewerOf(c).id);
+    if (no) return fail(c, no.status, no.status === 409 ? 'iou_state' : 'forbidden', no.text);
+    if (kind === 'payment') {
+      const r = await rowsOf(db, d), room = owedCents(r.ious, r.payments) - waitingPaid(r.payments);
+      if (row.cents > room) return fail(c, 409, 'iou_too_much', `That's more than the ${centsText(Math.max(0, room))} still owed.`);
+    }
+    await db.prepare(`UPDATE ${TABLE[kind]} SET declined_at = NULL, declined_by = NULL WHERE id = ?`).bind(row.id).run();
+    return pairAnswer(c, d);
   });
 
   ious.delete(`${path}/:id`, requireMember, async (c) => {

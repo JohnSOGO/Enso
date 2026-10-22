@@ -19,7 +19,7 @@ export const ENSO_DOES = [
   'Alerts tab → 🍳 Cooking machines: cooking timers (air fryer, oven…).',
   'Alerts tab → 💪 Task buddy: checks in on you every N minutes while you work on something.',
   'Alerts tab, at the top: 📢 Announce (say something on Phone / House speakers / FunHouse) and 🤫 Quiet the house.',
-  'Chores tab: chores on chosen days that rotate between people, steps that hand off, rooms with "what done looks like" photos, Whose mess? reports, bounties and the score, and 💵 IOUs (money family members owe each other, in dollars: OK / Got it, pay back or let go, payback plans every week, 2 weeks or month with a phone ping on the day; recorded only, no money moves).',
+  'Chores tab: chores on chosen days that rotate between people, steps that hand off, rooms with "what done looks like" photos, Whose mess? reports, bounties and the score, and 💵 IOUs (money family members owe each other, in dollars: OK / Got it or Decline (the one who added it is told and can ask again; a declined one stays on the record), pay back or let go, payback plans every week, 2 weeks or month with a phone ping on the day; recorded only, no money moves).',
   'Lists tab: Shopping, Wish list and any custom list, every day lists with a time, ✅ Things to do (with Plan it), 🎬 Movies & shows, 📥 Inbox (shared from the iPhone Share sheet).',
   'Recipes tab: recipes from a link or video, with photos and each person\'s emoji.',
   'Settings: Me (name, color, clock, after work time), Calendar options and days off, Phone alerts, Speakers (house announcements on Echo speakers), Alerts history, Household (rooms), Members and invites, Status, About, 💡 Requests (admins: what the Ensō button saved).',
