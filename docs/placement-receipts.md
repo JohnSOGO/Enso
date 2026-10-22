@@ -7,6 +7,23 @@ carry its result.
 
 ---
 
+## 2026-10-22 — Record, then speech to text (Ensō button) (placement-advisor)
+
+- **Ask:** AREC arec-record-voice.md, SPEC §8.18 part 2, v1.102.0 (⚑ Q375–Q376). Tap the mark to record (MediaRecorder:
+  mp4 on iPhone, webm elsewhere), tap again to stop; the clip is POSTed raw to `POST /api/v1/say/hear` (member only,
+  ≤ 2 MB / 60 s); Workers AI Whisper returns `{ text }`, which goes after what the box holds. Nothing stored or logged.
+- **Verdict:** NEW `src/worker/speech-to-text.ts` (hearClip, like say-reader.ts wraps Claude); EXISTING routes/say.ts
+  (the route), http.ts (audioBody beside photoBody), shared/say-reading.ts (constants), env.ts (AI), useSpeech.ts
+  (useRecord replaces useListen), EnsoButton.tsx (uploads the clip). Reorganizer NONE.
+- **Fallback:** SpeechRecognition dropped entirely (known iPhone bugs); no recorder → the keyboard-🎤 hint (⚑ Q333).
+- **Flow stage:** route say.ts → IO speech-to-text.ts → render useSpeech.ts + EnsoButton.tsx.
+- **Why:** an AI call inside the route would mix IO into validation. Rejected: claude.ts (another provider),
+  photo-reads.ts (the Claude read cap must not be spent on clips), fetch inside useSpeech.ts (its row says no fetch).
+  No daily cap (⚑ Q376), so no migration.
+- **Caps:** say.ts ~60, speech-to-text.ts ~28, http.ts ~56, useSpeech.ts 85 (shrank), EnsoButton.tsx 170. None in band.
+- **Sources read:** placement-advisor.md, arec-record-voice.md, scripts/arch.ts, module-ownership.md, routes/say.ts,
+  http.ts, useSpeech.ts, EnsoButton.tsx, env.ts, index.ts, wrangler.toml, vitest.config.ts, SPEC.md.
+
 ## 2026-10-22 — remembered note marks (placement-advisor)
 
 - **Ask:** v1.101.0, SPEC §8.4a "Remembered" + §4.2zzi (MojoSOGO 2026-10-22: "Have it remember previous highlight on

@@ -333,7 +333,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q328 | A new window reminder's days and window (§8.5c) | ⚑ Weekdays, 8:00am–11:00am |
 | Q329 | What Done does on a window reminder (§8.5c) | ⚑ Ends it: no more days, gone from the list |
 | Q330 | Editing a window reminder (§8.5c) | ⚑ PATCH takes either shape: change the days or window, or switch between a set time and a window |
-| Q331 | The Ensō button's spoken answer (§8.18) | ⚑ The phone's own voices (speechSynthesis), best English one, Enhanced / Premium when installed; no paid voice service |
+| Q331 | The Ensō button's spoken answer (§8.18) | ⚑ The phone's own voices (speechSynthesis), best English one, Enhanced / Premium when installed; no paid voice service (for speaking; listening moved to a paid speech-to-text in Q375) |
 | Q332 | Where the Ensō button sits (§8.18) | ⚑ An 84 px round Ensō mark (60 px until v1.87.1, he asked for bigger) centred just above the tab bar, on every tab |
 | Q333 | No speech-to-text on the phone (§8.18) | ⚑ A text box with "Tap the 🎤 on your keyboard and talk." and Send |
 | Q334 | When the answer is spoken (§8.18) | ⚑ Every answer, aloud, as the popup shows it; 🔇 stops it |
@@ -377,3 +377,5 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q372 | Who hears of a decline (§7B.9) | Same request, "the person who issued the IOU should be notified": ⚑ one push to the one who made it, phone only, "💵 Declined", private like a payback ping (never spoken, FunHouse or founder ping); payments too, not only IOUs (the AREC's shared piece) |
 | Q373 | Bringing a declined one back (§7B.9) | ⚑ **Ask again**, the maker's only: waiting again with no push; a payment must still fit what is owed; the maker or an admin can ✕ it instead |
 | Q374 | How long the home AI's highlights are remembered (§8.4a) | ⚑ 180 days from when they were stored, shared by the household (by the text's SHA-256, any member, any phone); only answers with ≥ 1 mark; dropped when a newer answer is stored after that |
+| Q375 | Record, then write it down (§8.18 part 2, v1.102.0) | MojoSOGO 2026-10-22 "Can we do a 'record' and process VTT?", "Only first does VTT. All others fail": the Ensō talk mark records (MediaRecorder) and Cloudflare Workers AI Whisper writes it down (POST /say/hear); the phone's SpeechRecognition is gone (the iPhone heard only the first talk per opening). ⚑ Cloudflare picked over Whisper on SogoAI or keyboard only (card asked); 60 s stop; whisper-large-v3-turbo |
+| Q376 | A cap on writing clips down (§8.18 part 2, v1.102.0) | ⚑ none: signed-in members only, 60 s and 2 MB a clip; not counted against the Claude reads (§7C.4). Pennies a month at family use |

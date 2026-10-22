@@ -1,4 +1,4 @@
-// SPEC §8.18 — POST /say: what was said to the Ensō button, read by Claude (say-reader.ts) and cleaned
+// SPEC §8.18 — POST /say/hear: a recorded clip written down (speech-to-text.ts). POST /say: what was said to the Ensō button, read by Claude (say-reader.ts) and cleaned
 // (cleanSayReading). The §7C.4 check order (signed in → the text → daily cap → key → count → read). Nothing saved;
 // the words are never stored or logged.
 import { Hono } from 'hono';
@@ -9,9 +9,10 @@ import { utcToLocal, weekdayOf } from '../../shared/time';
 import { afterOf } from '../../shared/reminders';
 import { isAdmin } from '../../shared/roles';
 import { all, first, nowIso } from '../db';
-import { body, fail } from '../http';
+import { audioBody, body, fail } from '../http';
 import { requireMember } from '../session';
 import { readSay } from '../say-reader';
+import { hearClip } from '../speech-to-text';
 import { spendPhotoRead } from '../photo-reads';
 
 const DAY_NAME = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -43,4 +44,14 @@ say.post('/say', requireMember, async (c) => {
   const reading = cleanSayReading(r.raw, { tz: spent.tz, now, meId: me.id, members });
   if (!reading) return fail(c, 502, 'say_failed', "Ensō didn't understand that. Try saying it another way.");
   return c.json(reading);
+});
+
+// §8.18 part 2 ⚑ Q375 — a recorded clip written down; not a Claude read, no cap of its own (⚑ Q376).
+say.post('/say/hear', requireMember, async (c) => {
+  if (!c.env.AI) return fail(c, 503, 'hear_off', "Ensō can't write down recordings: it isn't set up.");
+  const clip = await audioBody(c);
+  if (clip instanceof Response) return clip;
+  const r = await hearClip(c.env.AI, clip.bytes);
+  if (!r.ok) return fail(c, 502, 'hear_failed', "Ensō couldn't write that down. Try again, or use the keyboard's 🎤.");
+  return c.json({ text: r.text });
 });

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.84 · **Date:** 2026-10-21 · **Owner:** MojoSOGO
+**Version:** 3.85 · **Date:** 2026-10-22 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5781,30 +5781,34 @@ want without needing to know if the current build is capable"; "a big Ensō icon
 voice … also a text pop-up … yes clarify cancel" (the asks in full, and how this grew: `docs/history.md` §14). Photos and
 links keep filling things in as they do (§7.8, §7C.4b, §7E, §7H).
 
-**Reused, nothing reinvented:** the phone's own speech-to-text (the browser's SpeechRecognition, or the 🎤 on the
-iPhone keyboard), the phone's own voices (speechSynthesis; on the iPhone, Settings → Accessibility → Spoken Content →
+**Reused, nothing reinvented:** the phone's own recorder (MediaRecorder) with Cloudflare's speech-to-text on Ensō's
+own account (part 2), or the 🎤 on the iPhone keyboard, the phone's own voices (speechSynthesis; on the iPhone, Settings → Accessibility → Spoken Content →
 Voices → an **Enhanced** or **Premium** voice sounds human), the Claude reading every other "fill it in" uses (§7.9),
-and the reminder form (§8.5b, §8.5c). No paid voice service ⚑ Q331.
+and the reminder form (§8.5b, §8.5c). No paid voice for speaking ⚑ Q331; writing down a recording costs pennies
+(⚑ Q375).
 
 **1. The mark.** A round Ensō mark (the app icon, 84 px), centred just above the tab bar on every tab ⚑ Q332. A **tap**
 opens the popup, not listening yet ⚑ Q360 (MojoSOGO 2026-10-20 "tap to open input… tap enso to speak and again to stop").
 
 **2. Talking.** A line over a **text box** that is always there, and a smaller round Ensō mark at the right end of the
-buttons under it (after Cancel; MojoSOGO 2026-10-20 "Move logo"). **Tap the mark** and
-it listens: it pulses green and the line says "🎤 Listening… tap Ensō to stop."; **tap it again** and it stops ("Tap
-Ensō to talk, or type." while it isn't). The first tap is when the phone asks for the microphone (its own Allow / Don't
-Allow popup); nothing asks before ⚑ Q360. Heard words go after what the box already holds; it can be fixed by hand or
-typed (typing stops listening) ⚑ Q333. **Done** sends the box (enabled once it holds words), **🗑 Clear** empties it
-(still listening if it was), **Cancel** closes. With no speech-to-text, a refusal, or 8 seconds listening with nothing
-heard, the line says "Tap the 🎤 on your keyboard and talk." and the box still works ⚑ Q338; a refusal or a failed try
-(the mic busy, the popup's first answer) fails only that try, and the next tap of the mark asks again. Talking a second time
-works like the first (MojoSOGO 2026-10-21 "it works the first time, but when I do it a second time the text doesn't
-show up"): the iPhone hears only with the first listener a page makes, so there is one, started again each time, never
-while it is still finishing. Tapping the mark
-to talk puts the keyboard away first, so the keyboard's own 🎤 never holds the mic (MojoSOGO 2026-10-20 "sometimes the
-text box is not selected and the VtT is not captured"). The phone's voice is woken
-on Done, never while listening, so the voice and the mic never fight. Admins also see **💡 Requests** here
-(part 5).
+buttons under it (after Cancel; MojoSOGO 2026-10-20 "Move logo"). **Tap the mark** and the phone **records**: it
+pulses green and the line says "🎤 Recording… tap Ensō to stop."; **tap it again** and it stops, the line says "Writing
+it down…", and a second or two later the words go after what the box already holds ("Tap Ensō to talk, or type." the
+rest of the time) ⚑ Q375 (MojoSOGO 2026-10-22 "Can we do a 'record' and process VTT?", "Only first does VTT. All others
+fail": the iPhone's built-in listener heard only the first talk each opening). Every talk works the same, as many times
+as wanted. The first tap is when the phone asks for the microphone (its own Allow / Don't Allow popup); nothing asks
+before ⚑ Q360. A recording stops by itself at 60 seconds. The box can be fixed by hand or typed ⚑ Q333. **Done** sends
+the box (enabled once it holds words), **🗑 Clear** empties it, **Cancel** closes (a recording in progress is dropped).
+With no recorder, a refused microphone, or a clip that can't be written down, the line says "Tap the 🎤 on your keyboard
+and talk." and the box still works ⚑ Q338; the next tap of the mark tries again. Tapping the mark to talk puts the
+keyboard away first, so the keyboard's own 🎤 never holds the mic. The phone's voice is woken on Done, never while
+recording, so the voice and the mic never fight. Admins also see **💡 Requests** here (part 5).
+
+**Writing it down.** `POST /say/hear` takes the clip as it was recorded (audio/mp4 from the iPhone, audio/webm
+elsewhere, at most 2 MB) and Cloudflare's speech-to-text (Workers AI Whisper, on Ensō's own Cloudflare account, about
+$0.0005 a minute of talk) returns the words. Nothing is stored or logged: not the clip, not the words. It doesn't count
+against the daily Claude reads (§7C.4), and there is no daily cap of its own ⚑ Q376 (a member must be signed in; 60
+seconds and 2 MB bound each clip).
 
 **3. The reading.** `POST /say { text }`: Claude fixes the words (spelling, grammar, what was misheard) into "heard" and
 reads one of four. Nothing is saved by the reading itself.
@@ -5888,6 +5892,7 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
 | SY10 | POST /say as a member whose After is school at 15:00; as an admin with no After set | the prompt gives "after school" = 15:00; "after work" = 17:30 |
 | SY11 | POST /feature-requests/{id}/build as an admin on a new request (fire answered 200); as a plain member; on a needs_john one; with BUILD_FIRE_TOKEN unset; fire answered 500 | 202 `{ started: true }`, one POST to BUILD_FIRE_URL with the Bearer and the id + title in `text`; 403; 409; 503 `build_now_off`, no fire; 502 `build_failed` and one log line naming the id and `HTTP 500`, never the token |
 | SY8 | POST /feature-requests `{ …, outside: true }`; GET /ops/requests; founder …/ok on it; an admin …/dismiss on another | 201 status `outside`, listed in GET /feature-requests after 30 days too; not in /ops/requests; `new`; `dismissed` |
+| SY12 | POST /say/hear as a member with an audio/mp4 clip (fake AI answers " Remind me at nine. "); signed out; an image/jpeg body; an empty clip; a clip over 2 MB; the AI throws; no AI binding | 200 `{ text: 'Remind me at nine.' }` and the AI got the clip as base64; 401; 400; 400; 400; 502 `hear_failed`; 503 `hear_off` |
 | SY-M | on the iPhone | tap the Ensō button, tap Ensō in the box, say "weekdays 8 to 11 remind me to book the car check", hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; tap the mark → the box opens quiet; tap Ensō in it → the phone asks for the mic once, then "Listening…"; say "remind me tomorrow at 9 to call mom", tap Ensō again → it stops, Done → the answer; a fresh opening of the app never asks for the mic; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests; on any answer ✏️ Edit → the box holds what was heard, fix a word, Done → the new answer; tap Ensō, talk, tap Ensō, tap it again and talk more → the new words show too |
 
 ## 9. Delivery
@@ -6623,6 +6628,7 @@ other push stays until I hide it ⚑ Q284.
 | GET | `/reminders` | member | → open reminders (§8.5b), soonest first: `{ id, title, date, time, channels, renotifyMin, assignedTo, createdBy, state: 'due' \| 'ringing' \| 'missed', dueAt, window: { days: Weekday[], from, to } \| null }` (`dueAt` = the open fire's due time, else the reminder's own; a window's next ring, §8.5c) |
 | POST | `/reminders` | member | `{ title, date, time: "HH:MM", channels, renotifyMin?, assignedTo? }` or `{ title, window: { days, from, to }, channels, assignedTo? }` (§8.5c) → reminder (201); 400 when not after now, or a bad window |
 | PATCH/DELETE | `/reminders/{id}` | creator or owner | POST fields, all optional, merged; either shape (`window: null` back to a set time, §8.5c); re-plans like an alarm edit |
+| POST | `/say/hear` | member | the raw recorded clip (audio/mp4, audio/webm, audio/ogg, audio/wav; ≤ 2 MB) → 200 `{ text }` (§8.18 part 2); nothing stored or logged; 400 wrong type / empty / too big, 502 couldn't write it down, 503 no AI binding |
 | POST | `/say` | member | `{ text }` → 200 `{ kind: 'reminder', heard, say, reminder }` / `{ kind: 'exists', heard, say, where }` / `{ kind: 'request', heard, say, request: { title, summary, size } }` / `{ kind: 'event', heard, say, event: { title, date, time, assignedTo } }` / `{ kind: 'outside', heard, say, where (or null), request: { title, summary, size } }` (§8.18, §1.3); nothing saved; 400 blank, 429 reads used up, 503 no key, 502 / 422 reading failed |
 | GET/POST | `/feature-requests` | admin / member | → `FeatureRequest[]` newest first, last 30 days for done / dismissed: `{ id, text, title, summary, size, status, note, createdBy, createdAt }`; POST `{ text, title, summary, size, outside? }` → 201, status from size, or `outside` (§8.18, §1.3) |
 | POST | `/feature-requests/{id}/ok` · `/dismiss` | founder · admin | → the request; `ok` only from `needs_john` → `new`; `dismiss` from `new` / `needs_john`; else 409 |

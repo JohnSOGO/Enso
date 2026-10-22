@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-22, v1.101.0, main = production.*
+*Last updated 2026-10-22, v1.102.0, main = production.*
 
 ## Running where
 
@@ -51,6 +51,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 🎤 Record, then write it down (v1.102.0, §8.18 part 2, Q375–Q376): tap Ensō, tap Ensō in the box, talk, tap Ensō → "Writing it down…" → the words in the box; again and again, every time. Workers AI Whisper via the `[ai]` binding (bills to the Cloudflare account, pennies).
 - 💾 Remembered highlights (v1.101.0, §8.4a, migration 0062, Q374 ⚑): open an event's notes with ⤢ once and wait for
   "✨ Highlights by the home AI"; close it and open it again (or on another phone) → the same AI highlights show at once,
   with no "Asking…". Edit the notes → it asks again.
