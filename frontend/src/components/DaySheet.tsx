@@ -29,8 +29,8 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
 
   const row = (o: DayData['items'][number]) => {
     const who = participants(o.assignedTo, members, founder); // §8.3: each person once; everyone → one green Family chip
-    // §8.3: someone not going sees the same row, but it doesn't open (§6.3).
-    const open = canOpenEvent(o, { id: me.id, admin: isAdmin(me) });
+    // §8.3: someone not going sees the same row, but it doesn't open (§6.3); a masked private one shows only its time.
+    const open = !o.masked && canOpenEvent(o, { id: me.id, admin: isAdmin(me) });
     const Row = open ? 'button' : 'div';
     return (
       <li key={`${o.eventId}-${o.date}`}>
@@ -40,7 +40,7 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
           <span className={s.what}>
             <span className={s.title}>{o.emoji && `${o.emoji} `}{o.title}{o.hasReminder && <span aria-label="has reminder" title="Has a reminder"> 🔔</span>}{o.recurring && <span aria-label="repeats" title="Repeats"> 🔁</span>}{o.hasNotes && <span aria-label="has notes" title="Has notes"> 📝</span>}{!open && <span aria-label="only the people going can open it" title="Only the people going can open it"> 🔒</span>}</span>
             <span className={s.meta}>
-              {who.family ? <span className="chip" style={{ borderColor: 'var(--good)', background: 'var(--good)', color: '#0F172A', fontWeight: 600 }}>Family</span> : <>
+              {o.masked ? null : who.family ? <span className="chip" style={{ borderColor: 'var(--good)', background: 'var(--good)', color: '#0F172A', fontWeight: 600 }}>Family</span> : <>
                 {!who.ids.includes(o.createdBy) && <span className="chip" style={{ borderColor: o.color }}>{o.creatorName}</span>}
                 {who.ids.map((id) => <span key={id} className="chip" style={id === o.createdBy ? { borderColor: o.color } : undefined}>{memberById(id)?.displayName ?? 'unknown member'}</span>)}
               </>}

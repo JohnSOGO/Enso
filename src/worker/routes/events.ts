@@ -11,7 +11,7 @@ import { all, first, householdTz, newId, nowIso, parseJson } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
 import { canChange, isAdmin } from '../../shared/roles';
-import { canOpenEvent, cannotOpenText } from '../../shared/event-access';
+import { canOpenEvent, cannotOpenText, isMaskedFor, maskOccurrence } from '../../shared/event-access';
 import { eventView, insertEventStatement, onEventIds, optInStatement, parseEventInput, removeFutureFires, type EventRow } from '../event-rows';
 import { daysOff } from './household';
 import { weatherBetween } from '../weather-days';
@@ -41,14 +41,16 @@ events.get('/calendar', requireMember, async (c) => {
     if (!isOnFor(e, me, on.has(e.id) ? [me] : [])) continue; // §7.5: an optional event exists only for who has it on
     const span = diffDays(e.end_date, e.start_date);
     const assignedTo = parseJson<string[]>(e.assigned_to, []);
-    const hasNotes = e.notes !== null && canOpenEvent({ assignedTo, createdBy: e.created_by }, viewer); // §8.4a: a 🔒 event never tells
+    const seen = { assignedTo, createdBy: e.created_by, private: e.private === 1 }, masked = isMaskedFor(seen, viewer); // §6.3 Private events
+    const hasNotes = e.notes !== null && canOpenEvent(seen, viewer); // §8.4a: a 🔒 event never tells
     const ev = { start_date: e.start_date, recurrence: parseJson<Recurrence | null>(e.recurrence, null), exdates: parseJson<string[]>(e.exdates, []) };
     for (const date of occurrences(ev, addDays(from, -span), to)) {
-      occ.push({
+      const o = {
         eventId: e.id, date, endDate: addDays(date, span), startTime: e.start_time, endTime: e.end_time,
         title: e.title, allDay: e.start_time === null, color: e.color, createdBy: e.created_by, creatorName: e.creator_name,
-        assignedTo, hasReminder: e.remind_offset_min !== null, hasNotes, recurring: e.recurrence !== null, emoji: e.emoji,
-      });
+        assignedTo, hasReminder: e.remind_offset_min !== null, hasNotes, recurring: e.recurrence !== null, emoji: e.emoji, private: seen.private, masked: false,
+      };
+      occ.push(masked ? maskOccurrence(o) : o);
     }
   }
   occ.sort((a, b) => (a.date + (a.startTime ?? '')).localeCompare(b.date + (b.startTime ?? '')));
@@ -84,11 +86,11 @@ events.patch('/events/:id', requireMember, async (c) => {
     c.env.DB.prepare(
       `UPDATE events SET title = ?, notes = ?, address = ?, bring = ?, start_date = ?, start_time = ?, end_date = ?, end_time = ?, recurrence = ?,
          assigned_to = ?, remind_offset_min = ?, remind_channels = ?, renotify_min = ?, max_alerts = ?, optional = ?, emoji = ?, updated_at = ?,
-         remind_random_from = ?, remind_random_to = ?
+         remind_random_from = ?, remind_random_to = ?, private = ?
        WHERE id = ?`).bind(
       input.title, input.notes, input.address, input.bring, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
       input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, input.optional, input.emoji, now,
-      input.remind_random_from, input.remind_random_to, e.id),
+      input.remind_random_from, input.remind_random_to, input.private, e.id),
     removeFutureFires(c.env.DB, e.id, now),
     // §7.5 ⚑: whoever edits an event into optional has it on.
     ...(input.optional && !e.optional ? [optInStatement(c.env.DB, e.id, c.get('member').id, now)] : []),

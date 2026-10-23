@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-23, v1.105.1, main = production.*
+*Last updated 2026-10-23, v1.106.0, main = production.*
 
 ## Running where
 
@@ -51,6 +51,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 🔒 Private events (v1.106.0, §6.3, Q381–Q384): make an event, tick two adults as going, tick 🔒 Private, Save → on a kid's phone the day shows only the time and "🔒 Private", grey, and it doesn't open; on an adult's it shows whole.
 - 🧠 You want / I will (v1.105.0–1.105.1, §8.18 parts 3–4, Q380): tap Ensō, say "weekdays 8 to 11 remind me to book the car check", Done → "You want:" the gist, "I will:" numbered steps, "Did I get that right?", a small "I heard:"; the voice says "I will … Did I get that right?"
 - 🎤 Record, then write it down (v1.104.0, §8.18 part 2, Q378–Q379): tap Ensō, tap Ensō in the box, talk, tap Ensō → "Writing it down…" → the words in the box; again and again, every time. Workers AI Whisper via the `[ai]` binding (bills to the Cloudflare account, pennies).
 - ✨ Guessed event emoji (v1.103.0, §7.6, Q376–Q377 ⚑): on the iPhone, Calendar → tap a day → ＋ → type "Dentist" → the Emoji box shows 🦷 with "✨ guessed"; change the title to "Soccer practice" → ⚽; clear the box → it stays empty; Save → the day shows the emoji. Lists without their own emoji use the same table ("Birthday" list now 🎂).

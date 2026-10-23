@@ -11,7 +11,7 @@ import type { z as Zod } from 'zod';
 
 /** Everything else Ensō does, and where it lives, so a request for something that exists is pointed there. */
 export const ENSO_DOES = [
-  'Calendar tab: events with times, places, who is going, things to bring; public holidays (days off set by admins), 📈 options expiration, the weather and 🌑🌓🌕🌗 moon phases, each one turned on or off per person in Settings → Calendar → Optional calendar items; an event reminder before it (also every hour until Done, or at a random time in a window); fill an event from a screenshot, copied text or a link; 📍 saved places (Settings → Calendar → Saved places: an address with arrival notes and match words, used on an event that names it).',
+  'Calendar tab: events with times, places, who is going, things to bring; public holidays (days off set by admins), 📈 options expiration, the weather and 🌑🌓🌕🌗 moon phases, each one turned on or off per person in Settings → Calendar → Optional calendar items; 🔒 private events (only the people going see more than the time); an event reminder before it (also every hour until Done, or at a random time in a window); fill an event from a screenshot, copied text or a link; 📍 saved places (Settings → Calendar → Saved places: an address with arrival notes and match words, used on an event that names it).',
   'Alerts tab → 📌 Reminders: a one-off reminder that rings until Done, or random times inside a window on chosen days until Done.',
   'Alerts tab → ⏰ Alarms: rings at a set time on chosen days of the week, every week.',
   'Alerts tab → ⏱ Rolling timers: a countdown that restarts when acknowledged ("check on the dog every hour"), with active hours.',

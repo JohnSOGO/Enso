@@ -9,6 +9,7 @@ import { ALERT_TITLE_MAX, EVENT_ADDRESS_MAX, EVENT_BRING_ITEM_MAX, EVENT_BRING_M
 import { cleanBring } from '../shared/bring';
 import { randomWindowError } from '../shared/random-time';
 import { windowEnd } from '../shared/reminders';
+import { privateNeedsGoingText } from '../shared/event-access';
 import { all, first, parseJson } from './db';
 import { intIn, optStr, str } from './http';
 
@@ -23,6 +24,8 @@ export interface EventRow {
   remind_random_from: string | null; remind_random_to: string | null;
   created_by: string; created_at: string; updated_at: string; deleted_at: string | null;
   is_alarm: number; thing_id: string | null; optional: number; emoji: string | null;
+  /** §6.3 Private events: 1 = only the people who may open it see its summary. */
+  private: number;
   /** §7.7 — set only by coordinator SQL; the event routes never show such a row. */
   start_sun: SunEvent | null;
 }
@@ -42,7 +45,7 @@ export function eventView(e: EventRow) {
       maxAlerts: e.max_alerts,
       randomFrom: e.remind_random_from, randomTo: e.remind_random_to,
     },
-    createdBy: e.created_by, updatedAt: e.updated_at, thingId: e.thing_id, optional: e.optional === 1, emoji: e.emoji,
+    createdBy: e.created_by, updatedAt: e.updated_at, thingId: e.thing_id, optional: e.optional === 1, emoji: e.emoji, private: e.private === 1,
   };
 }
 
@@ -74,6 +77,7 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
     }
   }
   if (b.optional !== undefined && typeof b.optional !== 'boolean') return 'optional must be true or false.';
+  if (b.private !== undefined && typeof b.private !== 'boolean') return 'private must be true or false.';
   const emoji = b.emoji === undefined || b.emoji === null || b.emoji === '' ? null : b.emoji;
   const emojiErr = emoji === null ? null : emojiError(emoji);
   if (emojiErr) return emojiErr;
@@ -85,7 +89,7 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
   if (assigned.length) {
     const known = new Set((await all<{ id: string }>(db, 'SELECT id FROM members WHERE disabled_at IS NULL')).map((r) => r.id));
     if (!assigned.every((x) => known.has(x))) return 'assignedTo contains an unknown member.';
-  }
+  } else if (b.private) return privateNeedsGoingText; // §6.3 ⚑ Q383
   let remind: Pick<EventRow, 'remind_offset_min' | 'remind_channels' | 'renotify_min' | 'max_alerts' | 'remind_random_from' | 'remind_random_to'> =
     { remind_offset_min: null, remind_channels: null, renotify_min: null, max_alerts: 4, remind_random_from: null, remind_random_to: null };
   if (b.reminder !== null && b.reminder !== undefined) {
@@ -110,7 +114,7 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
   return {
     title, notes: notes ?? null, address: address?.trim() || null, bring: bring.length ? JSON.stringify(bring) : null, start_date: b.startDate, start_time: startTime, end_date: endDate as string, end_time: endTime,
     recurrence: recurrence === null ? null : JSON.stringify(recurrence), assigned_to: JSON.stringify(assigned), ...remind,
-    optional: b.optional ? 1 : 0, emoji: emoji as string | null,
+    optional: b.optional ? 1 : 0, emoji: emoji as string | null, private: b.private ? 1 : 0,
   };
 }
 
@@ -138,11 +142,11 @@ export function insertEventStatement(db: D1Database, id: string, input: EventInp
   return db.prepare(
     `INSERT INTO events (id, title, notes, address, bring, start_date, start_time, end_date, end_time, recurrence, assigned_to,
        remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at, thing_id, optional, emoji,
-       remind_random_from, remind_random_to, is_alarm)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       remind_random_from, remind_random_to, is_alarm, private)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(id, input.title, input.notes, input.address, input.bring, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
     input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, memberId, now, now, thingId, input.optional, input.emoji,
-    input.remind_random_from, input.remind_random_to, isAlarm ? 1 : 0);
+    input.remind_random_from, input.remind_random_to, isAlarm ? 1 : 0, input.private);
 }
 
 /** §7.5 — the ids of the events this member has turned on (their on-set). */

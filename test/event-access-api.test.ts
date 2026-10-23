@@ -1,7 +1,8 @@
-// SPEC §6.3 "Who opens an event" (EO4–EO6) — through the real Worker: only the people going open the details.
+// SPEC §6.3 "Who opens an event" (EO4–EO6) and "Private events" (PV2–PV6) — through the real Worker.
+import { env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Client, member, owner } from './helpers';
-import { cannotOpenText } from '../src/shared/event-access';
+import { cannotOpenText, privateNeedsGoingText } from '../src/shared/event-access';
 
 let o: Client, a: Client, k: Client, A: string, K: string;
 beforeAll(async () => {
@@ -43,5 +44,50 @@ describe('§6.3 who opens an event', () => {
     const occ = (await k.get('/calendar?from=2030-03-07&to=2030-03-07')).json.occurrences;
     const has = (id: string) => occ.find((x: any) => x.eventId === id).hasNotes;
     expect([has(mine.id), has(bare.id), has(locked.id)]).toEqual([true, false, false]);
+  });
+});
+
+describe('§6.3 private events', () => {
+  const night = (c: Client, assignedTo: string[], extra: object = {}) => c.post('/events', { title: 'Date night', emoji: '🍷', notes: 'Shh', startDate: '2030-03-08',
+    startTime: '19:00', endTime: '22:00', assignedTo, private: true, reminder: { offsetMin: 30, channels: ['push'] }, ...extra });
+  const occOf = async (c: Client, id: string) => (await c.get('/calendar?from=2030-03-08&to=2030-03-08')).json.occurrences.find((x: any) => x.eventId === id);
+
+  it('PV2 someone not going sees only the time, titled Private', async () => {
+    const e = (await night(o, [A])).json;
+    expect(e.private).toBe(true);
+    expect(await occOf(k, e.id)).toMatchObject({ date: '2030-03-08', startTime: '19:00', endTime: '22:00', title: 'Private', emoji: null, assignedTo: [],
+      createdBy: null, creatorName: '', hasReminder: false, recurring: false, hasNotes: false, masked: true });
+  });
+
+  it('PV3 the people going and an admin see it whole', async () => {
+    const e = (await night(a, [A])).json;
+    for (const c of [a, o]) expect(await occOf(c, e.id)).toMatchObject({ title: 'Date night', emoji: '🍷', assignedTo: [A], private: true, masked: false });
+  });
+
+  it('PV4 private with nobody going is refused', async () => {
+    const r = await night(o, []);
+    expect(r.status).toBe(400);
+    expect(r.json.message).toBe(privateNeedsGoingText);
+    const e = (await night(o, [A])).json;
+    expect((await o.patch(`/events/${e.id}`, { assignedTo: [] })).status).toBe(400);
+    expect((await o.patch(`/events/${e.id}`, { assignedTo: [], private: false })).status).toBe(200);
+  });
+
+  it('PV5 a private optional event is titled Private in /optional-events for someone not going', async () => {
+    const e = (await night(o, [A], { optional: true })).json;
+    const row = async (c: Client) => (await c.get('/optional-events')).json.find((x: any) => x.id === e.id);
+    expect(await row(k)).toMatchObject({ title: 'Private', emoji: null });
+    expect(await row(a)).toMatchObject({ title: 'Date night', emoji: '🍷' });
+  });
+
+  it('PV6 a private event\'s reminder push shows in Status only to its member', async () => {
+    const e = (await night(o, [A])).json, now = new Date().toISOString();
+    await env.DB.prepare(`INSERT INTO fires (id, kind, event_id, occurrence_date, due_at, state, alert_count) VALUES ('fire_pv6', 'reminder', ?, '2030-03-08', ?, 'ringing', 1)`)
+      .bind(e.id, now).run();
+    await env.DB.prepare(`INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, status, created_at, updated_at)
+      VALUES ('dlv_pv6', 'fire_pv6', 1, 'push', ?, 'Date night at 7:00 PM', 'sent', ?, ?)`).bind(A, now, now).run();
+    const has = async (c: Client) => (await c.get('/status')).json.recentDeliveries.some((d: any) => d.id === 'dlv_pv6');
+    expect(await has(a)).toBe(true);
+    expect(await has(k)).toBe(false);
   });
 });
