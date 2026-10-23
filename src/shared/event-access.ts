@@ -1,5 +1,6 @@
 // SPEC §6.3 "Who opens an event" and "Private events", §8.3 — who may open an event's details, and what a private one
-// shows to whoever may not (pure, imports nothing). routes/events.ts, routes/optins.ts and DaySheet.tsx ask these rules.
+// shows to whoever may not (pure, imports nothing). routes/events.ts and routes/optins.ts ask these rules;
+// DaySheet.tsx asks canOpenEvent and reads the server's `masked`.
 
 interface EventSeen { assignedTo: readonly string[]; createdBy: string | null }
 interface Viewer { id: string; admin: boolean }

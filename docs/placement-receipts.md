@@ -7,6 +7,32 @@ carry its result.
 
 ---
 
+## 2026-10-23 — privatePush NULL fix, v1.106.1 (placement-advisor)
+
+- **Ask:** steward finding #1 after v1.106.0: `privatePush`'s `t.fire_id IN (…)` is NULL for fire-less rows, so
+  `NOT privatePush` dropped them. Replace with a correlated EXISTS; test PV7.
+- **Verdict:** EXISTING src/worker/deliveries.ts (privatePush's only home); PV7 in test/event-access-api.test.ts.
+- **Why:** one line inside the predicate; its callers (FOUNDER_PING, household.ts /status) get it unchanged.
+  alert-history.ts alertSource needs no edit (a private fire is never a founder ping).
+- **Caps:** deliveries.ts 82/300; no file near the band.
+
+## 2026-10-23 — steward pass after v1.106.0 (code-steward)
+
+- **Run:** post-release, covering v1.106.0 🔒 Private events (726701f EventFlags seam by the reorganizer, the feat
+  commit: event-access isMaskedFor / maskOccurrence, migration 0063, /calendar + /optional-events masking, DaySheet,
+  EventFlags box, deliveries.ts privatePush widened to private events' fires). Report:
+  /mnt/project-files/steward/2026-10-23-v1-106-pass.md.
+- **Verdict:** MINOR DRIFT. Typecheck green; 1063/1063; arch:audit quiet (top EventForm 197/223). 2 receipts match 2
+  code commits; 0 without a receipt; AREC on file.
+- **Top finding:** HIGH: privatePush's new `t.fire_id IN (SELECT … private = 1)` is NULL for every fire-less delivery
+  once any private event has a fire, so FOUNDER_PING matched nothing (the /ops/notify cap, /ops/pings) and /status
+  hid other members' fire-less deliveries. Fixed in v1.106.1 (correlated EXISTS, PV7).
+- **Handoffs:** 0 reorganizer, 0 placement-advisor. 1 worker (#1, done in v1.106.1). The 5 v1.105.1 worker items stay
+  open (useRecord cancel race MED, testTimeout, rawBody, say-reading row, [ai] warning).
+- **Restraint:** no split. Reminders/alarms titles and House speech for private events are AREC / ⚑ Q384 choices left
+  to John. The event-access header wording fixed with v1.106.1.
+
+
 ## 2026-10-23 — Private events: masked /calendar rows (placement-advisor)
 
 - **Ask:** A `private` event flag (migration 0063, a 🔒 Private checkbox, carried through event-rows and routes/events);

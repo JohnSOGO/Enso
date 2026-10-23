@@ -3,6 +3,7 @@ import { env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Client, member, owner } from './helpers';
 import { cannotOpenText, privateNeedsGoingText } from '../src/shared/event-access';
+import { opsPingsSince } from '../src/worker/deliveries';
 
 let o: Client, a: Client, k: Client, A: string, K: string;
 beforeAll(async () => {
@@ -89,5 +90,17 @@ describe('§6.3 private events', () => {
     const has = async (c: Client) => (await c.get('/status')).json.recentDeliveries.some((d: any) => d.id === 'dlv_pv6');
     expect(await has(a)).toBe(true);
     expect(await has(k)).toBe(false);
+  });
+
+  it('PV7 after a private event has rung, fire-less deliveries still show in Status and founder pings still count', async () => {
+    const before = new Date(Date.now() - 1000).toISOString(), now = new Date().toISOString();
+    const e = (await night(o, [A])).json;
+    await env.DB.prepare(`INSERT INTO fires (id, kind, event_id, occurrence_date, due_at, state, alert_count) VALUES ('fire_pv7', 'reminder', ?, '2030-03-08', ?, 'ringing', 1)`)
+      .bind(e.id, now).run();
+    const pings = await opsPingsSince(env.DB, before);
+    await env.DB.prepare(`INSERT INTO deliveries (id, alert_number, channel, member_id, message, title, status, created_at, updated_at)
+      VALUES ('dlv_pv7', 1, 'push', ?, 'Build done', 'Ensō', 'sent', ?, ?)`).bind(A, now, now).run();
+    expect((await k.get('/status')).json.recentDeliveries.some((d: any) => d.id === 'dlv_pv7')).toBe(true);
+    expect(await opsPingsSince(env.DB, before)).toBe(pings + 1);
   });
 });

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.90 · **Date:** 2026-10-23 · **Owner:** MojoSOGO
+**Version:** 3.91 · **Date:** 2026-10-23 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1584,7 +1584,8 @@ event the viewer may not open; PV2 a private event in a non-going member's `/cal
 and times, emoji null, `assignedTo` [], `masked` true, no creator name, `hasReminder` / `recurring` / `hasNotes` false;
 PV3 the assignee and an admin get the real title, `private` true, `masked` false; PV4 POST or PATCH private with nobody
 assigned → 400; PV5 a private optional event in `/optional-events` → "Private" for a non-going member, its title for
-the assignee; PV6 a private event's reminder push to A is in A's `/status` Recent deliveries, not in B's.
+the assignee; PV6 a private event's reminder push to A is in A's `/status` Recent deliveries, not in B's; PV7 once a private event
+has a fire, a delivery with no fire is still in other members' `/status` and a founder ping still counts (§9.4).
 
 **Rules for changing people** (`PATCH /members/{id}`, owner only):
 - **The founder is protected:** their role cannot be changed and they cannot be disabled.
