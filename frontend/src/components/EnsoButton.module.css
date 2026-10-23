@@ -22,3 +22,5 @@
 @media (prefers-reduced-motion: reduce) { .talk.on { animation: none; } }
 .listening { font-weight: 600; margin-bottom: 8px; display: block; }
 .say { font-size: 1.1rem; line-height: 1.4; margin-bottom: 8px; }
+.steps { margin: 0 0 4px 1.3em; padding: 0; line-height: 1.4; }
+.steps li { margin-bottom: 2px; }

@@ -7,6 +7,23 @@ carry its result.
 
 ---
 
+## 2026-10-23 — "You want" / "I'll do" on the Ensō answer (placement-advisor)
+
+- **Ask:** AREC arec-enso-answer-gist.md, SPEC §8.18 parts 3–4 + SY13, v1.105.0 (⚑ Q380). POST /say's one structured
+  reading also gives `want` (one-line gist) and `steps` (1–4 lines of what Yes does), cleaned like `say` (want → heard,
+  steps → [say]); request and outside always get the fixed steps (requestSteps / outsideSteps). The popup shows You want /
+  I'll do / a smaller I heard; the spoken sentence is unchanged.
+- **Verdict:** EXISTING owners: src/worker/say-reader.ts (prompt + schema), src/shared/say-reading.ts (type, clamps,
+  fallbacks, fixed steps beside requestSay / outsideSay), frontend/src/components/EnsoButton.tsx (+ module.css, render),
+  test/say-api.test.ts (SY13). routes/say.ts untouched. Reorganizer NONE.
+- **Flow stage:** rules (say-reading.ts cleaner) → IO (say-reader.ts prompt) → render (EnsoButton.tsx).
+- **Why:** two more fields of a wire shape with one owner and an existing clamp-and-fallback cleaner. Rejected: a new
+  say-steps.ts (splits one reading), fixed steps in the route (a rule in a route), steps derived in the PWA (re-deciding),
+  a second Claude call (reads cost). Clamp names SAY_STEPS_MAX / SAY_STEP_MAX, never the recipe STEPS_MAX / STEP_MAX.
+- **Caps:** say-reading.ts ~118/300, say-reader.ts ~113/300, EnsoButton.tsx ~172/300, say-api.test.ts ~252. None in band.
+
+---
+
 ## 2026-10-23 — Record, then speech to text (Ensō button) (placement-advisor)
 
 - **Ask:** AREC arec-record-voice.md, SPEC §8.18 part 2, v1.104.0 (⚑ Q378–Q379). Tap the mark to record (MediaRecorder:

@@ -1,6 +1,6 @@
 // SPEC §8.18 — reads what was said to the Ensō button via claude.ts: the prompt (clean up the words, then a reminder,
 // "Ensō already does this", "can't do it yet", or "outside what Ensō is for"), the list of what else Ensō does, the
-// scope (§1.3), and the schema; askClaude → the
+// scope (§1.3), the gist and steps said back (⚑ Q380), and the schema; askClaude → the
 // raw answer or an honest failure. No Hono, no D1; never decides what is saved (the route cleans with cleanSayReading
 // and the person says Yes). WHEN A TAB OR SECTION IS ADDED, ADD IT TO ENSO_DOES; WHEN SPEC §1.3 CHANGES, CHANGE
 // ENSO_SCOPE (the code-steward checks both).
@@ -48,8 +48,10 @@ export const ENSO_SCOPE = {
 
 const sayReadingSchema = (z: typeof Zod) => z.object({
   heard: z.string(),
+  want: z.string(),
   kind: z.enum(SAY_KIND),
   say: z.string(),
+  steps: z.array(z.string()),
   reminder: z.object({
     title: z.string(), date: z.string().nullable(), time: z.string().nullable(),
     days: z.array(z.string()), from: z.string().nullable(), to: z.string().nullable(), who: z.array(z.string()),
@@ -94,6 +96,10 @@ export const sayPrompt = (i: Omit<ReadSayInput, 'apiKey' | 'text'>) =>
   `- "outside" when the ask does not fit what Ensō is for (below): "title" and "summary" as for a request, so John can ` +
   `look at it, "size" as for a request, and "where" the place from the list when part of it fits (like "Lists → Shopping" ` +
   `for groceries to order), else null. "say" one sentence. When unsure whether it fits, it fits: use "request" with "big".\n` +
+  `Then say it back like the opening of a review: "want" is one line of what ${i.me} wants, in plain words: the gist, ` +
+  `not the words ("A reminder to book the car check, some time on weekday mornings."); "steps" is one to four short lines ` +
+  `of what Ensō will do on Yes, in order, no numbers ("Fill a 📌 reminder: Book car check", "Ring once between 8 and 11am, ` +
+  `Monday to Friday", "You check it and tap Save").\n` +
   `Null for every field the kind doesn't use.\n\nWhat else Ensō does:\n${ENSO_DOES.map((l) => `- ${l}`).join('\n')}\n\n` +
   `What Ensō is for: one household's home life. It fits when it is about:\n${ENSO_SCOPE.fits.map((l) => `- ${l}`).join('\n')}\n` +
   `It does not fit when it is about:\n${ENSO_SCOPE.outside.map((l) => `- ${l}`).join('\n')}`;
