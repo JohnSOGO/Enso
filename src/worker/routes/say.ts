@@ -46,7 +46,7 @@ say.post('/say', requireMember, async (c) => {
   return c.json(reading);
 });
 
-// §8.18 part 2 ⚑ Q375 — a recorded clip written down; not a Claude read, no cap of its own (⚑ Q376).
+// §8.18 part 2 ⚑ Q378 — a recorded clip written down; not a Claude read, no cap of its own (⚑ Q379).
 say.post('/say/hear', requireMember, async (c) => {
   if (!c.env.AI) return fail(c, 503, 'hear_off', "Ensō can't write down recordings: it isn't set up.");
   const clip = await audioBody(c);

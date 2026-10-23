@@ -7,9 +7,9 @@ carry its result.
 
 ---
 
-## 2026-10-22 — Record, then speech to text (Ensō button) (placement-advisor)
+## 2026-10-23 — Record, then speech to text (Ensō button) (placement-advisor)
 
-- **Ask:** AREC arec-record-voice.md, SPEC §8.18 part 2, v1.102.0 (⚑ Q375–Q376). Tap the mark to record (MediaRecorder:
+- **Ask:** AREC arec-record-voice.md, SPEC §8.18 part 2, v1.104.0 (⚑ Q378–Q379). Tap the mark to record (MediaRecorder:
   mp4 on iPhone, webm elsewhere), tap again to stop; the clip is POSTed raw to `POST /api/v1/say/hear` (member only,
   ≤ 2 MB / 60 s); Workers AI Whisper returns `{ text }`, which goes after what the box holds. Nothing stored or logged.
 - **Verdict:** NEW `src/worker/speech-to-text.ts` (hearClip, like say-reader.ts wraps Claude); EXISTING routes/say.ts
@@ -19,10 +19,64 @@ carry its result.
 - **Flow stage:** route say.ts → IO speech-to-text.ts → render useSpeech.ts + EnsoButton.tsx.
 - **Why:** an AI call inside the route would mix IO into validation. Rejected: claude.ts (another provider),
   photo-reads.ts (the Claude read cap must not be spent on clips), fetch inside useSpeech.ts (its row says no fetch).
-  No daily cap (⚑ Q376), so no migration.
+  No daily cap (⚑ Q379), so no migration.
 - **Caps:** say.ts ~60, speech-to-text.ts ~28, http.ts ~56, useSpeech.ts 85 (shrank), EnsoButton.tsx 170. None in band.
 - **Sources read:** placement-advisor.md, arec-record-voice.md, scripts/arch.ts, module-ownership.md, routes/say.ts,
   http.ts, useSpeech.ts, EnsoButton.tsx, env.ts, index.ts, wrangler.toml, vitest.config.ts, SPEC.md.
+
+---
+
+## 2026-10-23 — guessed event emoji, one shared keyword table (placement-advisor)
+
+- **Ask:** v1.103.0, SPEC 3.86 §7.6 Guessed emoji, §7A.1, §7C.2, §8.4 (MojoSOGO 2026-10-23, ⚑ Q376/Q377). A pure `guessEmoji(text)`
+  (one keyword table: whole words or `*` stems, lower-cased, first row wins, else null) that the list default also uses
+  (`defaultListEmoji = guessEmoji(name) ?? 📋`, NAME_EMOJIS folded in). A new event's Emoji box shows and saves the guess
+  from the title until the person types or clears it, with a "✨ guessed" note. Editing never guesses. Plan it guesses
+  from the thing's title. No schema or API change.
+- **Verdict:** EXISTING `src/shared/emoji.ts` (guessEmoji and the table; it still imports nothing). EXISTING
+  `src/shared/lists.ts` (defaultListEmoji delegates, same signature; DEFAULT_LIST_EMOJI stays; now imports emoji.ts). NEW
+  row `frontend/src/components/EventEmojiField.tsx` (the box, `shownEmoji(value, own, title)` used by both the box and
+  EventForm's toPayload, and the ✨ guessed note). EventForm.tsx only hosts it, with an `emojiOwn` flag (blank false,
+  fromEvent true). Reorganizer NONE.
+- **Addendum (steward):** POST /things/:id/plan (EXISTING `src/worker/routes/things.ts`, route) passes
+  `emoji: guessEmoji(t.title)` into its `parseEventInput` body, §7C.2. The guess stays out of `event-rows.ts` so alarms and
+  the PWA's own choice are untouched. Rows compile once with Unicode boundaries, all inside `emoji.ts`.
+- **Flow stage:** rules (guessEmoji); render (the box); route (Plan it).
+- **Why:** §7.6 owns event emoji, and the guess and the one-emoji rule are one cohesive concern. Fan-in is small and there
+  is no cycle. Rejected: a new emoji-guess.ts (classitis, and the spec names emoji.ts); lists.ts (events would import list
+  rules); recipe-emoji.ts (a different concern: each person's opinion, never guessed). The box got its own leaf because
+  EventForm is at 199 of 223: inline it would enter the warning band. One derivation (shownEmoji) for what is shown and
+  what is saved; no effect writes into form.emoji. EventFillBar is untouched, since fills set the title and the guess
+  follows. Merged-table ordering is behavior: 🎂 birthday before the gift row (a "Birthday" list becomes 🎂), shopping
+  before hardware, travel before book.
+- **Caps:** emoji.ts ~110/300, lists.ts ~105/300, EventEmojiField.tsx ~17/300, EventForm.tsx 198/223, things.ts ~126/300.
+  None newly in the band.
+- **Steward (AREC):** only the list table guessed before; recipes must never be guessed; reminders/alarms have no Emoji
+  box (John's call, not built). Substring false positives (carpet, vacation, prefix, restore) fixed by whole words.
+
+---
+
+## 2026-10-22 — private-push predicate, session.ts row, note_marks asking key (placement-advisor)
+
+- **Ask:** v1.102.0, from the v1.101.0 steward backlog (MojoSOGO "Yes": 1, 3, 4c). (1) One IOU-notice privacy rule shared
+  by FOUNDER_PING and `/status`, plus a test (§7B.9 Q359, §9.4). (3) The session.ts map row names sha256hex (docs only).
+  (4c) The note_marks key is derived from the prompt and schema too, so a change to the question re-asks (§8.4a,
+  §4.2zzi, Q375). No migration.
+- **Verdict:** (1) EXISTING `src/worker/deliveries.ts`: export `privatePush(t)` =
+  `(${t}.iou_plan_id IS NOT NULL OR ${t}.iou_row_id IS NOT NULL)`; FOUNDER_PING uses `NOT privatePush('deliveries')`;
+  `/status` in EXISTING `src/worker/routes/household.ts` uses `(NOT privatePush('d') OR d.member_id = ?)`, one bind
+  fewer. Test IO15b in `test/ious-api.test.ts`. (3) map wording only. (4c) EXISTING `src/worker/note-marks-rows.ts`:
+  export `noteMarksKey(text)` = sha256hex(JSON.stringify([NOTE_MARKS_PROMPT, NOTE_MARKS_SCHEMA, text])), used by both the
+  read and the store; NA8 seeds with it, and a new case shows a bare-text-hash row is a miss. Model swaps accepted and
+  written into the spec. Reorganizer NONE.
+- **Flow stage:** persist (the delivery predicates; the note_marks key); route (only applies the predicate).
+- **Why:** (1) a fixed string can't serve both readers (FOUNDER_PING uses bare columns, `/status` needs the `d.` alias);
+  an alias-taking predicate leaves one copy, and a later bounty "Not yet" column goes in one place. Rejected the
+  steward's `MINE_ONLY` with `d.` built in. (4c) Rejected a shared `noteMarksKeyText` (shared/note-marks.ts is imported
+  by the PWA and home/; the key is a Worker storage concern); exported from the leaf so NA8 seeds with the real key.
+  Rejected reporting the model from the helper: on a hit nothing calls the home. (3) 4 of 5 sha256hex callers hash
+  credentials; no crypto leaf.
+- **Caps:** deliveries.ts ~80/300, household.ts ~109/300, note-marks-rows.ts ~37/300. None in the band.
 
 ## 2026-10-22 — steward pass after v1.101.0 (code-steward)
 

@@ -1,7 +1,7 @@
-// M4i acceptance — event emoji (SPEC §7.6 E1–E3) through the API, plus the one-emoji rule's unit rows.
+// M4i acceptance — event emoji (SPEC §7.6 E1–E4) through the API, plus the one-emoji rule's and the guess's unit rows.
 import { describe, expect, it } from 'vitest';
 import { owner } from './helpers';
-import { EMOJI_MAX_BYTES, emojiError } from '../src/shared/emoji';
+import { EMOJI_MAX_BYTES, GUESSABLE_EMOJIS, emojiError, guessEmoji } from '../src/shared/emoji';
 
 describe('emojiError (§7.6)', () => {
   it.each(['🧹', '🗑️', '🇺🇸', '❤️'])('accepts %s', (v) => expect(emojiError(v)).toBeNull());
@@ -17,6 +17,18 @@ describe('emojiError (§7.6)', () => {
     expect(emojiError(v)).not.toBeNull();
   });
   it('rejects non-strings', () => expect(emojiError(7)).not.toBeNull());
+});
+
+describe('guessEmoji (§7.6 Guessed emoji, E4)', () => {
+  it.each([
+    ['Dentist appt', '🦷'], ['Soccer practice', '⚽'], ["Mia's birthday", '🎂'], ['Take out trash', '🗑️'],
+    ['Book flights', '✈️'], ['Vacation days', '🧳'], ['Shopping', '🛒'], ['DR. Patel', '🩺'], ['Street sweeping', '🧹'],
+  ])('E4 %j → %s', (text, emoji) => expect(guessEmoji(text)).toBe(emoji));
+  it.each(['Meet Bob', 'Catherine', 'Carpet guy', 'Workshop', 'Prefix', 'Restore photos', ''])('E4 %j → no guess', (text) =>
+    expect(guessEmoji(text)).toBeNull());
+  it('E4 every emoji the table can give passes the one-emoji rule', () => {
+    for (const e of GUESSABLE_EMOJIS) expect(emojiError(e), e).toBeNull();
+  });
 });
 
 describe('event emoji through the API (E1–E3)', () => {

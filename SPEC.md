@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.85 · **Date:** 2026-10-22 · **Owner:** MojoSOGO
+**Version:** 3.87 · **Date:** 2026-10-23 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1115,9 +1115,10 @@ survive with the new columns NULL.
 ### 4.2zzi Schema change — `migrations/0062_note_marks.sql`
 
 Asked by MojoSOGO 2026-10-22: the home AI's highlights are remembered, so a notes text opened again shows them at once
-without asking SogoAI (§8.4a). One new table, `note_marks`: the hex SHA-256 of the exact notes text, the marks that
+without asking SogoAI (§8.4a). One new table, `note_marks`: the hex SHA-256 of what SogoAI is asked about a text
+(`noteMarksKey`: the prompt, the answer's schema and the exact notes text, since v1.102.0 ⚑ Q375), the marks that
 stood (validMarks' JSON) and when they were stored. It holds no notes text and points at no event or item: the same
-text in two places shares one answer, and an edited text simply has another hash. Rows older than
+text in two places shares one answer, and an edited text, or a changed prompt, simply has another hash. Rows older than
 `NOTE_MARKS_KEEP_DAYS` are deleted when a new one is stored. Additive; it runs before the deploy.
 
 Schema: [`migrations/0062_note_marks.sql`](migrations/0062_note_marks.sql). **Migration check (NM-M,**
@@ -1949,8 +1950,22 @@ presentation, ≤ 16 bytes) — anything else is 400 with a message. Where it sh
 - before the title in the day sheet and in Optional calendar items;
 - in the Ringing bar and alert text it is **not** added (messages stay plain text).
 
+**Guessed emoji** (MojoSOGO 2026-10-23 "When making a calendar event, Enso should make it best. Guess add an
+emoji"): a **new** event's Emoji box starts with `guessEmoji(title)` and follows the title as it is typed or filled
+(by the Ensō button, 📋 Paste or 📷 Screenshot), until the person types in the box or clears it; from then on the box
+is theirs (cleared stays empty). What the box holds when Save is pressed is saved as the event's emoji, like a typed
+one. Editing an existing event never guesses. ⚑ Q376. An event made by **Plan it** (§7C.2) gets the same guess from
+the thing's title; reminders and alarms (§8.5b) have no Emoji box and get none.
+- `guessEmoji(text)` (`src/shared/emoji.ts`, pure) is **one keyword table**, shared with the list default (§7A.1):
+  each row is whole words, or word starts where the row says so (so "dentist" finds "Dentist appt" and "shop…"
+  finds "shopping", but "cat" finds neither "vacation" nor "Catherine"), matched against the lower-cased text; the **first row in table order** that matches wins, else
+  `null` (no guess, the box stays empty). Patterns only: instant, no network, no AI ⚑ Q377. The rows are the table
+  in the file (school, sports, doctors, chores around the house, travel, meals, parties, pets…), not copied here.
+
 **Acceptance:** E1 an event with emoji 🧹 round-trips through POST/GET; E2 `"ab"`, `"🧹🧹"`
-or 17 bytes → 400; E3 `/calendar` occurrences carry `emoji`.
+or 17 bytes → 400; E3 `/calendar` occurrences carry `emoji`; E4 `guessEmoji` gives 🦷 for "Dentist appt", ⚽ for
+"Soccer practice", 🎂 for "Mia's birthday", 🗑️ for "Take out trash", 🧳 for "Vacation days" (never 🐾), `null` for "Meet Bob", "Catherine" and "Workshop", and every emoji in its table
+passes `emojiError`; Plan it on a thing called "Dentist" makes an event with 🦷, on "Pumpkin patch" one with none (D6).
 
 ### 7.7 Sun-timed alerts — `src/shared/sun.ts` (pure)
 
@@ -2308,11 +2323,10 @@ is done in JS with `itemKey` — never with SQLite `lower()`/`NOCASE`, which fol
   "There is already a list called “Shopping”."
 - At most `LISTS_MAX` (30) lists — a 31st is refused with a message.
 - **Emoji** (asked by MojoSOGO 2026-10-05): a list may have its own emoji — one emoji by the event rule
-  (`emojiError`, §7.6) — or none (`null`). None shows `defaultListEmoji(name)`: the first keyword found in the
-  name, else 📋 ⚑ Q157 (shopping / grocer / store / market → 🛒, wish / gift / birthday / christmas → 🎁,
-  hardware / tool / fix / repair → 🔨, garden / plant → 🌱, pharmacy / medicine → 💊, pack / trip / travel /
-  camp → 🧳, book → 📚, pet / dog / cat → 🐾, school / kid → 🎒, meal / food / cook → 🍽️, clean → 🧽,
-  house / home → 🏠). `listEmoji(list)` is the one function both the PWA and tests use. The same rules for who
+  (`emojiError`, §7.6) — or none (`null`). None shows `defaultListEmoji(name)`: `guessEmoji(name)` (§7.6, the
+  same table events guess from), else 📋 ⚑ Q157 (shopping / grocer / store / market → 🛒, wish / gift /
+  christmas → 🎁, hardware / tool / fix / repair → 🔨, garden / plant → 🌱, pharmacy / medicine → 💊, pack /
+  trip / travel → 🧳, …; a word must start a word, so "Workshop" is no longer 🛒). `listEmoji(list)` is the one function both the PWA and tests use. The same rules for who
   may rename a list decide who may change its emoji.
 - **Any member may create a list.** **Rename or delete:** its creator or an admin; the two
   seeded lists (no creator): admins only. ⚑ DEFAULT
@@ -3029,7 +3043,9 @@ costs the other one, so it waits for their **Got it** unless they recorded it. A
 
 **Who sees it** ⚑ Q350: the two people in a direction, and every admin. Nobody else, not even that a direction exists.
 A payback ping is the one who owes's alone ⚑ Q359: Settings → 📊 Status (§8.6) leaves other members' payback pings out
-of Recent deliveries, as it does their task check-ins (Q308).
+of Recent deliveries, as it does their task check-ins (Q308). Which pushes are private is one rule
+(`privatePush` in `src/worker/deliveries.ts`: a row with `iou_plan_id` or `iou_row_id`), read both by Status and
+by the founder-ping filter that keeps money off the FunHouse (§9.4a); a later private push adds its column there.
 
 **Records** ⚑ Q355: amounts are never edited. A mistake is fixed by deleting a waiting or declined row (who made it,
 or an admin; the person it waits on declines it instead) or, once OK'd, by an admin deleting it; a deleted row is kept
@@ -3103,6 +3119,7 @@ owed → 409 `iou_nothing_owed`. OK or Decline on a row that is not waiting, or 
 | IO12 | payments bring the direction to $0 | the plan's `ended_at` is set; no more pings; the pair leaves `/ious` |
 | IO13 | Ann adds "Bo owes Ann $80.01, Dinner", split | an IOU of $40.00 waiting for Bo's OK |
 | IO15 | a payback ping to Sam; `/status` as Sam, as Kai, as an admin | Sam's Recent deliveries list it; Kai's and the admin's do not |
+| IO15b | a declined notice to Ann (`iou_row_id`); `/status` as Ann and as another member; `opsPingsSince` | Ann's Recent deliveries list it; the other's do not; not counted as a founder ping |
 | IO16 | Mom adds "Sam owes Mom $300 · tickets"; Sam declines it | 200, the pair's `declined.ious` has it, not waiting, owed unchanged; one push to Mom "💵 Declined" "Sam declined your $300.00 IOU · tickets.", `iou_row_id` set, not in `/ops/pings`; Mom can't decline it (403); Sam can't ✕ it (403); a second decline → 409 |
 | IO17 | Mom asks again; Sam OKs | waiting again, no new push; Sam can't ask again (403); then owed + $300 |
 | IO18 | Sam records $100 paid, Mom declines; Sam pays the rest; Sam asks the $100 again | Sam gets "Mom declined your $100.00 payment."; ask again → 409 `iou_too_much`; Sam ✕ deletes it (204, gone from the card) |
@@ -3153,7 +3170,7 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
   reminders — planned, done and let-go things never re-plan.
 - **Plan it** (decided by MojoSOGO): pick a date (inside the window when there is one ⚑ —
   outside it is refused with a message) and optionally a time → a normal **calendar event**
-  is created (title; **address** = the thing's address, §7.9; notes = the thing's note + place +
+  is created (title; **emoji** = `guessEmoji(title)` or none, §7.6 Guessed emoji; **address** = the thing's address, §7.9; notes = the thing's note + place +
   phone + cost + link, one per line, plus the address only when it is too long for the event's
   Address box; `thing_id` set), the thing
   becomes `planned` with `planned_event_id`, and its scheduled reminders close `removed`
@@ -4501,7 +4518,8 @@ Fields:
 - **Notes** (optional, ≤ `EVENT_NOTES_MAX`), last: the box with **⤢** that opens the notes sheet (§8.4a). The ⤢ works
   for a member who can't change the event too; for them the sheet is read only.
 - **Emoji** (optional, §7.6): one emoji — typed with the phone's emoji keyboard — shown
-  beside the title.
+  beside the title. On a new event it is guessed from the title until the person types in it or clears it
+  (§7.6 Guessed emoji); while it holds a guess, a muted **✨ guessed** shows beside the box.
 - **☐ Optional — each person turns it on** (creator or admin, §7.5). On an optional event
   the form also shows **☐ On for me** — every member's own switch. It takes effect the
   moment it is ticked (like the Settings switch), needs no Save, and stays usable for
@@ -4568,8 +4586,12 @@ goes to the home AI and nowhere else, and the AI's highlights are remembered for
   - **The home AI** reads the same text and marks what a busy parent needs at a glance, including what no pattern sees
     ("Sam's allergy is peanuts", "Grandma drives us home"). Each time read mode shows a text it hasn't asked about,
     the sheet (`useNoteMarks`) sends it to `POST /notes/marks` (§10). **Remembered** (MojoSOGO 2026-10-22: "Have it
-    remember previous highlight on subsequent opens"): the route first looks up the text's SHA-256 in `note_marks`
-    (§4.2zzi). A hit answers with those marks at once, for anyone in the household, without asking SogoAI, even when
+    remember previous highlight on subsequent opens"): the route first looks up `note_marks` (§4.2zzi) by the SHA-256
+    of what SogoAI would be asked: `NOTE_MARKS_PROMPT`, `NOTE_MARKS_SCHEMA` and the text (`noteMarksKey`). So a change
+    to the prompt or the answer's shape asks every text afresh, and the old answers age out (MojoSOGO 2026-10-22,
+    ⚑ Q375). A model change on SogoAI is not seen: on a hit the Worker never asks the home, so it can't know the
+    model, and neither are the home-only settings (max tokens, temperature, timeouts). Each remembered answer is
+    still re-checked against the text, and ages out within `NOTE_MARKS_KEEP_DAYS`. A hit answers with those marks at once, for anyone in the household, without asking SogoAI, even when
     it is busy, off or not set up. An answer with at least one mark that stands is stored for its text; an empty
     answer or a failure never is, so the next open asks again. Notes that change are a different text and are asked
     afresh. A remembered answer is kept `NOTE_MARKS_KEEP_DAYS` (180) after it was stored; older ones are dropped
@@ -4624,7 +4646,7 @@ blank or over `NOTE_MARKS_TEXT_MAX` → 400; no helper settings → `{ via: 'pat
 200 every time. NA8 remembered: a text whose answer had marks is answered again from `note_marks` with the same marks
 and no call to the home, also with no helper settings; an empty answer, a failure and a changed text ask the home
 again; a row past `NOTE_MARKS_KEEP_DAYS` is gone after the next store; a stored row whose marks no longer stand
-against the text is not used.
+against the text is not used; a row keyed by the text alone (a different asking) is a miss and asks the home.
 
 ### 8.5 Alerts screen
 
@@ -5785,7 +5807,7 @@ links keep filling things in as they do (§7.8, §7C.4b, §7E, §7H).
 own account (part 2), or the 🎤 on the iPhone keyboard, the phone's own voices (speechSynthesis; on the iPhone, Settings → Accessibility → Spoken Content →
 Voices → an **Enhanced** or **Premium** voice sounds human), the Claude reading every other "fill it in" uses (§7.9),
 and the reminder form (§8.5b, §8.5c). No paid voice for speaking ⚑ Q331; writing down a recording costs pennies
-(⚑ Q375).
+(⚑ Q378).
 
 **1. The mark.** A round Ensō mark (the app icon, 84 px), centred just above the tab bar on every tab ⚑ Q332. A **tap**
 opens the popup, not listening yet ⚑ Q360 (MojoSOGO 2026-10-20 "tap to open input… tap enso to speak and again to stop").
@@ -5794,7 +5816,7 @@ opens the popup, not listening yet ⚑ Q360 (MojoSOGO 2026-10-20 "tap to open in
 buttons under it (after Cancel; MojoSOGO 2026-10-20 "Move logo"). **Tap the mark** and the phone **records**: it
 pulses green and the line says "🎤 Recording… tap Ensō to stop."; **tap it again** and it stops, the line says "Writing
 it down…", and a second or two later the words go after what the box already holds ("Tap Ensō to talk, or type." the
-rest of the time) ⚑ Q375 (MojoSOGO 2026-10-22 "Can we do a 'record' and process VTT?", "Only first does VTT. All others
+rest of the time) ⚑ Q378 (MojoSOGO 2026-10-22 "Can we do a 'record' and process VTT?", "Only first does VTT. All others
 fail": the iPhone's built-in listener heard only the first talk each opening). Every talk works the same, as many times
 as wanted. The first tap is when the phone asks for the microphone (its own Allow / Don't Allow popup); nothing asks
 before ⚑ Q360. A recording stops by itself at 60 seconds. The box can be fixed by hand or typed ⚑ Q333. **Done** sends
@@ -5807,7 +5829,7 @@ recording, so the voice and the mic never fight. Admins also see **💡 Requests
 **Writing it down.** `POST /say/hear` takes the clip as it was recorded (audio/mp4 from the iPhone, audio/webm
 elsewhere, at most 2 MB) and Cloudflare's speech-to-text (Workers AI Whisper, on Ensō's own Cloudflare account, about
 $0.0005 a minute of talk) returns the words. Nothing is stored or logged: not the clip, not the words. It doesn't count
-against the daily Claude reads (§7C.4), and there is no daily cap of its own ⚑ Q376 (a member must be signed in; 60
+against the daily Claude reads (§7C.4), and there is no daily cap of its own ⚑ Q379 (a member must be signed in; 60
 seconds and 2 MB bound each clip).
 
 **3. The reading.** `POST /say { text }`: Claude fixes the words (spelling, grammar, what was misheard) into "heard" and

@@ -1,6 +1,7 @@
 // SPEC §5.7, §9.1–9.4b, §6.6, §7B.7, §7B.8, §7B.9 — writing deliveries rows: the one INSERT for a push row, the one for a
-// house row and the one for a FunHouse row (§9.4b), each queued with created_at = updated_at = now, and the one
-// predicate for what is a founder ping (counted for §9.4's limit, listed with FunHouse rows for §9.4a's poller).
+// house row and the one for a FunHouse row (§9.4b), each queued with created_at = updated_at = now, the one predicate
+// for what is a founder ping (counted for §9.4's limit, listed with FunHouse rows for §9.4a's poller) and the one for
+// which pushes are private to their member (privatePush, §7B.9).
 // Never sends (push.ts, house.ts do), never updates a status.
 import { pushTitle } from '../shared/alert-history';
 import type { NoticeKind } from '../shared/vocab';
@@ -52,12 +53,15 @@ export function funhouseDelivery(db: D1Database, r: FunhouseRow, now: string): W
   return { id, stmt };
 }
 
+/** §7B.9 Q359 — a push only its own member may see (an IOU payback ping or declined notice): never a founder ping,
+ *  and shown in /status only to that member. `t` is the deliveries table's name or alias in the calling query. */
+export const privatePush = (t: string) => `(${t}.iou_plan_id IS NOT NULL OR ${t}.iou_row_id IS NOT NULL)`;
+
 /** What a founder ping is (§9.4): a fire-less push with a title that is not a sign-in notice (§6.6), a mess ask (§7B.7),
  *  a bounty push (§7B.8), a list ping (§7A.4) or an IOU
  *  payback ping or declined notice (§7B.9: money never reaches the FunHouse). Kept beside the writers it must tell apart; the hourly count and the FunHouse list (§9.4a) both read it. */
 const FOUNDER_PING = `channel = 'push' AND fire_id IS NULL AND title IS NOT NULL AND notice IS NULL AND mess_id IS NULL
-  AND bounty_id IS NULL AND earning_id IS NULL AND list_item_id IS NULL AND iou_plan_id IS NULL
-  AND iou_row_id IS NULL`;
+  AND bounty_id IS NULL AND earning_id IS NULL AND list_item_id IS NULL AND NOT ${privatePush('deliveries')}`;
 
 /** How many founder pings were written at or after `since`. */
 export async function opsPingsSince(db: D1Database, since: string): Promise<number> {

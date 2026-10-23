@@ -9,7 +9,7 @@ import { isDate, isTime } from './time';
 import { FEATURE_SUMMARY_MAX, FEATURE_TITLE_MAX } from './feature-requests';
 
 export const SAY_TEXT_MAX = 1000;
-/** §8.18 part 2 ⚑ Q375 — a recorded clip POST /say/hear writes down: the types phones record, the size and length bounds. */
+/** §8.18 part 2 ⚑ Q378 — a recorded clip POST /say/hear writes down: the types phones record, the size and length bounds. */
 export const SAY_AUDIO_TYPES = ['audio/mp4', 'audio/webm', 'audio/ogg', 'audio/wav'] as const;
 export const SAY_AUDIO_MAX_BYTES = 2 * 1024 * 1024;
 export const SAY_CLIP_MAX_MS = 60_000;

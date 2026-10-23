@@ -8,6 +8,7 @@ import worker from '../src/worker/index';
 import type { Env } from '../src/worker/env';
 import { NOTE_MARKS_KEEP_DAYS, NOTE_MARKS_TEXT_MAX } from '../src/shared/note-marks';
 import { sha256hex } from '../src/worker/session';
+import { noteMarksKey } from '../src/worker/note-marks-rows';
 import { BASE, Client, owner } from './helpers';
 import { homeEnv, keyedEnv } from './recipe-fakes';
 
@@ -124,10 +125,20 @@ describe('NA8 remembered highlights', () => {
     for (const [i, marks] of ['[{"text":"Grandma drives","kind":"key"}]', 'not json'].entries()) {
       const text = `NA8 six ${i}. Gate code 4471.`;
       await env.DB.prepare('INSERT INTO note_marks (text_hash, marks, created_at) VALUES (?, ?, ?)')
-        .bind(await sha256hex(text), marks, new Date().toISOString()).run();
+        .bind(await noteMarksKey(text), marks, new Date().toISOString()).run();
       const r = await ask(homeEnv(), MARKED, { text });
       expect(r.heard, marks).toHaveLength(1);
       expect(r.json.marks).toEqual([{ text: 'Gate code 4471', kind: 'key' }]);
     }
+  });
+
+  it('a good row keyed by the text alone (a different asking, Q375) is a miss and asks the home', async () => {
+    const text = 'NA8 seven. Gate code 4471.';
+    await env.DB.prepare('INSERT INTO note_marks (text_hash, marks, created_at) VALUES (?, ?, ?)')
+      .bind(await sha256hex(text), '[{"text":"NA8 seven","kind":"key"}]', new Date().toISOString()).run();
+    const r = await ask(homeEnv(), MARKED, { text });
+    expect(r.heard).toHaveLength(1);
+    expect(r.json.marks).toEqual([{ text: 'Gate code 4471', kind: 'key' }]);
+    expect(await noteMarksKey(text)).not.toBe(await sha256hex(text));
   });
 });

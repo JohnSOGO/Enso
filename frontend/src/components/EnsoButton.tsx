@@ -1,5 +1,5 @@
 // SPEC §8.18 — the Ensō button and its popup, rendered once by App.tsx: tap, say what you want into the text box
-// (a recording written down by POST /say/hear goes after what it holds, ⚑ Q375; type or fix it by hand; 🗑 Clear), POST /say, then what Ensō heard and
+// (a recording written down by POST /say/hear goes after what it holds, ⚑ Q378; type or fix it by hand; 🗑 Clear), POST /say, then what Ensō heard and
 // what it will do, spoken aloud, with Yes / Clarify / Cancel / ✏️ Edit (back to the box with what was heard, ⚑ Q361). Yes on a reminder opens the reminder form filled in; on
 // a request POST /feature-requests, then for an admin's small one "Build it now?" (⚑ Q344). Outside the scope (§1.3): Clarify / OK, and leaving any way but Clarify logs it
 // as Out of scope (POST /feature-requests with outside). Tap to talk (⚑ Q360): the mark opens it; the Ensō mark in its
@@ -42,7 +42,7 @@ export function EnsoButton() {
 
   const hint = rec.unavailable || rec.refused || unwritten;
 
-  // ⚑ Q375 — the clip, written down, goes after what the box holds by then.
+  // ⚑ Q378 — the clip, written down, goes after what the box holds by then.
   async function writeDown(clip: Blob) {
     const at = box.current;
     setWriting(true); setUnwritten(false);

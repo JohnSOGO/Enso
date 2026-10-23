@@ -1,4 +1,4 @@
-// SPEC §8.18 part 2 ⚑ Q375 — writes down a recorded clip via the Workers AI binding (Whisper): the clip as base64 →
+// SPEC §8.18 part 2 ⚑ Q378 — writes down a recorded clip via the Workers AI binding (Whisper): the clip as base64 →
 // the words, or an honest failure. No Hono, no D1; never stores or logs the clip or the words.
 
 export const HEAR_MODEL = '@cf/openai/whisper-large-v3-turbo';

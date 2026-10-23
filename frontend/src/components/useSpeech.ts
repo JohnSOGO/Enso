@@ -1,4 +1,4 @@
-// SPEC §8.18 ⚑ Q331, Q334, Q375 — the phone's own voice: recording (MediaRecorder; the clip is written down by the
+// SPEC §8.18 ⚑ Q331, Q334, Q378 — the phone's own voice: recording (MediaRecorder; the clip is written down by the
 // caller via POST /say/hear) and speaking (speechSynthesis, the best English voice). No fetch, no app state.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const recordType = () => ['audio/mp4', 'audio/webm', 'audio/ogg'].find((t) => MediaRecorder.isTypeSupported?.(t)) ?? '';
 
 /**
- * Record (⚑ Q375): start() asks for the mic (the phone's popup the first time) and records; stop() ends it and hands
+ * Record (⚑ Q378): start() asks for the mic (the phone's popup the first time) and records; stop() ends it and hands
  * the clip to `onClip`; cancel() drops it. It stops by itself after `maxMs`. `unavailable` when the phone can't record;
  * `refused` when this try was refused or failed (the next start tries again). The mic is let go after every clip.
  */
