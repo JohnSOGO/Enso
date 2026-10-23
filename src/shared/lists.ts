@@ -1,6 +1,7 @@
 // SPEC §7A.1 — household list and list item rules (pure). The route persists what these decide;
 // matching is done here with itemKey, never with SQLite lower()/NOCASE (ASCII-only).
 import { iso, ms } from './time';
+import { guessEmoji } from './emoji';
 
 export const TEXT_MAX = 120;
 export const NOTE_MAX = 1000;
@@ -17,26 +18,11 @@ export function listNameClash<T extends { id: string; name_key: string }>(id: st
   return lists.find((l) => l.id !== id && l.name_key === key) ?? null;
 }
 
-/** §7A.1 ⚑ Q157 — a list without its own emoji: the first keyword found in its name, else 📋. */
-const NAME_EMOJIS: readonly [RegExp, string][] = [
-  [/shop|grocer|store|market/, '🛒'],
-  [/wish|gift|birthday|christmas/, '🎁'],
-  [/hardware|tool|fix|repair/, '🔨'],
-  [/garden|plant/, '🌱'],
-  [/pharmacy|medicine/, '💊'],
-  [/pack|trip|travel|camp/, '🧳'],
-  [/book/, '📚'],
-  [/pet|dog|cat/, '🐾'],
-  [/school|kid/, '🎒'],
-  [/meal|food|cook/, '🍽️'],
-  [/clean/, '🧽'],
-  [/house|home/, '🏠'],
-];
+/** §7A.1 ⚑ Q157 — a list without its own emoji: the guess from its name (§7.6, the events' table), else 📋. */
 export const DEFAULT_LIST_EMOJI = '📋';
 
 export function defaultListEmoji(name: string): string {
-  const key = itemKey(name);
-  return NAME_EMOJIS.find(([re]) => re.test(key))?.[1] ?? DEFAULT_LIST_EMOJI;
+  return guessEmoji(name) ?? DEFAULT_LIST_EMOJI;
 }
 
 /** What a list shows: its own emoji, else the default from its name. */

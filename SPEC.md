@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.85 · **Date:** 2026-10-22 · **Owner:** MojoSOGO
+**Version:** 3.86 · **Date:** 2026-10-23 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1950,8 +1950,22 @@ presentation, ≤ 16 bytes) — anything else is 400 with a message. Where it sh
 - before the title in the day sheet and in Optional calendar items;
 - in the Ringing bar and alert text it is **not** added (messages stay plain text).
 
+**Guessed emoji** (MojoSOGO 2026-10-23 "When making a calendar event, Enso should make it best. Guess add an
+emoji"): a **new** event's Emoji box starts with `guessEmoji(title)` and follows the title as it is typed or filled
+(by the Ensō button, 📋 Paste or 📷 Screenshot), until the person types in the box or clears it; from then on the box
+is theirs (cleared stays empty). What the box holds when Save is pressed is saved as the event's emoji, like a typed
+one. Editing an existing event never guesses. ⚑ Q376. An event made by **Plan it** (§7C.2) gets the same guess from
+the thing's title; reminders and alarms (§8.5b) have no Emoji box and get none.
+- `guessEmoji(text)` (`src/shared/emoji.ts`, pure) is **one keyword table**, shared with the list default (§7A.1):
+  each row is whole words, or word starts where the row says so (so "dentist" finds "Dentist appt" and "shop…"
+  finds "shopping", but "cat" finds neither "vacation" nor "Catherine"), matched against the lower-cased text; the **first row in table order** that matches wins, else
+  `null` (no guess, the box stays empty). Patterns only: instant, no network, no AI ⚑ Q377. The rows are the table
+  in the file (school, sports, doctors, chores around the house, travel, meals, parties, pets…), not copied here.
+
 **Acceptance:** E1 an event with emoji 🧹 round-trips through POST/GET; E2 `"ab"`, `"🧹🧹"`
-or 17 bytes → 400; E3 `/calendar` occurrences carry `emoji`.
+or 17 bytes → 400; E3 `/calendar` occurrences carry `emoji`; E4 `guessEmoji` gives 🦷 for "Dentist appt", ⚽ for
+"Soccer practice", 🎂 for "Mia's birthday", 🗑️ for "Take out trash", 🧳 for "Vacation days" (never 🐾), `null` for "Meet Bob", "Catherine" and "Workshop", and every emoji in its table
+passes `emojiError`; Plan it on a thing called "Dentist" makes an event with 🦷, on "Pumpkin patch" one with none (D6).
 
 ### 7.7 Sun-timed alerts — `src/shared/sun.ts` (pure)
 
@@ -2309,11 +2323,10 @@ is done in JS with `itemKey` — never with SQLite `lower()`/`NOCASE`, which fol
   "There is already a list called “Shopping”."
 - At most `LISTS_MAX` (30) lists — a 31st is refused with a message.
 - **Emoji** (asked by MojoSOGO 2026-10-05): a list may have its own emoji — one emoji by the event rule
-  (`emojiError`, §7.6) — or none (`null`). None shows `defaultListEmoji(name)`: the first keyword found in the
-  name, else 📋 ⚑ Q157 (shopping / grocer / store / market → 🛒, wish / gift / birthday / christmas → 🎁,
-  hardware / tool / fix / repair → 🔨, garden / plant → 🌱, pharmacy / medicine → 💊, pack / trip / travel /
-  camp → 🧳, book → 📚, pet / dog / cat → 🐾, school / kid → 🎒, meal / food / cook → 🍽️, clean → 🧽,
-  house / home → 🏠). `listEmoji(list)` is the one function both the PWA and tests use. The same rules for who
+  (`emojiError`, §7.6) — or none (`null`). None shows `defaultListEmoji(name)`: `guessEmoji(name)` (§7.6, the
+  same table events guess from), else 📋 ⚑ Q157 (shopping / grocer / store / market → 🛒, wish / gift /
+  christmas → 🎁, hardware / tool / fix / repair → 🔨, garden / plant → 🌱, pharmacy / medicine → 💊, pack /
+  trip / travel → 🧳, …; a word must start a word, so "Workshop" is no longer 🛒). `listEmoji(list)` is the one function both the PWA and tests use. The same rules for who
   may rename a list decide who may change its emoji.
 - **Any member may create a list.** **Rename or delete:** its creator or an admin; the two
   seeded lists (no creator): admins only. ⚑ DEFAULT
@@ -3157,7 +3170,7 @@ loop: **idea → reminder → Plan it (a real calendar event) → done** (or let
   reminders — planned, done and let-go things never re-plan.
 - **Plan it** (decided by MojoSOGO): pick a date (inside the window when there is one ⚑ —
   outside it is refused with a message) and optionally a time → a normal **calendar event**
-  is created (title; **address** = the thing's address, §7.9; notes = the thing's note + place +
+  is created (title; **emoji** = `guessEmoji(title)` or none, §7.6 Guessed emoji; **address** = the thing's address, §7.9; notes = the thing's note + place +
   phone + cost + link, one per line, plus the address only when it is too long for the event's
   Address box; `thing_id` set), the thing
   becomes `planned` with `planned_event_id`, and its scheduled reminders close `removed`
@@ -4505,7 +4518,8 @@ Fields:
 - **Notes** (optional, ≤ `EVENT_NOTES_MAX`), last: the box with **⤢** that opens the notes sheet (§8.4a). The ⤢ works
   for a member who can't change the event too; for them the sheet is read only.
 - **Emoji** (optional, §7.6): one emoji — typed with the phone's emoji keyboard — shown
-  beside the title.
+  beside the title. On a new event it is guessed from the title until the person types in it or clears it
+  (§7.6 Guessed emoji); while it holds a guess, a muted **✨ guessed** shows beside the box.
 - **☐ Optional — each person turns it on** (creator or admin, §7.5). On an optional event
   the form also shows **☐ On for me** — every member's own switch. It takes effect the
   moment it is ticked (like the Settings switch), needs no Save, and stays usable for

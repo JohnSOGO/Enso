@@ -13,6 +13,7 @@ import { longDate } from './DaySheet';
 import { FromThing } from './ThingPhoto';
 import { EventFillBar } from './EventFillBar';
 import { AddressField } from './AddressField';
+import { EventEmojiField, shownEmoji } from './EventEmojiField';
 import { BringField } from './BringField';
 import { NotesField } from './NotesSheet';
 import { RepeatFields, ownWeek, repeatOf, toRecurrence, weeksOf, type RepeatValue } from './RepeatFields';
@@ -20,7 +21,7 @@ import { ReminderFields, reminderError, reminderOf, toReminder, type ReminderVal
 
 interface Form extends RepeatValue, ReminderValue {
   title: string; address: string; bring: string[]; notes: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string;
-  assignedTo: string[]; optional: boolean; emoji: string;
+  assignedTo: string[]; optional: boolean; emoji: string; emojiOwn: boolean; // emojiOwn: typed or cleared, not guessed (§7.6)
 }
 
 /** A new event; `start` = what the Ensō button read (§8.18, ⚑ Q341). */
@@ -28,7 +29,7 @@ function blank(date: string, founder: boolean, start?: SayEvent): Form {
   const said = start && { title: start.title, allDay: start.time === null, startTime: start.time ?? '09:00', assignedTo: start.assignedTo };
   return {
     title: '', address: '', bring: [], notes: '', date, allDay: false, startTime: '09:00', endTime: '', endDate: date,
-    repeat: 'none', byDay: [WEEKDAY[weekdayOf(date)]], weeks: ownWeek(date), until: '', assignedTo: [], optional: false, emoji: '',
+    repeat: 'none', byDay: [WEEKDAY[weekdayOf(date)]], weeks: ownWeek(date), until: '', assignedTo: [], optional: false, emoji: '', emojiOwn: false,
     ...reminderOf(null, founder), ...said,
   };
 }
@@ -39,7 +40,7 @@ function fromEvent(e: any): Form {
   return {
     title: e.title, address: e.address ?? '', bring: e.bring ?? [], notes: e.notes ?? '', date: e.startDate, allDay: e.allDay, startTime: e.startTime ?? '09:00',
     endTime: e.endTime ?? '', endDate: e.endDate, repeat, byDay: r?.byDay ?? [WEEKDAY[weekdayOf(e.startDate)]],
-    weeks: weeksOf(r, e.startDate), until: r?.until ?? '', assignedTo: e.assignedTo, optional: !!e.optional, emoji: e.emoji ?? '',
+    weeks: weeksOf(r, e.startDate), until: r?.until ?? '', assignedTo: e.assignedTo, optional: !!e.optional, emoji: e.emoji ?? '', emojiOwn: true,
     ...reminderOf(e.reminder),
   };
 }
@@ -50,7 +51,7 @@ function toPayload(f: Form) {
     title: f.title, address: f.address.trim() || null, bring: f.bring, notes: f.notes || null, startDate: f.date,
     startTime: f.allDay ? null : f.startTime, endTime: f.allDay || !f.endTime ? null : f.endTime,
     endDate: f.allDay ? f.endDate : f.date,
-    recurrence, assignedTo: f.assignedTo, optional: f.optional, emoji: f.emoji.trim() || null,
+    recurrence, assignedTo: f.assignedTo, optional: f.optional, emoji: shownEmoji(f.emoji, f.emojiOwn, f.title).trim() || null,
     reminder: toReminder(f),
   };
 }
@@ -172,9 +173,7 @@ export function EventForm({ eventId, date, start, onClose }: Props) {
               ))}
             </div>
           </div>
-          <label className="field"><span>Emoji (optional)</span>
-            <input value={form.emoji} onChange={(e) => set('emoji', e.target.value)} placeholder="🧹" style={{ width: '5rem' }} />
-          </label>
+          <EventEmojiField value={form.emoji} own={form.emojiOwn} title={form.title} onChange={(emoji) => setForm((f) => (f ? { ...f, emoji, emojiOwn: true } : f))} />
 
           <ReminderFields value={form} allDay={form.allDay} onChange={(c) => setForm((f) => (f ? { ...f, ...c } : f))} />
           <label className="row" style={{ marginBottom: 12, minHeight: 44 }}>
