@@ -17,6 +17,7 @@ import { EventEmojiField, shownEmoji } from './EventEmojiField';
 import { BringField } from './BringField';
 import { NotesField } from './NotesSheet';
 import { RepeatFields, ownWeek, repeatOf, toRecurrence, weeksOf, type RepeatValue } from './RepeatFields';
+import { EventFlags } from './EventFlags';
 import { ReminderFields, reminderError, reminderOf, toReminder, type ReminderValue } from './ReminderFields';
 
 interface Form extends RepeatValue, ReminderValue {
@@ -176,9 +177,7 @@ export function EventForm({ eventId, date, start, onClose }: Props) {
           <EventEmojiField value={form.emoji} own={form.emojiOwn} title={form.title} onChange={(emoji) => setForm((f) => (f ? { ...f, emoji, emojiOwn: true } : f))} />
 
           <ReminderFields value={form} allDay={form.allDay} onChange={(c) => setForm((f) => (f ? { ...f, ...c } : f))} />
-          <label className="row" style={{ marginBottom: 12, minHeight: 44 }}>
-            <input type="checkbox" checked={form.optional} onChange={(e) => set('optional', e.target.checked)} /> Optional — each person turns it on
-          </label>
+          <EventFlags value={form} onChange={(c) => setForm((f) => (f ? { ...f, ...c } : f))} />
         </fieldset>
       )}
       {form && <NotesField label="Notes" title={form.title || 'New event'} value={form.notes} max={EVENT_NOTES_MAX} canChange={canEdit && !busy} onChange={(v) => set('notes', v)} />}

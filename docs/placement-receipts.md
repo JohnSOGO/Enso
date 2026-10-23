@@ -7,6 +7,13 @@ carry its result.
 
 ---
 
+## 2026-10-23 — EventFlags seam for Private events (reorganizer)
+
+- **Ask:** placement-advisor's extract-first for Private events: EventForm.tsx is the audit's top file (198/223).
+- **Done:** the Optional box moved, unchanged, into NEW `frontend/src/components/EventFlags.tsx` (value/onChange like
+  ReminderFields); EventForm renders `<EventFlags>`; owner row added. Behavior unchanged; typecheck and tests green.
+
+
 ## 2026-10-23 — steward pass after v1.105.1 (code-steward)
 
 - **Run:** post-release, covering v1.104.0 (record, then write it down: speech-to-text.ts NEW, POST /say/hear,
