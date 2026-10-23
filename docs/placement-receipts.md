@@ -7,6 +7,21 @@ carry its result.
 
 ---
 
+## 2026-10-23 — "I will … Did I get that right?" said back (placement-advisor)
+
+- **Ask:** SPEC §8.18 parts 3–4, v1.105.1, refines Q380 (MojoSOGO "have it say I will … and then the reexplain and then
+  ask, did I get that right?"). For reminder / event / exists, `say` = "I will " + steps joined + " Did I get that right?";
+  no steps → Claude's say + the question; request → requestSay + the question; outside unchanged. Prompt asks steps that
+  read after "I will"; requestSteps / outsideSteps reworded. The PWA shows "I will:" and the question (not on Outside).
+- **Verdict:** EXISTING src/shared/say-reading.ts (sayBack, SAY_CHECK in cleanSayReading), src/worker/say-reader.ts
+  (prompt), frontend/src/components/EnsoButton.tsx (render, imports SAY_CHECK), test/say-api.test.ts. Reorganizer NONE.
+- **Flow stage:** rules (the sentence); IO (prompt); render (label and question).
+- **Why:** say-reading.ts owns `say`, the fixed lines and steps, and the sentence derives from the steps. Rejected:
+  building it in the worker (a rule in IO) or in the PWA (a second copy of the question, §0.5).
+- **Caps:** say-reading.ts ~135/300, say-reader.ts ~116/300, EnsoButton.tsx ~175/300. None in band.
+
+---
+
 ## 2026-10-23 — "You want" / "I'll do" on the Ensō answer (placement-advisor)
 
 - **Ask:** AREC arec-enso-answer-gist.md, SPEC §8.18 parts 3–4 + SY13, v1.105.0 (⚑ Q380). POST /say's one structured

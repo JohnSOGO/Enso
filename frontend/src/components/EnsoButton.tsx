@@ -1,6 +1,6 @@
 // SPEC §8.18 — the Ensō button and its popup, rendered once by App.tsx: tap, say what you want into the text box
 // (a recording written down by POST /say/hear goes after what it holds, ⚑ Q378; type or fix it by hand; 🗑 Clear), POST /say, then what Ensō heard and
-// what it wants and the steps Yes takes (⚑ Q380; the one sentence spoken aloud), with Yes / Clarify / Cancel / ✏️ Edit (back to the box with what was heard, ⚑ Q361). Yes on a reminder opens the reminder form filled in; on
+// what it wants and the steps Yes takes, "Did I get that right?" (⚑ Q380; said back aloud as "I will …"), with Yes / Clarify / Cancel / ✏️ Edit (back to the box with what was heard, ⚑ Q361). Yes on a reminder opens the reminder form filled in; on
 // a request POST /feature-requests, then for an admin's small one "Build it now?" (⚑ Q344). Outside the scope (§1.3): Clarify / OK, and leaving any way but Clarify logs it
 // as Out of scope (POST /feature-requests with outside). Tap to talk (⚑ Q360): the mark opens it; the Ensō mark in its
 // footer starts recording (the first tap is when the phone asks for the mic) and a second tap stops and writes it down. Renders what the server
@@ -15,7 +15,7 @@ import { isAdmin } from '../../../src/shared/roles';
 import { speak, stopSpeaking, unlockSpeech, useRecord } from './useSpeech';
 import { errorText, post, upload } from '../api';
 import { canBuild, type FeatureRequest } from '../../../src/shared/feature-requests';
-import { SAY_CLIP_MAX_MS, SAY_TEXT_MAX, clarified, type SayEvent, type SayReading, type SayReminder } from '../../../src/shared/say-reading';
+import { SAY_CHECK, SAY_CLIP_MAX_MS, SAY_TEXT_MAX, clarified, type SayEvent, type SayReading, type SayReminder } from '../../../src/shared/say-reading';
 import s from './EnsoButton.module.css';
 
 type Phase = 'closed' | 'listen' | 'reading' | 'answer' | 'saved';
@@ -126,8 +126,9 @@ export function EnsoButton() {
           {phase === 'answer' && reading && (
             <div aria-live="polite">
               <p className={s.say}><b>You want:</b> {reading.want}</p>
-              <p style={{ margin: '8px 0 4px' }}><b>I'll do:</b></p>
+              <p style={{ margin: '8px 0 4px' }}><b>I will:</b></p>
               <ol className={s.steps}>{reading.steps.map((t, i) => <li key={i}>{t}</li>)}</ol>
+              {reading.kind !== 'outside' && <p className={s.say}>{SAY_CHECK}</p>}
               <p className="muted" style={{ fontSize: '.8rem', marginTop: 8 }}>I heard: {reading.heard}</p>
               <button className="plain" onClick={stopSpeaking} aria-label="Stop speaking">🔇</button>
             </div>

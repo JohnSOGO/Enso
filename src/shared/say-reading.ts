@@ -51,12 +51,21 @@ export function outsideSay(where: string | null): string {
     + (where ? ` The part that fits is in ${where}.` : '');
 }
 
-/** The request and outside steps (⚑ Q380): always these, so Ensō never promises a build. */
+/** The request and outside steps (⚑ Q380), read after "I will": always these, so Ensō never promises a build. */
 export function requestSteps(size: FeatureRequestSize): string[] {
-  return ['Save it as a feature request', size === 'big' ? 'John looks at it first' : 'The next build can make it'];
+  return ['save it as a feature request', size === 'big' ? 'let John look at it first' : 'leave it for the next build'];
 }
 export function outsideSteps(where: string | null): string[] {
-  return ['Log it as Out of scope for John', ...(where ? [`The part that fits is in ${where}`] : [])];
+  return ['log it as Out of scope for John', ...(where ? [`point you to ${where}`] : [])];
+}
+
+/** ⚑ Q380 — the question every answer but Outside ends with (MojoSOGO "ask, did I get that right?"). */
+export const SAY_CHECK = 'Did I get that right?';
+
+/** The steps said back: "I will a, b and c." */
+export function sayBack(steps: string[]): string {
+  const list = steps.length > 1 ? `${steps.slice(0, -1).join(', ')} and ${steps[steps.length - 1]}` : steps[0] ?? '';
+  return `I will ${list.replace(/[.\s]+$/, '')}.`;
 }
 
 /** Clarify: what was said before, then the new words. */
@@ -81,7 +90,10 @@ export function cleanSayReading(raw: Record<string, unknown>, o: CleanOpts): Say
   const steps = r.kind === 'request' ? requestSteps(r.request.size)
     : r.kind === 'outside' ? outsideSteps(r.where)
     : own.length ? own : [r.say];
-  return { ...r, want: str(raw.want, SAY_MAX) || r.heard, steps };
+  const say = r.kind === 'outside' ? r.say
+    : r.kind === 'request' || !own.length ? `${r.say} ${SAY_CHECK}`
+    : `${sayBack(own)} ${SAY_CHECK}`;
+  return { ...r, want: str(raw.want, SAY_MAX) || r.heard, say, steps };
 }
 
 function cleanKind(raw: Record<string, unknown>, o: CleanOpts): Read | null {
