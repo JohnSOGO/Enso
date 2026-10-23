@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.87 · **Date:** 2026-10-23 · **Owner:** MojoSOGO
+**Version:** 3.88 · **Date:** 2026-10-23 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5832,8 +5832,14 @@ $0.0005 a minute of talk) returns the words. Nothing is stored or logged: not th
 against the daily Claude reads (§7C.4), and there is no daily cap of its own ⚑ Q379 (a member must be signed in; 60
 seconds and 2 MB bound each clip).
 
-**3. The reading.** `POST /say { text }`: Claude fixes the words (spelling, grammar, what was misheard) into "heard" and
-reads one of four. Nothing is saved by the reading itself.
+**3. The reading.** `POST /say { text }`: Claude fixes the words (spelling, grammar, what was misheard) into "heard",
+reads one of four, and says it back the way an AREC opens ⚑ Q380 (MojoSOGO 2026-10-23 "something very similar to
+abstract and reexplain (see arec, the A and R)"): **want**, one line of what the speaker wants in plain words, the gist
+and not the words ("A reminder to book the car check, some time on weekday mornings."), and **steps**, one to four
+short lines of what Yes will do ("Fill a 📌 reminder: Book car check", "Ring once between 8 and 11am, Monday to
+Friday", "You check it and tap Save"). Not yet and Outside always get the same steps, as their sentence is always the
+same, so Ensō never promises a build. A reading with no want shows what was heard; one with no steps shows its
+sentence. Nothing is saved by the reading itself.
 
 | Reading | When | What Ensō says | Buttons |
 |---|---|---|---|
@@ -5851,8 +5857,8 @@ Who is going is matched to the members by name; the speaker's own name, or "me",
 event means just the speaker. An event with no real date is not read (the speaker is asked to say it another way); a
 time that is not a real time is left out, so the form opens all day for the speaker to fix.
 
-**4. The answer.** The popup shows what Ensō heard, the sentence and the buttons, and the phone **says the sentence
-aloud** in its best English voice ⚑ Q334; 🔇 stops it. **Clarify** opens the box again (tap Ensō to talk) and sends what was said
+**4. The answer.** The popup shows **You want:** and the want, **I'll do:** and the steps numbered, then, smaller,
+"I heard:" and the words, and the buttons; the phone **says the sentence aloud** (the one sentence, not the steps) in its best English voice ⚑ Q334; 🔇 stops it. **Clarify** opens the box again (tap Ensō to talk) and sends what was said
 before with the new words. **✏️ Edit** (after the other buttons on every answer) opens the box again filled with what
 Ensō heard, not listening, to fix words the phone got wrong and send again with Done ⚑ Q361 (MojoSOGO 2026-10-20 "Let me
 edit the text… voice to text gets some words wrong", "Edit"). **Who:** any member. Each send counts against the household's daily Claude reading budget (§7C.4
@@ -5915,7 +5921,8 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
 | SY11 | POST /feature-requests/{id}/build as an admin on a new request (fire answered 200); as a plain member; on a needs_john one; with BUILD_FIRE_TOKEN unset; fire answered 500 | 202 `{ started: true }`, one POST to BUILD_FIRE_URL with the Bearer and the id + title in `text`; 403; 409; 503 `build_now_off`, no fire; 502 `build_failed` and one log line naming the id and `HTTP 500`, never the token |
 | SY8 | POST /feature-requests `{ …, outside: true }`; GET /ops/requests; founder …/ok on it; an admin …/dismiss on another | 201 status `outside`, listed in GET /feature-requests after 30 days too; not in /ops/requests; `new`; `dismissed` |
 | SY12 | POST /say/hear as a member with an audio/mp4 clip (fake AI answers " Remind me at nine. "); signed out; an image/jpeg body; an empty clip; a clip over 2 MB; the AI throws; no AI binding | 200 `{ text: 'Remind me at nine.' }` and the AI got the clip as base64; 401; 400; 400; 400; 502 `hear_failed`; 503 `hear_off` |
-| SY-M | on the iPhone | tap the Ensō button, tap Ensō in the box, say "weekdays 8 to 11 remind me to book the car check", hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; tap the mark → the box opens quiet; tap Ensō in it → the phone asks for the mic once, then "Listening…"; say "remind me tomorrow at 9 to call mom", tap Ensō again → it stops, Done → the answer; a fresh opening of the app never asks for the mic; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests; on any answer ✏️ Edit → the box holds what was heard, fix a word, Done → the new answer; tap Ensō, talk, tap Ensō, tap it again and talk more → the new words show too |
+| SY13 | Claude answers a reminder with want and three steps; with no want and no steps; a request (big) and an outside with steps of its own; seven steps | 200 with `want` and `steps` as given; `want` = heard, `steps` = [say]; `steps` = `requestSteps('big')` / `outsideSteps(where)`, never Claude's; the first four |
+| SY-M | on the iPhone | tap the Ensō button, tap Ensō in the box, say "weekdays 8 to 11 remind me to book the car check", see "You want:" with the gist and "I'll do:" with numbered steps, hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; tap the mark → the box opens quiet; tap Ensō in it → the phone asks for the mic once, then "Listening…"; say "remind me tomorrow at 9 to call mom", tap Ensō again → it stops, Done → the answer; a fresh opening of the app never asks for the mic; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests; on any answer ✏️ Edit → the box holds what was heard, fix a word, Done → the new answer; tap Ensō, talk, tap Ensō, tap it again and talk more → the new words show too |
 
 ## 9. Delivery
 
@@ -6651,7 +6658,7 @@ other push stays until I hide it ⚑ Q284.
 | POST | `/reminders` | member | `{ title, date, time: "HH:MM", channels, renotifyMin?, assignedTo? }` or `{ title, window: { days, from, to }, channels, assignedTo? }` (§8.5c) → reminder (201); 400 when not after now, or a bad window |
 | PATCH/DELETE | `/reminders/{id}` | creator or owner | POST fields, all optional, merged; either shape (`window: null` back to a set time, §8.5c); re-plans like an alarm edit |
 | POST | `/say/hear` | member | the raw recorded clip (audio/mp4, audio/webm, audio/ogg, audio/wav; ≤ 2 MB) → 200 `{ text }` (§8.18 part 2); nothing stored or logged; 400 wrong type / empty / too big, 502 couldn't write it down, 503 no AI binding |
-| POST | `/say` | member | `{ text }` → 200 `{ kind: 'reminder', heard, say, reminder }` / `{ kind: 'exists', heard, say, where }` / `{ kind: 'request', heard, say, request: { title, summary, size } }` / `{ kind: 'event', heard, say, event: { title, date, time, assignedTo } }` / `{ kind: 'outside', heard, say, where (or null), request: { title, summary, size } }` (§8.18, §1.3); nothing saved; 400 blank, 429 reads used up, 503 no key, 502 / 422 reading failed |
+| POST | `/say` | member | `{ text }` → 200, every reading with `heard, want, say, steps` (⚑ Q380), and: `{ kind: 'reminder', reminder }` / `{ kind: 'exists', where }` / `{ kind: 'request', request: { title, summary, size } }` / `{ kind: 'event', event: { title, date, time, assignedTo } }` / `{ kind: 'outside', where (or null), request: { title, summary, size } }` (§8.18, §1.3); nothing saved; 400 blank, 429 reads used up, 503 no key, 502 / 422 reading failed |
 | GET/POST | `/feature-requests` | admin / member | → `FeatureRequest[]` newest first, last 30 days for done / dismissed: `{ id, text, title, summary, size, status, note, createdBy, createdAt }`; POST `{ text, title, summary, size, outside? }` → 201, status from size, or `outside` (§8.18, §1.3) |
 | POST | `/feature-requests/{id}/ok` · `/dismiss` | founder · admin | → the request; `ok` only from `needs_john` → `new`; `dismiss` from `new` / `needs_john`; else 409 |
 | POST | `/feature-requests/{id}/build` | admin | starts the build session now (§8.18 part 6, ⚑ Q344) → 202 `{ started: true }`; only from `new`, else 409; 503 `build_now_off` (not set up) / 502 `build_failed` (the fire was refused) |

@@ -1,6 +1,6 @@
 // SPEC §8.18, §1.3 — what was said to the Ensō button, as Claude read it: the wire shape POST /say answers with, the
-// cleaner that checks a reminder with the same rules POST /reminders uses, the fixed request and outside lines, and
-// what Clarify sends.
+// cleaner that checks a reminder with the same rules POST /reminders uses, the want and steps (⚑ Q380), the fixed request
+// and outside lines and steps, and what Clarify sends.
 // Pure: `now` and `tz` are passed in; never decides what is saved.
 import { WEEKDAY, isOneOf, type FeatureRequestSize, type Weekday } from './vocab';
 import { ALERT_TITLE_MAX } from './alert-limits';
@@ -15,6 +15,9 @@ export const SAY_AUDIO_MAX_BYTES = 2 * 1024 * 1024;
 export const SAY_CLIP_MAX_MS = 60_000;
 const SAY_MAX = 400;
 const WHERE_MAX = 80;
+/** ⚑ Q380 — the answer's steps: at most this many, each at most this long (not the recipe STEPS_MAX). */
+const SAY_STEPS_MAX = 4;
+const SAY_STEP_MAX = 100;
 
 /** What the reminder form starts from (§8.5b / §8.5c); a missing date + time leaves the form's own. */
 export interface SayReminder { title: string; assignedTo: string[]; date: string | null; time: string | null; window: ReminderWindow | null }
@@ -22,14 +25,16 @@ export interface SayReminder { title: string; assignedTo: string[]; date: string
 /** What the new-event form starts from (§8.4, ⚑ Q341); `time` null = all day. */
 export interface SayEvent { title: string; date: string; time: string | null; assignedTo: string[] }
 
-/** POST /say (§10). `heard` = the cleaned-up words; `say` = the sentence shown and spoken. */
-export type SayReading = { heard: string; say: string } & (
+/** POST /say (§10). `heard` = the cleaned-up words; `want` = the gist; `say` = the sentence spoken; `steps` = what Yes does. */
+export type SayReading = { heard: string; want: string; say: string; steps: string[] } & SayKind;
+type SayKind = (
   | { kind: 'reminder'; reminder: SayReminder }
   | { kind: 'event'; event: SayEvent }
   | { kind: 'exists'; where: string }
   | { kind: 'request'; request: FeatureAsk }
   | { kind: 'outside'; where: string | null; request: FeatureAsk } // §1.3: logged as Out of scope on leaving
 );
+type Read = { heard: string; say: string } & SayKind;
 export interface FeatureAsk { title: string; summary: string; size: FeatureRequestSize }
 
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max) : '');
@@ -46,6 +51,14 @@ export function outsideSay(where: string | null): string {
     + (where ? ` The part that fits is in ${where}.` : '');
 }
 
+/** The request and outside steps (⚑ Q380): always these, so Ensō never promises a build. */
+export function requestSteps(size: FeatureRequestSize): string[] {
+  return ['Save it as a feature request', size === 'big' ? 'John looks at it first' : 'The next build can make it'];
+}
+export function outsideSteps(where: string | null): string[] {
+  return ['Log it as Out of scope for John', ...(where ? [`The part that fits is in ${where}`] : [])];
+}
+
 /** Clarify: what was said before, then the new words. */
 export const clarified = (before: string, more: string) => `${before.trim()}\n${more.trim()}`.slice(0, SAY_TEXT_MAX);
 
@@ -57,9 +70,21 @@ function whoOf(who: unknown, meId: string, members: { id: string; name: string }
   return ids.length ? [...new Set(ids)] : [meId];
 }
 
+type CleanOpts = { tz: string; now: string; meId: string; members: { id: string; name: string }[] };
+
 /** Claude's raw answer → a SayReading, or null when it is not one. A reminder's times and window are kept only when
- *  POST /reminders would take them (else the form's own); a request's lines are always `requestSay`. */
-export function cleanSayReading(raw: Record<string, unknown>, o: { tz: string; now: string; meId: string; members: { id: string; name: string }[] }): SayReading | null {
+ *  POST /reminders would take them (else the form's own); a request's lines and steps are always the fixed ones. */
+export function cleanSayReading(raw: Record<string, unknown>, o: CleanOpts): SayReading | null {
+  const r = cleanKind(raw, o);
+  if (!r) return null;
+  const own = Array.isArray(raw.steps) ? raw.steps.map((x) => str(x, SAY_STEP_MAX)).filter(Boolean).slice(0, SAY_STEPS_MAX) : [];
+  const steps = r.kind === 'request' ? requestSteps(r.request.size)
+    : r.kind === 'outside' ? outsideSteps(r.where)
+    : own.length ? own : [r.say];
+  return { ...r, want: str(raw.want, SAY_MAX) || r.heard, steps };
+}
+
+function cleanKind(raw: Record<string, unknown>, o: CleanOpts): Read | null {
   const heard = str(raw.heard, SAY_TEXT_MAX), say = str(raw.say, SAY_MAX);
   if (raw.kind === 'exists') {
     const where = str(raw.where, WHERE_MAX);

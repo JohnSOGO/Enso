@@ -1,4 +1,4 @@
-// SPEC §8.18 SY1–SY10 — the Ensō button: POST /say reads what was said (Claude is a fake api.anthropic.com behind a
+// SPEC §8.18 SY1–SY10, SY13 — the Ensō button: POST /say reads what was said (Claude is a fake api.anthropic.com behind a
 // fetch spy that refuses every other host; the key is fake), feature requests, Build now (SY11) and the build
 // session's queue.
 import { SELF, createExecutionContext, env } from 'cloudflare:test';
@@ -6,7 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import worker from '../src/worker/index';
 import type { Env } from '../src/worker/env';
 import { READS_PER_DAY } from '../src/shared/things';
-import { cleanSayReading, clarified, outsideSay, requestSay } from '../src/shared/say-reading';
+import { cleanSayReading, clarified, outsideSay, outsideSteps, requestSay, requestSteps } from '../src/shared/say-reading';
 import { buildRefusal, canBuild, closeMove, dismissMove, okMove, statusFor } from '../src/shared/feature-requests';
 import { ADMIN_ROLE } from '../src/shared/roles';
 import { addDays, utcToLocal } from '../src/shared/time';
@@ -35,7 +35,7 @@ async function say(e: Env, answer: object | null, text: unknown = 'weekdays 8 to
   }), e, createExecutionContext());
   return { status: res.status, json: await res.json<any>(), heard };
 }
-const none = { reminder: null, event: null, where: null, title: null, summary: null, size: null };
+const none = { want: '', steps: [], reminder: null, event: null, where: null, title: null, summary: null, size: null };
 const reads = async () => (await env.DB.prepare('SELECT COUNT(*) AS n FROM photo_reads').first<{ n: number }>())!.n;
 const requests = async () => (await env.DB.prepare('SELECT COUNT(*) AS n FROM feature_requests').first<{ n: number }>())!.n;
 
@@ -47,6 +47,7 @@ describe('§8.18 POST /say', () => {
       reminder: { title: 'Book car check', date: null, time: null, days: ['MO', 'TU', 'WE', 'TH', 'FR'], from: '08:00', to: '11:00', who: ['me'] } });
     expect(r.status, JSON.stringify(r.json)).toBe(200);
     expect(r.json).toEqual({ kind: 'reminder', heard: 'Weekdays 8 to 11, remind me to book the car check.',
+      want: 'Weekdays 8 to 11, remind me to book the car check.', steps: ["I'll remind you on weekdays between 8 and 11am to book the car check."],
       say: "I'll remind you on weekdays between 8 and 11am to book the car check.",
       reminder: { title: 'Book car check', assignedTo: [A], date: null, time: null, window: { days: ['MO', 'TU', 'WE', 'TH', 'FR'], from: '08:00', to: '11:00' } } });
     expect(await reads()).toBe(1);
@@ -60,6 +61,7 @@ describe('§8.18 POST /say', () => {
     expect(ex.json).toMatchObject({ kind: 'exists', where: 'Alerts → ⏱ Rolling timers' });
     const rq = await say(keyedEnv(), { ...none, heard: 'Make the fridge order groceries.', kind: 'request', say: 'x', title: 'Fridge orders groceries', summary: 'Order food when the fridge is low.', size: 'big' });
     expect(rq.json).toEqual({ kind: 'request', heard: 'Make the fridge order groceries.', say: requestSay('big'),
+      want: 'Make the fridge order groceries.', steps: requestSteps('big'),
       request: { title: 'Fridge orders groceries', summary: 'Order food when the fridge is low.', size: 'big' } });
     expect(await requests()).toBe(before);
   });
@@ -69,7 +71,7 @@ describe('§8.18 POST /say', () => {
     const r = await say(keyedEnv(), { ...none, heard: 'Order our groceries from Amazon every Friday.', kind: 'outside', say: 'x',
       where: 'Lists → Shopping', title: 'Order groceries from Amazon', summary: 'Order the shopping list on Fridays.', size: 'big' });
     expect(r.json).toEqual({ kind: 'outside', heard: 'Order our groceries from Amazon every Friday.', say: outsideSay('Lists → Shopping'),
-      where: 'Lists → Shopping', request: { title: 'Order groceries from Amazon', summary: 'Order the shopping list on Fridays.', size: 'big' } });
+      want: 'Order our groceries from Amazon every Friday.', steps: outsideSteps('Lists → Shopping'), where: 'Lists → Shopping', request: { title: 'Order groceries from Amazon', summary: 'Order the shopping list on Fridays.', size: 'big' } });
     const bare = await say(keyedEnv(), { ...none, heard: 'What is the news?', kind: 'outside', say: 'x', title: 'News', summary: '', size: null });
     expect(bare.json).toMatchObject({ kind: 'outside', where: null, say: outsideSay(null), request: { size: 'big' } });
     expect(JSON.stringify(r.heard[0])).toContain('banking');
@@ -83,12 +85,28 @@ describe('§8.18 POST /say', () => {
     const r = await say(keyedEnv(), { ...none, heard: 'Schedule a dinner on the 23rd for me and Shelly at 8 PM.', kind: 'event', say: "I'll add dinner.",
       event: { title: 'Dinner', date: '2026-10-23', time: '20:00', who: ['me', 'Shelly'] } });
     expect(r.json).toEqual({ kind: 'event', heard: 'Schedule a dinner on the 23rd for me and Shelly at 8 PM.', say: "I'll add dinner.",
-      event: { title: 'Dinner', date: '2026-10-23', time: '20:00', assignedTo: [A, m.id] } });
+      want: 'Schedule a dinner on the 23rd for me and Shelly at 8 PM.', steps: ["I'll add dinner."], event: { title: 'Dinner', date: '2026-10-23', time: '20:00', assignedTo: [A, m.id] } });
     const allDay = await say(keyedEnv(), { ...none, heard: 'h', kind: 'event', say: 's', event: { title: 'Fair', date: '2026-10-24', time: '8pm', who: [] } });
     expect(allDay.json.event).toEqual({ title: 'Fair', date: '2026-10-24', time: null, assignedTo: [A] });
     expect((await say(keyedEnv(), { ...none, heard: 'h', kind: 'event', say: 's', event: { title: 'X', date: '2026-02-30', time: null, who: [] } })).status).toBe(502);
     expect(await requests()).toBe(before);
     expect(JSON.stringify(r.heard[0])).toContain('nickname');
+  });
+
+  it('SY13 want and steps said back; the fallbacks; fixed steps for a request or outside; at most four', async () => {
+    const reminder = { title: 'Book car check', date: null, time: null, days: ['MO', 'TU', 'WE', 'TH', 'FR'], from: '08:00', to: '11:00', who: ['me'] };
+    const steps = ['Fill a 📌 reminder: Book car check', 'Ring once between 8 and 11am, Monday to Friday', 'You check it and tap Save'];
+    const r = await say(keyedEnv(), { ...none, heard: 'h', kind: 'reminder', say: 's', want: ' A reminder to book the car check. ', steps, reminder });
+    expect(r.json).toMatchObject({ want: 'A reminder to book the car check.', steps });
+    expect(JSON.stringify(r.heard[0])).toContain('the gist');
+    const bare = await say(keyedEnv(), { ...none, heard: 'h', kind: 'reminder', say: 's', want: '', steps: [' ', ''], reminder });
+    expect(bare.json).toMatchObject({ want: 'h', steps: ['s'] });
+    const rq = await say(keyedEnv(), { ...none, heard: 'h', kind: 'request', say: 'x', steps: ['Build it tonight'], title: 'T', summary: '', size: 'big' });
+    expect(rq.json.steps).toEqual(requestSteps('big'));
+    const out = await say(keyedEnv(), { ...none, heard: 'h', kind: 'outside', say: 'x', steps: ['Order it'], where: 'Lists → Shopping', title: 'T', summary: '', size: 'big' });
+    expect(out.json.steps).toEqual(outsideSteps('Lists → Shopping'));
+    const many = await say(keyedEnv(), { ...none, heard: 'h', kind: 'reminder', say: 's', steps: ['1', '2', '3', '4', '5', '6', '7'], reminder });
+    expect(many.json.steps).toEqual(['1', '2', '3', '4']);
   });
 
   it('SY10 "after work" / "after school" is the speaker\'s own After', async () => {

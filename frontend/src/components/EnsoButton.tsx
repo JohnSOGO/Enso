@@ -1,6 +1,6 @@
 // SPEC §8.18 — the Ensō button and its popup, rendered once by App.tsx: tap, say what you want into the text box
 // (a recording written down by POST /say/hear goes after what it holds, ⚑ Q378; type or fix it by hand; 🗑 Clear), POST /say, then what Ensō heard and
-// what it will do, spoken aloud, with Yes / Clarify / Cancel / ✏️ Edit (back to the box with what was heard, ⚑ Q361). Yes on a reminder opens the reminder form filled in; on
+// what it wants and the steps Yes takes (⚑ Q380; the one sentence spoken aloud), with Yes / Clarify / Cancel / ✏️ Edit (back to the box with what was heard, ⚑ Q361). Yes on a reminder opens the reminder form filled in; on
 // a request POST /feature-requests, then for an admin's small one "Build it now?" (⚑ Q344). Outside the scope (§1.3): Clarify / OK, and leaving any way but Clarify logs it
 // as Out of scope (POST /feature-requests with outside). Tap to talk (⚑ Q360): the mark opens it; the Ensō mark in its
 // footer starts recording (the first tap is when the phone asks for the mic) and a second tap stops and writes it down. Renders what the server
@@ -125,8 +125,10 @@ export function EnsoButton() {
           {phase === 'reading' && <p className={s.listening}>Ensō is thinking…</p>}
           {phase === 'answer' && reading && (
             <div aria-live="polite">
-              <p className="muted" style={{ fontSize: '.85rem', marginBottom: 8 }}>I heard: {reading.heard}</p>
-              <p className={s.say}>{reading.say}</p>
+              <p className={s.say}><b>You want:</b> {reading.want}</p>
+              <p style={{ margin: '8px 0 4px' }}><b>I'll do:</b></p>
+              <ol className={s.steps}>{reading.steps.map((t, i) => <li key={i}>{t}</li>)}</ol>
+              <p className="muted" style={{ fontSize: '.8rem', marginTop: 8 }}>I heard: {reading.heard}</p>
               <button className="plain" onClick={stopSpeaking} aria-label="Stop speaking">🔇</button>
             </div>
           )}
