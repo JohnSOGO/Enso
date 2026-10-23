@@ -7,6 +7,36 @@ carry its result.
 
 ---
 
+## 2026-10-23 — guessed event emoji, one shared keyword table (placement-advisor)
+
+- **Ask:** v1.103.0, SPEC 3.86 §7.6 Guessed emoji, §7A.1, §7C.2, §8.4 (MojoSOGO 2026-10-23, ⚑ Q376/Q377). A pure `guessEmoji(text)`
+  (one keyword table: whole words or `*` stems, lower-cased, first row wins, else null) that the list default also uses
+  (`defaultListEmoji = guessEmoji(name) ?? 📋`, NAME_EMOJIS folded in). A new event's Emoji box shows and saves the guess
+  from the title until the person types or clears it, with a "✨ guessed" note. Editing never guesses. Plan it guesses
+  from the thing's title. No schema or API change.
+- **Verdict:** EXISTING `src/shared/emoji.ts` (guessEmoji and the table; it still imports nothing). EXISTING
+  `src/shared/lists.ts` (defaultListEmoji delegates, same signature; DEFAULT_LIST_EMOJI stays; now imports emoji.ts). NEW
+  row `frontend/src/components/EventEmojiField.tsx` (the box, `shownEmoji(value, own, title)` used by both the box and
+  EventForm's toPayload, and the ✨ guessed note). EventForm.tsx only hosts it, with an `emojiOwn` flag (blank false,
+  fromEvent true). Reorganizer NONE.
+- **Addendum (steward):** POST /things/:id/plan (EXISTING `src/worker/routes/things.ts`, route) passes
+  `emoji: guessEmoji(t.title)` into its `parseEventInput` body, §7C.2. The guess stays out of `event-rows.ts` so alarms and
+  the PWA's own choice are untouched. Rows compile once with Unicode boundaries, all inside `emoji.ts`.
+- **Flow stage:** rules (guessEmoji); render (the box); route (Plan it).
+- **Why:** §7.6 owns event emoji, and the guess and the one-emoji rule are one cohesive concern. Fan-in is small and there
+  is no cycle. Rejected: a new emoji-guess.ts (classitis, and the spec names emoji.ts); lists.ts (events would import list
+  rules); recipe-emoji.ts (a different concern: each person's opinion, never guessed). The box got its own leaf because
+  EventForm is at 199 of 223: inline it would enter the warning band. One derivation (shownEmoji) for what is shown and
+  what is saved; no effect writes into form.emoji. EventFillBar is untouched, since fills set the title and the guess
+  follows. Merged-table ordering is behavior: 🎂 birthday before the gift row (a "Birthday" list becomes 🎂), shopping
+  before hardware, travel before book.
+- **Caps:** emoji.ts ~110/300, lists.ts ~105/300, EventEmojiField.tsx ~17/300, EventForm.tsx 198/223, things.ts ~126/300.
+  None newly in the band.
+- **Steward (AREC):** only the list table guessed before; recipes must never be guessed; reminders/alarms have no Emoji
+  box (John's call, not built). Substring false positives (carpet, vacation, prefix, restore) fixed by whole words.
+
+---
+
 ## 2026-10-22 — private-push predicate, session.ts row, note_marks asking key (placement-advisor)
 
 - **Ask:** v1.102.0, from the v1.101.0 steward backlog (MojoSOGO "Yes": 1, 3, 4c). (1) One IOU-notice privacy rule shared

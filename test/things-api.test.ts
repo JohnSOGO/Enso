@@ -182,7 +182,7 @@ describe('M4g things — Plan it (D6, D7)', () => {
     expect(p.json.thing).toMatchObject({ status: 'planned', plannedEventId: p.json.eventId, plannedDate: '2026-10-14' });
     const ev = (await o.get(`/events/${p.json.eventId}`)).json;
     expect(ev).toMatchObject({
-      title: 'Pumpkin patch', startDate: '2026-10-14', startTime: '10:00', thingId: t.id, reminder: null,
+      title: 'Pumpkin patch', startDate: '2026-10-14', startTime: '10:00', thingId: t.id, reminder: null, emoji: null,
       address: '12 Farm Rd', notes: 'Bring boots\nOld farm\n555-0101\n$5 a pumpkin\nhttps://patch.example',
     });
     expect((await firesOf(t.id)).every((f) => f.state === 'closed' && f.close_reason === 'removed')).toBe(true);
@@ -191,6 +191,12 @@ describe('M4g things — Plan it (D6, D7)', () => {
     await tickAt(o, '2026-10-09T13:00:00.000Z');
     expect((await firesOf(t.id)).filter((f) => f.state !== 'closed')).toEqual([]);
     expect((await o.post(`/things/${t.id}/plan`, { date: '2026-10-15' })).status).toBe(409);
+  });
+
+  it('D6 (§7.6 E4) Plan it on a thing called "Dentist" → its event gets the guessed 🦷', async () => {
+    const t = await createThing(fairBody({ title: 'Dentist' }));
+    const p = await o.post(`/things/${t.id}/plan`, { date: '2026-10-14' });
+    expect((await o.get(`/events/${p.json.eventId}`)).json.emoji).toBe('🦷');
   });
 
   it('D7 Plan it on 10-25 (outside the window) → 400 with a message', async () => {

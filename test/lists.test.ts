@@ -44,6 +44,8 @@ describe('list rules (pure)', () => {
     expect(defaultListEmoji('Hardware')).toBe('🔨');
     expect(defaultListEmoji('Camping trip')).toBe('🧳');
     expect(defaultListEmoji('Odds and ends')).toBe(DEFAULT_LIST_EMOJI);
+    expect(defaultListEmoji('Workshop')).toBe(DEFAULT_LIST_EMOJI); // a word must start a word (§7.6)
+    expect(defaultListEmoji('Birthday')).toBe('🎂');
     expect(listEmoji({ name: 'Shopping', emoji: null })).toBe('🛒');
     expect(listEmoji({ name: 'Shopping', emoji: '🛍️' })).toBe('🛍️');
   });

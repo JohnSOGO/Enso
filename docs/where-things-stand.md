@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-22, v1.102.0, main = production.*
+*Last updated 2026-10-23, v1.103.0, main = production.*
 
 ## Running where
 
@@ -51,6 +51,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- ✨ Guessed event emoji (v1.103.0, §7.6, Q376–Q377 ⚑): on the iPhone, Calendar → tap a day → ＋ → type "Dentist" → the Emoji box shows 🦷 with "✨ guessed"; change the title to "Soccer practice" → ⚽; clear the box → it stays empty; Save → the day shows the emoji. Lists without their own emoji use the same table ("Birthday" list now 🎂).
 - 🔒 One privacy rule for money pushes, and highlights tied to how the AI is asked (v1.102.0, §7B.9, §8.4a, Q375):
   nothing new to see. Remembered highlights from v1.101.0 stay; the next prompt change re-asks every note on its own.
 - 💾 Remembered highlights (v1.101.0, §8.4a, migration 0062, Q374 ⚑): open an event's notes with ⤢ once and wait for
