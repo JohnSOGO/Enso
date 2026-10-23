@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.88 · **Date:** 2026-10-23 · **Owner:** MojoSOGO
+**Version:** 3.89 · **Date:** 2026-10-23 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -5836,10 +5836,14 @@ seconds and 2 MB bound each clip).
 reads one of four, and says it back the way an AREC opens ⚑ Q380 (MojoSOGO 2026-10-23 "something very similar to
 abstract and reexplain (see arec, the A and R)"): **want**, one line of what the speaker wants in plain words, the gist
 and not the words ("A reminder to book the car check, some time on weekday mornings."), and **steps**, one to four
-short lines of what Yes will do ("Fill a 📌 reminder: Book car check", "Ring once between 8 and 11am, Monday to
-Friday", "You check it and tap Save"). Not yet and Outside always get the same steps, as their sentence is always the
-same, so Ensō never promises a build. A reading with no want shows what was heard; one with no steps shows its
-sentence. Nothing is saved by the reading itself.
+short lines of what Yes will do, each read after "I will" ("fill a 📌 reminder: Book car check", "ring once between 8
+and 11am, Monday to Friday"). Not yet and Outside always get the same steps ("save it as a feature request", "let John
+look at it first"; "log it as Out of scope for John", "point you to Lists → Shopping"), as their sentence is always the
+same, so Ensō never promises a build. **Said back** (MojoSOGO 2026-10-23 "have it say I will … and then the reexplain
+and then ask, did I get that right?"): the sentence is "I will " and the steps ("…, … and …."), then "Did I get that
+right?". Not yet keeps its fixed sentence and asks too; Outside keeps its fixed sentence and does not ask (its button is
+OK). A reading with no want shows what was heard; one with no steps shows and says its own sentence, then the
+question. Nothing is saved by the reading itself.
 
 | Reading | When | What Ensō says | Buttons |
 |---|---|---|---|
@@ -5857,8 +5861,9 @@ Who is going is matched to the members by name; the speaker's own name, or "me",
 event means just the speaker. An event with no real date is not read (the speaker is asked to say it another way); a
 time that is not a real time is left out, so the form opens all day for the speaker to fix.
 
-**4. The answer.** The popup shows **You want:** and the want, **I'll do:** and the steps numbered, then, smaller,
-"I heard:" and the words, and the buttons; the phone **says the sentence aloud** (the one sentence, not the steps) in its best English voice ⚑ Q334; 🔇 stops it. **Clarify** opens the box again (tap Ensō to talk) and sends what was said
+**4. The answer.** The popup shows **You want:** and the want, **I will:** and the steps numbered, "Did I get that right?" (not on
+Outside), then, smaller, "I heard:" and the words, and the buttons (Yes = right); the phone **says the sentence aloud** ("I
+will … Did I get that right?") in its best English voice ⚑ Q334; 🔇 stops it. **Clarify** opens the box again (tap Ensō to talk) and sends what was said
 before with the new words. **✏️ Edit** (after the other buttons on every answer) opens the box again filled with what
 Ensō heard, not listening, to fix words the phone got wrong and send again with Done ⚑ Q361 (MojoSOGO 2026-10-20 "Let me
 edit the text… voice to text gets some words wrong", "Edit"). **Who:** any member. Each send counts against the household's daily Claude reading budget (§7C.4
@@ -5921,8 +5926,8 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
 | SY11 | POST /feature-requests/{id}/build as an admin on a new request (fire answered 200); as a plain member; on a needs_john one; with BUILD_FIRE_TOKEN unset; fire answered 500 | 202 `{ started: true }`, one POST to BUILD_FIRE_URL with the Bearer and the id + title in `text`; 403; 409; 503 `build_now_off`, no fire; 502 `build_failed` and one log line naming the id and `HTTP 500`, never the token |
 | SY8 | POST /feature-requests `{ …, outside: true }`; GET /ops/requests; founder …/ok on it; an admin …/dismiss on another | 201 status `outside`, listed in GET /feature-requests after 30 days too; not in /ops/requests; `new`; `dismissed` |
 | SY12 | POST /say/hear as a member with an audio/mp4 clip (fake AI answers " Remind me at nine. "); signed out; an image/jpeg body; an empty clip; a clip over 2 MB; the AI throws; no AI binding | 200 `{ text: 'Remind me at nine.' }` and the AI got the clip as base64; 401; 400; 400; 400; 502 `hear_failed`; 503 `hear_off` |
-| SY13 | Claude answers a reminder with want and three steps; with no want and no steps; a request (big) and an outside with steps of its own; seven steps | 200 with `want` and `steps` as given; `want` = heard, `steps` = [say]; `steps` = `requestSteps('big')` / `outsideSteps(where)`, never Claude's; the first four |
-| SY-M | on the iPhone | tap the Ensō button, tap Ensō in the box, say "weekdays 8 to 11 remind me to book the car check", see "You want:" with the gist and "I'll do:" with numbered steps, hear the answer, Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; tap the mark → the box opens quiet; tap Ensō in it → the phone asks for the mic once, then "Listening…"; say "remind me tomorrow at 9 to call mom", tap Ensō again → it stops, Done → the answer; a fresh opening of the app never asks for the mic; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests; on any answer ✏️ Edit → the box holds what was heard, fix a word, Done → the new answer; tap Ensō, talk, tap Ensō, tap it again and talk more → the new words show too |
+| SY13 | Claude answers a reminder with want and three steps; with no want and no steps; a request (big) and an outside with steps of its own; seven steps | 200 with `want` and `steps` as given; `want` = heard, `steps` = [say]; `steps` = `requestSteps('big')` / `outsideSteps(where)`, never Claude's; the first four. `say` = "I will a, b and c. Did I get that right?"; with no steps, Claude's say + "Did I get that right?"; a request `requestSay` + the question; an outside `outsideSay` alone |
+| SY-M | on the iPhone | tap the Ensō button, tap Ensō in the box, say "weekdays 8 to 11 remind me to book the car check", see "You want:" with the gist and "I will:" with numbered steps, hear "I will … Did I get that right?", Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; tap the mark → the box opens quiet; tap Ensō in it → the phone asks for the mic once, then "Listening…"; say "remind me tomorrow at 9 to call mom", tap Ensō again → it stops, Done → the answer; a fresh opening of the app never asks for the mic; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests; on any answer ✏️ Edit → the box holds what was heard, fix a word, Done → the new answer; tap Ensō, talk, tap Ensō, tap it again and talk more → the new words show too |
 
 ## 9. Delivery
 
