@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { PHOTO_MAX_BYTES, PHOTO_TYPES } from '../shared/photos';
+import { SAY_AUDIO_MAX_BYTES, SAY_AUDIO_TYPES } from '../shared/say-reading';
 import { isOneOf } from '../shared/vocab';
 
 /** Every error response: { error, message } with a non-empty message (SPEC §10). */
@@ -37,5 +38,19 @@ export async function photoBody(c: Context): Promise<{ bytes: ArrayBuffer; type:
   const bytes = await c.req.arrayBuffer();
   if (bytes.byteLength > PHOTO_MAX_BYTES) return tooBig();
   if (bytes.byteLength === 0) return fail(c, 400, 'invalid_input', 'The photo is empty.');
+  return { bytes, type };
+}
+
+const AUDIO_MB = SAY_AUDIO_MAX_BYTES / (1024 * 1024);
+
+/** The raw recorded clip, or a 400 naming what is wrong with it (§8.18 part 2). */
+export async function audioBody(c: Context): Promise<{ bytes: ArrayBuffer; type: string } | Response> {
+  const type = (c.req.header('content-type') ?? '').split(';')[0].trim().toLowerCase();
+  if (!isOneOf(SAY_AUDIO_TYPES, type)) return fail(c, 400, 'invalid_input', `The recording must be one of: ${SAY_AUDIO_TYPES.join(', ')}.`);
+  const tooBig = () => fail(c, 400, 'invalid_input', `The recording is too long: at most ${AUDIO_MB} MB.`);
+  if (Number(c.req.header('content-length') ?? 0) > SAY_AUDIO_MAX_BYTES) return tooBig();
+  const bytes = await c.req.arrayBuffer();
+  if (bytes.byteLength > SAY_AUDIO_MAX_BYTES) return tooBig();
+  if (bytes.byteLength === 0) return fail(c, 400, 'invalid_input', 'The recording is empty.');
   return { bytes, type };
 }

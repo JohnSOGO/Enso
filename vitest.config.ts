@@ -11,6 +11,7 @@ export default defineConfig(async () => {
     plugins: [
       cloudflareTest({
         wrangler: { configPath: './wrangler.toml' },
+        remoteBindings: false, // §8.18 the AI binding (speech to text) is never called from a test
         miniflare: {
           bindings: {
             TEST_MIGRATIONS: migrations,

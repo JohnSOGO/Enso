@@ -48,3 +48,6 @@ WEATHER_URL = "https://api.open-meteo.com"
 
 [triggers]
 crons = ["* * * * *"]
+
+[ai]
+binding = "AI"

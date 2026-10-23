@@ -1,8 +1,10 @@
 import type { Role } from '../shared/vocab';
+import type { SpeechAi } from './speech-to-text';
 
 export interface Env {
   DB: D1Database;
   PHOTOS: R2Bucket;
+  AI?: SpeechAi; // §8.18 part 2 Workers AI (speech to text), the [ai] binding in wrangler.toml
   SETUP_TOKEN?: string;
   DEV_ENDPOINTS?: string;
   VAPID_PUBLIC_KEY?: string;
