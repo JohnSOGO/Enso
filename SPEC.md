@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.89 · **Date:** 2026-10-23 · **Owner:** MojoSOGO
+**Version:** 3.90 · **Date:** 2026-10-23 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1125,6 +1125,16 @@ Schema: [`migrations/0062_note_marks.sql`](migrations/0062_note_marks.sql). **Mi
 [`test/migration-0062.test.ts`](test/migration-0062.test.ts)**):** the table takes a row; a second row with the same
 hash is refused.
 
+### 4.2zzj Schema change — `migrations/0063_event_private.sql`
+
+Asked in a 💡 request 2026-10-23 (§6.3 "Private events"): an event can be marked private, so the people who may not
+open it see only its time. One column, `events.private` (0/1, default 0); every existing event stays as it was.
+Additive; it runs before the deploy.
+
+Schema: [`migrations/0063_event_private.sql`](migrations/0063_event_private.sql). **Migration check (PV-M,**
+[`test/migration-0063.test.ts`](test/migration-0063.test.ts)**):** an existing event reads `private` 0; a new one
+takes 1.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1546,15 +1556,35 @@ its form shows "Only the creator or an admin can change this …" and no Save, D
 
 **Who opens an event** (v1.80.0, MojoSOGO 2026-10-16: "when the three adults are going out, the kids should not be
 able to open the event and look at the details … only people that are invited to the event can open and look at the
-details"). Everyone still sees an event's **summary** in `/calendar` and the day sheet (title, time, emoji, who's
-going, 🔔 / 🔁). Its **details** (`GET /events/{id}`: notes, address, things to bring, reminder) open only for: anyone
+details"). An event's **details** (`GET /events/{id}`: notes, address, things to bring, reminder) open only for: anyone
 when **nobody is assigned** (everyone's event), the members **assigned**, its **creator**, and **admins** (⚑ Q296:
 admins may already change any event). The rule is `canOpenEvent` (`shared/event-access.ts`); anyone else gets 403
-`forbidden`, "Only the people going can open this event." Whoever may change an event may open it. Optional-event
-switches (§7.5) are unchanged. **Acceptance** (`test/event-access.test.ts`, `test/event-access-api.test.ts`): EO1 nobody
-assigned, assigned, creator or admin → may open; EO2 anyone else → may not; EO3 canChange ⇒ canOpenEvent; EO4 a member
-not going → 403 on `GET /events/{id}`, the event still in their `/calendar` with title, time and assignees; EO5 the
-assignee, the creator and an admin → 200; EO6 nobody assigned → 200 for any member.
+`forbidden`, "Only the people going can open this event." Whoever may change an event may open it. Everyone else
+still sees an ordinary event's **summary** in `/calendar` and the day sheet (title, time, emoji, who's going, 🔔 / 🔁),
+as a 🔒 row that doesn't open.
+
+**Private events** (v1.106.0, 💡 request 2026-10-23: "if only adults are invited … if it's marked private, the kids
+shouldn't even see the summary; they should just see … the time range, and the name of the event as 'Private'"). An
+event marked **🔒 Private** (§8.4) hides its summary too from everyone who may not open it, the same people as above:
+for an adults-only night out with the adults ticked, that is the kids ⚑ Q381 (Ensō has no adult flag; who may open is
+the line). They get, in `/calendar`, only its **date and start–end time**, titled **Private**, with no emoji, nobody
+going, no creator, no 🔔 / 🔁 / 📝, a grey bar instead of the creator's colour, and `masked: true` ⚑ Q382; the day sheet
+shows it as a 🔒 Private row that doesn't open, and `/optional-events` (§7.5) titles it Private the same way. The
+people who may open it see it as any event. Private needs someone ticked as going ⚑ Q383: an event for nobody is
+everyone's, so a private one with nobody is refused with 400 "Tick who's going to make it private." Its reminder
+pushes are private to their member: Settings → 📊 Status leaves them out of other members' Recent deliveries (the
+`privatePush` rule, §7B.9). Its 🔊 House reminder speaks as set on the speakers of the people going ⚑ Q384 (untick
+🔊 to keep it off the speakers). The rule is `isMaskedFor` + `maskOccurrence` beside `canOpenEvent`.
+
+**Acceptance** (`test/event-access.test.ts`, `test/event-access-api.test.ts`): EO1 nobody assigned, assigned, creator
+or admin → may open; EO2 anyone else → may not; EO3 canChange ⇒ canOpenEvent; EO4 a member not going → 403 on
+`GET /events/{id}`, an ordinary event still in their `/calendar` with title, time and assignees; EO5 the assignee, the
+creator and an admin → 200; EO6 nobody assigned → 200 for any member; PV1 `isMaskedFor` is true only for a private
+event the viewer may not open; PV2 a private event in a non-going member's `/calendar` → title "Private", the same date
+and times, emoji null, `assignedTo` [], `masked` true, no creator name, `hasReminder` / `recurring` / `hasNotes` false;
+PV3 the assignee and an admin get the real title, `private` true, `masked` false; PV4 POST or PATCH private with nobody
+assigned → 400; PV5 a private optional event in `/optional-events` → "Private" for a non-going member, its title for
+the assignee; PV6 a private event's reminder push to A is in A's `/status` Recent deliveries, not in B's.
 
 **Rules for changing people** (`PATCH /members/{id}`, owner only):
 - **The founder is protected:** their role cannot be changed and they cannot be disabled.
@@ -3044,7 +3074,8 @@ costs the other one, so it waits for their **Got it** unless they recorded it. A
 **Who sees it** ⚑ Q350: the two people in a direction, and every admin. Nobody else, not even that a direction exists.
 A payback ping is the one who owes's alone ⚑ Q359: Settings → 📊 Status (§8.6) leaves other members' payback pings out
 of Recent deliveries, as it does their task check-ins (Q308). Which pushes are private is one rule
-(`privatePush` in `src/worker/deliveries.ts`: a row with `iou_plan_id` or `iou_row_id`), read both by Status and
+(`privatePush` in `src/worker/deliveries.ts`: a row with `iou_plan_id` or `iou_row_id`, or a fire of a private event,
+§6.3), read both by Status and
 by the founder-ping filter that keeps money off the FunHouse (§9.4a); a later private push adds its column there.
 
 **Records** ⚑ Q355: amounts are never edited. A mistake is fixed by deleting a waiting or declined row (who made it,
@@ -4477,7 +4508,8 @@ It contains, in order:
 3. All-day events.
 4. Timed events in time order, each showing time, title, creator chip, assigned
    chips, 🔔 if it has a reminder and 📝 if it has notes (§8.4a). The 📝 shows only on a row the member may open:
-   `/calendar` sends `hasNotes` true only then, so a 🔒 event never tells that it has notes ⚑ Q362.
+   `/calendar` sends `hasNotes` true only then, so a 🔒 event never tells that it has notes ⚑ Q362. A private event
+   the member may not open shows only its time, a grey bar and "🔒 Private", and doesn't open (§6.3 Private events).
 
 **Who it's for** (v1.73.0, MojoSOGO 2026-10-12: "One person mentioned twice; just mention once. If
 everyone; make one green bubble with words family"): each person shows **once**. A creator who
@@ -4520,6 +4552,8 @@ Fields:
 - **Emoji** (optional, §7.6): one emoji — typed with the phone's emoji keyboard — shown
   beside the title. On a new event it is guessed from the title until the person types in it or clears it
   (§7.6 Guessed emoji); while it holds a guess, a muted **✨ guessed** shows beside the box.
+- **☐ 🔒 Private — only the people going see it** (creator or admin, §6.3 Private events): shown with the Optional
+  box; needs someone ticked in Assigned to.
 - **☐ Optional — each person turns it on** (creator or admin, §7.5). On an optional event
   the form also shows **☐ On for me** — every member's own switch. It takes effect the
   moment it is ticked (like the Settings switch), needs no Save, and stays usable for
@@ -6644,8 +6678,8 @@ other push stays until I hide it ⚑ Q284.
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
 | DELETE | `/invites/{id}` | owner | revoke |
-| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[], moonPhases[], weather[] }` (each occurrence carries `emoji`, and `hasNotes`: true only when it has notes and the member may open it, §8.4a; `moonPhases` is `{ date, name, emoji }[]` for the range (§7.12); `weather` is the stored forecast days in the range, §7.11); recurring events expanded server-side with `recurrence.ts`; alarms and sun-timed events (§7.7) excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
-| GET | `/optional-events` | member | → `{ id, title, emoji, recurrence, startDate, on }[]` — every optional event, with this member's switch |
+| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[], moonPhases[], weather[] }` (each occurrence carries `emoji`, `private`, `masked`, and `hasNotes`: true only when it has notes and the member may open it, §8.4a; a private event the member may not open is masked to its date and times, titled Private, §6.3; `moonPhases` is `{ date, name, emoji }[]` for the range (§7.12); `weather` is the stored forecast days in the range, §7.11); recurring events expanded server-side with `recurrence.ts`; alarms and sun-timed events (§7.7) excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
+| GET | `/optional-events` | member | → `{ id, title, emoji, recurrence, startDate, on }[]` — every optional event, with this member's switch; a private one this member may not open titled Private with no emoji (§6.3) |
 | PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |
 | POST | `/events/read-photo` | member | raw image body → `{ title, startDate, endDate, startTime, endTime, location, notes }` (each nullable); 503 / 502 / 422 / 429 per §7.8 |

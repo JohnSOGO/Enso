@@ -11,6 +11,7 @@ export interface Occurrence {
   eventId: string; date: string; endDate: string; startTime: string | null; endTime: string | null;
   title: string; allDay: boolean; color: string; createdBy: string; creatorName: string;
   assignedTo: string[]; hasReminder: boolean; hasNotes: boolean; recurring: boolean; emoji: string | null;
+  private: boolean; masked: boolean; // §6.3 Private events: masked = cut to its time, titled Private
 }
 export interface DayData {
   items: (Occurrence & { continued: boolean })[];

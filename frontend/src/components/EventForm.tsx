@@ -22,7 +22,7 @@ import { ReminderFields, reminderError, reminderOf, toReminder, type ReminderVal
 
 interface Form extends RepeatValue, ReminderValue {
   title: string; address: string; bring: string[]; notes: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string;
-  assignedTo: string[]; optional: boolean; emoji: string; emojiOwn: boolean; // emojiOwn: typed or cleared, not guessed (§7.6)
+  assignedTo: string[]; optional: boolean; private: boolean; emoji: string; emojiOwn: boolean; // emojiOwn: typed or cleared, not guessed (§7.6)
 }
 
 /** A new event; `start` = what the Ensō button read (§8.18, ⚑ Q341). */
@@ -30,7 +30,7 @@ function blank(date: string, founder: boolean, start?: SayEvent): Form {
   const said = start && { title: start.title, allDay: start.time === null, startTime: start.time ?? '09:00', assignedTo: start.assignedTo };
   return {
     title: '', address: '', bring: [], notes: '', date, allDay: false, startTime: '09:00', endTime: '', endDate: date,
-    repeat: 'none', byDay: [WEEKDAY[weekdayOf(date)]], weeks: ownWeek(date), until: '', assignedTo: [], optional: false, emoji: '', emojiOwn: false,
+    repeat: 'none', byDay: [WEEKDAY[weekdayOf(date)]], weeks: ownWeek(date), until: '', assignedTo: [], optional: false, private: false, emoji: '', emojiOwn: false,
     ...reminderOf(null, founder), ...said,
   };
 }
@@ -41,7 +41,7 @@ function fromEvent(e: any): Form {
   return {
     title: e.title, address: e.address ?? '', bring: e.bring ?? [], notes: e.notes ?? '', date: e.startDate, allDay: e.allDay, startTime: e.startTime ?? '09:00',
     endTime: e.endTime ?? '', endDate: e.endDate, repeat, byDay: r?.byDay ?? [WEEKDAY[weekdayOf(e.startDate)]],
-    weeks: weeksOf(r, e.startDate), until: r?.until ?? '', assignedTo: e.assignedTo, optional: !!e.optional, emoji: e.emoji ?? '', emojiOwn: true,
+    weeks: weeksOf(r, e.startDate), until: r?.until ?? '', assignedTo: e.assignedTo, optional: !!e.optional, private: !!e.private, emoji: e.emoji ?? '', emojiOwn: true,
     ...reminderOf(e.reminder),
   };
 }
@@ -52,7 +52,7 @@ function toPayload(f: Form) {
     title: f.title, address: f.address.trim() || null, bring: f.bring, notes: f.notes || null, startDate: f.date,
     startTime: f.allDay ? null : f.startTime, endTime: f.allDay || !f.endTime ? null : f.endTime,
     endDate: f.allDay ? f.endDate : f.date,
-    recurrence, assignedTo: f.assignedTo, optional: f.optional, emoji: shownEmoji(f.emoji, f.emojiOwn, f.title).trim() || null,
+    recurrence, assignedTo: f.assignedTo, optional: f.optional, private: f.private && f.assignedTo.length > 0, emoji: shownEmoji(f.emoji, f.emojiOwn, f.title).trim() || null,
     reminder: toReminder(f),
   };
 }

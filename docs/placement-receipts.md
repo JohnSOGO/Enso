@@ -7,6 +7,25 @@ carry its result.
 
 ---
 
+## 2026-10-23 — Private events: masked /calendar rows (placement-advisor)
+
+- **Ask:** A `private` event flag (migration 0063, a 🔒 Private checkbox, carried through event-rows and routes/events);
+  a viewer who may not open a private event gets only its date and times in /calendar, titled "Private" (SPEC §6.3
+  Private events, v1.106.0). Also: where masking goes in other surfaces.
+- **Verdict:** EXISTING src/shared/event-access.ts (isMaskedFor, PRIVATE_TITLE, maskOccurrence; row widened); EXISTING
+  src/worker/event-rows.ts (column, view, parse, insert); EXISTING src/worker/routes/events.ts (the /calendar loop,
+  PATCH column); EXISTING src/worker/routes/optins.ts (same mask on /optional-events); EXISTING
+  frontend/src/components/DaySheet.tsx (🔒 Private, not openable when `masked`); NEW frontend/src/components/EventFlags.tsx
+  (Optional and Private boxes), extracted from EventForm.tsx first by the reorganizer; NEW migrations/0063 + test.
+  say-reader.ts: REUSE-add-nothing (ENSO_DOES names it). Steward sibling: EXISTING src/worker/deliveries.ts privatePush
+  takes a private event's fires (Status), the one private-push rule (§7B.9).
+- **Why:** what a private event shows to whom is a decision, so it goes beside canOpenEvent in the pure leaf that owns
+  event visibility, not inline in the /calendar loop (events.ts 125/147). The PWA reads the server's `masked` flag
+  because stripped assignees make canOpenEvent true on the phone. EventForm.tsx is the audit's top file, so its flags
+  moved to a field component.
+- **Caps:** event-access.ts ~35/300; events.ts 127/147; EventForm.tsx 197/223; EventFlags.tsx ~20/300. None newly in the band.
+
+
 ## 2026-10-23 — EventFlags seam for Private events (reorganizer)
 
 - **Ask:** placement-advisor's extract-first for Private events: EventForm.tsx is the audit's top file (198/223).
