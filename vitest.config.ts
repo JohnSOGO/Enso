@@ -55,6 +55,7 @@ export default defineConfig(async () => {
     ],
     test: {
       include: ['test/**/*.test.ts'],
+      testTimeout: 30_000, // eight files sign in inside the test body (two PBKDF2 runs); 5 s timed out under full-suite load
       setupFiles: ['./test/apply-migrations.ts'],
     },
   };

@@ -7,6 +7,21 @@ carry its result.
 
 ---
 
+## 2026-10-23 — steward picks 1 and 2: useRecord start/cancel race, suite testTimeout (placement-advisor)
+
+- **Ask:** v1.106.2, MojoSOGO "1 and 2" from the steward pass after v1.105.1. (1) A cancel() or stop() during the
+  getUserMedia await was lost, so recording began after the popup closed. (2) testTimeout 30_000 (eight files sign in
+  inside the test body).
+- **Verdict:** (1) EXISTING `frontend/src/components/useSpeech.ts` useRecord: a generation ref bumped by end() and
+  unmount; start() gives up (stops the stream's tracks) when it changed across the await; a pending ref ignores a second
+  start during the popup. No unit test (no hook test setup; a new framework for one fix). (2) EXISTING `vitest.config.ts`
+  `test.testTimeout`. Map rows unchanged. Reorganizer NONE.
+- **Why:** the race lives in useRecord's own life cycle; EnsoButton.tsx is untouched. The timeout is suite-wide config.
+- **Caps:** useSpeech.ts ~92/300; vitest.config.ts not capped. Spec unchanged (§8.18 part 2 already says Cancel drops
+  a recording in progress); history entry added.
+
+---
+
 ## 2026-10-23 — privatePush NULL fix, v1.106.1 (placement-advisor)
 
 - **Ask:** steward finding #1 after v1.106.0: `privatePush`'s `t.fire_id IN (…)` is NULL for fire-less rows, so

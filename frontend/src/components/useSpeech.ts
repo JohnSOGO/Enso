@@ -13,6 +13,8 @@ const recordType = () => ['audio/mp4', 'audio/webm', 'audio/ogg'].find((t) => Me
 export function useRecord(onClip: (clip: Blob) => void, maxMs: number) {
   const rec = useRef<MediaRecorder | null>(null);
   const keep = useRef(true); // false: cancel() drops the clip
+  const gen = useRef(0); // bumped by stop / cancel / unmount: a start still waiting on the mic popup gives up
+  const pending = useRef(false); // the mic popup is up
   const latest = useRef(onClip);
   latest.current = onClip;
   const [recording, setRecording] = useState(false);
@@ -20,16 +22,21 @@ export function useRecord(onClip: (clip: Blob) => void, maxMs: number) {
   const unavailable = typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia;
 
   const end = useCallback((keepIt: boolean) => {
+    gen.current++;
     keep.current = keepIt;
     if (rec.current?.state === 'recording') rec.current.stop();
     setRecording(false);
   }, []);
   const start = useCallback(async () => {
-    if (unavailable || rec.current?.state === 'recording') return;
+    if (unavailable || pending.current || rec.current?.state === 'recording') return;
     setRefused(false);
+    const g = gen.current;
     let stream: MediaStream;
+    pending.current = true;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch { setRefused(true); return; }
+    catch { if (gen.current === g) setRefused(true); return; }
+    finally { pending.current = false; }
+    if (gen.current !== g) { stream.getTracks().forEach((t) => t.stop()); return; } // stopped or cancelled during the popup
     try {
       const type = recordType();
       const r = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
@@ -51,7 +58,7 @@ export function useRecord(onClip: (clip: Blob) => void, maxMs: number) {
   }, [unavailable, maxMs, end]);
   const stop = useCallback(() => end(true), [end]);
   const cancel = useCallback(() => end(false), [end]);
-  useEffect(() => () => { keep.current = false; if (rec.current?.state === 'recording') rec.current.stop(); }, []);
+  useEffect(() => () => { gen.current++; keep.current = false; if (rec.current?.state === 'recording') rec.current.stop(); }, []);
   return { recording, unavailable, refused, start, stop, cancel };
 }
 
