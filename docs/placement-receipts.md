@@ -7,6 +7,27 @@ carry its result.
 
 ---
 
+## 2026-10-23 — steward pass after v1.105.1 (code-steward)
+
+- **Run:** post-release, covering v1.104.0 (record, then write it down: speech-to-text.ts NEW, POST /say/hear,
+  http.ts audioBody, useRecord, [ai] binding, vitest remoteBindings:false) and v1.105.0–1.105.1 (the Ensō answer:
+  want / steps / sayBack / SAY_CHECK in say-reading.ts, the prompt in say-reader.ts, EnsoButton.tsx render). Also
+  reconciles v1.102.0, v1.103.0 and the PC's RM1–RM4 timeouts. Report: /mnt/project-files/steward/2026-10-23-v1-105-pass.md.
+- **Verdict:** SOUND. Typecheck green; 1056/1056; arch:audit quiet (top EventForm 198/223). 5 receipts match 5 code
+  commits; 0 code commits without a receipt.
+- **Top finding:** MED: useRecord's cancel() during the getUserMedia await is lost; start() then records up to 60 s
+  with the popup closed and uploads a clip EnsoButton drops. Fix: a generation ref start() checks after the await.
+- **Handoffs:** 0 reorganizer, 0 placement-advisor. 5 to worker: #1 the useRecord cancel race (useSpeech.ts);
+  #2 `testTimeout: 30_000` in vitest.config.ts (eight files sign in inside the test body: two PBKDF2 runs under the 5 s
+  default under full-suite load); #3 a shared rawBody for photoBody / audioBody on the next touch of http.ts; #4 rewrite
+  the say-reading.ts map row; #5 try `remote = true` on [ai] to silence the AI-binding warning (157 a run).
+- **Restraint:** no EnsoButton split (hotspot, 13 changes in 8 days, coherent at 173/300; seam = the answer view); no
+  cap on /say/hear (⚑ Q379); speech-to-text.ts stays the IO boundary. Still carried: NOTE_MARKS_VIA / NoteMarksVia,
+  LM_STUDIO_URL re-export; isShareKey / InboxSetup apiUrl; deleteEventStatements, renotifyText, updateEventStatement;
+  show* gating at a 5th calendar item; ious.ts at 81%.
+
+---
+
 ## 2026-10-23 — "I will … Did I get that right?" said back (placement-advisor)
 
 - **Ask:** SPEC §8.18 parts 3–4, v1.105.1, refines Q380 (MojoSOGO "have it say I will … and then the reexplain and then
