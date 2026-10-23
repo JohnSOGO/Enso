@@ -56,7 +56,7 @@ export function funhouseDelivery(db: D1Database, r: FunhouseRow, now: string): W
 /** §7B.9 Q359 — a push only its own member may see (an IOU payback ping or declined notice, or a fire of a private event,
  *  §6.3): never a founder ping, and shown in /status only to that member. `t` is the deliveries table's name or alias in the calling query. */
 export const privatePush = (t: string) => `(${t}.iou_plan_id IS NOT NULL OR ${t}.iou_row_id IS NOT NULL
-  OR ${t}.fire_id IN (SELECT f.id FROM fires f JOIN events e ON e.id = f.event_id WHERE e.private = 1))`;
+  OR EXISTS (SELECT 1 FROM fires f JOIN events e ON e.id = f.event_id WHERE f.id = ${t}.fire_id AND e.private = 1))`;
 
 /** What a founder ping is (§9.4): a fire-less push with a title that is not a sign-in notice (§6.6), a mess ask (§7B.7),
  *  a bounty push (§7B.8), a list ping (§7A.4) or an IOU
