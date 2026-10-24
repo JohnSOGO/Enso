@@ -1,9 +1,10 @@
 // SPEC §7B.9 acceptance IO3–IO18 through the real Worker: adding IOUs, whoever it costs agrees, payments, who sees,
-// payback plans and their phone-only ping (not a founder ping), a plan ending at $0, and declining / asking again.
+// payback plans and their phone-only ping (not a founder ping), a plan ending at $0, declining / asking again, and the
+// one push to the one a row waits on.
 import { env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Client, member, owner, tickAt } from './helpers';
-import { DECLINED_TITLE, PAYBACK_TITLE } from '../src/shared/ious';
+import { DECLINED_TITLE, PAYBACK_TITLE, WAITING_TITLE } from '../src/shared/ious';
 import { localToUtc } from '../src/shared/time';
 import { opsPingsAfter, opsPingsSince } from '../src/worker/deliveries';
 
@@ -152,15 +153,53 @@ describe('§7B.9 family IOUs', () => {
     const again = await ma.post(`/ious/${w.id}/again`);
     expect(again.json).toMatchObject({ waiting: { ious: [{ id: w.id }] }, declined: { ious: [] } });
     expect(await pushes(A)).toHaveLength(1);
+    expect((await pushes(L)).filter((x: any) => x.title === WAITING_TITLE.iou)).toHaveLength(2); // made, then asked again
     expect((await lee.post(`/ious/${w.id}/ok`)).json.owedCents).toBe(30000);
     // IO18 a payment: declined, then the rest paid, so asking again no longer fits.
     const p = (await lee.post('/iou-payments', { owedBy: L, owedTo: A, amount: 100, how: 'paid' })).json.waiting.payments[0];
     await ma.post(`/iou-payments/${p.id}/decline`);
-    expect((await pushes(L))[0]).toMatchObject({ message: `${maName} declined your $100.00 payment.` });
+    expect((await pushes(L)).find((x: any) => x.title === DECLINED_TITLE)).toMatchObject({ message: `${maName} declined your $100.00 payment.` });
     await ma.post('/iou-payments', { owedBy: L, owedTo: A, amount: 250, how: 'let_go' });
     const no = await lee.post(`/iou-payments/${p.id}/again`);
     expect([no.status, no.json.error]).toEqual([409, 'iou_too_much']);
     expect((await lee.del(`/iou-payments/${p.id}`)).status).toBe(204);
     expect((await pairOf(lee, L, A)).declined.payments).toEqual([]);
+  });
+
+  it('IO19 + IO20 a row waiting on someone pushes them once, phone only, private; one that counts at once pushes nobody', async () => {
+    const { client: bo, id: B } = await member(o);
+    const { client: cy, id: C } = await member(o);
+    const boName = (await bo.get('/me')).json.displayName, cyName = (await cy.get('/me')).json.displayName;
+    const asks = async (to: string) => (await env.DB.prepare('SELECT title, message, iou_row_id, channel FROM deliveries WHERE member_id = ? AND iou_row_id IS NOT NULL AND title IN (?, ?) ORDER BY created_at, id')
+      .bind(to, WAITING_TITLE.iou, WAITING_TITLE.payment).all()).results;
+    await bo.post('/ious', { owedBy: B, owedTo: C, amount: 50 }); // Bo owes: counts at once
+    expect(await asks(C)).toEqual([]);
+    const pay = (await bo.post('/iou-payments', { owedBy: B, owedTo: C, amount: 20, how: 'paid' })).json.waiting.payments[0];
+    expect(await asks(C)).toEqual([{ title: WAITING_TITLE.payment, message: `${boName} paid you $20.00. Tap Got it or Decline.`, iou_row_id: pay.id, channel: 'push' }]);
+    expect(await asks(B)).toEqual([]);
+    await cy.post('/iou-payments', { owedBy: B, owedTo: C, amount: 5, how: 'let_go' }); // the one owed: at once
+    await o.post('/ious', { owedBy: B, owedTo: C, amount: 1 }); // an admin who is neither: at once
+    expect(await asks(C)).toHaveLength(1);
+    expect(await asks(B)).toEqual([]);
+    await bo.post('/ious', { owedBy: C, owedTo: B, amount: 0.5 }); // waits on Cy
+    expect((await asks(C)).at(-1)).toMatchObject({ title: WAITING_TITLE.iou, message: `${boName} says you owe $0.50. Tap OK or Decline.` });
+    const before = (await asks(B)).length;
+    await cy.post('/ious', { owedBy: B, owedTo: C, amount: 30, note: 'pizza' }); // a plain IOU Cy adds waits on Bo
+    expect(await asks(B)).toHaveLength(before + 1);
+    expect((await asks(B)).at(-1)).toMatchObject({ message: `${cyName} says you owe $30.00 · pizza. Tap OK or Decline.` });
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM deliveries WHERE channel != 'push' AND message LIKE '%pizza%'").first<{ n: number }>())!.n).toBe(0);
+    expect((await opsPingsAfter(env.DB, null, '2000-01-01T00:00:00Z', 500)).some((x: any) => x.message?.includes('Tap'))).toBe(false);
+    expect((await kai.get('/status')).json.recentDeliveries.some((d: any) => d.message?.includes('Tap'))).toBe(false);
+  });
+
+  it('IO21 off the tab with the rest an IOU: one tap, one push', async () => {
+    const { client: di, id: D } = await member(o);
+    const { id: E } = await member(o);
+    await di.post('/ious', { owedBy: D, owedTo: E, amount: 10 }); // Di owes Ed $10 (at once)
+    const n = async () => (await env.DB.prepare('SELECT COUNT(*) AS n FROM deliveries WHERE member_id = ? AND iou_row_id IS NOT NULL').bind(E).first<{ n: number }>())!.n;
+    // Di paid a $30 bill; Ed's $30 goes $10 off Di's tab and $20 as an IOU, both waiting on Ed.
+    const r = await di.post('/ious', { owedBy: E, owedTo: D, amount: 30, offTab: true });
+    expect(r.status, JSON.stringify(r.json)).toBe(201);
+    expect(await n()).toBe(1);
   });
 });

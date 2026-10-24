@@ -1,7 +1,7 @@
 // SPEC §7B.9 — family IOUs, the pure rules (IO1–IO2 and the rules behind IO3–IO12 and IO16–IO18; the API rows are ious-api.test.ts).
 import { describe, expect, it } from 'vitest';
 import {
-  IOU_CENTS_MAX, askAgainError, behindCents, declineError, declinedMessage, centsText, countsAtOnce, deleteError, okError, owedCents, pairsOf, parseAmount, parsePlanInput,
+  IOU_CENTS_MAX, askAgainError, behindCents, declineError, declinedMessage, waitingMessage, waitingText, centsText, countsAtOnce, deleteError, okError, owedCents, pairsOf, parseAmount, parsePlanInput,
   pingDue, planDates, queueOf, type IouPaymentRow, type IouPlanRow, type IouRow,
 } from '../src/shared/ious';
 
@@ -86,6 +86,10 @@ describe('§7B.9 IOU rules', () => {
     expect(deleteError('iou', no, { id: 'mom', admin: false })).toBeNull();
     expect(declinedMessage('iou', 'Sam', 30000, 'tickets')).toBe('Sam declined your $300.00 IOU · tickets.');
     expect(declinedMessage('payment', 'Mom', 10000, null)).toBe('Mom declined your $100.00 payment.');
+    // IO19 what a waiting row asks of the one it waits on (⚑ Q385)
+    expect(waitingMessage('payment', 'Sam', 10000, 'paid', null)).toBe('Sam paid you $100.00. Tap Got it or Decline.');
+    expect(waitingMessage('payment', 'Sam', 4000, 'tab', 'pizza')).toBe('Sam took $40.00 off your tab · pizza. Tap Got it or Decline.');
+    expect(waitingText('iou', 'Mom', 30000, null, 'tickets')).toBe('Mom says you owe $300.00 · tickets.');
     const older = { ...no, id: 'o', declined_at: '2026-10-19T00:00:00.000Z' };
     const p = pairsOf([no, older], [pay('p', 100, { ok_at: null, declined_at: T, declined_by: 'mom', created_by: 'sam' })], [], { id: 'mom', admin: false }, '2026-10-20', 'UTC');
     expect(p).toHaveLength(1);

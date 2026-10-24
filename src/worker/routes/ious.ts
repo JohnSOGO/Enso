@@ -1,10 +1,10 @@
-// SPEC §7B.9 — family IOUs: adding IOUs, paying back or letting go, OK / Got it, declining (one push to the one who made
-// it) and asking again, deleting, and payback plans. Every
+// SPEC §7B.9 — family IOUs: adding IOUs, paying back or letting go, OK / Got it (one push to the one a new or asked-again
+// row waits on), declining (one push to the one who made it) and asking again, deleting, and payback plans. Every
 // rule (amounts, who agrees, who sees, the queue, behind) is src/shared/ious.ts; this file validates and persists.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import {
-  askAgainError, countsAtOnce, declineError, declinedMessage, DECLINED_TITLE, deleteError, dirOf, reverse, tabSplit, letGoError, madeError, okError, owedCents, pairsOf, parseIouInput, parsePaymentInput,
+  askAgainError, countsAtOnce, declineError, declinedMessage, DECLINED_TITLE, WAITING_TITLE, waitingMessage, waitsOn, deleteError, dirOf, reverse, tabSplit, letGoError, madeError, okError, owedCents, pairsOf, parseIouInput, parsePaymentInput,
   parsePlanInput, rawOwed, waitingPaid, canSee, centsText, type Direction, type IouKind, type IouPaymentRow, type IouPlanRow,
   type IouRow, type IouViewer,
 } from '../../shared/ious';
@@ -55,6 +55,19 @@ async function loadRow(c: Context<AppEnv>, kind: IouKind): Promise<IouRow | IouP
   return r && canSee(dirOf(r), viewerOf(c)) ? r : fail(c, 404, 'not_found', GONE);
 }
 
+/** One private, phone-only push about one row (§7B.9: `iou_row_id`, so never a founder ping, the FunHouse or the house),
+ *  sent only to an active member. */
+async function pushOne(c: Context<AppEnv>, memberId: string, title: string, message: string, rowId: string, now: string): Promise<void> {
+  if (!(await activeMemberIds(c.env.DB)).includes(memberId)) return;
+  const push = pushDelivery(c.env.DB, { memberId, title, message, iouRowId: rowId }, now);
+  await push.stmt.run();
+  await sendPushDeliveries(c.env, [push.id], now);
+}
+
+/** ⚑ Q385 — the one a row now waits on is told once: "💵 OK?" / "💵 Got it?". */
+const askOne = (c: Context<AppEnv>, kind: IouKind, row: { id: string; cents: number; how?: IouPaymentRow['how'] | null; note: string | null } & Direction, now: string) =>
+  pushOne(c, waitsOn(kind, row), WAITING_TITLE[kind], waitingMessage(kind, c.get('member').display_name, row.cents, row.how ?? null, row.note), row.id, now);
+
 export const ious = new Hono<AppEnv>();
 
 ious.get('/ious', requireMember, async (c) => c.json({ pairs: await pairsFor(c) }));
@@ -68,17 +81,22 @@ ious.post('/ious', requireMember, async (c) => {
   const now = nowIso(), back = reverse(input), at = (ok: boolean) => [ok ? now : null, ok ? v.id : null];
   const tab = input.offTab ? await rowsOf(db, back) : null;
   const part = tabSplit(input.cents, tab ? owedCents(tab.ious, tab.payments) - waitingPaid(tab.payments) : 0);
-  const writes: D1PreparedStatement[] = [];
+  const writes: D1PreparedStatement[] = [], asks: [IouKind, Parameters<typeof askOne>[2]][] = [];
   if (part.tab) {
+    const id = newId('iop'), ok = countsAtOnce('payment', back, v.id);
     writes.push(db.prepare('INSERT INTO iou_payments (id, owed_by, owed_to, cents, how, note, created_by, ok_at, ok_by, created_at) VALUES (?, ?, ?, ?, \'tab\', ?, ?, ?, ?, ?)')
-      .bind(newId('iop'), back.owedBy, back.owedTo, part.tab, input.note, v.id, ...at(countsAtOnce('payment', back, v.id)), now));
+      .bind(id, back.owedBy, back.owedTo, part.tab, input.note, v.id, ...at(ok), now));
+    if (!ok) asks.push(['payment', { id, ...back, cents: part.tab, how: 'tab', note: input.note }]);
   }
   if (part.iou) {
+    const id = newId('iou'), ok = countsAtOnce('iou', input, v.id);
     writes.push(db.prepare('INSERT INTO ious (id, owed_by, owed_to, cents, note, created_by, ok_at, ok_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(newId('iou'), input.owedBy, input.owedTo, part.iou, input.note, v.id, ...at(countsAtOnce('iou', input, v.id)), now));
+      .bind(id, input.owedBy, input.owedTo, part.iou, input.note, v.id, ...at(ok), now));
+    if (!ok) asks.push(['iou', { id, ...input, cents: part.iou }]);
   }
   await db.batch(writes);
   if (part.tab && countsAtOnce('payment', back, v.id)) await endPlanIfPaid(db, back);
+  if (asks[0]) await askOne(c, ...asks[0], now); // ⚑ Q385: one tap, one push; both rows wait on the same person
   const pairs = await pairsFor(c);
   const touched = (d: Direction) => pairs.find((p) => p.owedBy === d.owedBy && p.owedTo === d.owedTo);
   return c.json({ pairs: [touched(input), part.tab ? touched(back) : undefined].filter(Boolean) }, 201);
@@ -93,10 +111,11 @@ ious.post('/iou-payments', requireMember, async (c) => {
   const r = await rowsOf(db, input);
   const room = owedCents(r.ious, r.payments) - waitingPaid(r.payments);
   if (input.cents > room) return fail(c, 409, 'iou_too_much', `That's more than the ${centsText(Math.max(0, room))} still owed.`);
-  const now = nowIso(), ok = countsAtOnce('payment', input, v.id);
+  const now = nowIso(), ok = countsAtOnce('payment', input, v.id), id = newId('iop');
   await db.prepare('INSERT INTO iou_payments (id, owed_by, owed_to, cents, how, created_by, ok_at, ok_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(newId('iop'), input.owedBy, input.owedTo, input.cents, input.how, v.id, ok ? now : null, ok ? v.id : null, now).run();
+    .bind(id, input.owedBy, input.owedTo, input.cents, input.how, v.id, ok ? now : null, ok ? v.id : null, now).run();
   if (ok) await endPlanIfPaid(db, input);
+  else await askOne(c, 'payment', { id, ...input, note: null }, now);
   return pairAnswer(c, input, 201);
 });
 
@@ -119,11 +138,7 @@ for (const [kind, path] of [['iou', '/ious'], ['payment', '/iou-payments']] as c
     const now = nowIso();
     const done = await db.prepare(`UPDATE ${TABLE[kind]} SET declined_at = ?, declined_by = ? WHERE id = ? AND ok_at IS NULL AND declined_at IS NULL`).bind(now, me.id, row.id).run();
     if (!done.meta.changes) return fail(c, 409, 'iou_state', 'That is no longer waiting.'); // a second tap at the same moment
-    if ((await activeMemberIds(db)).includes(row.created_by)) {
-      const push = pushDelivery(db, { memberId: row.created_by, title: DECLINED_TITLE, message: declinedMessage(kind, me.display_name, row.cents, row.note), iouRowId: row.id }, now);
-      await push.stmt.run();
-      await sendPushDeliveries(c.env, [push.id], now);
-    }
+    await pushOne(c, row.created_by, DECLINED_TITLE, declinedMessage(kind, me.display_name, row.cents, row.note), row.id, now);
     return pairAnswer(c, dirOf(row));
   });
 
@@ -137,6 +152,7 @@ for (const [kind, path] of [['iou', '/ious'], ['payment', '/iou-payments']] as c
       if (row.cents > room) return fail(c, 409, 'iou_too_much', `That's more than the ${centsText(Math.max(0, room))} still owed.`);
     }
     await db.prepare(`UPDATE ${TABLE[kind]} SET declined_at = NULL, declined_by = NULL WHERE id = ?`).bind(row.id).run();
+    await askOne(c, kind, { ...row, ...d, how: 'how' in row ? row.how : null }, nowIso());
     return pairAnswer(c, d);
   });
 

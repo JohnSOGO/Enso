@@ -11,6 +11,8 @@ export const IOU_CENTS_MAX = 9_999_999_999;
 export const PLAN_PING_TIME = '09:00';
 export const PAYBACK_TITLE = '💵 Payback due';
 export const DECLINED_TITLE = '💵 Declined';
+/** ⚑ Q385 — the push to the one a row waits on, by kind. */
+export const WAITING_TITLE: Record<IouKind, string> = { iou: '💵 OK?', payment: '💵 Got it?' };
 
 /** An `ious` row (§4.2zzf). */
 export interface IouRow {
@@ -167,6 +169,15 @@ export function deleteError(_kind: IouKind, r: Okable, v: IouViewer): string | n
 /** The declined notice to the one who made it (⚑ Q372). */
 export const declinedMessage = (kind: IouKind, byName: string, cents: number, note: string | null) =>
   `${byName} declined your ${centsText(cents)} ${kind === 'iou' ? 'IOU' : 'payment'}${note ? ` · ${note}` : ''}.`;
+
+/** What a waiting row asks of the one it waits on (⚑ Q385): the banner's line, and the push with what to tap. */
+export function waitingText(kind: IouKind, byName: string, cents: number, how: IouPayHow | null, note: string | null): string {
+  const amount = centsText(cents);
+  const what = kind === 'iou' ? `says you owe ${amount}` : how === 'tab' ? `took ${amount} off your tab` : `paid you ${amount}`;
+  return `${byName} ${what}${note ? ` · ${note}` : ''}.`;
+}
+export const waitingMessage = (kind: IouKind, byName: string, cents: number, how: IouPayHow | null, note: string | null) =>
+  `${waitingText(kind, byName, cents, how, note)} Tap ${kind === 'iou' ? 'OK' : 'Got it'} or Decline.`;
 
 type Counted = { cents: number; ok_at: string | null; deleted_at: string | null };
 const counted = <T extends Counted>(rows: readonly T[]) => rows.filter((r) => r.ok_at && !r.deleted_at);

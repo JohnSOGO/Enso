@@ -7,6 +7,30 @@ carry its result.
 
 ---
 
+## 2026-10-24 — IOU waiting push + IOU banner, v1.107.0 (placement-advisor, code-steward)
+
+- **Ask:** MojoSOGO: "when an iou payment is made, an ack is required so put it at the top of the app and send an alert
+  to the phone only". (1) When an IOU row starts waiting on someone (a payment, a tab payment from ＋ IOU, an IOU, or Ask
+  again), that person gets one private push, phone only (deliveries.iou_row_id). (2) A banner on every screen with the
+  rows waiting on me, with OK / Got it and Decline (SPEC §7B.9, §8.15c, §8.15a). No migration.
+- **Verdict:** EXISTING src/shared/ious.ts (WAITING_TITLE / waitingText / waitingMessage, pure, next to declinedMessage).
+  EXISTING src/worker/routes/ious.ts: one file-local pushOne (+ askOne) used by POST /ious, POST /iou-payments, …/again
+  and the existing /decline; the one it waits on comes from waitsOn; push only when !countsAtOnce and the person is
+  active. EXISTING frontend/src/components/Ious.tsx exports useIous / useIouAction / IouAnswerButtons / okable, hoisted
+  out of IousSection, matching Messes.tsx. NEW frontend/src/components/IouBanner.tsx renders the rows where !okError.
+  EXISTING frontend/src/App.tsx mounts it under MessBanner. Reorganizer NONE.
+- **Why:** the words are a rule; the route only persists and sends, as decline already did. iou_row_id already makes the
+  push private (privatePush: no founder ping, no FunHouse, others' Status). Only a push row is written, so deliveries.ts,
+  push.ts, alert-history.ts and household.ts are unchanged. The banner copies MessBanner, so the card and the banner
+  can't drift. Spec gaps settled as ⚑ Q385: one push per tap; banner under the mess banner; Decline keeps its confirm.
+- **Steward (AREC pass):** traps checked (iouRowId on every push; no "already pushed" check, so Ask again re-asks; banner
+  filters by okError, not canSee). Same need elsewhere, listed for John, not built: a banner for 🪙 earnings waiting on an
+  admin (already pushed); bounty Not yet doesn't tell the doer. Backlog: `roomCents` for the thrice-written
+  owedCents − waitingPaid in routes/ious.ts (low).
+- **Caps:** src/shared/ious.ts ~258/300 (nearest the band); routes/ious.ts ~197; Ious.tsx ~140; IouBanner.tsx ~33; App.tsx ~165.
+
+---
+
 ## 2026-10-23 — steward picks 1 and 2: useRecord start/cancel race, suite testTimeout (placement-advisor)
 
 - **Ask:** v1.106.2, MojoSOGO "1 and 2" from the steward pass after v1.105.1. (1) A cancel() or stop() during the
