@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.91 · **Date:** 2026-10-23 · **Owner:** MojoSOGO
+**Version:** 3.92 · **Date:** 2026-10-24 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3039,14 +3039,23 @@ let go (`let_go`) in one direction. A **payback plan** is a repeating amount due
 | the one owed | waits for the one who owes: **OK** | counts at once |
 | an admin who is neither | counts at once | counts at once |
 
-Only that person can OK it. Until then it is **waiting**: shown to both, counted in nothing.
+Only that person can OK it. Until then it is **waiting**: shown to both, counted in nothing, and that person is told.
+
+**Told to OK** ⚑ Q385 (MojoSOGO 2026-10-24: "when an iou payment is made, an ack is required so put it at the top of
+the app and send an alert to the phone only"). The OK / **Got it** is the ack. When a row starts waiting on someone (the
+other one of the two made it, ＋ IOU took some off a tab, or its maker asked again), that person gets **one push**,
+phone only and private like a declined notice: "💵 Got it?" for a payment, "💵 OK?" for an IOU (`WAITING_TITLE`), the
+text `waitingMessage` ("Sam paid you $100.00. Tap Got it or Decline."). The amount shows on the lock screen, as a
+declined notice's does. One tap that writes two waiting rows (off the tab with the rest an IOU, both waiting on the same
+person) sends one push. Every screen shows each row waiting on me at the top, in the **IOU banner** (§8.15a), until I
+answer it. A row that counts at once tells nobody, and an inactive member gets no push.
 
 **Declined** ⚑ Q371 (💡 request 2026-10-21: "the person who issued the IOU should be notified, and the bill should stay on
 the records in case we need to reactivate it"). The person a waiting row waits on may **Decline** it instead of OK.
 It is kept, counted in nothing, and shown under **Declined** to the two and admins. The one who made it gets **one
 push** ⚑ Q372, phone only and private like a payback ping: "💵 Declined", `declinedMessage`. Only the one who made it
-may **Ask again** ⚑ Q373: the row is waiting again, with no push (waiting rows show in the app); a payment asked again
-must still fit what is owed (409 `iou_too_much`). The one who made it, or an admin, may ✕ a declined row (deleted).
+may **Ask again** ⚑ Q373: the row is waiting again, and the one it waits on is told again (Told to OK); a payment asked
+again must still fit what is owed (409 `iou_too_much`). The one who made it, or an admin, may ✕ a declined row (deleted).
 
 **What is owed** in a direction = the sum of its OK'd, live IOUs minus the sum of its OK'd, live payments (never below
 0). **The queue** is its OK'd IOUs oldest first; payments pay them off oldest first, so each IOU shows how much of it is
@@ -3086,6 +3095,9 @@ can't be deleted while the payments already OK'd in its direction need it (what 
 
 **The rules** (pure; imports only vocab, time and recurrence):
 
+- `WAITING_TITLE` = { iou: "💵 OK?", payment: "💵 Got it?" }; `waitingText(kind, byName, cents, how, note)` → "{by} says
+  you owe {amount}" / "{by} paid you {amount}" / "{by} took {amount} off your tab", then " · {note}" when there is one,
+  and "." (the banner's line); `waitingMessage` adds " Tap OK or Decline." / " Tap Got it or Decline." (the push).
 - `IOU_NOTE_MAX` = 120. **No amount limit** ⚑ Q356: `IOU_CENTS_MAX` = 9 999 999 999 (\$99,999,999.99) only guards
   against a slip of the thumb and whole cents staying exact. `PLAN_PING_TIME` = `'09:00'`. `PAYBACK_TITLE` = "💵 Payback due".
 - `parseAmount(v)` → whole cents, or a message: a number of dollars, or text like `"1,500.50"` / `"$20"` (commas, a
@@ -3122,10 +3134,13 @@ can't be deleted while the payments already OK'd in its direction need it (what 
 `src/worker/deliveries.ts` leaves out `iou_plan_id` rows (§9.4), so it is neither counted for the hourly limit nor
 listed for the FunHouse poller. Tick step 3g, `src/worker/iou-pings.ts`. A **declined notice** is the same kind of push
 with `deliveries.iou_row_id` set to the declined row and the title `DECLINED_TITLE`, sent by the decline itself (Q372).
-Nothing else in IOUs pushes anyone ⚑ Q353: the waiting rows show in the app. Both are the receiver's alone in Status (Q359).
+A **waiting ask** (Told to OK, Q385) is the same kind of push with `iou_row_id` set to the waiting row and the title
+`WAITING_TITLE[kind]`, sent by the write that made it wait. Nothing else in IOUs pushes anyone. All three are the
+receiver's alone in Status (Q359), and none is spoken, sent to the FunHouse or counted as a founder ping.
 
 **The routes** — `src/worker/routes/ious.ts` (§10): `GET /ious` → `{ pairs }`; `POST /ious` → `{ pairs }` (the
-directions it touched: the IOU's, and the tab's when it took some off), `POST /ious/{id}/ok`,
+directions it touched: the IOU's, and the tab's when it took some off). `POST /ious`, `POST /iou-payments` and `…/again`
+send the waiting ask; `…/decline` sends the declined notice. `POST /ious/{id}/ok`,
 `DELETE /ious/{id}`; `POST /iou-payments`, `POST /iou-payments/{id}/ok`, `DELETE /iou-payments/{id}`; `POST
 …/{id}/decline` and `POST …/{id}/again` on both; `POST /iou-plans`, `DELETE /iou-plans/{id}`. Every other write answers with that direction's `IouPair` (null when nothing
 is left in it); the deletes answer 204. A row I may not see is 404. A payment above what is owed in its direction
@@ -3133,7 +3148,7 @@ minus the payments still waiting there → 409 `iou_too_much` "That's more than 
 owed → 409 `iou_nothing_owed`. OK or Decline on a row that is not waiting, or Ask again on one not declined → 409
 `iou_state`.
 
-**Acceptance (IO1–IO18, `test/ious.test.ts` for the rules, `test/ious-api.test.ts` through the Worker):**
+**Acceptance (IO1–IO21, `test/ious.test.ts` for the rules, `test/ious-api.test.ts` through the Worker):**
 
 | # | Given | Then |
 |---|---|---|
@@ -3153,11 +3168,14 @@ owed → 409 `iou_nothing_owed`. OK or Decline on a row that is not waiting, or 
 | IO15 | a payback ping to Sam; `/status` as Sam, as Kai, as an admin | Sam's Recent deliveries list it; Kai's and the admin's do not |
 | IO15b | a declined notice to Ann (`iou_row_id`); `/status` as Ann and as another member; `opsPingsSince` | Ann's Recent deliveries list it; the other's do not; not counted as a founder ping |
 | IO16 | Mom adds "Sam owes Mom $300 · tickets"; Sam declines it | 200, the pair's `declined.ious` has it, not waiting, owed unchanged; one push to Mom "💵 Declined" "Sam declined your $300.00 IOU · tickets.", `iou_row_id` set, not in `/ops/pings`; Mom can't decline it (403); Sam can't ✕ it (403); a second decline → 409 |
-| IO17 | Mom asks again; Sam OKs | waiting again, no new push; Sam can't ask again (403); then owed + $300 |
+| IO17 | Mom asks again; Sam OKs | waiting again, no new push to Mom, Sam gets "💵 OK?" again (his second); Sam can't ask again (403); then owed + $300 |
 | IO18 | Sam records $100 paid, Mom declines; Sam pays the rest; Sam asks the $100 again | Sam gets "Mom declined your $100.00 payment."; ask again → 409 `iou_too_much`; Sam ✕ deletes it (204, gone from the card) |
+| IO19 | Bo records $20 paid to Cy | one push to Cy, `push` channel, "💵 Got it?" "Bo paid you $20.00. Tap Got it or Decline.", `iou_row_id` = the payment; none to Bo |
+| IO20 | Bo adds an IOU he owes; Cy lets $5 go; an admin adds one; Cy adds "Bo owes Cy $30 · pizza" | no push for the first three; Bo gets "💵 OK?" "Cy says you owe $30.00 · pizza. Tap OK or Decline."; no house or FunHouse row, not in `/ops/pings`, not in another member's Status |
+| IO21 | Di owes Ed $10; Di adds Ed owes Di $30 off the tab ($10 off the tab and $20 an IOU, both waiting on Ed) | one push to Ed |
 | IO14 | Ann owes Bo $1,000; Ann adds a $100 split off her tab; then Bo adds $9,600 off the tab himself | a $50.00 `tab` payment waiting for Bo's Got it, no IOU for Bo; then the rest of Ann's tab is paid at once and the rest of the $9,600 is Bo's IOU; `how: 'tab'` on `/iou-payments` → 400 |
 
-**Status:** v1.94.0; declined v1.100.0. Manual (IOU1–IOU3 on the iPhone, §8.15c).
+**Status:** v1.94.0; declined v1.100.0; told to OK v1.107.0. Manual (IOU1–IOU4 on the iPhone, §8.15c).
 
 
 ---
@@ -5591,6 +5609,17 @@ change the room, so every chore in it shows the change ⚑ Q268:
   same stack wherever they show (the Messes section, the alert card, §9.5). Answering removes the row.
 - It is not red and makes no sound; it stays until I answer, even while the mess is on To talk about.
 
+**The IOU banner** ⚑ Q385 — right under it, the same look, one row per IOU or payment waiting on me (§7B.9 Told to OK:
+the person `okError` lets OK it, so an admin sees only their own), oldest first in each direction:
+
+```
+💵 Sam paid you $100.00.                                   [Got it] [Decline]
+💵 Mom says you owe $300.00 · tickets.                         [OK] [Decline]
+```
+
+- The line is `waitingText`; the buttons are the 💵 IOUs card's own (§8.15c, Decline asks first). Answering removes the
+  row; a refusal shows inside the banner. Declined rows stay on the card, not here.
+
 **Messes** — a section of the 🧹 Chores tab, the 🧽 Messes button of its menu (§8.15):
 
 ```
@@ -5720,7 +5749,8 @@ Acceptance (IOU1–IOU2, manual on the iPhone at 320 px): IOU1 an adult adds "I 
 at once; Mom adds a $300 one, the adult's card shows OK, and after OK the queue shows both; IOU2 a weekly plan pings
 the one who owes at 09:00 on its day, phone only, and a payment recorded by them shows Got it on the other's phone;
 IOU3 Mom adds an IOU, Sam taps Decline, Mom's phone gets "💵 Declined" and her card shows it under Declined; Ask again
-puts it back in Sam's Waiting for OK.
+puts it back in Sam's Waiting for OK; IOU4 Sam taps Pay back $100, Mom's phone gets "💵 Got it?" (phone only, nothing
+spoken) and every screen of hers shows "💵 Sam paid you $100.00." at the top; Got it there removes it and counts it.
 
 
 ### 8.16 🎯 Point at it — name what I tapped

@@ -18,6 +18,7 @@ import { RingingBar } from './components/RingingBar';
 import { EnsoButton } from './components/EnsoButton';
 import { TaskSaid } from './components/TaskSaid';
 import { MessBanner } from './components/MessBanner';
+import { IouBanner } from './components/IouBanner';
 import { SignIn } from './components/SignIn';
 import { JoinPage } from './components/JoinPage';
 import { ApproveLogin, forgetApproveRequest, keepApproveRequest } from './components/ApproveLogin';
@@ -69,6 +70,7 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
       <RingingBar />
       <TaskSaid />
       <MessBanner />
+      <IouBanner />
       {(house || phoneOff) && (
         <div className={s.badges}>
           {house && (
