@@ -16,6 +16,16 @@ import type { DeviceAction } from '../../../src/shared/vocab';
 const MODE_NAME: Record<string, string> = { off: 'Off', cool: 'Cool', heat: 'Heat', dry: 'Dry', fan_only: 'Fan', auto: 'Auto', heat_cool: 'Heat/Cool' };
 const modeName = (m: string) => MODE_NAME[m] ?? m;
 const deg = (n: number | null) => (n === null ? '—' : `${n}°`);
+/** §8.19 — the status, big and bright (MojoSOGO 2026-10-27 "make status larger font and easier to see"). */
+const STATUS = { margin: '6px 0 8px', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text)' } as const;
+
+/** One temperature: a small label over a big figure. */
+const Temp = ({ label, n }: { label: string; n: number | null }) => (
+  <div style={{ textAlign: 'center' }}>
+    <div style={{ fontSize: '.85rem', color: 'var(--text-dim)' }}>{label}</div>
+    <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--text)', lineHeight: 1.1 }}>{deg(n)}</div>
+  </div>
+);
 
 function DeviceCard({ device, onChange }: { device: Device; onChange: (d: Device) => void }) {
   const [busy, setBusy] = useState(false);
@@ -35,10 +45,14 @@ function DeviceCard({ device, onChange }: { device: Device; onChange: (d: Device
         )}
       </div>
       {!device.available && <p className="muted" style={{ margin: '4px 0 0' }}>Not answering{device.error ? `: ${device.error}` : ''}</p>}
-      {device.available && !c && <p className="muted" style={{ margin: '4px 0 0' }}>{device.on ? 'On' : 'Off'}</p>}
+      {device.available && !c && <p style={STATUS}>{device.on ? 'On' : 'Off'}</p>}
       {device.available && c && (
         <>
-          <p className="muted" style={{ margin: '4px 0 8px' }}>{modeName(c.mode)} · Room {deg(c.current)} · Set {deg(c.target)}</p>
+          <p style={STATUS}>{modeName(c.mode)}</p>
+          <div className="row" style={{ justifyContent: 'space-around', margin: '0 0 10px' }}>
+            <Temp label="Room" n={c.current} />
+            <Temp label="Set" n={c.target} />
+          </div>
           <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
             {c.modes.map((m) => (
               <button key={m} aria-pressed={m === c.mode} disabled={busy} onClick={() => act('mode', { mode: m })}>{modeName(m)}</button>
