@@ -4,6 +4,7 @@ import { get } from '../api';
 import { useApp, type Me } from '../state';
 import { addDays, diffDays, startOfWeek } from '../../../src/shared/time';
 import type { WeatherDay } from '../../../src/shared/weather';
+import { CALENDAR_ITEMS } from '../../../src/shared/calendar-items';
 import { DayCell, isMultiDay } from './DayCell';
 import s from './Calendar.module.css';
 
@@ -26,14 +27,13 @@ export interface DayData {
  *  not in the cached chunks (a refetch can land before the new `me` does). */
 export function shownFor(data: DayData | undefined, me: Me): DayData | undefined {
   if (!data) return data;
-  return {
-    ...data,
-    publicHolidays: me.showPublicHolidays ? data.publicHolidays : [],
-    marketDays: me.showOptionsExpiration ? data.marketDays : [],
-    moonPhases: me.showMoon ? data.moonPhases : [],
-    schoolDays: me.showSchool ? data.schoolDays : [],
-    weather: me.showWeather ? data.weather : undefined,
-  };
+  const shown: DayData = { ...data };
+  for (const { pref, day } of CALENDAR_ITEMS) {
+    if (me[pref]) continue;
+    if (day === 'weather') shown.weather = undefined;
+    else shown[day] = [];
+  }
+  return shown;
 }
 
 const WEEKS_BACK = 520; // ±10 years of scrollable weeks

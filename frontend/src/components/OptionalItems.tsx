@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { del, errorText, get, patch, put } from '../api';
 import { useApp } from '../state';
 import type { Recurrence } from '../../../src/shared/recurrence';
+import { CALENDAR_ITEMS, type ItemPref } from '../../../src/shared/calendar-items';
 import { repeatText } from './RepeatFields';
 import { useAction } from './useAction';
 import s from './Lists.module.css';
@@ -24,7 +25,7 @@ export function OptionalItems() {
     setRows((rs) => rs && rs.map((x) => (x.id === e.id ? { ...x, on } : x)));
     refresh(); // the calendar and the Ringing bar follow at once
   });
-  const setPref = (key: 'showPublicHolidays' | 'showOptionsExpiration' | 'showWeather' | 'showMoon' | 'showSchool', on: boolean) =>
+  const setPref = (key: ItemPref, on: boolean) =>
     run(async () => { await patch('/me', { [key]: on }); refresh(); });
 
   const line = (key: string, label: string, title: ReactNode, on: boolean, onChange: (on: boolean) => void) => (
@@ -46,11 +47,7 @@ export function OptionalItems() {
       {errorEl}
       <table className={s.table}>
         <tbody>
-          {line('public', 'Public holidays', 'Public holidays', !!me.showPublicHolidays, (on) => setPref('showPublicHolidays', on))}
-          {line('market', 'Monthly options expiration', '📈 Monthly options expiration', !!me.showOptionsExpiration, (on) => setPref('showOptionsExpiration', on))}
-          {line('weather', 'Weather', '🌤️ Weather', !!me.showWeather, (on) => setPref('showWeather', on))}
-          {line('moon', 'Moon phases', '🌕 Moon phases', !!me.showMoon, (on) => setPref('showMoon', on))}
-          {line('school', 'School days off', '🏫 School days off', !!me.showSchool, (on) => setPref('showSchool', on))}
+          {CALENDAR_ITEMS.map((i) => line(i.pref, i.label, i.title, !!me[i.pref], (on) => setPref(i.pref, on)))}
           {rows?.map((e) => line(e.id, e.title, <>
             {e.emoji && `${e.emoji} `}{e.title} <span className="muted" style={{ fontWeight: 400 }}>· {repeatText(e.recurrence, e.startDate)}</span>
           </>, e.on, (on) => toggle(e, on)))}

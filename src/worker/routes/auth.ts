@@ -11,6 +11,7 @@ import { sendSignInNotice } from './phone-login';
 import { speakersError } from '../../shared/speakers';
 import { choiceOf } from '../speaker-choices';
 import { afterError, afterOf } from '../../shared/reminders';
+import { CALENDAR_ITEMS } from '../../shared/calendar-items';
 
 export const MIN_PASSWORD = 10;
 const FAIL_WINDOW_MIN = 15;
@@ -58,9 +59,7 @@ async function createMember(db: D1Database, b: Record<string, unknown>, role: Ro
 export async function memberView(db: D1Database, id: string) {
   const row = await first<Record<string, unknown> & { houseSpeakers: string | null }>(db,
     `SELECT m.id, m.email, m.display_name AS displayName, m.color, m.role,
-            p.show_public_holidays AS showPublicHolidays,
-            p.show_options_expiration AS showOptionsExpiration,
-            p.show_weather AS showWeather, p.show_moon AS showMoon, p.show_school AS showSchool,
+            ${CALENDAR_ITEMS.map((i) => `p.${i.column} AS ${i.pref}`).join(', ')},
             p.house_speakers AS houseSpeakers, p.clock_24h AS clock24h, p.after_kind AS afterKind, p.after_time AS afterTime
        FROM members m LEFT JOIN member_prefs p ON p.member_id = m.id WHERE m.id = ?`, id);
   if (!row) return row;
@@ -164,10 +163,7 @@ auth.patch('/me', requireMember, async (c) => {
     if (typeof b.color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(b.color)) return fail(c, 400, 'invalid_input', 'Color must look like #RRGGBB.');
     stmts.push(c.env.DB.prepare('UPDATE members SET color = ? WHERE id = ?').bind(b.color, id));
   }
-  for (const [key, col] of [
-    ['showPublicHolidays', 'show_public_holidays'], ['showOptionsExpiration', 'show_options_expiration'],
-    ['showWeather', 'show_weather'], ['showMoon', 'show_moon'], ['showSchool', 'show_school'], ['clock24h', 'clock_24h'],
-  ] as const) {
+  for (const [key, col] of [...CALENDAR_ITEMS.map((i) => [i.pref, i.column] as const), ['clock24h', 'clock_24h'] as const]) {
     if (b[key] !== undefined) {
       if (typeof b[key] !== 'boolean') return fail(c, 400, 'invalid_input', `${key} must be true or false.`);
       stmts.push(c.env.DB.prepare(`UPDATE member_prefs SET ${col} = ? WHERE member_id = ?`).bind(b[key] ? 1 : 0, id));

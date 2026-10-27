@@ -7,6 +7,20 @@ carry its result.
 
 ---
 
+## 2026-10-27 — built-in calendar items descriptor (reorganizer)
+
+- **Trigger:** placement-advisor 2026-10-27 (fishing AREC): the five built-in calendar items were listed by hand in
+  four places; extract-first into one descriptor list before a sixth is added.
+- **Seam moved:** each item's pref, column, DayData key, label and title, from `src/worker/routes/auth.ts`,
+  `frontend/src/state.tsx`, `frontend/src/components/Calendar.tsx` and `frontend/src/components/OptionalItems.tsx` to
+  `src/shared/calendar-items.ts` [NEW row].
+- **Room opened:** auth.ts 190 → 186, OptionalItems.tsx 61 → 58, state.tsx 129 → 130, Calendar.tsx 217 → 217; no caps moved.
+- **Behavior:** preserved (same /me fields, PATCH keys, shownFor output, Settings rows and order); typecheck, test and
+  arch:audit green.
+- **Restraint:** only the five items moved; clock24h, houseSpeakers and after stay where they are.
+
+---
+
 ## 2026-10-27 — Steward pass, v1.110.0 scope (code-steward)
 
 - **Run:** post-release, v1.110.0 (🍳 Recipes into the Lists popup as a fixed view)
