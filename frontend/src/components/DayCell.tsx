@@ -23,13 +23,14 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
   date: string; data: DayData | undefined; stay: Span | undefined; lanes: number; barH: number; rowH: number; cellW: number;
   narrow: boolean; todayStr: string; onOpen: (date: string, data: DayData | undefined) => void;
 }) {
-  const { me, members, memberById, clock } = useApp();
+  const { members, memberById, clock } = useApp();
   const founder = members.find((m) => m.isFounder)?.id; // §7.1: MojoSOGO first
   const [y, m, d] = date.split('-').map(Number);
-  const pub = me.showPublicHolidays ? data?.publicHolidays ?? [] : [];
-  const market = me.showOptionsExpiration ? data?.marketDays ?? [] : [];
-  const moon = me.showMoon ? data?.moonPhases ?? [] : []; // §7.12
-  const wx = me.showWeather ? data?.weather : undefined; // §7.11
+  // Already cut to what is on for this member (shownFor, §7.2).
+  const pub = data?.publicHolidays ?? [];
+  const market = data?.marketDays ?? [];
+  const moon = data?.moonPhases ?? []; // §7.12
+  const wx = data?.weather; // §7.11
   const items = data?.items ?? [];
   const days = items.filter((o) => !isMultiDay(o)); // multi-day events are drawn as bars
   // §7.2 day icons beside the number: holiday, 📈, then unassigned events' emoji (Q277); at most two.
