@@ -7,6 +7,43 @@ carry its result.
 
 ---
 
+## 2026-10-27 — 🏡 Home, Home Assistant devices by room, v1.109.0 (placement-advisor, code-steward, reorganizer)
+
+- **Ask:** MojoSOGO: "have a button for home automation; opens to button list of defined rooms in Enso; then assigned
+  items to room". A 🏡 Home tab: rooms → each room's HA devices (first: the Midea AC), live state and control; the
+  room's creator or an admin assigns devices (SPEC §1.3, §4.2zzl, §8.19, §9.2e; migration 0065).
+- **Steward (pre-build, AREC):** not a duplicate; fits §1.3 (widened by one phrase, ENSO_SCOPE with it); not §12 (Ensō
+  never creates in HA). Shared pieces: one HA client (extract first), the speaker-picker shape copied once (generalize
+  at a third use), the chores → room nullable-owner pattern. Verdict: build with extract-first.
+- **Verdict:** REORGANIZER FIRST (54814a8): the private `ha()` out of house.ts into NEW src/worker/ha.ts (HaConfig,
+  haConfigOf with only the four HA settings, haCall GET/POST); HouseConfig = HaConfig + the speech settings, no
+  behaviour change. Then NEW src/shared/home-devices.ts (rules; DEVICE_DOMAIN / DEVICE_ACTION in vocab.ts), NEW
+  src/worker/home-devices.ts (HA I/O, raw text only), NEW src/worker/routes/home-devices.ts (the four rows; loadRoom
+  exported from routes/rooms.ts), NEW HomeTab.tsx / HomeRoom.tsx / HomeDevicePicker.tsx. EXISTING routes/rooms.ts
+  (a room delete also takes room_devices), index.ts (mount), App.tsx (NAV), say-reader.ts (ENSO_SCOPE / ENSO_DOES).
+- **Why:** devices are not speakers (per-person delivery targets), so a new pure leaf, not a second concern in
+  speakers.ts. Importing house.ts would tie devices to the speech module and to the Echo settings; ha.ts is the
+  one-concern seam both use. rooms.ts plus the device routes would reach ~89% of its cap with a second concern (live HA
+  I/O). Services are a fixed list per domain and only a device in a room is controlled, because the HA token has full
+  access to the house.
+- **Rejected:** device rules in speakers.ts; device routes in rooms.ts; importing houseConfigOf; a generic HA service
+  passthrough.
+- **Open → ⚑ defaults:** Q389 (7th tab 🏡 Home), Q390 (any member runs, creator/admin picks), Q391 (a device in another
+  room → 400), Q392 (HA down shown inline, no badge).
+---
+
+## 2026-10-27 — HA calls into src/worker/ha.ts (reorganizer)
+
+- **Trigger:** placement-advisor's extract-first verdict for 🏡 Home (rooms → HA devices): the HA call lived privately
+  in house.ts, which owns House delivery.
+- **Seam moved:** the HA config (HA_URL, HA_TOKEN, CF Access pair) and the one Bearer call through access.ts, from
+  `src/worker/house.ts` to `src/worker/ha.ts` [NEW row]
+- **Room opened:** house.ts 138 → 126 lines; no pinned cap (global 300). ha.ts 26 lines.
+- **Behavior:** preserved (54814a8) — typecheck, npm test (1073/1073) and arch:audit green on the commit alone;
+  houseConfigOf still needs all seven settings, same POST paths, headers, bodies and timeouts, all exports kept.
+- **Restraint:** only the config and the call moved; speak, the speaker template, drain and houseState stay.
+---
+
 ## 2026-10-27 — Steward pass, v1.108.0 scope (code-steward)
 
 - **Run:** post-release, v1.108.0 (🏫 school days off + shownFor gate)

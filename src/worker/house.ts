@@ -4,7 +4,7 @@
 // failed. It also asks HA for its speaker list (§9.2a), giving back the raw answer.
 import type { Env } from './env';
 import { all, first, parseJson } from './db';
-import { callThroughAccess } from './access';
+import { haCall, haConfigOf, type HaConfig } from './ha';
 import { everySpeaker, speakerList, splitSpeakers } from '../shared/speakers';
 import type { DeliveryStatus, HouseState } from '../shared/vocab';
 
@@ -17,20 +17,15 @@ export const ECHO_TIMEOUT_MS = 15_000;
 export const SATELLITE_TIMEOUT_MS = 25_000;
 export const EXHAUSTED = `house delivery never finished after ${MAX_ATTEMPTS} attempts`;
 
-export interface HouseConfig {
-  haUrl: string; echoTargets: string[]; echoType: string; satelliteEntity: string;
-  haToken: string; accessId: string; accessSecret: string;
-}
+export type HouseConfig = HaConfig & { echoTargets: string[]; echoType: string; satelliteEntity: string };
 
 /** All seven House settings, or null when any is missing — then nothing is spoken, visibly. */
 export function houseConfigOf(env: Env): HouseConfig | null {
-  const { HA_URL, ECHO_TARGETS, ECHO_TYPE, SATELLITE_ENTITY, HA_TOKEN, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET } = env;
+  const { ECHO_TARGETS, ECHO_TYPE, SATELLITE_ENTITY } = env;
   const targetsOk = Array.isArray(ECHO_TARGETS) && ECHO_TARGETS.length > 0 && ECHO_TARGETS.every((t) => typeof t === 'string' && t);
-  if (!HA_URL || !targetsOk || !ECHO_TYPE || !SATELLITE_ENTITY || !HA_TOKEN || !CF_ACCESS_CLIENT_ID || !CF_ACCESS_CLIENT_SECRET) return null;
-  return {
-    haUrl: HA_URL.replace(/\/+$/, ''), echoTargets: ECHO_TARGETS, echoType: ECHO_TYPE, satelliteEntity: SATELLITE_ENTITY,
-    haToken: HA_TOKEN, accessId: CF_ACCESS_CLIENT_ID, accessSecret: CF_ACCESS_CLIENT_SECRET,
-  };
+  const ha = haConfigOf(env);
+  if (!ha || !targetsOk || !ECHO_TYPE || !SATELLITE_ENTITY) return null;
+  return { ...ha, echoTargets: ECHO_TARGETS, echoType: ECHO_TYPE, satelliteEntity: SATELLITE_ENTITY };
 }
 
 /** §9.2a — the default speakers as configured: the Echo names, then the Voice PE. */
@@ -44,21 +39,14 @@ export function classifyHouse(oks: readonly boolean[]): HouseResult {
   return n === 0 ? 'failed' : n === oks.length ? 'sent' : 'partial';
 }
 
-/** One POST to HA → its answer text on a 2xx, else access.ts's honest reason. Never names a token. */
-function ha(cfg: HouseConfig, path: string, payload: unknown, timeoutMs: number) {
-  return callThroughAccess(cfg, `${cfg.haUrl}${path}`, {
-    method: 'POST', timeoutMs, body: JSON.stringify(payload),
-    headers: { Authorization: `Bearer ${cfg.haToken}`, 'Content-Type': 'application/json; charset=utf-8' },
-  });
-}
-const said = async (r: ReturnType<typeof ha>) => { const x = await r; return x.ok ? 'ok' : x.reason; };
+const said = async (r: ReturnType<typeof haCall>) => { const x = await r; return x.ok ? 'ok' : x.reason; };
 
 /** §9.2 step 4: on the row's speakers (NULL → the defaults); a surface with no speaker is not called. */
 async function speak(cfg: HouseConfig, message: string, speakers: string[] | null): Promise<{ status: HouseResult; detail: string }> {
   const { echo, satellite } = speakers === null ? { echo: cfg.echoTargets, satellite: [cfg.satelliteEntity] } : splitSpeakers(speakers);
   const [e, v] = await Promise.all([
-    echo.length ? said(ha(cfg, '/api/services/notify/alexa_media', { target: echo, message, data: { type: cfg.echoType } }, ECHO_TIMEOUT_MS)) : null,
-    satellite.length ? said(ha(cfg, '/api/services/assist_satellite/announce',
+    echo.length ? said(haCall(cfg, 'POST', '/api/services/notify/alexa_media', { target: echo, message, data: { type: cfg.echoType } }, ECHO_TIMEOUT_MS)) : null,
+    satellite.length ? said(haCall(cfg, 'POST', '/api/services/assist_satellite/announce',
       { entity_id: speakers === null ? cfg.satelliteEntity : satellite, message }, SATELLITE_TIMEOUT_MS)) : null,
   ]);
   const called = { ...(e !== null && { echo: e }), ...(v !== null && { voice_pe: v }) };
@@ -76,7 +64,7 @@ export const SPEAKER_TEMPLATE = `{%- set ns = namespace(out=[]) -%}
 {{ ns.out | tojson }}`;
 
 /** One POST of SPEAKER_TEMPLATE to /api/template → HA's raw answer, or an honest reason. */
-export const houseSpeakerList = (cfg: HouseConfig) => ha(cfg, '/api/template', { template: SPEAKER_TEMPLATE }, ECHO_TIMEOUT_MS);
+export const houseSpeakerList = (cfg: HouseConfig) => haCall(cfg, 'POST', '/api/template', { template: SPEAKER_TEMPLATE }, ECHO_TIMEOUT_MS);
 
 /** §7D.3 — every speaker HA lists now; null (the default speakers) when House is off or the list can't be read. */
 export async function allHouseSpeakers(env: Env): Promise<string[] | null> {

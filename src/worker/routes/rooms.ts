@@ -52,8 +52,8 @@ async function areaView(db: D1Database, a: AreaRow): Promise<RoomArea> {
   return { id: a.id, roomId: a.room_id, name: a.name, expectations: JSON.parse(a.expectations), photos: photos.map((p) => p.id), updatedAt: a.updated_at };
 }
 
-/** A room, or the 404 to send (403 for a write by someone who can't change it). */
-async function loadRoom(c: Context<AppEnv>, forWrite: boolean): Promise<RoomRow | Response> {
+/** A room, or the 404 to send (403 for a write by someone who can't change it). Also the device routes' (§9.2e). */
+export async function loadRoom(c: Context<AppEnv>, forWrite: boolean): Promise<RoomRow | Response> {
   const r = await first<RoomRow>(c.env.DB, 'SELECT * FROM rooms WHERE id = ?', c.req.param('id'));
   if (!r) return fail(c, 404, 'not_found', ROOM_GONE);
   return (forWrite && refuse(c, r.created_by)) || r;
@@ -102,7 +102,7 @@ rooms.patch('/rooms/:id', requireMember, async (c) => {
   return c.json(roomView((await first<RoomRow>(db, 'SELECT * FROM rooms WHERE id = ?', r.id))!, (await areaCounts(db)).get(r.id) ?? 0));
 });
 
-/** Deleting a room takes its areas and their photos (rows, then the R2 objects); its chores keep going with no room. */
+/** Deleting a room takes its areas and their photos (rows, then the R2 objects) and its device rows (§9.2e); its chores keep going with no room. */
 rooms.delete('/rooms/:id', requireMember, async (c) => {
   const r = await loadRoom(c, true);
   if (r instanceof Response) return r;
@@ -113,6 +113,7 @@ rooms.delete('/rooms/:id', requireMember, async (c) => {
     db.prepare('UPDATE chores SET room_id = NULL WHERE room_id = ?').bind(r.id),
     db.prepare('DELETE FROM room_area_photos WHERE area_id IN (SELECT id FROM room_areas WHERE room_id = ?)').bind(r.id),
     db.prepare('DELETE FROM room_areas WHERE room_id = ?').bind(r.id),
+    db.prepare('DELETE FROM room_devices WHERE room_id = ?').bind(r.id),
     db.prepare('DELETE FROM rooms WHERE id = ?').bind(r.id),
   ]);
   if (keys.length) await c.env.PHOTOS.delete(keys.map((k) => k.photo_key));

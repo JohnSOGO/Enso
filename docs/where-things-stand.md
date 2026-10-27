@@ -5,14 +5,14 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-27, v1.108.0, main = production.*
+*Last updated 2026-10-27, v1.109.0, main = production.*
 
 ## Running where
 
 | Part | Where | Notes |
 |---|---|---|
 | App (Worker + PWA) | https://enso.sogodojo.com | Cloudflare Worker `enso`, D1 `enso`, R2 photos. The opening screen shows the live version and commit. |
-| Home Assistant voice | ha.sogodojo.com → HA (192.168.0.123) | Cloudflare tunnel `haosdojo` (HA Cloudflared add-on), Access service token `enso-worker`. SPEC §9.2. |
+| Home Assistant voice + devices | ha.sogodojo.com → HA (192.168.0.123) | Cloudflare tunnel `haosdojo` (HA Cloudflared add-on), Access service token `enso-worker`. SPEC §9.2; the 🏡 Home tab reads and runs room devices through the same token (§9.2e). |
 | Home helper | sogoai.sogodojo.com → SogoAI 127.0.0.1:8790 | Tunnel `sogoai` (Cloudflared service on SogoAI), the same Access token plus Bearer `CAPTIONS_TOKEN`. It fetches YouTube captions (§7E.2c), names item photos (§7A.3) and marks notes (§8.4a) with LM Studio's `photo-polish` (`IDENTIFY_MODEL`). Notes are asked only while the PC model manager (127.0.0.1:8793 `/state`, no lease) shows that model loaded and idle. Built from `home/` with `npm run build:home`. Its notes on SogoAI: `C:\Users\Public\git\SogolAI\ENSO-HOME-HELPER.md`. |
 | Weather forecast | api.open-meteo.com (free, no key) | `WEATHER_URL` var in wrangler.toml; fetched once a day by the tick (§7.11). Empty turns weather off. |
 | Claude → MojoSOGO's phone | `POST /api/v1/ops/notify` | Bearer `OPS_NOTIFY_TOKEN` (README "Ping MojoSOGO's phone"). Always goes to the founder, John Redman, who is MojoSOGO. |
@@ -51,6 +51,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 🏡 Home (v1.109.0, §9.2e, §8.19, migration 0065, Q389–Q392 ⚑): on the iPhone, 🏡 Home → his room (an admin adds it in Settings → 🏠 Household first) → ✏ Devices → tick ❄️ Midea AC → Save → the card shows Fan · Room 54° · Set 70°; tap Cool → the AC changes and the card reads Cool; ＋ → Set 71°. The AC's filter alert is on in HA (clean the filter).
 - 🏫 School days off (v1.108.0, §7.13, migration 0064, Q386–Q388 ⚑): scroll to Nov 2026 → 11-11 shows 🏫 by the number, 11-18/19 🕛, 11-23…27 🏫; tap 11-25 → "🏫 Thanksgiving break — No school". Settings → 📅 Calendar → 🏫 School days off → untick → gone from cells and the day sheet. Next school year: swap the rows in `src/shared/school.ts`.
 - 💵 Told to OK (v1.107.0, §7B.9, §8.15a, Q385 ⚑): on one phone tap Chores → 💵 IOUs → a card → Pay back $1 → the other phone gets "💵 Got it?" (phone only, nothing spoken) and shows "💵 … paid you $1.00." at the top of every screen → Got it there removes it. An IOU the other side adds shows the same with OK.
 - 🔒 Private events (v1.106.0, §6.3, Q381–Q384): make an event, tick two adults as going, tick 🔒 Private, Save → on a kid's phone the day shows only the time and "🔒 Private", grey, and it doesn't open; on an adult's it shows whole.

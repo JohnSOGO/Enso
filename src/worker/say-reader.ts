@@ -22,6 +22,7 @@ export const ENSO_DOES = [
   'Chores tab: chores on chosen days that rotate between people, steps that hand off, rooms with "what done looks like" photos, Whose mess? reports, bounties and the score, and 💵 IOUs (money family members owe each other, in dollars: OK / Got it or Decline (the one it waits on gets a phone ping and sees it at the top of every screen; the one who added it is told of a decline and can ask again; a declined one stays on the record), pay back or let go, payback plans every week, 2 weeks or month with a phone ping on the day; recorded only, no money moves).',
   'Lists tab: Shopping, Wish list and any custom list, every day lists with a time, ✅ Things to do (with Plan it), 🎬 Movies & shows, 📥 Inbox (shared from the iPhone Share sheet).',
   'Recipes tab: recipes from a link or video, with photos and each person\'s emoji.',
+  '🏡 Home tab: each room\'s Home Assistant devices (the AC, lights, switches, fans): on / off, and an AC\'s mode and set temperature; the room\'s creator or an admin picks which devices are in it (✏ Devices).',
   'Settings: Me (name, color, clock, after work time), Calendar options and days off, Phone alerts, Speakers (house announcements on Echo speakers), Alerts history, Household (rooms), Members and invites, Status, About, 💡 Requests (admins: what the Ensō button saved).',
 ] as const;
 
@@ -32,7 +33,7 @@ export const ENSO_SCOPE = {
     'reminders, alarms and timers for the people in the house',
     'chores, rooms, messes, bounties and who did what',
     "IOUs: money the household's members owe each other, in dollars, and paying it back (Ensō records it; it never moves money)",
-    'the house itself: its machines (washer, dryer, dish washer, cooking), its speakers and announcements, quiet times',
+    'the house itself: its machines (washer, dryer, dish washer, cooking), its speakers and announcements, quiet times, and its devices in Home Assistant, room by room (the AC, lights, switches, fans)',
     "the household's lists: shopping, wishes, to-dos, every day lists, movies and shows, things shared in",
     'recipes and cooking',
     'the members of the household and their settings',
@@ -40,7 +41,7 @@ export const ENSO_SCOPE = {
   outside: [
     'buying, ordering or paying (stores, Amazon, deliveries, bills); Ensō keeps the list, not the cart',
     'money beyond who owes whom in the house: moving or sending money (Venmo, bank transfers, cards), banking, budgets, investing, trading',
-    'work or school systems, or other apps, websites or accounts to log into or control',
+    'work or school systems, or other apps, websites or accounts to log into or control (the house\'s own Home Assistant is not one)',
     'general questions, chat, search or news',
     "people outside the household, or anything to do with them that isn't the household's own plan",
   ],

@@ -12,6 +12,7 @@ import { ChoreForm } from './components/ChoreForm';
 import { ChoreSheet } from './components/ChoreSheet';
 import { HouseholdLists } from './components/HouseholdLists';
 import { Recipes } from './components/Recipes';
+import { HomeTab } from './components/HomeTab';
 import { Settings } from './components/Settings';
 import { useAlertLink } from './components/MyAlerts';
 import { RingingBar } from './components/RingingBar';
@@ -31,7 +32,7 @@ import { Splash } from './components/Splash';
 import s from './App.module.css';
 
 /** The bottom tab bar (§8.1): the one list of tabs — id, icon, label. */
-const NAV = [['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alerts'], ['chores', '🧹', 'Chores'], ['lists', '🛒', 'Lists'], ['recipes', '🍳', 'Recipes'], ['settings', '⚙', 'Settings']] as const;
+const NAV = [['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alerts'], ['chores', '🧹', 'Chores'], ['lists', '🛒', 'Lists'], ['recipes', '🍳', 'Recipes'], ['home', '🏡', 'Home'], ['settings', '⚙', 'Settings']] as const;
 type Tab = (typeof NAV)[number][0];
 const TABS: readonly Tab[] = NAV.map(([id]) => id);
 /** §8.1 ⚑ Q38 — the House badge per server-reported state; `ok` and `untried` show none. */
@@ -92,6 +93,7 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
         {tab === 'chores' && <ChoresTab onEdit={(chore) => setOverlay({ kind: 'chore', chore })} onOpenAreas={(chore) => setOverlay({ kind: 'areas', chore })} />}
         {tab === 'lists' && <HouseholdLists pickRequest={listsTap} />}
         {tab === 'recipes' && <Recipes />}
+        {tab === 'home' && <HomeTab />}
         {tab === 'settings' && <Settings onLogout={onLogout} openAlert={openAlert} onAlertOpened={onAlertOpened} />}
       </main>
       {tab === 'calendar' && (

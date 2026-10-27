@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.93 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
+**Version:** 3.94 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -118,7 +118,8 @@ household's home life turning. An ask fits when it is about:
 - **chores**, rooms, messes, bounties and who did what;
 - **IOUs**: money the household's members owe each other, in US dollars, and paying it back (§7B.9). Ensō **records**
   it; it never moves money (MojoSOGO 2026-10-20 "Add to Ensos scope a family IOU system" … "This is for real money USD");
-- the **house** itself: its machines (washer, dryer, dish washer, cooking), its speakers and announcements, quiet times;
+- the **house** itself: its machines (washer, dryer, dish washer, cooking), its speakers and announcements, quiet times,
+  and its **devices in Home Assistant**, room by room (the AC, lights, switches, fans: §9.2e; MojoSOGO 2026-10-27);
 - the household's **lists**: shopping, wishes, to-dos, every day lists, movies and shows, things shared in;
 - **recipes** and cooking;
 - the **members** of the household and their settings.
@@ -129,7 +130,8 @@ It does not fit when it is about the list below. Ensō says so instead of offeri
 - **buying, ordering or paying** (stores, Amazon, deliveries, bills). Ensō keeps the list, not the cart;
 - **money** beyond who owes whom in the house: moving or sending money (Venmo, bank transfers, cards), banking,
   budgets, investing, trading;
-- **work or school systems**, or other apps, websites or accounts to log into or control;
+- **work or school systems**, or other apps, websites or accounts to log into or control (the house's own Home
+  Assistant is not one: Ensō already speaks through it and runs the devices put in a room, §9.2e);
 - **general questions, chat, search or news** (Ensō is not an assistant for everything);
 - **people outside the household**, or anything to do with them that isn't the household's own plan.
 
@@ -412,6 +414,8 @@ This table says what each term means.
 | `ok` / `failing` | House state (§9.2): the newest finished house delivery is `sent`/`partial` / is `failed` |
 | `not_configured` | House state: one of the seven House settings (§9.2) is missing — nothing is spoken |
 | `untried` | House state: configured, but no house delivery has finished yet |
+| `climate` / `light` / `switch` / `fan` (device domain) | The kinds of Home Assistant device a room can hold (§9.2e), read from the entity id's prefix: an AC or thermostat / a light / a plug or switch / a fan |
+| `on` / `off` / `mode` / `target` (device action) | What a tap asks of a device (§9.2e): turn it on / off / set an AC's mode / set its target temperature |
 
 Lists are **data, not vocabulary** (§7A): their names live in the `lists` table.
 
@@ -1141,6 +1145,17 @@ Asked by MojoSOGO 2026-10-27 ("Add as optional calendar"): one `member_prefs` sw
 `show_school`, **on by default** (§7.5, §7.13). Additive; it runs before the deploy.
 
 Schema: [`migrations/0064_school_days.sql`](migrations/0064_school_days.sql). **Check:** SC6 (§7.13).
+
+### 4.2zzl Schema change — `migrations/0065_room_devices.sql`
+
+Asked by MojoSOGO 2026-10-27 ("opens to button list of defined rooms in Enso; then assigned items to room"): a room
+holds Home Assistant devices (§9.2e). One table, `room_devices`, keyed by the HA entity id, so a device is in at most
+one room; its `position` is the order picked. Nothing about the device itself is stored: its name and state are asked
+of HA live. Additive; it runs before the deploy.
+
+Schema: [`migrations/0065_room_devices.sql`](migrations/0065_room_devices.sql). **Migration check (HD-M,**
+[`test/migration-0065.test.ts`](test/migration-0065.test.ts)**):** existing rooms untouched, no device rows; a
+second row for the same entity is refused; `foreign_key_check` empty.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -2750,7 +2765,7 @@ the room should look like when complete … rooms get sections like kitchen alre
 "Living room") holds up to 8 **areas** — "Sink", "Counters", "Floor" — each with a list of **expectations** ("No
 dishes left in the sink", "Faucet wiped dry") and up to 4 **reference photos** of that area done right. A chore may
 name **one room** (or none); its 📋 sheet shows the chore's **Done means…** (§7B.4) and then its room. Several chores
-may share a room. Areas say what done looks like every time; nothing here changes turns, runs or fires.
+may share a room. A room also holds the house's **devices** (the AC, lights…), shown on the 🏡 Home tab (§9.2e, §8.19). Areas say what done looks like every time; nothing here changes turns, runs or fires.
 
 **The rules** (pure; imports nothing):
 
@@ -2771,8 +2786,9 @@ admin renames or deletes it and adds, changes or deletes its areas and their pho
 
 - `GET /rooms` → `Room[]` by `position` (the order added). `POST /rooms` `{ name }` → 201 room; at `ROOMS_MAX` → 400
   "A household has at most 30 rooms." `PATCH /rooms/{id}` `{ name }` → the room.
-- `DELETE /rooms/{id}` → 204: in one batch its areas and their photo rows go and every chore naming it gets
-  `room_id` NULL; then the R2 objects. Its chores keep going with no room.
+- `DELETE /rooms/{id}` → 204: in one batch its areas and their photo rows go, its device rows go (§9.2e; the devices
+  stay in HA, in no room) and every chore naming it gets `room_id` NULL; then the R2 objects. Its chores keep going
+  with no room.
 - `GET /rooms/{id}/areas` → `RoomArea[]` by `position`. An unknown room → 404 "That room no longer exists."
 - `POST /rooms/{id}/areas` `{ name, expectations? }` → 201 area, after the last. At `AREAS_MAX` → 400
   "A room has at most 8 areas."
@@ -4475,14 +4491,14 @@ only the grey backdrop):
 |  S   M   T   W   T   F   S          |
 |  ...continuous weeks...             |
 +-------------------------------------+
-| 📅 Calendar ⏰ Alerts 🧹 Chores 🛒 Lists 🍳 Recipes ⚙ Settings | <- tab bar
+| 📅 Calendar ⏰ Alerts 🧹 Chores 🛒 Lists 🍳 Recipes 🏡 Home ⚙ Settings | <- tab bar
 +-------------------------------------+
 ```
 
-- **Six tabs** (since v1.28.0, ⚑ Q166): **🧹 Chores** (§8.15) sits between Alarms and Lists; 🍳 Recipes
-  between Lists and Settings (v1.11.0, ⚑ Q60). The bar is a grid with one equal column per tab
-  (`grid-auto-flow: column`), icon above label, so all six fit one line at 320 px without wrapping or
-  truncating (labels .7rem).
+- **Seven tabs**: **🧹 Chores** (§8.15) sits between Alarms and Lists (v1.28.0, ⚑ Q166); 🍳 Recipes after Lists
+  (v1.11.0, ⚑ Q60); **🏡 Home** (§8.19) between Recipes and Settings (v1.109.0, ⚑ Q389). The bar is a grid with one
+  equal column per tab (`grid-auto-flow: column`), icon above label, so all seven fit one line at 320 px without
+  wrapping or truncating (labels .7rem).
 - **Flush at the bottom** (asked by MojoSOGO 2026-10-10): the app frame is fixed to the whole screen
   (`position: fixed; inset: 0`), never `height: 100%`, which on an installed iPhone left a strip of
   page below the bar. The bar's own colour runs down through the home-indicator area. In the
@@ -6034,6 +6050,47 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
 | SY13 | Claude answers a reminder with want and three steps; with no want and no steps; a request (big) and an outside with steps of its own; seven steps | 200 with `want` and `steps` as given; `want` = heard, `steps` = [say]; `steps` = `requestSteps('big')` / `outsideSteps(where)`, never Claude's; the first four. `say` = "I will a, b and c. Did I get that right?"; with no steps, Claude's say + "Did I get that right?"; a request `requestSay` + the question; an outside `outsideSay` alone |
 | SY-M | on the iPhone | tap the Ensō button, tap Ensō in the box, say "weekdays 8 to 11 remind me to book the car check", see "You want:" with the gist and "I will:" with numbered steps, hear "I will … Did I get that right?", Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; tap the mark → the box opens quiet; tap Ensō in it → the phone asks for the mic once, then "Listening…"; say "remind me tomorrow at 9 to call mom", tap Ensō again → it stops, Done → the answer; a fresh opening of the app never asks for the mic; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests; on any answer ✏️ Edit → the box holds what was heard, fix a word, Done → the new answer; tap Ensō, talk, tap Ensō, tap it again and talk more → the new words show too |
 
+### 8.19 🏡 Home — the house's devices, room by room (§9.2e) — asked by MojoSOGO 2026-10-27
+
+"Have a button for home automation; opens to button list of defined rooms in Enso; then assigned items to room."
+
+```
+🏡 Home
+[ 🚪 Kitchen      ] [ 🚪 John's room  ]
+[ 🚪 Living room  ] [ 🚪 Garage       ]
+
+  John's room                       ✕
+  ┌───────────────────────────────┐
+  │ ❄️ Midea AC            [ Off ] │
+  │ Fan only · Room 54° · Set 70°  │
+  │ [Off] [Cool] [Dry] [Fan] [Auto]│
+  │        [ − ]  70°  [ ＋ ]       │
+  └───────────────────────────────┘
+  [ ✏ Devices ]                [Close]
+```
+
+- The **🏡 Home** tab (⚑ Q389; 🏠 stays Settings → Household) shows every room (§7B.6, by `position`) as a button in
+  the same grid as Settings (`PickGrid`), each `🚪 {name}`. No rooms → "No rooms yet. An admin adds them in Settings →
+  🏠 Household."
+- A tap opens the room in a modal: one card per device from `GET /rooms/{id}/devices`, in the order picked. A card
+  shows the domain's emoji (❄️ climate, 💡 light, 🔌 switch, 🌀 fan), the device's name, its state in words and one
+  **Turn on / Turn off** button. An AC also shows its mode, **Room {current}°** and **Set {target}°**,
+  one button per mode HA lists (the current one pressed; names: Off, Cool, Heat, Dry, Fan, Auto, Heat/Cool), and **−
+  / ＋** around the target (one step each). Each tap sends `POST /house/devices/{id}` and the card shows the state it
+  answers; while it waits the card's buttons are off. A failure shows inside the card (`role="alert"`).
+- A device HA can't read shows dim with "Not answering" (or the reason), and no buttons. HA not set up / not
+  reachable shows once at the top of the modal, with **Try again** ⚑ Q392; no new badge.
+- No devices yet → "No devices in this room yet." (+ " Tap ✏ Devices to pick them." for whoever can).
+- **✏ Devices** (the room's creator or an admin, §6.3, ⚑ Q390) swaps the cards for the picker: a **Find** box and one
+  checkbox line per device `GET /house/devices` lists (emoji, name, a dim entity id), ticked ones first; a device in
+  another room shows "in {room}", unticked and off ⚑ Q391. **Save** sends `PUT /rooms/{id}/devices` with the ticked
+  ids in the order shown and returns to the cards; **Cancel** returns unchanged. 12 at most.
+- Text fields 16 px, buttons 44 px tall, one card per row at 320 px.
+
+**Check (HD-UI, on the iPhone):** 🏡 Home → John's room → ✏ Devices → tick Midea AC → Save → its card shows the room
+temperature and mode; Cool → the AC beeps and the card reads Cool; ＋ → Set goes up one.
+
+
 ## 9. Delivery
 
 ### 9.1 Web Push — phone notifications
@@ -6126,6 +6183,10 @@ Manual on the live site: iPhone home-screen app → Turn on → Send a test arri
 arrives on the lock screen; tapping opens the Ringing bar. Android: Done/Snooze work.
 
 ### 9.2 House delivery — `src/worker/house.ts`
+
+Every call to Home Assistant (speaking here, the speaker list in §9.2a, the devices in §9.2e) goes through one client,
+`src/worker/ha.ts`: `haConfigOf(env)` needs only `HA_URL`, `HA_TOKEN` and the Access pair (null otherwise), and
+`haCall` makes one GET or POST with the Bearer token through Access, giving the answer's text or an honest reason.
 
 The Worker speaks every `house` delivery itself, through Home Assistant's REST API at
 `HA_URL` — a **Cloudflare Tunnel** (HA's Cloudflared add-on) behind **Cloudflare Access**
@@ -6429,6 +6490,74 @@ machine wording checks read the push row, which carries the same words.
 | PF1 | `speaksOnHouse` | Phone+House repeating: 1 → false, 2 → true; House only: 1 → true; Phone+House with renotify null or maxAlerts 1: 1 → true; Phone only: false |
 | PF2 | tick: a Phone+House reminder repeating every 5 min | alert 1: push rows, no house row, zero HA calls; alert 2: push rows and one house row, spoken |
 | PF3 | tick: a Phone+House reminder with no repeat | its one alert is spoken |
+
+### 9.2e The house's devices, room by room — `src/shared/home-devices.ts` (pure) — asked by MojoSOGO 2026-10-27
+
+MojoSOGO 2026-10-27, after "Can you see the ac via home assistant?" (yes, a Midea AC): Ensō shows and runs the house's
+Home Assistant devices, grouped by Ensō's rooms (§7B.6). The screen is §8.19. Ensō **only reads states and calls a
+fixed list of services**: it never creates or changes anything in HA (no entities, automations or scenes, §12), and
+a caller never names a service.
+
+**A device** is an HA entity id whose prefix is one of `DEVICE_DOMAIN` (§3): `climate.<slug>`, `light.<slug>`,
+`switch.<slug>`, `fan.<slug>`; a slug is `[a-z0-9_]+`. A room holds up to `ROOM_DEVICES_MAX` = 12 ⚑; a device is in
+at most one room (`room_devices`, §4.2zzl). Its name and state are asked of HA every time, never stored.
+
+**Rules** (pure, imports only vocab):
+- `deviceDomain(id)` → the domain or null.
+- `parseRoomDevices(v)` → the list, or the message "devices must be a list of up to 12 different Home Assistant device
+  ids (climate, light, switch or fan)." for anything but an array of at most 12 distinct ids with a domain.
+- `deviceFromState(id, text)` → `Device` from HA's `/api/states/{id}` answer, or null when it isn't one:
+  `{ id, name, domain, state, available, on, climate }`. `name` is `attributes.friendly_name` (else the id);
+  `available` is false for `unavailable` / `unknown`; `on` is available and not `off`. For a climate device
+  `climate` = `{ mode: state, modes: hvac_modes, current: current_temperature, target: temperature, min: min_temp,
+  max: max_temp, step: target_temp_step }` (numbers or null; `step` 1 when missing ⚑), else null.
+- `deviceUnreachable(id, reason)` → the `Device` shown when HA didn't answer for it: its id as name, `state`
+  `unavailable`, not available, with `error` = the reason (a read `Device` has `error` null).
+- `devicePickList(text)` → `{ id, name, domain }[]` (A–Z by name, duplicates and ids without a domain dropped) from
+  the template answer below, or null when it isn't a JSON array.
+- `deviceCall(device, body)` → `{ path, payload }` or the 400 message. `body.action` is one of `DEVICE_ACTION`:
+  - `on` / `off` → `/api/services/{domain}/turn_on|turn_off` `{ entity_id }` (an AC too: HA's climate turn_on brings
+    back its last mode).
+  - `mode` (climate only) → `/api/services/climate/set_hvac_mode` `{ entity_id, hvac_mode }`; `body.mode` must be one
+    of the device's `modes`, else "mode must be one of: …".
+  - `target` (climate only, with a target) → `/api/services/climate/set_temperature` `{ entity_id, temperature }`;
+    `body.target` a number, clamped to min…max and rounded to the step.
+  - Anything else → "action must be one of: on, off, mode, target." / "{action} isn't something a {domain} does."
+
+**The routes** — `src/worker/routes/home-devices.ts`, through `src/worker/home-devices.ts` (HA I/O, raw text only):
+- **`GET /house/devices`** (member) — the pick list, live. HA not set up (`haConfigOf` null) → 503
+  `house_not_configured`, before any fetch. One `POST /api/template` (15 s), body `{ template: DEVICE_TEMPLATE }`,
+  which lists every `climate` / `light` / `switch` / `fan` entity with its name. Non-2xx / a throw / unreadable → 502
+  `house_unreachable` with the reason. → `{ devices: { id, name, domain, roomId }[] }`, `roomId` the room it is in
+  or null.
+- **`GET /rooms/{id}/devices`** (member) → `{ devices: Device[] }` in the order picked. No devices → `[]` with no
+  fetch. Otherwise 503 when HA isn't set up, and one `GET /api/states/{entity}` per device, all at once (10 s each);
+  one that fails or can't be read is `deviceUnreachable`. An unknown room → 404 "That room no longer exists."
+- **`PUT /rooms/{id}/devices { devices }`** (the room's creator or an admin, §6.3; else 403) → `{ devices: string[] }`.
+  `parseRoomDevices` → 400 `invalid_input`; a device already in another room → 400 "{id} is already in {room}." ⚑
+  Q391 (untick it there first). The room's rows are replaced in one batch. Not checked against HA: an id HA no longer
+  has shows as not answering.
+- **`POST /house/devices/{entity} { action, mode?, target? }`** (any member ⚑ Q390) — only a device that is in a room,
+  else 404 "That device isn't in a room."; 503 when HA isn't set up. It reads the device's state, makes `deviceCall`
+  (400 with its message), POSTs that one service (15 s; failure → 502 `house_unreachable` with the reason), then reads
+  the state again → `Device`.
+- Never a token in any answer or log (access.ts).
+
+**Acceptance (HD — each row is a test; a fake HA at https://ha.test):**
+
+| # | Check | Expected |
+|---|---|---|
+| HD1 | `deviceDomain`, `parseRoomDevices` | `climate.midea_ac_1` climate; `light.x` light; `media_player.x`, `climate.Bad Id`, `""` null; 13 ids / a duplicate / a media player / not an array → the message |
+| HD2 | `deviceFromState` on the Midea AC's answer (fan_only, 54.5 current, 70 target, 60–86, no step); on an `unavailable` light; on `"oops"` | climate `{ mode: 'fan_only', modes, current: 54.5, target: 70, min: 60, max: 86, step: 1 }`, on, available; light not available, not on; null |
+| HD3 | `deviceCall` | on/off → turn_on/turn_off of its domain; mode cool → set_hvac_mode; mode heat when not listed → 400 text; target 90 → 86, 70.4 → 70; mode or target on a light → 400 text; action `explode` → 400 text |
+| HD4 | `devicePickList` | A–Z, a `media_player` and a duplicate dropped; not an array → null |
+| HD5 | `GET /house/devices` | one POST `/api/template` with DEVICE_TEMPLATE and the three auth headers; each with its `roomId`; not set up → 503 and no fetch; HA 500 → 502 |
+| HD6 | `PUT /rooms/{id}/devices` by an admin, then `GET /rooms/{id}/devices` | saved in order; one GET `/api/states/{id}` each; a failing one shows `available` false with its `error`; an empty room makes no fetch |
+| HD7 | PUT a device already in another room; a bad list; by a member who didn't make the room | 400 naming the room; 400; 403 |
+| HD8 | `POST /house/devices/{id}` mode cool by a plain member | GET state, POST `/api/services/climate/set_hvac_mode` `{ entity_id, hvac_mode: 'cool' }`, GET state → the new `Device` |
+| HD9 | POST for a device in no room; a bad action; HA 500 on the service | 404 and no fetch; 400 and no service call; 502 |
+| HD10 | delete a room with devices | its `room_devices` rows gone; the device can be put in another room |
+| HD-M | migration 0065 (§4.2zzl) | see §4.2zzl |
 
 ### 9.3 Announcements — `src/shared/announce.ts`, `POST /announce`
 
@@ -6745,6 +6874,8 @@ other push stays until I hide it ⚑ Q284.
 | GET | `/me` | member | → member + prefs |
 | PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration?, showWeather?, showMoon?, showSchool?, houseSpeakers?: string[] \| null, clock24h?: boolean, afterKind?: 'work' \| 'school' \| null, afterTime?: "HH:MM" \| null }` (§9.2a, §8.17, §8.5b) |
 | GET | `/house/speakers` | member | → `{ speakers: { id, name, kind }[], mine, defaults }` asked of Home Assistant live; 503 `house_not_configured`; 502 `house_unreachable` (§9.2a) |
+| GET | `/house/devices` | member | → `{ devices: { id, name, domain, roomId }[] }` asked of Home Assistant live; 503 `house_not_configured`; 502 `house_unreachable` (§9.2e) |
+| POST | `/house/devices/{entity}` | member | `{ action: 'on' \| 'off' \| 'mode' \| 'target', mode?, target? }` → `Device` after one allowed service call; 404 not in a room; 400 / 503 / 502 (§9.2e) |
 | GET | `/members` | member | → `{ id, email, displayName, color, role, isFounder, disabledAt, after: { kind, time } }[]` (no hashes; `email` only for owners; `after` §8.5b) |
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
@@ -6819,7 +6950,8 @@ other push stays until I hide it ⚑ Q284.
 | GET/POST | `/places` | member | GET → `Place[]` by name; POST `{ name, address, notes?, words? }` → place (201); 400 at 100 places (§7.9b) |
 | PATCH/DELETE | `/places/{id}` | the place's creator or an admin | PATCH (fields left out are kept) → place; DELETE → 204, events keep their address (§7.9b) |
 | GET/POST | `/rooms` | GET member / POST owner | GET → `Room[]` by position; POST `{ name }` → room (201); 400 at 30 rooms (§7B.6) |
-| PATCH/DELETE | `/rooms/{id}` | the room's creator or owner | PATCH `{ name }` → room; DELETE → 204 with its areas and photos, its chores' room cleared (§7B.6) |
+| PATCH/DELETE | `/rooms/{id}` | the room's creator or owner | PATCH `{ name }` → room; DELETE → 204 with its areas, photos and device rows, its chores' room cleared (§7B.6) |
+| GET/PUT | `/rooms/{id}/devices` | GET member / PUT the room's creator or owner | GET → `{ devices: Device[] }` live from HA; PUT `{ devices: string[] }` (≤ 12, none in another room) → `{ devices }` (§9.2e) |
 | GET/POST | `/rooms/{id}/areas` | GET member / POST the room's creator or owner | GET → `RoomArea[]` by position; POST `{ name, expectations? }` → area (201); 400 at 8 areas; 404 when the room is gone (§7B.6) |
 | PATCH/DELETE | `/room-areas/{id}` | the room's creator or owner | PATCH `{ name?, expectations? }` → area; DELETE → 204 with its photos (§7B.6) |
 | POST | `/room-areas/{id}/photos` | the room's creator or owner | the raw image → area (201); 400 at 4 photos or a bad image (§7B.6) |
