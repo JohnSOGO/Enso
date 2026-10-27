@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-27, v1.110.0, main = production.*
+*Last updated 2026-10-27, v1.111.0, main = production.*
 
 ## Running where
 
@@ -15,6 +15,7 @@ the working agreement in `CLAUDE.md`.
 | Home Assistant voice + devices | ha.sogodojo.com → HA (192.168.0.123) | Cloudflare tunnel `haosdojo` (HA Cloudflared add-on), Access service token `enso-worker`. SPEC §9.2; the 🏡 Home tab reads and runs room devices through the same token (§9.2e). |
 | Home helper | sogoai.sogodojo.com → SogoAI 127.0.0.1:8790 | Tunnel `sogoai` (Cloudflared service on SogoAI), the same Access token plus Bearer `CAPTIONS_TOKEN`. It fetches YouTube captions (§7E.2c), names item photos (§7A.3) and marks notes (§8.4a) with LM Studio's `photo-polish` (`IDENTIFY_MODEL`). Notes are asked only while the PC model manager (127.0.0.1:8793 `/state`, no lease) shows that model loaded and idle. Built from `home/` with `npm run build:home`. Its notes on SogoAI: `C:\Users\Public\git\SogolAI\ENSO-HOME-HELPER.md`. |
 | Weather forecast | api.open-meteo.com (free, no key) | `WEATHER_URL` var in wrangler.toml; fetched once a day by the tick (§7.11). Empty turns weather off. |
+| 🎣 Fishing data | NOAA CO-OPS tides, Open-Meteo marine, CDFW trout plants (ArcGIS), SD County Parks iCal (Tockify): all free, no key | `TIDES_URL`, `MARINE_URL`, `FISH_PLANTS_URL`, `PARKS_ICAL_URL` vars in wrangler.toml; fetched once a day by the tick (§7.14). Empty turns that part off. Next year: add CDFW's Free Fishing Days to `FREE_FISHING_DAYS` in `src/shared/fish-events.ts`. |
 | Claude → MojoSOGO's phone | `POST /api/v1/ops/notify` | Bearer `OPS_NOTIFY_TOKEN` (README "Ping MojoSOGO's phone"). Always goes to the founder, John Redman, who is MojoSOGO. |
 | Claude → the FunHouse | `GET /api/v1/ops/pings`, polled by the dev PC | Scheduled task "Enso FunHouse poller" on SogoGamerPC runs `home/funhouse-poller.cmd` (README "The same pings on the FunHouse"); hands Claude's pings and 🎪 FunHouse alerts (§9.4b) to the bridge on 127.0.0.1:8765. Cloud threads ping with `ENSO_OPS_NOTIFY_TOKEN` from the project's cloud environment. |
 
@@ -51,6 +52,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 🎣 Good fishing times (v1.111.0, §7.14, §7.14b, migration 0066, Q394–Q401 ⚑): Settings → 📅 Calendar → tick 🎣 Good fishing times → pick How far will we go (try 1 h) → open 📍 spots in reach; tick 🔔 Ping me. The next 7 days show 🎣 bottom right on great days; tap a day → "🎣🎣🎣 6:20am–8:20am Oceanside Pier · dawn, high tide …" and the best lake, each a link; 🐟 lines for trout plants (Cuyamaca, Doane Pond) when in range. After 7pm a phone ping for a great tomorrow.
 - 🍳 Recipes in Lists (v1.110.0, §8.8, §8.12, Q393 ⚑): the tab bar has six tabs, no 🍳; tap 🛒 Lists → 🍳 Recipes (n) after 📥 Inbox → every recipe is there with its picture and emoji; paste a link → Read it → it opens.
 - 🏡 Home (v1.109.0, §9.2e, §8.19, migration 0065, Q389–Q392 ⚑): on the iPhone, 🏡 Home → his room (an admin adds it in Settings → 🏠 Household first) → ✏ Devices → tick ❄️ Midea AC → Save → the card shows Fan · Room 54° · Set 70°; tap Cool → the AC changes and the card reads Cool; ＋ → Set 71°. The AC's filter alert is on in HA (clean the filter).
 - 🏫 School days off (v1.108.0, §7.13, migration 0064, Q386–Q388 ⚑): scroll to Nov 2026 → 11-11 shows 🏫 by the number, 11-18/19 🕛, 11-23…27 🏫; tap 11-25 → "🏫 Thanksgiving break — No school". Settings → 📅 Calendar → 🏫 School days off → untick → gone from cells and the day sheet. Next school year: swap the rows in `src/shared/school.ts`.

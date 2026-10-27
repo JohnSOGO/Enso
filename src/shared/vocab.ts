@@ -16,6 +16,7 @@ export const MACHINE = ['washer', 'dryer', 'dishwasher'] as const; // §7D, card
 export const COOK_KIND = ['air_fryer', 'stove', 'oven', 'microwave', 'other'] as const; // §7D.8 a cooking timer's kind, in picker order
 export const MACHINE_STATE = ['free', 'running', 'done'] as const; // §7D, derived, never stored
 export const SUN_EVENT = ['sunset'] as const; // §7.7 events.start_sun — there is no sunrise
+export const TIDE_KIND = ['H', 'L'] as const; // §7.14 tide_turns.kind: a high or a low (NOAA's own letters)
 export const RECIPE_SOURCE = ['description', 'captions', 'transcript', 'comments', 'page', 'typed'] as const; // §7E what a recipe was read from ('transcript': pasted, §7E.2b)
 export const CAPTIONS_FAILURE = ['blocked', 'none', 'failed'] as const; // §7E why captions couldn't be read
 export const SPEAKER_KIND = ['echo', 'satellite'] as const; // §9.2a a house speaker, from its HA entity id

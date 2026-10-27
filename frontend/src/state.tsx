@@ -15,6 +15,8 @@ export interface Me extends Record<ItemPref, number> {
   houseSpeakers: string[] | null;
   /** §8.17: true = 24-hour clock, false = 12-hour. */
   clock24h: boolean;
+  /** §7.14: How far will we go (drive minutes) and the evening-before 🎣 ping. */
+  fishingRange: number; fishingAlert: boolean;
   /** §8.5b: my After work / After school, resolved by the server. */
   after: After;
 }

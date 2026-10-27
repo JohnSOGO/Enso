@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { isValidTimeZone } from '../../shared/time';
 import { DEFAULT_DAYS_OFF, HOLIDAYS, HOLIDAY_KEYS, isHolidayKey, type HolidayKey } from '../../shared/holidays';
-import { all, first, newId, nowIso, parseJson, run } from '../db';
+import { all, first, newId, nowIso, parseJson, placeOf, run } from '../db';
 import { body, fail, str } from '../http';
 import { requireMember, requireOwner } from '../session';
 import { NO_SUBSCRIPTION, PUSH_NOT_CONFIGURED, sendTestPush } from '../push';
@@ -24,9 +24,11 @@ export async function daysOff(db: D1Database): Promise<HolidayKey[]> {
 }
 
 async function settingsView(db: D1Database) {
-  const s = await first<{ household_name: string; timezone: string }>(db, 'SELECT household_name, timezone FROM settings WHERE id = 1');
+  const s = await first<{ household_name: string; timezone: string; latitude: number | null; longitude: number | null }>(db,
+    'SELECT household_name, timezone, latitude, longitude FROM settings WHERE id = 1');
   return {
     householdName: s!.household_name, timezone: s!.timezone, daysOff: await daysOff(db),
+    place: placeOf(s!.latitude, s!.longitude), // §7.14: the spots' drive times are measured from it
     holidays: HOLIDAY_KEYS.map((key) => ({ key, name: HOLIDAYS[key].name, emoji: HOLIDAYS[key].emoji })),
   };
 }

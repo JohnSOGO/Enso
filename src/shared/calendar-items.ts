@@ -1,5 +1,5 @@
 // SPEC §7.2, §7.5 — the built-in calendar items each member can switch on or off: public holidays, 📈 options
-// expiration, weather, moon phases and school days off. One row each: its /me key, its member_prefs column, the
+// expiration, weather, moon phases, school days off and good fishing times. One row each: its /me key, its member_prefs column, the
 // DayData key the calendar drops when it is off, and its Settings → 📅 Calendar label and title. Pure, imports nothing.
 
 export const CALENDAR_ITEMS = [
@@ -8,6 +8,7 @@ export const CALENDAR_ITEMS = [
   { pref: 'showWeather', column: 'show_weather', day: 'weather', label: 'Weather', title: '🌤️ Weather' },
   { pref: 'showMoon', column: 'show_moon', day: 'moonPhases', label: 'Moon phases', title: '🌕 Moon phases' },
   { pref: 'showSchool', column: 'show_school', day: 'schoolDays', label: 'School days off', title: '🏫 School days off' },
+  { pref: 'showFishing', column: 'show_fishing', day: 'fishing', label: 'Good fishing times', title: '🎣 Good fishing times' },
 ] as const;
 
 /** A built-in item's /me key (showMoon …). */

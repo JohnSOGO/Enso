@@ -1,8 +1,10 @@
-// SPEC §7.1–7.2 — one calendar day cell: classes, stay tint, date line, weather and moon corner, bar-lane gap, event marks.
+// SPEC §7.1–7.2 — one calendar day cell: classes, stay tint, date line, weather, moon and fishing corner, bar-lane gap, event marks.
 import { useApp } from '../state';
 import { dotSize, fitLines, LINE_GAP } from '../day-lines';
 import { participants } from '../participants';
 import { heatOf } from '../../../src/shared/weather';
+import { GREAT } from '../../../src/shared/fishing';
+import { FISH_EMOJI } from '../../../src/shared/fish-events';
 import type { DayData, Occurrence, Span } from './Calendar';
 import s from './DayCell.module.css';
 
@@ -32,6 +34,8 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
   const moon = data?.moonPhases ?? []; // §7.12
   const school = data?.schoolDays ?? []; // §7.13
   const wx = data?.weather; // §7.11
+  const fish = data?.fishing; // §7.14: 🎣 a great window in reach, else 🐟 a fish event
+  const fishMark = fish?.windows.some((w) => w.rating === GREAT) ? '🎣' : fish?.events.length ? FISH_EMOJI : '';
   const items = data?.items ?? [];
   const days = items.filter((o) => !isMultiDay(o)); // multi-day events are drawn as bars
   // §7.2 day icons beside the number: holiday, 🏫, 📈, then unassigned events' emoji (Q277); at most two.
@@ -63,6 +67,7 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
     items.length ? `${items.length} event${items.length > 1 ? 's' : ''}` : '',
     ...pub.map((h) => h.name), ...school.map((x) => x.name), ...market.map((m) => m.name), ...moon.map((m) => m.name),
     wx ? `${wx.words}, high ${wx.high}°, low ${wx.low}°` : '',
+    fishMark === '🎣' ? 'great fishing' : '', ...(fish?.events.map((e) => e.title) ?? []),
   ].filter(Boolean).join(', ');
   return (
     <button className={cls} aria-label={label} onClick={() => onOpen(date, data)}
@@ -80,10 +85,10 @@ export function DayCell({ date, data, stay, lanes, barH, rowH, cellW, narrow, to
           <span className={s.hEmoji} aria-hidden title={[...pub.map((h) => h.name), ...school.map((x) => x.name), ...market.map((m) => m.name), ...iconed.map((o) => o.title)].join(', ')}>{icons.map((x) => x.emoji).join('')}</span>
         )}
       </span>
-      {(wx || moon.length > 0) && ( // §7.11, §7.12 bottom-right: the high in its heat band, the emoji, the moon
-        <span className={s.wx} aria-hidden title={[wx?.words, ...moon.map((m) => m.name)].filter(Boolean).join(', ')}>
+      {(wx || moon.length > 0 || fishMark) && ( // §7.11, §7.12, §7.14 bottom-right: the high in its heat band, the emoji, the moon, 🎣
+        <span className={s.wx} aria-hidden title={[wx?.words, ...moon.map((m) => m.name), fishMark && 'Fishing'].filter(Boolean).join(', ')}>
           {wx && <><span className={s[heatOf(wx.high)]}>{wx.high}</span>{wx.emoji}</>}
-          {moon.slice(0, 1).map((m) => m.emoji)}
+          {moon.slice(0, 1).map((m) => m.emoji)}{fishMark}
         </span>
       )}
       {lanes > 0 && <span aria-hidden style={{ height: lanes * (barH + 1), flex: 'none' }} />}

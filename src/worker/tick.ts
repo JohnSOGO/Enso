@@ -18,6 +18,9 @@ import { weatherTick } from './weather-days';
 import { cookDayTick } from './cook-rows';
 import { listPingTick } from './list-pings';
 import { iouPingTick } from './iou-pings';
+import { coastTick } from './coast-days';
+import { fishEventsTick } from './fish-events-rows';
+import { fishingPingTick } from './fishing-pings';
 
 export interface TickSummary { materialized: number; stepped: number; alerts: number; deliveries: number }
 
@@ -108,6 +111,10 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
   await listPingTick(env, now);
   // 3g. Ping the one who owes on a payback plan's due day (§7B.9).
   await iouPingTick(env, now);
+  // 3h–3j. Refresh the tides, waves and wind, and the fish events, once a day; then the evening-before 🎣 ping (§7.14).
+  await coastTick(env, now);
+  await fishEventsTick(env, now);
+  await fishingPingTick(env, now);
   // 4. Speak the queued and stale-claimed house deliveries (§9.2).
   await sendHouseDeliveries(env, now);
   return summary;

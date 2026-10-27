@@ -11,6 +11,7 @@ import { PickGrid } from './PickGrid';
 import { OptionalItems } from './OptionalItems';
 import { DaysOff } from './DaysOff';
 import { Places } from './Places';
+import { FishingSettings } from './FishingSettings';
 import { SettingsMe } from './SettingsMe';
 import { PhoneAlerts } from './PhoneAlerts';
 import { HouseSpeakers } from './HouseSpeakers';
@@ -43,7 +44,7 @@ export function Settings({ onLogout, openAlert, onAlertOpened }: { onLogout: () 
 
   const body: Record<Area, () => ReactNode> = {
     me: () => <SettingsMe />,
-    calendar: () => <><OptionalItems />{isAdmin(me) && <DaysOff />}<Places /></>,
+    calendar: () => <><OptionalItems /><FishingSettings />{isAdmin(me) && <DaysOff />}<Places /></>,
     phone: () => <PhoneAlerts />,
     speakers: () => <HouseSpeakers />,
     alerts: () => <MyAlerts openId={openAlert} onOpened={onAlertOpened} />,

@@ -1,8 +1,9 @@
-// SPEC §8.3 — the day sheet: weather (§7.11), holidays, all-day events, timed events, then "+ Add event".
+// SPEC §8.3 — the day sheet: weather (§7.11), holidays, fishing (§7.14), all-day events, timed events, then "+ Add event".
 import { Modal } from './Modal';
 import { useApp } from '../state';
 import type { DayData, Occurrence } from './Calendar';
 import { weatherText } from '../../../src/shared/weather';
+import { fishingText } from '../../../src/shared/fishing';
 import { participants } from '../participants';
 import { canOpenEvent } from '../../../src/shared/event-access';
 import { isAdmin } from '../../../src/shared/roles';
@@ -21,7 +22,7 @@ interface Props {
 }
 
 export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
-  const { memberById, members, me, clock } = useApp();
+  const { memberById, members, me, clock, tz } = useApp();
   const founder = members.find((m) => m.isFounder)?.id; // §8.3: MojoSOGO first
   const items = data?.items ?? [];
   const allDay = items.filter((o) => o.allDay);
@@ -58,6 +59,10 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
       {data?.publicHolidays.map((h) => <p key={h.name} className={s.holiday} style={{ background: 'var(--holiday-public-cell)', borderRadius: 6, padding: '2px 8px' }}>{h.emoji} {h.name} — day off</p>)}
       {data?.schoolDays.map((x) => <p key={x.name} className={s.holiday}>{x.emoji} {x.name}</p>)}
       {data?.marketDays.map((m) => <p key={m.name} className={s.holiday}>{m.emoji} {m.name}</p>)}
+      {data?.fishing?.windows.map((w) => <p key={w.spot.kind} className={s.holiday}>
+        <a href={w.spot.link} target="_blank" rel="noreferrer">{fishingText(w, tz, me.clock24h)}</a></p>)}
+      {data?.fishing?.events.map((e) => <p key={e.title} className={s.holiday}>
+        {e.url ? <a href={e.url} target="_blank" rel="noreferrer">{e.emoji} {e.title}</a> : <>{e.emoji} {e.title}</>}</p>)}
       {items.length === 0 && <p className="muted">Nothing on this day.</p>}
       <ul className={s.list}>
         {allDay.map(row)}

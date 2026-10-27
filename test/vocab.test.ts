@@ -18,6 +18,7 @@ const EXPECTED: Record<string, readonly string[]> = {
   'chores.timing': vocab.CHORE_TIMING,
   'things.status': vocab.THING_STATUS,
   'events.start_sun': vocab.SUN_EVENT,
+  'tide_turns.kind': vocab.TIDE_KIND,
   'login_requests.status': vocab.LOGIN_REQUEST_STATUS,
   'deliveries.notice': vocab.NOTICE_KIND,
   'messes.settled_how': vocab.MESS_SETTLE,

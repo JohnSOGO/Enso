@@ -12,6 +12,7 @@ import { speakersError } from '../../shared/speakers';
 import { choiceOf } from '../speaker-choices';
 import { afterError, afterOf } from '../../shared/reminders';
 import { CALENDAR_ITEMS } from '../../shared/calendar-items';
+import { rangeError } from '../../shared/fishing-spots';
 
 export const MIN_PASSWORD = 10;
 const FAIL_WINDOW_MIN = 15;
@@ -60,12 +61,12 @@ export async function memberView(db: D1Database, id: string) {
   const row = await first<Record<string, unknown> & { houseSpeakers: string | null }>(db,
     `SELECT m.id, m.email, m.display_name AS displayName, m.color, m.role,
             ${CALENDAR_ITEMS.map((i) => `p.${i.column} AS ${i.pref}`).join(', ')},
-            p.house_speakers AS houseSpeakers, p.clock_24h AS clock24h, p.after_kind AS afterKind, p.after_time AS afterTime
+            p.house_speakers AS houseSpeakers, p.clock_24h AS clock24h, p.fishing_range AS fishingRange, p.fishing_alert AS fishingAlert, p.after_kind AS afterKind, p.after_time AS afterTime
        FROM members m LEFT JOIN member_prefs p ON p.member_id = m.id WHERE m.id = ?`, id);
   if (!row) return row;
   const { afterKind, afterTime, ...rest } = row as typeof row & { afterKind: string | null; afterTime: string | null; role: Role };
   return {
-    ...rest, houseSpeakers: choiceOf(row.houseSpeakers), clock24h: row.clock24h === 1,
+    ...rest, houseSpeakers: choiceOf(row.houseSpeakers), clock24h: row.clock24h === 1, fishingAlert: row.fishingAlert === 1, // §7.14
     after: afterOf({ admin: isAdmin(rest as { role: Role }), kind: afterKind, time: afterTime }), // §8.5b
   };
 }
@@ -163,7 +164,7 @@ auth.patch('/me', requireMember, async (c) => {
     if (typeof b.color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(b.color)) return fail(c, 400, 'invalid_input', 'Color must look like #RRGGBB.');
     stmts.push(c.env.DB.prepare('UPDATE members SET color = ? WHERE id = ?').bind(b.color, id));
   }
-  for (const [key, col] of [...CALENDAR_ITEMS.map((i) => [i.pref, i.column] as const), ['clock24h', 'clock_24h'] as const]) {
+  for (const [key, col] of [...CALENDAR_ITEMS.map((i) => [i.pref, i.column] as const), ['clock24h', 'clock_24h'] as const, ['fishingAlert', 'fishing_alert'] as const]) {
     if (b[key] !== undefined) {
       if (typeof b[key] !== 'boolean') return fail(c, 400, 'invalid_input', `${key} must be true or false.`);
       stmts.push(c.env.DB.prepare(`UPDATE member_prefs SET ${col} = ? WHERE member_id = ?`).bind(b[key] ? 1 : 0, id));
@@ -174,6 +175,11 @@ auth.patch('/me', requireMember, async (c) => {
     if (err) return fail(c, 400, 'invalid_input', err);
     if (b.afterKind !== undefined) stmts.push(c.env.DB.prepare('UPDATE member_prefs SET after_kind = ? WHERE member_id = ?').bind(b.afterKind, id));
     if (b.afterTime !== undefined) stmts.push(c.env.DB.prepare('UPDATE member_prefs SET after_time = ? WHERE member_id = ?').bind(b.afterTime, id));
+  }
+  if (b.fishingRange !== undefined) { // §7.14 How far will we go
+    const err = rangeError(b.fishingRange);
+    if (err) return fail(c, 400, 'invalid_input', err);
+    stmts.push(c.env.DB.prepare('UPDATE member_prefs SET fishing_range = ? WHERE member_id = ?').bind(b.fishingRange, id));
   }
   if (b.houseSpeakers !== undefined) {
     const err = speakersError(b.houseSpeakers);

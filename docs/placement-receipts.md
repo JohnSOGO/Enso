@@ -21,6 +21,37 @@ carry its result.
 
 ---
 
+## 2026-10-27 — 🎣 Good fishing times, v1.111.0 (placement-advisor)
+
+- **Ask:** MojoSOGO approved "All": a fixed spots table with drive-time range per member, a pure tide/sun/solunar/wind
+  scorer, a daily NOAA tide + Open-Meteo marine fetch, a 🎣 calendar item (6th built-in), an evening-before ping
+  opt-in; step B CDFW trout plants + SD Parks iCal + Free Fishing Days as 🐟 lines (SPEC §7.14, §7.14b, §4.2zzm).
+- **Verdict:** REORGANIZER FIRST (calendar-items.ts, done above). Then NEW src/shared/fishing-spots.ts, fishing.ts,
+  moon-times.ts, coast.ts, fish-events.ts; src/worker/coast-days.ts (step 3h), fish-events-rows.ts (step 3i),
+  fishing-days.ts, fishing-pings.ts (step 3j); frontend FishingSettings.tsx. EXISTING sun.ts (+sunriseUtc), auth.ts
+  (/me), routes/events.ts (one fishingBetween call), household.ts (/settings place), tick.ts, env.ts, deliveries.ts
+  (fishing_on, founder ping), DayCell.tsx, DaySheet.tsx, Settings.tsx, say-reader.ts (ENSO_DOES).
+- **Flow stage:** rules (shared) → persist (coast-days, fish-events-rows) → read (fishing-days) → deliver
+  (fishing-pings) → render.
+- **Why:** moon.ts owns phases only, so rise/transit is its own owner; weather.ts is not widened (coast data stays
+  separate so a surf or tide-pool item reuses it). The alert is a fire-less ping (the list/IOU shape), not an engine
+  fire kind (engine.ts at 88%). Deviation: the once-a-day claim is shared by coast and fish events in
+  `src/worker/daily-refresh.ts` [NEW row] (their third use of weather's rule), not copied twice; weather-days.ts untouched.
+- **Caps:** routes/events.ts 129/147, tick.ts 121/148, auth.ts 192/300; nothing newly in the band.
+
+---
+
+## 2026-10-27 — Steward pass, fishing AREC (code-steward)
+
+- **Run:** AREC for a feature spanning several areas (🎣 fishing times)
+- **Verdict:** MINOR DRIFT
+- **Top finding:** a 6th built-in calendar switch is shotgun surgery across 8 files, so open a descriptor list first
+  (done: calendar-items.ts); keep /calendar to one call so routes/events.ts stays out of the band
+- **Handoffs:** reorganizer (built-ins descriptor); placement-advisor (coast/fishing placement)
+- **Restraint:** no engine fire kind, no generic geo module, no surf/tide-pool stubs
+
+---
+
 ## 2026-10-27 — Steward pass, v1.110.0 scope (code-steward)
 
 - **Run:** post-release, v1.110.0 (🍳 Recipes into the Lists popup as a fixed view)

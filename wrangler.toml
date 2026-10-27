@@ -45,6 +45,12 @@ HOME_CAPTIONS_URL = "https://sogoai.sogodojo.com"
 BUILD_FIRE_URL = "https://api.anthropic.com/v1/claude_code/routines/trig_01HcWVca5w8nD14G1LXyEYR7/fire"
 # SPEC §7.11 — the daily forecast on the calendar (free, no key). Empty turns weather off.
 WEATHER_URL = "https://api.open-meteo.com"
+# SPEC §7.14 — good fishing times: tides (NOAA CO-OPS) and waves (Open-Meteo marine), free, no key. Empty turns them off.
+TIDES_URL = "https://api.tidesandcurrents.noaa.gov"
+MARINE_URL = "https://marine-api.open-meteo.com"
+# SPEC §7.14b — fish events: the CDFW trout plants in San Diego County (ds2897, GeoJSON) and the county parks' calendar.
+FISH_PLANTS_URL = "https://services2.arcgis.com/Uq9r85Potqm3MfRV/arcgis/rest/services/biosds2897_fmu/FeatureServer/0/query?where=Counties%20LIKE%20%27%25San%20Diego%25%27&outFields=WaterName,WeekOfPlantStart,FishType,Lat,Lon,OBJECTID&orderByFields=WeekOfPlantStart%20DESC&outSR=4326&f=geojson"
+PARKS_ICAL_URL = "https://tockify.com/api/feeds/ics/sdparkscalendar"
 
 [triggers]
 crons = ["* * * * *"]
