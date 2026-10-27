@@ -35,6 +35,8 @@ export default defineConfig(async () => {
             // §7.11 — pinned empty so no tick in a test asks the real forecast; test/weather.test.ts sets
             // https://weather.test per call, with a fetch spy answering it.
             WEATHER_URL: '',
+            // §7.14 — the same for the tides, waves and fish events: test/fishing-api.test.ts sets fakes per call.
+            TIDES_URL: '', MARINE_URL: '', FISH_PLANTS_URL: '', PARKS_ICAL_URL: '',
             // §9.2 — pinned so a test can never speak in the real house: a fake host, and the secrets
             // empty (House is then not configured). test/house.test.ts overrides them per call, with a
             // fetch spy answering https://ha.test.

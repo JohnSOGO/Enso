@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.97 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
+**Version:** 3.98 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -263,10 +263,16 @@ Enso/
 │   │   ├── holidays.ts     # §7.3
 │   │   ├── markets.ts      # §7.4
 │   │   ├── moon.ts         # §7.12
+│   │   ├── moon-times.ts   # §7.14 moonrise, moonset, overhead, underfoot per local date and place
+│   │   ├── calendar-items.ts # §7.2, §7.5 the built-in calendar items' switches, one list
+│   │   ├── fishing-spots.ts # §7.14 the fixed spots table, drive times, How far will we go
+│   │   ├── fishing.ts      # §7.14 the window rating and its words
+│   │   ├── coast.ts        # §7.14 tide, wave and wind addresses and answers
+│   │   ├── fish-events.ts  # §7.14b trout plants, parks events, Free Fishing Days
 │   │   ├── lists.ts        # §7A.1 item rules: itemKey, add/reopen decision, limits, 30-day window
 │   │   ├── item-reading.ts # §7A.3 naming a snapped item: the prompt, cleanItemName, the helper's report
 │   │   ├── machines.ts     # §7D the laundry loop + dish washer: state, transitions, done message
-│   │   ├── sun.ts          # §7.7 sunset per local date and place (NOAA)
+│   │   ├── sun.ts          # §7.7, §7.14 sunset and sunrise per local date and place (NOAA)
 │   │   ├── recipes.ts      # §7E recipe rules: limits, YouTube link → video id, typed input, the wire
 │   │   ├── recipe-reading.ts # §7E.2, §7E.2b, §7E.2c reading a video: sources, creator's comments, transcript, cleaning a reading, captions from home
 │   │   ├── recipe-link.ts  # §7E.6 any link: its kind (video or page, cleaned), the site's name, the look-up and fill prompts
@@ -331,6 +337,7 @@ against the deployed Worker. On iPhone, push works only after
 | `HOME_CAPTIONS_URL` (var, `wrangler.toml`) | Worker | Where the SogoAI helper is reached: `https://sogoai.sogodojo.com` (§7E.2c), for `/captions`, `/identify` (§7A.3) and `/note-marks` (§8.4a) alike. Tests pin `https://sogoai.test`, which only a fetch spy answers. |
 | `IDENTIFY_MODEL` (SogoAI's `C:\Enso\captions-helper.env`, not a Worker setting) | SogoAI helper | The LM Studio model id `/identify` and `/note-marks` ask (§7A.3, §8.4a): `photo-polish`, the one small vision chat model SogoAI keeps loaded ⚑ Q115. `/note-marks` asks it only while the PC model manager shows it loaded. Unset or empty → `/identify` answers `{ ok: false, kind: "off" }` (the Worker then asks Claude) and `/note-marks` answers `off` (patterns); captions keep working and the helper still starts. Not a secret. |
 | `OPS_NOTIFY_TOKEN` (secret) | Worker **and** MojoSOGO's machines (`%USERPROFILE%\.enso\ops-notify-token`) | The bearer a Claude Code session sends to `POST /ops/notify` to push a message to the founder's phone (§9.4), checked in constant time. A long random string, set with `npx wrangler secret put OPS_NOTIFY_TOKEN` in a real PowerShell window and the same value in the token file (never in the repo). Unset or empty → `/ops/notify` is 503 `ops_notify_off` (never open). Never logged, never in a message or a delivery's detail. Tests pin a test-only value. |
+| `TIDES_URL`, `MARINE_URL`, `FISH_PLANTS_URL`, `PARKS_ICAL_URL` (vars, `wrangler.toml`) | Worker | Good fishing times (§7.14, §7.14b): the NOAA CO-OPS and Open-Meteo marine base addresses, and the CDFW trout plants query and the county parks iCal feed. Free, no key. Empty turns that part off; tests pin them empty and reach only fakes. |
 | `BUILD_FIRE_URL` (var, `wrangler.toml`), `BUILD_FIRE_TOKEN` (secret) | Worker | Build now (§8.18 part 6): the "Enso daily feature requests" routine's API fire address (`https://api.anthropic.com/v1/claude_code/routines/{id}/fire`) and its bearer, made once at claude.ai/code/routines → the routine → Edit → Add another trigger → API → Generate token, set with `npx wrangler secret put BUILD_FIRE_TOKEN` in a real PowerShell window. Either empty → `/feature-requests/{id}/build` is 503 `build_now_off`. Never logged or shown. |
 
 Dev secrets go in `.dev.vars` (gitignored); production uses `wrangler secret put`, typed
@@ -389,6 +396,7 @@ This table says what each term means.
 | `dishwasher` | The **Dish washer** (§7D.6): started and done like the laundry machines, on its own (no next machine) |
 | `free` / `running` / `done` | A machine's state (§7D): no load / a load, before done-at / a load, done-at passed — derived from the row and `now` |
 | `sunset` | An event whose start is the day's local sunset (§7.7, `events.start_sun`); there is no sunrise |
+| `H` / `L` | A high / low tide turn (`TIDE_KIND`, `tide_turns.kind`, §7.14), NOAA's own letters |
 | `description` / `captions` | A recipe was read from the video's description / its captions (§7E); a recipe can carry both |
 | `page` | A recipe read from a link that is not a YouTube video: a Facebook reel or post, a recipe site, any web page (§7E.6) |
 | `typed` | A recipe typed by hand, with no video (§7E) |
@@ -1157,6 +1165,22 @@ Schema: [`migrations/0065_room_devices.sql`](migrations/0065_room_devices.sql). 
 [`test/migration-0065.test.ts`](test/migration-0065.test.ts)**):** existing rooms untouched, no device rows; a
 second row for the same entity is refused; `foreign_key_check` empty.
 
+### 4.2zzm Schema change — `migrations/0066_fishing.sql`
+
+Asked by MojoSOGO 2026-10-27 ("add it as an option to the calendar and also optionally sign up for alerts … set the
+distance from our home"): good fishing times (§7.14, §7.14b). Three `member_prefs` settings: `show_fishing` (the
+calendar item, **off** by default), `fishing_range` (How far will we go, in drive minutes, 30) and `fishing_alert`
+(the evening-before ping, off). Two tables the daily refreshes replace, `tide_turns` (a station's highs and lows, UTC)
+and `coast_days` (each day's highest wave and strongest wind, either unknown), and `fish_events` (trout plants and
+parks events, with their place when known). `settings.coast_tried_at` and `settings.fish_events_tried_at` are the
+refreshes' claims (as `weather_tried_at`, §7.11); `deliveries.fishing_on` marks a fishing ping with the day it is
+about, so the founder pings leave it out and a member gets one a day. Additive; it runs before the deploy.
+
+Schema: [`migrations/0066_fishing.sql`](migrations/0066_fishing.sql). **Migration check (FI-M,**
+[`test/migration-0066.test.ts`](test/migration-0066.test.ts)**):** an existing member has 🎣 off, 30 minutes and no
+ping; the settings row survives with both claims NULL; the three tables start empty; a tide kind other than H or L is
+refused.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1383,6 +1407,10 @@ Runs from `scheduled()` every minute, and from `POST /api/v1/dev/tick` in dev.
    3e. **Cooking timers' end of day.** Close every open cooking timer `cookExpired` names (§7D.8).
    3f. **Ping owners.** `listPingTick` (`src/worker/list-pings.ts`): every day list items whose time has come (§7A.4).
    3g. **Payback pings.** `iouPingTick` (`src/worker/iou-pings.ts`): each live payback plan due today (§7B.9).
+   3h. **Coast data.** `coastTick` (`src/worker/coast-days.ts`): the once-a-day tide, wave and wind refresh (§7.14).
+   3i. **Fish events.** `fishEventsTick` (`src/worker/fish-events-rows.ts`): the once-a-day trout plants and parks
+   events refresh (§7.14b). Both never throw; a failure is logged and retried hourly.
+   3j. **Fishing pings.** `fishingPingTick` (`src/worker/fishing-pings.ts`): the evening-before 🎣 ping (§7.14).
 4. **Speak house.** `sendHouseDeliveries(env, now)` drains queued and stale-claimed `house`
    deliveries (§9.2).
 5. Use a D1 `batch()` per fire for the writes. D1 has no `BEGIN`/`COMMIT`.
@@ -1426,8 +1454,9 @@ For one alert of one fire:
   - from the second alert on, append `" (alert {n})"`
 
 A delivery with **no fire** is an announcement (§9.3, `POST /announce`), a sign-in notice (§6.6), a
-founder ping (§9.4, `POST /ops/notify`), a mess ask (§7B.7), a bounty push (§7B.8), a list ping (§7A.4), or an IOU
-payback ping or declined notice (§7B.9). Of these `tick` writes mess asks (step 3b, §5.6), list pings and payback pings; every
+founder ping (§9.4, `POST /ops/notify`), a mess ask (§7B.7), a bounty push (§7B.8), a list ping (§7A.4), a fishing ping (§7.14), or an IOU
+payback ping or declined notice (§7B.9). Of these `tick` writes mess asks (step 3b, §5.6), list pings, payback pings and
+fishing pings; every
 fire-less row is written through `src/worker/deliveries.ts`.
 
 ### 5.8 Engine acceptance tables (M1 — each row is a test)
@@ -1853,10 +1882,12 @@ it is on for the member (§7.5).
 - **Legend:** shown once, directly under the sticky month header: a yellow square
   (`--holiday-public-swatch`) "Public holiday" and "📈 Options expiration" (§7.4), each only
   while it is on for the member.
-- **Switches:** public holidays, 📈, the weather (§7.11), moon phases (§7.12) and school days off (§7.13) are rows
-  of **Optional calendar items** (§7.5), not separate checkboxes. The calendar drops what is off **once**, where it
-  hands a day's `DayData` out (`shownFor` in `Calendar.tsx`), so the cell, the day sheet and anything later never
-  check a switch themselves.
+- **Switches:** public holidays, 📈, the weather (§7.11), moon phases (§7.12), school days off (§7.13) and good
+  fishing times (§7.14) are rows of **Optional calendar items** (§7.5), not separate checkboxes. They are **one list**,
+  `CALENDAR_ITEMS` (`src/shared/calendar-items.ts`: each item's `/me` key, `member_prefs` column, day field, label),
+  which `/me`, Settings and the calendar all read, so a new built-in item is one row there. The calendar drops what is
+  off **once**, where it hands a day's `DayData` out (`shownFor` in `Calendar.tsx`), so the cell, the day sheet and
+  anything later never check a switch themselves.
 - **Off means off everywhere** for that member — the cell tint and icon, the legend entry
   **and the day sheet** (a public holiday switched off is not listed there either). ⚑
 
@@ -1974,6 +2005,107 @@ replaces the table; nothing else changes.
 | SC5 | GET `/calendar` for 2026-11-08 … 11-14 | `schoolDays` holds 11-11 with its name and emoji; a week in August gives `[]` |
 | SC6 | migration 0064, then `PATCH /me { showSchool }` | an existing member has `showSchool` 1; false saves 0; `'no'` is refused (400) |
 
+### 7.14 Good fishing times 🎣 (`src/shared/fishing.ts`, pure) — asked by MojoSOGO 2026-10-27
+
+"Is there website or information that you can pull to find out when good fishing times are happening … the Oceanside
+pier or in San Diego in general", then: an option on the calendar, alerts to sign up for, and "set the distance from
+our home like how far can we go". Research and the AREC: `arec-fishing-times.md` (project files).
+
+**The spots** (`src/shared/fishing-spots.ts`): one fixed table, `FISHING_SPOTS`, of the piers, jetties, landings and
+lakes a car reaches from Oceanside, from Oceanside Pier to Lake Morena and two Riverside County lakes. Each row has
+its name, `ocean` or `lake`, place, a link to its own site and a short note; an ocean spot names its NOAA tide station.
+Oceanside Harbor's station (9410396) has no predictions, so the north county spots use **La Jolla (9410230)** and the
+bay and south use **San Diego (9410170)** ⚑ Q398. The rows are the table in the file, not copied here. Which days a
+city reservoir opens is not modelled: its link says ⚑ Q399.
+
+**How far will we go** (per member, `fishing_range`): 15, 30, 45 minutes, 1, 1½ or 2 hours of driving, **30** to
+start ⚑ Q394. A spot's drive time is `driveMinutes(home, spot)`: the straight-line miles from the household place
+(§4.2o) × 1.35 for roads, at 40 mph, to the nearest 5 minutes (at least 5). A rough guide, not a map route. No
+household place → no fishing anywhere (nothing to measure from).
+
+**The windows.** Each day has two, **dawn** (45 minutes before sunrise to 75 after) and **dusk** (75 before sunset to
+45 after), to the nearest 5 minutes. Sunrise and sunset are `sunriseUtc` / `sunsetUtc` (§7.7) and the solunar times
+`moonTimes` (`src/shared/moon-times.ts`: the moon's rise, set, overhead and underfoot on a local date, low-precision
+Meeus, within a few minutes), all at the household place. A window is rated ⚑ Q395:
+- **1** for the light;
+- **+1 at sea** when a tide turn (a high or a low) is within an hour of it; **+1 at a lake** when a new or full moon
+  (§7.12) is that day or the next or the day before;
+- **+1** when a solunar period touches it: the moon overhead or underfoot (an hour either side, a major) or its rise
+  or set (half an hour, a minor);
+- **−1** (never below 1) when the day's strongest wind is **15 mph** or more, or, at sea, its highest wave **6 ft** or
+  more.
+`windowsAt(spot, facts)` gives a spot's two; `bestWindows` keeps the best at sea and the best at a lake among the
+spots in reach (nearest first, so a tie goes to the nearer), best first. **3 is great.**
+
+**The coast data** (`src/shared/coast.ts`, rows in `src/worker/coast-days.ts`, tick step 3h): once a day, like the
+forecast (§7.11: due when there was no good refresh today and no try in the last hour; claimed on
+`settings.coast_tried_at`), the high and low tides of both stations from **NOAA CO-OPS** (`{TIDES_URL}/api/prod/datagetter`,
+`interval=hilo`, MLLW, feet, GMT, yesterday to a day past the week), each day's highest wave off Oceanside from
+**Open-Meteo marine** (`{MARINE_URL}/v1/marine`, `wave_height_max`, metres → feet) and each day's strongest wind at home
+from the forecast address (`{WEATHER_URL}/v1/forecast`, `wind_speed_10m_max`, mph). All free, no key. A good refresh
+replaces `tide_turns` and `coast_days` (the 7 days from today). Both stations must answer or nothing changes; the wave
+and the wind are extras, unknown when their answer fails. `TIDES_URL` empty or no place → off. So 🎣 covers the next 7
+days.
+
+**On the calendar** (off by default ⚑ Q401; a member turns **🎣 Good fishing times** on in Optional calendar items,
+§7.5): `/calendar` returns this member's `fishing: { date, windows, events }[]` (`fishingBetween`,
+`src/worker/fishing-days.ts`, read with their own range). A day with a **great** window shows **🎣** in the
+bottom-right corner after the moon; a day with only a fish event (§7.14b) shows **🐟** there ⚑ Q396. The day sheet
+(§8.3) lists each best window as `fishingText`: "🎣🎣🎣 6:20am–8:20am Oceanside Pier · dawn, high tide 7:30am,
+moonset" (in the member's clock, §8.17), a link to the spot's site; then the fish events.
+
+**The ping** (per member, `fishing_alert`, off): from **7:00pm** local (`FISHING_PING_TIME`), each active member with it
+on whose range holds a great window or any fish event **tomorrow** gets one push, titled "🎣 Good fishing", one line
+each ("Tomorrow 6:20am–8:20am Oceanside Pier · dawn, …", "Tomorrow: 🐟 Kids Fishing Derby"), phone only: no fire,
+never spoken, never on the FunHouse, never a founder ping (§9.4). Marked by `deliveries.fishing_on` = tomorrow, so it
+is sent once ⚑ Q397. Tick step 3j, `src/worker/fishing-pings.ts`.
+
+**Settings** (§8.6, `FishingSettings.tsx`): under Optional calendar items, **🎣 Fishing**: How far will we go (a
+picker), **🔔 Ping me the evening before a great time or a fish event**, and **📍 n spots in reach**, a list (nearest
+first: 🌊 or 🏞️, the name as a link, ~minutes, its note). `GET /settings` carries the household `place` for it.
+
+**Acceptance (each row a test,** [`test/fishing.test.ts`](test/fishing.test.ts),
+[`test/fishing-api.test.ts`](test/fishing-api.test.ts), [`test/moon-times.test.ts`](test/moon-times.test.ts)**):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| MT1–MT3 | `moonTimes` and `sunriseUtc` for Oceanside on 2026-06-21, 10-25, 10-27, 11-09, 12-21 | each within 6 minutes of an independent ephemeris (astronomy-engine); a time not on that local day is null; polar night has no sunrise |
+| FS1 | every row of `FISHING_SPOTS` | unique ids, an https link, a tide station only at sea |
+| FS2 | drive times from 33.20, −117.29 | Oceanside Pier 10, Lake Cuyamaca 90; 15 min reaches Guajome Lake, Oceanside Pier, the harbor, Agua Hedionda, Discovery Lake; 2 h reaches every spot; a range of 50 or "45" is refused |
+| FS3 | a high tide at 7:30am and moonset at 8:40am on 10-27 | dawn 6:20–8:20am rated 3 (dawn, high, moonset); dusk 1 |
+| FS4 | a lake with a full moon; with 18 mph wind; the pier with 7 ft waves | 2; 1; 1 with "big surf"; no surf at a lake |
+| FS5 | `bestWindows` at 15 min, `fishingText`, `fishingPing` | pier 3 then Guajome 2; the text in 12- and 24-hour; the ping's lines; null with nothing great and no event |
+| FS6 | the coast answers | NOAA turns read, an error answer → null; waves 0.94 m → 3.1 ft; unequal lists → null |
+| FA1 | `/me` | showFishing 0, fishingRange 30, fishingAlert false; 50 or 'yes' → 400; each saves; `/settings` has the place |
+| FA2 | coastTick with the fakes, twice a minute apart | once: tides for 9410230 and 9410170 from the day before, waves, wind in mph |
+| FA3 | `/calendar` after it | 7 fishing days from today, each the best at sea and at a lake; 10-27 at sea is dusk at Oceanside Pier, rated 3 (the 6pm high, moonrise); a 15.5 mph day is windy |
+| FA4 | no `TIDES_URL` | nothing asked; `fishing` is `[]` |
+| FA5 | ping at 6:59pm, 7:00pm, 7:30pm with a parks derby tomorrow | nothing; one push "🎣 Good fishing" with the derby, `fishing_on` tomorrow; no second; no founder ping |
+
+### 7.14b Fish events 🐟 (`src/shared/fish-events.ts`, pure)
+
+"Sometimes they host events": trout plants, derbies and the free days, pulled where they can be ⚑ Q400.
+- **Trout plants:** CDFW's planting schedule for San Diego County (its ArcGIS layer ds2897, `FISH_PLANTS_URL`, GeoJSON,
+  no key), one row a plant on the first day of its week: "Trout planted this week: Cuyamaca Lake", with the water's
+  place, so it shows only within the member's range.
+- **County parks events:** the San Diego County Parks calendar (Tockify iCal, `PARKS_ICAL_URL`): the events whose
+  **title** says fish, fishing, derby, angler, angling, trout, bass or catfish, dated in the household zone. They have
+  no place, so they show at any range.
+- **Free Fishing Days:** `FREE_FISHING_DAYS`, typed once a year from CDFW (2026: 07-04 and 09-05), "Free Fishing Day:
+  no license needed", for everyone with 🎣 on.
+- City lakes (Dixon, Poway, Santee, Miramar) post their derbies only on their own pages: not pulled. A link pasted into
+  📥 Send to Enso (§7H) makes it an event.
+
+`fishEventsTick` (`src/worker/fish-events-rows.ts`, tick step 3i) refreshes once a day on the same rule, claimed on
+`settings.fish_events_tried_at`; each source replaces only its own rows, and one that fails keeps what it had.
+
+| # | Setup / call | Expected |
+|---|---|---|
+| FE1 | `parsePlants` of a CDFW feature; of an error; of a bad date | one row on 2026-10-25 with its place; null; null |
+| FE2 | `parseParksIcal` with a folded "Kids Fishing Derby" at 02:00Z and a yoga event that mentions fish only in its description | only the derby, on the local date (the day before), its URL kept; not a calendar → null |
+| FE3 | `freeDaysBetween` | July and September 2026 days; none in October |
+| FA6 | fishEventsTick with the fakes, then `/calendar` at 2 h and at 30 min | the Cuyamaca plant and the derby; at 30 min only the derby; 07-04 carries the free day |
+
 ### 7.5 Optional events — each person turns them on
 
 **Optional calendar items** (Settings → 📅 Calendar) is the one list of everything a member can
@@ -1984,7 +2116,8 @@ switch on for their own calendar (decided by MojoSOGO 2026-10-03):
 3. **🌤️ Weather** — built in, on by default (`member_prefs.show_weather`, §7.11);
 4. **🌕 Moon phases** — built in, on by default (`member_prefs.show_moon`, §7.12);
 5. **🏫 School days off** — built in, on by default (`member_prefs.show_school`, §7.13);
-6. then every **optional event** (below), each with its emoji and how it repeats.
+6. **🎣 Good fishing times** — built in, **off** by default (`member_prefs.show_fishing`, §7.14) ⚑ Q401;
+7. then every **optional event** (below), each with its emoji and how it repeats.
 Each row is one line with its **On** switch; the rows sit close together (32px, MojoSOGO 2026-10-19 "Reduce spacing")
 ⚑ Q348.
 The old separate checkboxes in Me are gone.
@@ -2086,7 +2219,8 @@ audience is not empty), Done / Snooze, renotify, `missed`. What is new:
 - **Ringing bar** (§8.2): its row reads `🔔 Put the goats away · sunset` ⚑ Q56.
 - **Repeats** ⚑ Q51: the goat row carries `renotify_min = 15`, `max_alerts = 3` — alerts at
   −30, −15 and at sunset, until someone taps Done.
-- **Sunset only** ⚑ Q59: there is no sunrise.
+- **Sunset only** ⚑ Q59: there is no sunrise alert. (`sunriseUtc`, the same algorithm, exists only for the fishing
+  windows, §7.14.)
 
 **Acceptance (M4n — each row is a test):**
 
@@ -4581,7 +4715,8 @@ A modal that opens over the calendar and is titled with the date ("Tue, Oct 6").
 It contains, in order:
 
 1. The day's weather, when there is a forecast for it (§7.11), then its moon phase (§7.12).
-2. The holiday line(s), then the school day line (§7.13), then 📈 (§7.4).
+2. The holiday line(s), then the school day line (§7.13), then 📈 (§7.4), then the fishing lines (§7.14): the best
+   window at sea and at a lake, each a link to its spot's site, then each 🐟 fish event.
 3. All-day events.
 4. Timed events in time order, each showing time, title, creator chip, assigned
    chips, 🔔 if it has a reminder and 📝 if it has notes (§8.4a). The 📝 shows only on a row the member may open:
@@ -5063,7 +5198,8 @@ Settings
 
 - **🙂 Me:** name, color, **Clock: 12-hour / 24-hour** (§8.17), **After work / After school** (§8.5b), and (founder only) **🎯 Point at it** on this device (§8.16).
 - **📅 Calendar** (named "Calendar items" before v1.67.0): **Optional calendar items** — Public holidays, 📈 options
-  expiration, 🌤️ Weather, 🌕 Moon phases, 🏫 School days off, then one line per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); then,
+  expiration, 🌤️ Weather, 🌕 Moon phases, 🏫 School days off, 🎣 Good fishing times, then one line per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); then
+  **🎣 Fishing** (§7.14): How far will we go, 🔔 Ping me the evening before, and 📍 the spots in reach; then,
   for admins only, **Days off** (§7.3) ⚑ Q267 (asked by MojoSOGO 2026-10-12: move Days off "into its own calendar section");
   then **📍 Saved places** for everyone (§7.9b).
 - **📱 Phone alerts:** this phone's state and Turn on / Turn off / Send a test (§9.1).
@@ -6887,7 +7023,7 @@ other push stays until I hide it ⚑ Q284.
 | POST | `/auth/phone-login/{id}/deny` | member (the requested one) | "This wasn't me" → `{ status: 'denied' }`; 404 / 409 as approve (§6.6) |
 | POST | `/auth/logout` | member | → 204; clears cookie |
 | GET | `/me` | member | → member + prefs |
-| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration?, showWeather?, showMoon?, showSchool?, houseSpeakers?: string[] \| null, clock24h?: boolean, afterKind?: 'work' \| 'school' \| null, afterTime?: "HH:MM" \| null }` (§9.2a, §8.17, §8.5b) |
+| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration?, showWeather?, showMoon?, showSchool?, showFishing?, houseSpeakers?: string[] \| null, clock24h?: boolean, fishingAlert?: boolean, fishingRange?: 15 \| 30 \| 45 \| 60 \| 90 \| 120, afterKind?: 'work' \| 'school' \| null, afterTime?: "HH:MM" \| null }` (§9.2a, §8.17, §7.14, §8.5b) |
 | GET | `/house/speakers` | member | → `{ speakers: { id, name, kind }[], mine, defaults }` asked of Home Assistant live; 503 `house_not_configured`; 502 `house_unreachable` (§9.2a) |
 | GET | `/house/devices` | member | → `{ devices: { id, name, domain, roomId }[] }` asked of Home Assistant live; 503 `house_not_configured`; 502 `house_unreachable` (§9.2e) |
 | POST | `/house/devices/{entity}` | member | `{ action: 'on' \| 'off' \| 'mode' \| 'target', mode?, target? }` → `Device` after one allowed service call; 404 not in a room; 400 / 503 / 502 (§9.2e) |
@@ -6895,7 +7031,7 @@ other push stays until I hide it ⚑ Q284.
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
 | DELETE | `/invites/{id}` | owner | revoke |
-| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[], moonPhases[], schoolDays[], weather[] }` (each occurrence carries `emoji`, `private`, `masked`, and `hasNotes`: true only when it has notes and the member may open it, §8.4a; a private event the member may not open is masked to its date and times, titled Private, §6.3; `moonPhases` and `schoolDays` are `{ date, name, emoji }[]` for the range (§7.12, §7.13); `weather` is the stored forecast days in the range, §7.11); recurring events expanded server-side with `recurrence.ts`; alarms and sun-timed events (§7.7) excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
+| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[], moonPhases[], schoolDays[], weather[], fishing[] }` (each occurrence carries `emoji`, `private`, `masked`, and `hasNotes`: true only when it has notes and the member may open it, §8.4a; a private event the member may not open is masked to its date and times, titled Private, §6.3; `moonPhases` and `schoolDays` are `{ date, name, emoji }[]` for the range (§7.12, §7.13); `weather` is the stored forecast days in the range, §7.11; `fishing` is this member's `{ date, windows[], events[] }` days, §7.14); recurring events expanded server-side with `recurrence.ts`; alarms and sun-timed events (§7.7) excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
 | GET | `/optional-events` | member | → `{ id, title, emoji, recurrence, startDate, on }[]` — every optional event, with this member's switch; a private one this member may not open titled Private with no emoji (§6.3) |
 | PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |
@@ -6945,7 +7081,7 @@ other push stays until I hide it ⚑ Q284.
 | POST | `/push/test` | member | one test push to my subscriptions → `{ sent }`; 409 when I have none (§9.1) |
 | DELETE | `/push/subscriptions/{id}` | owner of the subscription | |
 | GET | `/push/vapid-key` | public | → `{ key }` |
-| GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff }`; PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
+| GET/PATCH | `/settings` | GET member / PATCH owner | GET → `{ householdName, timezone, daysOff, place: { lat, lon } \| null }` (place: §7.14); PATCH `{ householdName?, timezone?, daysOff?: HolidayKey[] }` |
 | GET | `/status` | member | → `{ house: { state: HouseState, lastOkAt, lastFailedAt, lastError } (§9.2, derived, never stored), mySubscriptions[] (each with `id`, `endpoint`, `lastOkAt`, `lastError`), recentDeliveries[], myTask: { title, state: working \| break \| paused } \| null (my open task session, §8.5a Q309) }` |
 | GET | `/me/alerts` | member | → `{ alerts: { id, title, message, source, kind, alertNumber, status, detail, createdAt }[] }` — my pushes not hidden, newest first, ≤ 200 (§9.5) |
 | DELETE | `/me/alerts/{id}` | member (my push) | → 204, hidden from my list; 404 `not_found` otherwise (§9.5) |

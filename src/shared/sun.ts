@@ -1,4 +1,4 @@
-// SPEC §7.7 — sunset for a local date and a place, by the NOAA general solar position
+// SPEC §7.7, §7.14 — sunset and sunrise for a local date and a place, by the NOAA general solar position
 // algorithm (fractional year γ, equation of time, declination, hour angle at zenith 90.833°).
 // Pure: no clock, no I/O; imports nothing but time.ts.
 import { iso } from './time';
@@ -11,8 +11,8 @@ const rad = (d: number) => (d * Math.PI) / 180;
 
 const isLeap = (y: number) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
 
-/** Sunset in minutes after 00:00 UTC of `day0`, evaluated at `atMin` (minutes after day0), or null (polar). */
-function sunsetMinutes(dayOfYear: number, daysInYear: number, atMin: number, place: Place): number | null {
+/** Sunset (`sign` 1) or sunrise (−1) in minutes after 00:00 UTC of `day0`, evaluated at `atMin` (minutes after day0), or null (polar). */
+function sunMinutes(dayOfYear: number, daysInYear: number, atMin: number, place: Place, sign: 1 | -1): number | null {
   const g = ((2 * Math.PI) / daysInYear) * (dayOfYear - 1 + (atMin / 60 - 12) / 24);
   const eqtime = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g)
     - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
@@ -22,22 +22,27 @@ function sunsetMinutes(dayOfYear: number, daysInYear: number, atMin: number, pla
   const cosHa = Math.cos(rad(ZENITH)) / (Math.cos(lat) * Math.cos(decl)) - Math.tan(lat) * Math.tan(decl);
   if (!(cosHa >= -1 && cosHa <= 1)) return null; // the sun stays up, or stays down, all day
   const ha = (Math.acos(cosHa) * 180) / Math.PI;
-  return 720 - 4 * (place.lon - ha) - eqtime;
+  return 720 - 4 * (place.lon - sign * ha) - eqtime;
 }
 
 /**
  * The UTC instant of sunset on local date `date` (YYYY-MM-DD) at `place`, rounded to the minute,
  * or null when the sun does not set that day. Never a substitute time.
  */
-export function sunsetUtc(date: string, place: Place): string | null {
+export const sunsetUtc = (date: string, place: Place): string | null => sunUtc(date, place, 1);
+
+/** The UTC instant of sunrise on local date `date` at `place`, the same way (§7.14 good fishing times). */
+export const sunriseUtc = (date: string, place: Place): string | null => sunUtc(date, place, -1);
+
+function sunUtc(date: string, place: Place, sign: 1 | -1): string | null {
   const [y, m, d] = date.split('-').map(Number);
   const day0 = Date.UTC(y, m - 1, d);
   const dayOfYear = Math.round((day0 - Date.UTC(y, 0, 1)) / DAY_MS) + 1;
   const daysInYear = isLeap(y) ? 366 : 365;
-  // Evaluate at the date's local solar noon, then once more at the sunset that gives.
-  const first = sunsetMinutes(dayOfYear, daysInYear, 720 - 4 * place.lon, place);
+  // Evaluate at the date's local solar noon, then once more at the sunset (sunrise) that gives.
+  const first = sunMinutes(dayOfYear, daysInYear, 720 - 4 * place.lon, place, sign);
   if (first === null) return null;
-  const min = sunsetMinutes(dayOfYear, daysInYear, first, place);
+  const min = sunMinutes(dayOfYear, daysInYear, first, place, sign);
   if (min === null) return null;
   return iso(day0 + Math.round(min) * 60_000);
 }

@@ -16,16 +16,16 @@ export interface PushRow {
   memberId: string; message: string; fireId?: string | null; alertNumber?: number;
   title?: string | null; notice?: NoticeKind | null; url?: string | null; messId?: string | null;
   bountyId?: string | null; earningId?: string | null; listItemId?: string | null; iouPlanId?: string | null;
-  iouRowId?: string | null;
+  iouRowId?: string | null; fishingOn?: string | null;
 }
 
 export function pushDelivery(db: D1Database, r: PushRow, now: string): Written {
   const id = newId('dlv');
   const stmt = db.prepare(
     `INSERT INTO deliveries (id, fire_id, alert_number, channel, member_id, message, title, notice, url, mess_id, bounty_id,
-       earning_id, list_item_id, iou_plan_id, iou_row_id, status, created_at, updated_at) VALUES (?, ?, ?, 'push', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?)`)
+       earning_id, list_item_id, iou_plan_id, iou_row_id, fishing_on, status, created_at, updated_at) VALUES (?, ?, ?, 'push', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?)`)
     .bind(id, r.fireId ?? null, r.alertNumber ?? 1, r.memberId, r.message, r.title ?? null, r.notice ?? null, r.url ?? null,
-      r.messId ?? null, r.bountyId ?? null, r.earningId ?? null, r.listItemId ?? null, r.iouPlanId ?? null, r.iouRowId ?? null, now, now);
+      r.messId ?? null, r.bountyId ?? null, r.earningId ?? null, r.listItemId ?? null, r.iouPlanId ?? null, r.iouRowId ?? null, r.fishingOn ?? null, now, now);
   return { id, stmt };
 }
 
@@ -59,10 +59,10 @@ export const privatePush = (t: string) => `(${t}.iou_plan_id IS NOT NULL OR ${t}
   OR EXISTS (SELECT 1 FROM fires f JOIN events e ON e.id = f.event_id WHERE f.id = ${t}.fire_id AND e.private = 1))`;
 
 /** What a founder ping is (§9.4): a fire-less push with a title that is not a sign-in notice (§6.6), a mess ask (§7B.7),
- *  a bounty push (§7B.8), a list ping (§7A.4) or an IOU
+ *  a bounty push (§7B.8), a list ping (§7A.4), a fishing ping (§7.14) or an IOU
  *  payback ping or declined notice (§7B.9: money never reaches the FunHouse). Kept beside the writers it must tell apart; the hourly count and the FunHouse list (§9.4a) both read it. */
 const FOUNDER_PING = `channel = 'push' AND fire_id IS NULL AND title IS NOT NULL AND notice IS NULL AND mess_id IS NULL
-  AND bounty_id IS NULL AND earning_id IS NULL AND list_item_id IS NULL AND NOT ${privatePush('deliveries')}`;
+  AND bounty_id IS NULL AND earning_id IS NULL AND list_item_id IS NULL AND fishing_on IS NULL AND NOT ${privatePush('deliveries')}`;
 
 /** How many founder pings were written at or after `since`. */
 export async function opsPingsSince(db: D1Database, since: string): Promise<number> {

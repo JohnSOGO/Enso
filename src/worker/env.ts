@@ -18,6 +18,10 @@ export interface Env {
   BUILD_FIRE_URL?: string; // §8.18 part 6 Build now: the build routine's fire address
   BUILD_FIRE_TOKEN?: string; // its bearer (a secret)
   WEATHER_URL?: string; // §7.11 the Open-Meteo base address; empty = no weather
+  TIDES_URL?: string; // §7.14 the NOAA CO-OPS base address; empty = no coast data (no fishing windows)
+  MARINE_URL?: string; // §7.14 the Open-Meteo marine base address; empty = waves unknown
+  FISH_PLANTS_URL?: string; // §7.14b the CDFW trout plants query (GeoJSON); empty = none
+  PARKS_ICAL_URL?: string; // §7.14b the county parks' events calendar (iCal); empty = none
   // §9.2 House delivery — vars in wrangler.toml, the three secrets via `wrangler secret put`.
   HA_URL?: string;
   ECHO_TARGETS?: string[];

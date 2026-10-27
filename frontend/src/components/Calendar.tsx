@@ -4,6 +4,8 @@ import { get } from '../api';
 import { useApp, type Me } from '../state';
 import { addDays, diffDays, startOfWeek } from '../../../src/shared/time';
 import type { WeatherDay } from '../../../src/shared/weather';
+import type { FishingDay } from '../../../src/shared/fishing';
+import { CALENDAR_ITEMS } from '../../../src/shared/calendar-items';
 import { DayCell, isMultiDay } from './DayCell';
 import s from './Calendar.module.css';
 
@@ -20,20 +22,20 @@ export interface DayData {
   moonPhases: { name: string; emoji: string }[]; // §7.12
   schoolDays: { name: string; emoji: string }[]; // §7.13
   weather?: WeatherDay; // §7.11
+  fishing?: FishingDay; // §7.14
 }
 
 /** SPEC §7.2 — the one place a built-in item's switch is read: what is off for `me` is dropped here, at the hand-off,
  *  not in the cached chunks (a refetch can land before the new `me` does). */
 export function shownFor(data: DayData | undefined, me: Me): DayData | undefined {
   if (!data) return data;
-  return {
-    ...data,
-    publicHolidays: me.showPublicHolidays ? data.publicHolidays : [],
-    marketDays: me.showOptionsExpiration ? data.marketDays : [],
-    moonPhases: me.showMoon ? data.moonPhases : [],
-    schoolDays: me.showSchool ? data.schoolDays : [],
-    weather: me.showWeather ? data.weather : undefined,
-  };
+  const shown: DayData = { ...data };
+  for (const { pref, day } of CALENDAR_ITEMS) {
+    if (me[pref]) continue;
+    if (day === 'weather' || day === 'fishing') shown[day] = undefined;
+    else shown[day] = [];
+  }
+  return shown;
 }
 
 const WEEKS_BACK = 520; // ±10 years of scrollable weeks
@@ -90,6 +92,7 @@ function buildDays(json: any, from: string, to: string): Map<string, DayData> {
   for (const m of json.moonPhases ?? []) day(m.date).moonPhases.push({ name: m.name, emoji: m.emoji });
   for (const sd of json.schoolDays ?? []) day(sd.date).schoolDays.push({ name: sd.name, emoji: sd.emoji });
   for (const w of (json.weather ?? []) as WeatherDay[]) day(w.date).weather = w;
+  for (const f of (json.fishing ?? []) as FishingDay[]) day(f.date).fishing = f;
   return days;
 }
 

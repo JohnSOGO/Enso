@@ -6,14 +6,17 @@ import { clockText, utcToLocal } from '../../src/shared/time';
 import type { AlertKind, Channel, DeliveryStatus, HouseState, Role, TaskMood } from '../../src/shared/vocab';
 import type { Task, TaskState } from '../../src/shared/tasks';
 import type { After } from '../../src/shared/reminders';
+import type { ItemPref } from '../../src/shared/calendar-items';
 
-export interface Me {
+/** The built-in calendar items' switches (§7.2) are the ItemPref keys, 1 = on. */
+export interface Me extends Record<ItemPref, number> {
   id: string; email: string; displayName: string; color: string; role: Role;
-  showPublicHolidays: number; showOptionsExpiration: number; showWeather: number; showMoon: number; showSchool: number;
   /** §9.2a: the house speakers this member chose; null = not chosen (the default speakers). */
   houseSpeakers: string[] | null;
   /** §8.17: true = 24-hour clock, false = 12-hour. */
   clock24h: boolean;
+  /** §7.14: How far will we go (drive minutes) and the evening-before 🎣 ping. */
+  fishingRange: number; fishingAlert: boolean;
   /** §8.5b: my After work / After school, resolved by the server. */
   after: After;
 }

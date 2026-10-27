@@ -32,7 +32,7 @@ export interface SourceFacts {
 }
 
 /** Where a push came from, in the order §9.5 gives (the ping branch matches opsPingsSince, §9.4, except that a bounty
- *  push, §7B.8, a list ping, §7A.4, and an IOU payback ping, §7B.9, also take the title branch). */
+ *  push, §7B.8, a list ping, §7A.4, a fishing ping, §7.14, and an IOU payback ping, §7B.9, also take the title branch). */
 export function alertSource(r: SourceFacts): string {
   if (r.hasFire && r.kind === 'timer' && r.isTask) return '💪 Task buddy'; // §7G
   if (r.hasFire && r.kind) return r.kind === 'reminder' && r.isAlarm ? 'Alarm' : KIND_SOURCE[r.kind]; // ⚑ Q222
