@@ -1,6 +1,4 @@
-/* SPEC §8.12 — the Recipes tab and the recipe view. Rows reuse Lists.module.css (.list, .item, .main, .title). */
-.screen { padding: 12px; overflow-y: auto; overscroll-behavior: contain; height: 100%; }
-
+/* SPEC §8.12 — Lists → 🍳 Recipes and the recipe view. Rows reuse Lists.module.css (.list, .item, .main, .title). */
 .paste { display: flex; gap: 8px; margin-bottom: 8px; }
 .paste > input { flex: 1; min-width: 0; min-height: 44px; }
 .paste > button { flex: none; min-height: 44px; }

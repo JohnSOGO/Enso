@@ -64,7 +64,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q57 | The household place | ⚑ 33.20 / −117.29 (ZIP 92056, Oceanside), set by migration 0016; no edit UI |
 | Q58 | Who edits or deletes the goat item | ⚑ Only coordinator SQL; the event routes give 404 |
 | Q59 | Sunrise too? | ⚑ No — sunset only |
-| Q60 | Where do recipes live (§8.1, §8.12)? | ⚑ Their own tab, "Recipes" 🍳, between Lists and Settings; five tabs fit at 320 px (Q12's "no fifth tab" was about chores) |
+| Q60 | Where do recipes live (§8.1, §8.12)? | ⚑ Their own tab, "Recipes" 🍳, between Lists and Settings; five tabs fit at 320 px (Q12's "no fifth tab" was about chores) — **replaced by Q393** (v1.110.0) |
 | Q61 | Pasting a link | ⚑ Saves the recipe at once, then opens its view with the source note; ✎ fixes it |
 | Q62 | A recipe row | ⚑ A small thumbnail + the dish's name, plus a "watch it" badge when nothing was found; newest first |
 | Q63 | The same link pasted twice | ⚑ 409 `duplicate`; the PWA opens the existing recipe |
@@ -395,3 +395,4 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q390 | Who runs and who picks a room's devices (§9.2e, §6.3) | ⚑ any member runs a device (like the machines and Quiet the house); the room's creator or an admin picks which devices are in it |
 | Q391 | A device already in another room (§9.2e) | ⚑ refused, 400 "{id} is already in {room}." (untick it there first): a silent move would let one room's creator change another's room; the picker shows it "in {room}", unticked and off |
 | Q392 | Home Assistant down for the devices (§8.19) | ⚑ shown inside the room (one line with Try again; a device HA can't read shows dim, "Not answering"), no new badge; the 🔇 House badge stays about speaking |
+| Q393 | Recipes move into Lists (§8.1, §8.8, §8.12, v1.110.0) | **MojoSOGO 2026-10-27** "move recipes into lists": the 🍳 Recipes tab goes; **🍳 Recipes** is the fourth fixed view in the Lists popup, after 📥 Inbox, its count the number of recipes; a phone that remembered the old tab opens on Lists → 🍳 Recipes. Only the screen moves, no data. ⚑ the place (fourth) and the count. AREC: arec-recipes-in-lists.md |

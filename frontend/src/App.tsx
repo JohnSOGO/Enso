@@ -10,8 +10,7 @@ import { Alarms, AlarmForm, type Alarm } from './components/Alarms';
 import { ChoresTab, type Chore } from './components/Chores';
 import { ChoreForm } from './components/ChoreForm';
 import { ChoreSheet } from './components/ChoreSheet';
-import { HouseholdLists } from './components/HouseholdLists';
-import { Recipes } from './components/Recipes';
+import { HouseholdLists, rememberRecipesView } from './components/HouseholdLists';
 import { HomeTab } from './components/HomeTab';
 import { Settings } from './components/Settings';
 import { useAlertLink } from './components/MyAlerts';
@@ -32,7 +31,7 @@ import { Splash } from './components/Splash';
 import s from './App.module.css';
 
 /** The bottom tab bar (§8.1): the one list of tabs — id, icon, label. */
-const NAV = [['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alerts'], ['chores', '🧹', 'Chores'], ['lists', '🛒', 'Lists'], ['recipes', '🍳', 'Recipes'], ['home', '🏡', 'Home'], ['settings', '⚙', 'Settings']] as const;
+const NAV = [['calendar', '📅', 'Calendar'], ['alarms', '⏰', 'Alerts'], ['chores', '🧹', 'Chores'], ['lists', '🛒', 'Lists'], ['home', '🏡', 'Home'], ['settings', '⚙', 'Settings']] as const;
 type Tab = (typeof NAV)[number][0];
 const TABS: readonly Tab[] = NAV.map(([id]) => id);
 /** §8.1 ⚑ Q38 — the House badge per server-reported state; `ok` and `untried` show none. */
@@ -56,7 +55,11 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
   const { me, status, today } = useApp();
   const [tab, setTab] = useState<Tab>(() => {
     if (openAlert) return 'settings'; // §9.5 — a tapped notification opens its card in Settings → 🔔 Alerts
-    try { const t = localStorage.getItem('enso.tab') as Tab; return TABS.includes(t) ? t : 'calendar'; } catch { return 'calendar'; }
+    try {
+      const t = localStorage.getItem('enso.tab');
+      if (t === 'recipes') { rememberRecipesView(); return 'lists'; } // Q393: the old 🍳 tab is Lists → 🍳 Recipes
+      return TABS.includes(t as Tab) ? t as Tab : 'calendar';
+    } catch { return 'calendar'; }
   });
   const [overlay, setOverlay] = useState<Overlay>(null);
   /** §8.8 ⚑ Q158: each tap of 🛒 Lists asks the Lists tab to open its popup; 0 = the app opened on Lists (no popup). */
@@ -92,7 +95,6 @@ function Shell({ onLogout, justJoined, openAlert, onAlertOpened }: { onLogout: (
         {tab === 'alarms' && <Alarms onEditAlarm={(alarm) => setOverlay({ kind: 'alarm', alarm })} onEditTimer={(timer) => setOverlay({ kind: 'timer', timer })} />}
         {tab === 'chores' && <ChoresTab onEdit={(chore) => setOverlay({ kind: 'chore', chore })} onOpenAreas={(chore) => setOverlay({ kind: 'areas', chore })} />}
         {tab === 'lists' && <HouseholdLists pickRequest={listsTap} />}
-        {tab === 'recipes' && <Recipes />}
         {tab === 'home' && <HomeTab />}
         {tab === 'settings' && <Settings onLogout={onLogout} openAlert={openAlert} onAlertOpened={onAlertOpened} />}
       </main>
