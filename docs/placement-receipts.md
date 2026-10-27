@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-27 — Steward pass, v1.108.0 scope (code-steward)
+
+- **Run:** post-release, v1.108.0 (🏫 school days off + shownFor gate)
+- **Verdict:** SOUND
+- **Top finding:** shownFor (sole reader of all five built-in switches) has no test (low)
+- **Handoffs:** 0 to reorganizer, 2 to worker (shownFor test; dated owed entry for the 2027–28 SCHOOL_DAYS swap), 1 to
+  placement-advisor (routes/events.ts 87%: the next built-in comes with the descriptor step)
+- **Restraint:** switch list written out in five places is the already-logged 6th-item descriptor trigger, not
+  re-flagged; no file in the warning band
+---
+
 ## 2026-10-27 — 🏫 School days off, optional built-in item, v1.108.0 (placement-advisor, code-steward, reorganizer)
 
 - **Ask:** MojoSOGO: "Here are the school days off schedule. Add as optional calendar." The Vista Unified 2026–27 days
