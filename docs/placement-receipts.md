@@ -7,6 +7,17 @@ carry its result.
 
 ---
 
+## 2026-10-27 — Steward pass, v1.110.0 scope (code-steward)
+
+- **Run:** post-release, v1.110.0 (🍳 Recipes into the Lists popup as a fixed view)
+- **Verdict:** SOUND
+- **Top finding:** none
+- **Handoffs:** none
+- **Restraint:** the four-way `special` check / view ternary in HouseholdLists.tsx (one lookup at a fifth fixed view or the next touch);
+  the 🍳 picker count refreshing only on the next lists load (as ✅ Things to do); HouseholdLists.tsx at 85%, below the band
+
+---
+
 ## 2026-10-27 — Recipes into Lists, v1.110.0 (placement-advisor + code-steward AREC)
 
 - **Ask:** the 🍳 Recipes tab goes; Recipes becomes the fourth fixed view in the 🛒 Lists popup ("🍳 Recipes (n)" after
