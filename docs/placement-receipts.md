@@ -7,6 +7,21 @@ carry its result.
 
 ---
 
+## 2026-10-27 — Steward follow-ups: moon-phase rule, weather onto daily-refresh, v1.111.1 (placement-advisor)
+
+- **Ask:** MojoSOGO picked 1, 2, 3 of the v1.111.0 steward pass: (1) move fishing-days.ts's new/full ±1-day regex on
+  moon names into a pure rule; (2) the map rows; (3) move weatherTick onto claimDailyRefresh/fetchRead.
+- **Verdict:** (1) `src/shared/fishing.ts` gets `phaseNear` (pure; matches emoji against moon.ts `PHASES`, now
+  exported); fishing-days.ts calls it; one test row (FS4b). (3) `src/worker/weather-days.ts` uses
+  `claimDailyRefresh('weather_tried_at', …)` and `fetchRead('weather', …)`; the `tried` union in
+  `src/worker/daily-refresh.ts` widens; the local timeout const is deleted. (2) docs only.
+- **Why:** the bonus is a fishing decision, so it belongs in the rules stage; a `kind` on MoonPhase would leak onto the
+  /calendar wire. The weather claim and timeout were the third copy of a shape that already has an owner.
+- **Caps:** fishing.ts ~100/300, weather-days ~38, daily-refresh 27, moon 60.
+- **Reorganizer:** none needed.
+
+---
+
 ## 2026-10-27 — Steward pass, v1.111.0 scope (code-steward)
 
 - **Run:** post-release, v1.111.0 (🎣 good fishing times, plus the calendar-items.ts descriptor)

@@ -2,28 +2,23 @@
 // rows. The rules (when, the address, the answer, what a code means) are src/shared/weather.ts. Never throws.
 import type { Env } from './env';
 import { all, first, placeOf } from './db';
-import { forecastUrl, parseForecast, weatherDue, weatherOf, type WeatherDay } from '../shared/weather';
+import { claimDailyRefresh, fetchRead } from './daily-refresh';
+import { forecastUrl, parseForecast, weatherOf, type WeatherDay } from '../shared/weather';
 import { utcToLocal } from '../shared/time';
-
-const WEATHER_FETCH_TIMEOUT_MS = 10_000;
 
 export async function weatherTick(env: Env, now: string): Promise<void> {
   if (!env.WEATHER_URL) return;
   const db = env.DB;
   try {
-    const s = (await first<{ timezone: string; latitude: number | null; longitude: number | null; weather_tried_at: string | null }>(db,
-      'SELECT timezone, latitude, longitude, weather_tried_at FROM settings WHERE id = 1'))!;
+    const s = (await first<{ timezone: string; latitude: number | null; longitude: number | null }>(db,
+      'SELECT timezone, latitude, longitude FROM settings WHERE id = 1'))!;
     const place = placeOf(s.latitude, s.longitude);
     if (!place) return;
-    const last = await first<{ at: string | null }>(db, 'SELECT MAX(fetched_at) AS at FROM weather_days');
-    if (!weatherDue({ triedAt: s.weather_tried_at, fetchedAt: last?.at ?? null }, now, s.timezone)) return;
-    // Only the tick that changed the row asks (two overlapping ticks fetch once).
-    const won = await db.prepare('UPDATE settings SET weather_tried_at = ? WHERE id = 1 AND weather_tried_at IS ?')
-      .bind(now, s.weather_tried_at).run();
-    if (!won.meta.changes) return;
-    const res = await fetch(forecastUrl(env.WEATHER_URL, place, s.timezone), { signal: AbortSignal.timeout(WEATHER_FETCH_TIMEOUT_MS) });
-    if (!res.ok) { console.log('weather', `HTTP ${res.status}`); return; }
-    const days = parseForecast(await res.json().catch(() => null));
+    // Only the tick that wins the claim asks (two overlapping ticks fetch once).
+    if (!await claimDailyRefresh(db, 'weather_tried_at', 'SELECT MAX(fetched_at) AS at FROM weather_days', now, s.timezone)) return;
+    const json = await fetchRead('weather', forecastUrl(env.WEATHER_URL, place, s.timezone), (r) => r.json().catch(() => null));
+    if (json === null) return;
+    const days = parseForecast(json);
     if (!days) { console.log('weather', 'not a forecast'); return; }
     const today = utcToLocal(now, s.timezone).date;
     await db.batch([

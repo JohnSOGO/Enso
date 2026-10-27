@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.98 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
+**Version:** 3.99 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2029,7 +2029,7 @@ household place → no fishing anywhere (nothing to measure from).
 Meeus, within a few minutes), all at the household place. A window is rated ⚑ Q395:
 - **1** for the light;
 - **+1 at sea** when a tide turn (a high or a low) is within an hour of it; **+1 at a lake** when a new or full moon
-  (§7.12) is that day or the next or the day before;
+  (§7.12) is that day or the next or the day before (`phaseNear`);
 - **+1** when a solunar period touches it: the moon overhead or underfoot (an hour either side, a major) or its rise
   or set (half an hour, a minor);
 - **−1** (never below 1) when the day's strongest wind is **15 mph** or more, or, at sea, its highest wave **6 ft** or
@@ -2074,6 +2074,7 @@ first: 🌊 or 🏞️, the name as a link, ~minutes, its note). `GET /settings`
 | FS2 | drive times from 33.20, −117.29 | Oceanside Pier 10, Lake Cuyamaca 90; 15 min reaches Guajome Lake, Oceanside Pier, the harbor, Agua Hedionda, Discovery Lake; 2 h reaches every spot; a range of 50 or "45" is refused |
 | FS3 | a high tide at 7:30am and moonset at 8:40am on 10-27 | dawn 6:20–8:20am rated 3 (dawn, high, moonset); dusk 1 |
 | FS4 | a lake with a full moon; with 18 mph wind; the pier with 7 ft waves | 2; 1; 1 with "big surf"; no surf at a lake |
+| FS4b | `phaseNear` over October 2026 (🌕 10-25 in Los Angeles) | full on 10-24, 10-25, 10-26; null on 10-23, 10-27 and on a quarter's day |
 | FS5 | `bestWindows` at 15 min, `fishingText`, `fishingPing` | pier 3 then Guajome 2; the text in 12- and 24-hour; the ping's lines; null with nothing great and no event |
 | FS6 | the coast answers | NOAA turns read, an error answer → null; waves 0.94 m → 3.1 ft; unequal lists → null |
 | FA1 | `/me` | showFishing 0, fishingRange 30, fishingAlert false; 50 or 'yes' → 400; each saves; `/settings` has the place |

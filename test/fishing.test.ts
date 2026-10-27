@@ -2,7 +2,8 @@
 // window rating, the words, the coast answers and the fish event answers.
 import { describe, expect, it } from 'vitest';
 import { FISHING_SPOTS, TIDE_STATIONS, driveMinutes, rangeError, spotsWithin } from '../src/shared/fishing-spots';
-import { bestWindows, fishingPing, fishingText, windowsAt, type DayFacts } from '../src/shared/fishing';
+import { bestWindows, fishingPing, fishingText, phaseNear, windowsAt, type DayFacts } from '../src/shared/fishing';
+import { moonPhasesBetween } from '../src/shared/moon';
 import { parseTides, parseWaves, parseWind, tidesUrl } from '../src/shared/coast';
 import { freeDaysBetween, parseParksIcal, parsePlants } from '../src/shared/fish-events';
 
@@ -44,6 +45,12 @@ describe('FS3–FS5 the rating and the words', () => {
     expect(windowsAt(spot('guajome-lake'), { ...calm, phase: 'full', windMph: 18 })[0].rating).toBe(1);
     expect(windowsAt(spot('oceanside-pier'), { ...calm, waveFt: 7 })[0]).toMatchObject({ rating: 1, why: [{ what: 'dawn' }, { what: 'surf' }] });
     expect(windowsAt(spot('guajome-lake'), { ...calm, waveFt: 7 })[0].why).toEqual([{ what: 'dawn' }]); // no surf on a lake
+  });
+  it('FS4b the lake bonus: a new or full moon that day, the day before or the day after', () => {
+    const oct = moonPhasesBetween('2026-10-01', '2026-10-31', TZ); // 🌕 10-25 in Los Angeles; 🌑 10-10, quarters between
+    expect(['2026-10-23', '2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27'].map((d) => phaseNear(oct, d))).toEqual([null, 'full', 'full', 'full', null]);
+    const q = oct.find((p) => p.emoji === '🌓')!;
+    expect(phaseNear(oct, q.date)).toBeNull(); // a quarter is no bonus
   });
   it('FS5 best at sea and best at a lake, ties to the nearer; the text and the ping', () => {
     const f = { ...calm, tides: [{ at: '2026-10-27T14:30:00.000Z', kind: 'H' as const, heightFt: 4.1 }], moon: { ...NONE, set: '2026-10-27T15:40:00.000Z' } };
