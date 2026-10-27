@@ -3,7 +3,7 @@
 import { first, placeOf } from './db';
 import { coastBetween } from './coast-days';
 import { fishEventsBetween } from './fish-events-rows';
-import { bestWindows, type FishingDay } from '../shared/fishing';
+import { bestWindows, phaseNear, type FishingDay } from '../shared/fishing';
 import { FISH_EMOJI, freeDaysBetween } from '../shared/fish-events';
 import { DEFAULT_FISHING_RANGE, driveMinutes, spotsWithin } from '../shared/fishing-spots';
 import { moonPhasesBetween } from '../shared/moon';
@@ -23,10 +23,9 @@ export async function fishingBetween(db: D1Database, from: string, to: string, m
   const out = new Map<string, FishingDay>();
   const day = (date: string) => out.get(date) ?? (out.set(date, { date, windows: [], events: [] }), out.get(date)!);
   for (const c of days) {
-    const near = phases.find((p) => Math.abs(Date.parse(p.date) - Date.parse(c.date)) <= 86400000 && /New|Full/.test(p.name));
     const base = {
       sunrise: sunriseUtc(c.date, home), sunset: sunsetUtc(c.date, home), moon: moonTimes(c.date, home, tz),
-      phase: near ? (near.name.startsWith('New') ? 'new' as const : 'full' as const) : null, windMph: c.windMph, waveFt: c.waveFt,
+      phase: phaseNear(phases, c.date), windMph: c.windMph, waveFt: c.waveFt,
     };
     // Every stored turn is handed in: only one near a window counts.
     const windows = bestWindows(spots, (spot) => ({ ...base, tides: (spot.station && tides.get(spot.station)) || [] }));

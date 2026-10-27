@@ -3,7 +3,8 @@
 import type { Spot } from './fishing-spots';
 import type { MoonTimes } from './moon-times';
 import type { TideTurn } from './coast';
-import { addMinutes, clockText, ms, utcToLocal } from './time';
+import { PHASES, type MoonPhase } from './moon';
+import { addDays, addMinutes, clockText, ms, utcToLocal } from './time';
 
 export type FishWhat = 'dawn' | 'dusk' | 'high' | 'low' | 'over' | 'under' | 'moonrise' | 'moonset' | 'new' | 'full' | 'windy' | 'surf';
 export interface FishWhy { what: FishWhat; at?: string }
@@ -24,6 +25,12 @@ const DAWN = [-45, 75] as const, DUSK = [-75, 45] as const; // minutes around su
 const TIDE_NEAR = 60, MAJOR = 60, MINOR = 30; // minutes either side of a tide turn, the moon over/under, its rise/set
 export const WINDY_MPH = 15, BIG_SURF_FT = 6;
 export const GREAT = 3;
+
+/** A new or full moon on `date`, the day before or the day after (the lake's bonus), else null. */
+export function phaseNear(phases: readonly MoonPhase[], date: string): 'new' | 'full' | null {
+  const p = phases.find((x) => x.date >= addDays(date, -1) && x.date <= addDays(date, 1) && (x.emoji === PHASES[0].emoji || x.emoji === PHASES[2].emoji));
+  return p ? (p.emoji === PHASES[0].emoji ? 'new' : 'full') : null;
+}
 
 const round5 = (iso: string) => new Date(Math.round(ms(iso) / 300000) * 300000).toISOString();
 const overlaps = (a: string, b: string, at: string, pad: number) => ms(at) + pad * 60000 >= ms(a) && ms(at) - pad * 60000 <= ms(b);

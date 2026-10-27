@@ -3,7 +3,7 @@ import { addDays, utcToLocal } from './time';
 
 export interface MoonPhase { date: string; name: string; emoji: string }
 
-const PHASES = [
+export const PHASES = [
   { name: 'New moon', emoji: '🌑' },
   { name: 'First quarter', emoji: '🌓' },
   { name: 'Full moon', emoji: '🌕' },
