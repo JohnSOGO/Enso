@@ -404,3 +404,4 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q399 | City reservoir open days (§7.14) | ⚑ not modelled; the spot's note says "Open some days only" and its link has the days |
 | Q400 | Fish events (§7.14b) | ⚑ CDFW trout plants (San Diego County, by place within range), county parks iCal events with a fishing word in the title (any range), Free Fishing Days typed yearly; city lake derbies not pulled (no feed) |
 | Q401 | 🎣 Good fishing times by default (§7.5) | ⚑ off for everyone (unlike weather and moon): it is for whoever fishes |
+| Q402 | Why a fishing window scored (§7.14, §8.3) | ⚑ tapping a fishing line opens a popup, not the site: a headline by rods ("An OK time to fish" / "A good time to fish!" / "A great time to fish! Go!"), one plain, no-jargon line per reason with its emoji, 😌 calm when nothing took one off, what the rods mean, the drive and note, the day's 🐟 events, then the spot's site at the bottom |
