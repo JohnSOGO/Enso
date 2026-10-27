@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.92 · **Date:** 2026-10-24 · **Owner:** MojoSOGO
+**Version:** 3.93 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1135,6 +1135,13 @@ Schema: [`migrations/0063_event_private.sql`](migrations/0063_event_private.sql)
 [`test/migration-0063.test.ts`](test/migration-0063.test.ts)**):** an existing event reads `private` 0; a new one
 takes 1.
 
+### 4.2zzk Schema change — `migrations/0064_school_days.sql`
+
+Asked by MojoSOGO 2026-10-27 ("Add as optional calendar"): one `member_prefs` switch beside the weather and moon ones,
+`show_school`, **on by default** (§7.5, §7.13). Additive; it runs before the deploy.
+
+Schema: [`migrations/0064_school_days.sql`](migrations/0064_school_days.sql). **Check:** SC6 (§7.13).
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1818,13 +1825,12 @@ Oct '26   4    5    6    7    8    9   10
 |------|--------|-----------|
 | Public (days off) | Computed in `src/shared/holidays.ts`, filtered to the household's **days off** (§7.3) — no hand-typed yearly dates | **Whole cell tinted faint yellow** (`--holiday-public-cell`) + the holiday's **emoji**; name in the day sheet |
 
-**School holidays were removed** (decided by MojoSOGO 2026-10-03): a school break is entered
-as an ordinary event when wanted. Migration 0010 drops the table, the member switch and
-the 5 carried-over "Fall break" days (deleted, not converted — his choice).
+**School days off** are their own built-in item, 🏫 (§7.13): the school's own table, not a holiday rule, so they
+never tint the cell.
 
 **Day icons** — a day's icons sit **to the right of the date number, on the same line, at
 every width** (phones included; never on the line below — decided by MojoSOGO). Icons, in
-order: the public holiday's emoji, 📈 (§7.4), then the emoji of the day's single-day events
+order: the public holiday's emoji, the school day's emoji (§7.13), 📈 (§7.4), then the emoji of the day's single-day events
 with **nobody assigned**, in the order of their lines (Q277); at most **two**. An assigned
 event's emoji sits at the start of its own line under the number instead (§7.1, Q275). Each is shown only if
 it is on for the member (§7.5).
@@ -1832,8 +1838,10 @@ it is on for the member (§7.5).
 - **Legend:** shown once, directly under the sticky month header: a yellow square
   (`--holiday-public-swatch`) "Public holiday" and "📈 Options expiration" (§7.4), each only
   while it is on for the member.
-- **Switches:** public holidays, 📈, the weather (§7.11) and moon phases (§7.12) are rows of **Optional calendar
-  items** (§7.5), not separate checkboxes.
+- **Switches:** public holidays, 📈, the weather (§7.11), moon phases (§7.12) and school days off (§7.13) are rows
+  of **Optional calendar items** (§7.5), not separate checkboxes. The calendar drops what is off **once**, where it
+  hands a day's `DayData` out (`shownFor` in `Calendar.tsx`), so the cell, the day sheet and anything later never
+  check a switch themselves.
 - **Off means off everywhere** for that member — the cell tint and icon, the legend entry
   **and the day sheet** (a public holiday switched off is not listed there either). ⚑
 
@@ -1920,6 +1928,37 @@ options expiration"; `member_prefs.show_options_expiration`, §4.2c).
 | MN3 | a 12-month range | 48 to 50 phases, alternating new → first quarter → full → last quarter in order |
 | MN4 | GET `/calendar` for a week holding a phase | `moonPhases` has that day with its name and emoji; a week without one gives `[]` |
 
+### 7.13 School days off 🏫 (`src/shared/school.ts`, pure) — asked by MojoSOGO 2026-10-27
+
+"Here are the school days off schedule. Add as optional calendar." The kids' school calendar (Vista Unified, 2026–27)
+is one table in code, `SCHOOL_DAYS`, a row per stretch: first day, last day, name and kind. Next year's schedule
+replaces the table; nothing else changes.
+
+| Kind | Emoji | Said as | 2026–27 rows |
+|---|:---:|---|---|
+| No school | 🏫 | "Veterans Day — No school" | Veterans Day 11-11; Thanksgiving break 11-23–11-27; Winter break 12-21–01-05; Martin Luther King Jr. Day 01-18; Presidents' Week 02-15–02-19; Spring break 03-26–04-02; Memorial Day 05-31 |
+| Minimum day | 🕛 | "Staff development — Minimum day" | Middle school conferences 11-18–11-19 and 03-10–03-11; Staff development 02-24; Last day of school 06-03 (🎓) |
+| Students return | 🎒 | "Students return" | 01-06; 04-05 |
+
+- `schoolDaysBetween(from, to)` returns `{ date, name, emoji }[]`, one per day in date order: every day of a stretch,
+  weekends included, so a break reads as one run ⚑ Q386. A row may name its own emoji (the last day's 🎓) ⚑ Q388.
+- **On the calendar:** the emoji sits in the day-icon place beside the number, after the public holiday's (§7.2, so
+  at most two icons still holds); no cell tint and no legend entry (the day sheet names it) ⚑ Q387. The day sheet
+  (§8.3) lists "🏫 Thanksgiving break — No school" after the holiday line; the cell's accessible label adds the name.
+- **On for everyone by default**; a member turns **🏫 School days off** off in Optional calendar items (§7.5), which
+  hides it in the cell and the day sheet.
+- `/calendar` always returns `schoolDays` for the range (§10).
+- **Acceptance (each row a test,** [`test/school.test.ts`](test/school.test.ts)**):**
+
+| # | Setup / call | Expected |
+|---|---|---|
+| SC1 | `schoolDaysBetween('2026-11-01', '2026-11-30')` | 🏫 11-11; 🕛 11-18, 11-19; 🏫 11-23 … 11-27 (five days), each named "Thanksgiving break — No school" |
+| SC2 | `schoolDaysBetween('2026-12-20', '2027-01-07')` | 🏫 every day 12-21 … 01-05 (16), then 🎒 01-06 "Students return"; nothing on 12-20 or 01-07 |
+| SC3 | `schoolDaysBetween('2027-06-01', '2027-06-30')` | only 06-03, 🎓 "Last day of school — Minimum day" |
+| SC4 | every row of `SCHOOL_DAYS` | first day ≤ last day, rows in date order, none overlapping |
+| SC5 | GET `/calendar` for 2026-11-08 … 11-14 | `schoolDays` holds 11-11 with its name and emoji; a week in August gives `[]` |
+| SC6 | migration 0064, then `PATCH /me { showSchool }` | an existing member has `showSchool` 1; false saves 0; `'no'` is refused (400) |
+
 ### 7.5 Optional events — each person turns them on
 
 **Optional calendar items** (Settings → 📅 Calendar) is the one list of everything a member can
@@ -1929,7 +1968,8 @@ switch on for their own calendar (decided by MojoSOGO 2026-10-03):
    (`member_prefs.show_options_expiration`, §7.4);
 3. **🌤️ Weather** — built in, on by default (`member_prefs.show_weather`, §7.11);
 4. **🌕 Moon phases** — built in, on by default (`member_prefs.show_moon`, §7.12);
-5. then every **optional event** (below), each with its emoji and how it repeats.
+5. **🏫 School days off** — built in, on by default (`member_prefs.show_school`, §7.13);
+6. then every **optional event** (below), each with its emoji and how it repeats.
 Each row is one line with its **On** switch; the rows sit close together (32px, MojoSOGO 2026-10-19 "Reduce spacing")
 ⚑ Q348.
 The old separate checkboxes in Me are gone.
@@ -4522,8 +4562,8 @@ whose source is gone still shows, so it can be closed ⚑ Q347.
 A modal that opens over the calendar and is titled with the date ("Tue, Oct 6").
 It contains, in order:
 
-1. The day's weather, when there is a forecast for it (§7.11).
-2. The holiday line(s).
+1. The day's weather, when there is a forecast for it (§7.11), then its moon phase (§7.12).
+2. The holiday line(s), then the school day line (§7.13), then 📈 (§7.4).
 3. All-day events.
 4. Timed events in time order, each showing time, title, creator chip, assigned
    chips, 🔔 if it has a reminder and 📝 if it has notes (§8.4a). The 📝 shows only on a row the member may open:
@@ -5005,7 +5045,7 @@ Settings
 
 - **🙂 Me:** name, color, **Clock: 12-hour / 24-hour** (§8.17), **After work / After school** (§8.5b), and (founder only) **🎯 Point at it** on this device (§8.16).
 - **📅 Calendar** (named "Calendar items" before v1.67.0): **Optional calendar items** — Public holidays, 📈 options
-  expiration, 🌤️ Weather, 🌕 Moon phases, then one line per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); then,
+  expiration, 🌤️ Weather, 🌕 Moon phases, 🏫 School days off, then one line per optional event (emoji, title, how it repeats), each with an **On** switch (§7.5); then,
   for admins only, **Days off** (§7.3) ⚑ Q267 (asked by MojoSOGO 2026-10-12: move Days off "into its own calendar section");
   then **📍 Saved places** for everyone (§7.9b).
 - **📱 Phone alerts:** this phone's state and Turn on / Turn off / Send a test (§9.1).
@@ -6703,13 +6743,13 @@ other push stays until I hide it ⚑ Q284.
 | POST | `/auth/phone-login/{id}/deny` | member (the requested one) | "This wasn't me" → `{ status: 'denied' }`; 404 / 409 as approve (§6.6) |
 | POST | `/auth/logout` | member | → 204; clears cookie |
 | GET | `/me` | member | → member + prefs |
-| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration?, showWeather?, showMoon?, houseSpeakers?: string[] \| null, clock24h?: boolean, afterKind?: 'work' \| 'school' \| null, afterTime?: "HH:MM" \| null }` (§9.2a, §8.17, §8.5b) |
+| PATCH | `/me` | member | `{ displayName?, color?, showPublicHolidays?, showOptionsExpiration?, showWeather?, showMoon?, showSchool?, houseSpeakers?: string[] \| null, clock24h?: boolean, afterKind?: 'work' \| 'school' \| null, afterTime?: "HH:MM" \| null }` (§9.2a, §8.17, §8.5b) |
 | GET | `/house/speakers` | member | → `{ speakers: { id, name, kind }[], mine, defaults }` asked of Home Assistant live; 503 `house_not_configured`; 502 `house_unreachable` (§9.2a) |
 | GET | `/members` | member | → `{ id, email, displayName, color, role, isFounder, disabledAt, after: { kind, time } }[]` (no hashes; `email` only for owners; `after` §8.5b) |
 | PATCH | `/members/{id}` | owner | `{ disabled?: boolean, role?: Role }` — rules in §6.3 |
 | GET/POST | `/invites` | owner | GET → `{ id, displayName, createdAt, expiresAt, usedAt, usedBy, revokedAt }[]`; POST `{ displayName }` → `{ code, expiresAt }` (the code is shown only once; the PWA builds the link and QR from it) |
 | DELETE | `/invites/{id}` | owner | revoke |
-| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[], moonPhases[], weather[] }` (each occurrence carries `emoji`, `private`, `masked`, and `hasNotes`: true only when it has notes and the member may open it, §8.4a; a private event the member may not open is masked to its date and times, titled Private, §6.3; `moonPhases` is `{ date, name, emoji }[]` for the range (§7.12); `weather` is the stored forecast days in the range, §7.11); recurring events expanded server-side with `recurrence.ts`; alarms and sun-timed events (§7.7) excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
+| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | member | → `{ occurrences[], publicHolidays[], marketDays[], moonPhases[], schoolDays[], weather[] }` (each occurrence carries `emoji`, `private`, `masked`, and `hasNotes`: true only when it has notes and the member may open it, §8.4a; a private event the member may not open is masked to its date and times, titled Private, §6.3; `moonPhases` and `schoolDays` are `{ date, name, emoji }[]` for the range (§7.12, §7.13); `weather` is the stored forecast days in the range, §7.11); recurring events expanded server-side with `recurrence.ts`; alarms and sun-timed events (§7.7) excluded; **optional events only if on for this member (§7.5)**; public holidays filtered to days off; max range 120 days |
 | GET | `/optional-events` | member | → `{ id, title, emoji, recurrence, startDate, on }[]` — every optional event, with this member's switch; a private one this member may not open titled Private with no emoji (§6.3) |
 | PUT/DELETE | `/events/{id}/optin` | member | turn an optional event on / off **for me** → 204; 400 if the event isn't optional |
 | POST | `/events` | member | event fields → event |

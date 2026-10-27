@@ -56,6 +56,7 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
       {data?.weather && <p className={s.holiday}>{weatherText(data.weather)}</p>}
       {data?.moonPhases.map((m) => <p key={m.name} className={s.holiday}>{m.emoji} {m.name}</p>)}
       {data?.publicHolidays.map((h) => <p key={h.name} className={s.holiday} style={{ background: 'var(--holiday-public-cell)', borderRadius: 6, padding: '2px 8px' }}>{h.emoji} {h.name} — day off</p>)}
+      {data?.schoolDays.map((x) => <p key={x.name} className={s.holiday}>{x.emoji} {x.name}</p>)}
       {data?.marketDays.map((m) => <p key={m.name} className={s.holiday}>{m.emoji} {m.name}</p>)}
       {items.length === 0 && <p className="muted">Nothing on this day.</p>}
       <ul className={s.list}>

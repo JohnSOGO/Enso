@@ -9,7 +9,7 @@ import type { After } from '../../src/shared/reminders';
 
 export interface Me {
   id: string; email: string; displayName: string; color: string; role: Role;
-  showPublicHolidays: number; showOptionsExpiration: number; showWeather: number; showMoon: number;
+  showPublicHolidays: number; showOptionsExpiration: number; showWeather: number; showMoon: number; showSchool: number;
   /** §9.2a: the house speakers this member chose; null = not chosen (the default speakers). */
   houseSpeakers: string[] | null;
   /** §8.17: true = 24-hour clock, false = 12-hour. */
