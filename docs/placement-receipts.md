@@ -7,6 +7,20 @@ carry its result.
 
 ---
 
+## 2026-10-27 — Why this fishing window, v1.112.0 (placement-advisor)
+
+- **Ask:** MojoSOGO: tapping a fishing line opens a popup that says, in plain words, why the window scored, with the
+  spot's public site at the bottom.
+- **Verdict:** the words are a pure `fishingReasons` in `src/shared/fishing.ts` (beside `fishingText`, same `hm`);
+  `FishingWindow` carries the day's `windMph` / `waveFt` and the spot's `note` (set in `windowsAt`). NEW
+  `frontend/src/components/FishingWhy.tsx`, the shared Modal only, site link in its `footer`. `DaySheet.tsx` holds
+  the open window in `useState` and its fishing lines become buttons. Seam fishing.ts into `fishing-words.ts` if it
+  passes ~200 lines.
+- **Why:** the reasons are fishing rules in words, tested pure like `fishingText`; the frontend only draws them.
+- **Caps:** fishing.ts ~133/300, DaySheet ~76, FishingWhy ~27.
+
+---
+
 ## 2026-10-27 — Steward follow-ups: moon-phase rule, weather onto daily-refresh, v1.111.1 (placement-advisor)
 
 - **Ask:** MojoSOGO picked 1, 2, 3 of the v1.111.0 steward pass: (1) move fishing-days.ts's new/full ±1-day regex on

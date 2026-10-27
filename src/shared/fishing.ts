@@ -10,7 +10,8 @@ export type FishWhat = 'dawn' | 'dusk' | 'high' | 'low' | 'over' | 'under' | 'mo
 export interface FishWhy { what: FishWhat; at?: string }
 export interface FishingWindow {
   from: string; to: string; rating: 1 | 2 | 3; why: FishWhy[];
-  spot: { id: string; name: string; kind: Spot['kind']; minutes: number; link: string };
+  windMph: number | null; waveFt: number | null; // the day's, for the reasons (waves null at a lake)
+  spot: { id: string; name: string; kind: Spot['kind']; minutes: number; link: string; note?: string };
 }
 export interface FishEvent { emoji: string; title: string; url: string | null }
 export interface FishingDay { date: string; windows: FishingWindow[]; events: FishEvent[] }
@@ -56,7 +57,8 @@ export function windowsAt(spot: Spot & { minutes: number }, f: DayFacts): Fishin
     if (spot.kind === 'ocean' && f.waveFt !== null && f.waveFt >= BIG_SURF_FT) rough.push({ what: 'surf' });
     if (rough.length) rating = Math.max(1, rating - 1);
     out.push({ from, to, rating: rating as FishingWindow['rating'], why: [...why, ...rough],
-      spot: { id: spot.id, name: spot.name, kind: spot.kind, minutes: spot.minutes, link: spot.link } });
+      windMph: f.windMph, waveFt: spot.kind === 'ocean' ? f.waveFt : null,
+      spot: { id: spot.id, name: spot.name, kind: spot.kind, minutes: spot.minutes, link: spot.link, note: spot.note } });
   }
   return out;
 }
@@ -83,6 +85,37 @@ const hm = (iso: string, tz: string, h24: boolean) => clockText(utcToLocal(iso, 
 export function fishingText(w: FishingWindow, tz: string, h24 = false): string {
   const why = w.why.map((y) => (y.at ? `${WORDS[y.what]} ${hm(y.at, tz, h24)}` : WORDS[y.what])).join(', ');
   return `${'🎣'.repeat(w.rating)} ${hm(w.from, tz, h24)}–${hm(w.to, tz, h24)} ${w.spot.name} · ${why}`;
+}
+
+const HEADLINE = ['', 'An OK time to fish', 'A good time to fish!', 'A great time to fish! Go!'];
+
+/** Why a window got its rods, in plain words (§7.14): a headline, then one line a reason, then what the rods mean. */
+export function fishingReasons(w: FishingWindow, tz: string, h24 = false): { headline: string; lines: { emoji: string; text: string }[] } {
+  const at = (iso?: string) => (iso ? hm(iso, tz, h24) : '');
+  const say: Record<FishWhat, (y: FishWhy) => [string, string]> = {
+    dawn: () => ['🌅', 'Dawn. Fish come up to feed in the low light, and it is cool and quiet.'],
+    dusk: () => ['🌇', 'Dusk. As the light fades, the fish start hunting again.'],
+    high: (y) => ['🌊', `High tide at ${at(y.at)}. The water turns around, it moves and stirs up food, and fish bite when the water moves.`],
+    low: (y) => ['🌊', `Low tide at ${at(y.at)}. The water turns around, it moves and stirs up food, and fish bite when the water moves.`],
+    over: () => ['🌝', 'The moon is right overhead. Its pull is strongest now: one of the two big feeding times of the day.'],
+    under: () => ['🌚', 'The moon is right under your feet, on the far side of the earth: the other big feeding time of the day.'],
+    moonrise: () => ['🌙', 'Moonrise. A short burst of feeding as the moon comes up.'],
+    moonset: () => ['🌙', 'Moonset. A short burst of feeding as the moon goes down.'],
+    new: () => ['🌑', 'New moon this week. Fish feed more around a new moon.'],
+    full: () => ['🌕', 'Full moon this week. Fish feed more around a full moon.'],
+    windy: () => ['💨', `Windy, up to ${w.windMph} mph. Harder to cast, so one 🎣 off.`],
+    surf: () => ['🌊', `Big waves, up to ${w.waveFt} ft. Rough out there, so one 🎣 off.`],
+  };
+  const lines = w.why.map((y) => { const [emoji, text] = say[y.what](y); return { emoji, text }; });
+  const rough = w.why.some((y) => y.what === 'windy' || y.what === 'surf');
+  if (!rough && w.windMph !== null) {
+    lines.push({ emoji: '😌', text: `Calm: wind up to ${w.windMph} mph${w.waveFt !== null ? `, waves up to ${w.waveFt} ft` : ''}.` });
+  }
+  lines.push({ emoji: '🎣', text: w.spot.kind === 'ocean'
+    ? 'Each 🎣 is one thing going for you: the light, a turning tide, a moon feeding time.'
+    : 'Each 🎣 is one thing going for you: the light, a new or full moon, a moon feeding time.' });
+  lines.push({ emoji: '🚗', text: `About ${w.spot.minutes} min from home${w.spot.note ? `. ${w.spot.note}.` : '.'}` });
+  return { headline: `${'🎣'.repeat(w.rating)} ${HEADLINE[w.rating]}`, lines };
 }
 
 /** The evening-before ping (§7.14): from this local time on. */

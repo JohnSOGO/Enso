@@ -1,9 +1,11 @@
 // SPEC §8.3 — the day sheet: weather (§7.11), holidays, fishing (§7.14), all-day events, timed events, then "+ Add event".
+import { useState } from 'react';
 import { Modal } from './Modal';
+import { FishingWhy } from './FishingWhy';
 import { useApp } from '../state';
 import type { DayData, Occurrence } from './Calendar';
 import { weatherText } from '../../../src/shared/weather';
-import { fishingText } from '../../../src/shared/fishing';
+import { fishingText, type FishingWindow } from '../../../src/shared/fishing';
 import { participants } from '../participants';
 import { canOpenEvent } from '../../../src/shared/event-access';
 import { isAdmin } from '../../../src/shared/roles';
@@ -27,6 +29,7 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
   const items = data?.items ?? [];
   const allDay = items.filter((o) => o.allDay);
   const timed = items.filter((o) => !o.allDay);
+  const [why, setWhy] = useState<FishingWindow | null>(null); // §8.3: a fishing line opens why it scored
 
   const row = (o: DayData['items'][number]) => {
     const who = participants(o.assignedTo, members, founder); // §8.3: each person once; everyone → one green Family chip
@@ -60,7 +63,7 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
       {data?.schoolDays.map((x) => <p key={x.name} className={s.holiday}>{x.emoji} {x.name}</p>)}
       {data?.marketDays.map((m) => <p key={m.name} className={s.holiday}>{m.emoji} {m.name}</p>)}
       {data?.fishing?.windows.map((w) => <p key={w.spot.kind} className={s.holiday}>
-        <a href={w.spot.link} target="_blank" rel="noreferrer">{fishingText(w, tz, me.clock24h)}</a></p>)}
+        <button className="plain" style={{ font: 'inherit', color: 'var(--accent)', textAlign: 'left' }} onClick={() => setWhy(w)}>{fishingText(w, tz, me.clock24h)}</button></p>)}
       {data?.fishing?.events.map((e) => <p key={e.title} className={s.holiday}>
         {e.url ? <a href={e.url} target="_blank" rel="noreferrer">{e.emoji} {e.title}</a> : <>{e.emoji} {e.title}</>}</p>)}
       {items.length === 0 && <p className="muted">Nothing on this day.</p>}
@@ -68,6 +71,7 @@ export function DaySheet({ date, data, onClose, onOpenEvent, onAdd }: Props) {
         {allDay.map(row)}
         {timed.map(row)}
       </ul>
+      {why && <FishingWhy w={why} events={data?.fishing?.events ?? []} tz={tz} h24={me.clock24h} onClose={() => setWhy(null)} />}
     </Modal>
   );
 }

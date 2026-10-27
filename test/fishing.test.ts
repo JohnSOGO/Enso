@@ -2,7 +2,7 @@
 // window rating, the words, the coast answers and the fish event answers.
 import { describe, expect, it } from 'vitest';
 import { FISHING_SPOTS, TIDE_STATIONS, driveMinutes, rangeError, spotsWithin } from '../src/shared/fishing-spots';
-import { bestWindows, fishingPing, fishingText, phaseNear, windowsAt, type DayFacts } from '../src/shared/fishing';
+import { bestWindows, fishingPing, fishingReasons, fishingText, phaseNear, windowsAt, type DayFacts } from '../src/shared/fishing';
 import { moonPhasesBetween } from '../src/shared/moon';
 import { parseTides, parseWaves, parseWind, tidesUrl } from '../src/shared/coast';
 import { freeDaysBetween, parseParksIcal, parsePlants } from '../src/shared/fish-events';
@@ -61,6 +61,19 @@ describe('FS3–FS5 the rating and the words', () => {
     expect(fishingPing({ date: '2026-10-27', windows: best, events: [{ emoji: '🐟', title: 'Trout planted this week: Cuyamaca Lake', url: null }] }, TZ))
       .toBe('Tomorrow 6:20am–8:20am Oceanside Pier · dawn, high tide 7:30am, moonset\nTomorrow: 🐟 Trout planted this week: Cuyamaca Lake');
     expect(fishingPing({ date: '2026-10-27', windows: [best[1]], events: [] }, TZ)).toBeNull();
+  });
+  it('FS5b why it scored: a line a reason, calm, what the rods mean, the drive; rough days say what took one off', () => {
+    const f = { ...calm, tides: [{ at: '2026-10-27T14:30:00.000Z', kind: 'H' as const, heightFt: 4.1 }], moon: { ...NONE, set: '2026-10-27T15:40:00.000Z' } };
+    const r = fishingReasons(windowsAt(spot('oceanside-pier'), f)[0], TZ);
+    expect(r.headline).toBe('🎣🎣🎣 A great time to fish! Go!');
+    expect(r.lines.map((l) => l.emoji)).toEqual(['🌅', '🌊', '🌙', '😌', '🎣', '🚗']);
+    expect(r.lines[1].text).toMatch(/^High tide at 7:30am\. /);
+    expect(r.lines[3].text).toBe('Calm: wind up to 8 mph, waves up to 3 ft.');
+    expect(r.lines[5].text).toBe('About 10 min from home. No license needed on a public pier.');
+    const lake = fishingReasons(windowsAt(spot('guajome-lake'), { ...calm, phase: 'full', windMph: 18 })[0], TZ, true);
+    expect(lake.headline).toBe('🎣 An OK time to fish');
+    expect(lake.lines.map((l) => l.emoji)).toEqual(['🌅', '🌕', '💨', '🎣', '🚗']);
+    expect(lake.lines[2].text).toBe('Windy, up to 18 mph. Harder to cast, so one 🎣 off.');
   });
 });
 
