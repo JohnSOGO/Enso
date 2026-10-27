@@ -35,10 +35,10 @@ function DeviceCard({ device, onChange }: { device: Device; onChange: (d: Device
         )}
       </div>
       {!device.available && <p className="muted" style={{ margin: '4px 0 0' }}>Not answering{device.error ? `: ${device.error}` : ''}</p>}
-      {device.available && !c && <p className="muted" style={{ margin: '4px 0 0' }}>{device.on ? 'On' : 'Off'}</p>}
+      {device.available && !c && <p style={{ margin: '4px 0 0', fontSize: '1.25rem' }}><strong>{device.on ? 'On' : 'Off'}</strong></p>}
       {device.available && c && (
         <>
-          <p className="muted" style={{ margin: '4px 0 8px' }}>{modeName(c.mode)} · Room {deg(c.current)} · Set {deg(c.target)}</p>
+          <p style={{ margin: '4px 0 8px', fontSize: '1.25rem' }}><strong>{modeName(c.mode)}</strong> · Room {deg(c.current)} · Set {deg(c.target)}</p>
           <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
             {c.modes.map((m) => (
               <button key={m} aria-pressed={m === c.mode} disabled={busy} onClick={() => act('mode', { mode: m })}>{modeName(m)}</button>

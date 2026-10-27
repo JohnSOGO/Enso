@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.95 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
+**Version:** 3.96 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -6062,7 +6062,7 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
   John's room                       ✕
   ┌───────────────────────────────┐
   │ ❄️ Midea AC            [ Off ] │
-  │ Fan only · Room 54° · Set 70°  │
+  │ Fan · Room 54° · Set 70°       │
   │ [Off] [Cool] [Dry] [Fan] [Auto]│
   │        [ − ]  70°  [ ＋ ]       │
   └───────────────────────────────┘
@@ -6074,7 +6074,9 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
   🏠 Household."
 - A tap opens the room in a modal: one card per device from `GET /rooms/{id}/devices`, in the order picked. A card
   shows the domain's emoji (❄️ climate, 💡 light, 🔌 switch, 🌀 fan), the device's name, its state in words and one
-  **Turn on / Turn off** button. An AC also shows its mode, **Room {current}°** and **Set {target}°**,
+  **Turn on / Turn off** button. The state line is large (1.25 rem) and in full colour, never dim, so it reads at a
+  glance: **On** / **Off**, or for an AC its mode in bold, **Room {current}°** and **Set {target}°** (MojoSOGO
+  2026-10-27 "make status larger font and easier to see"). An AC also shows
   one button per mode HA lists (the current one pressed; names: Off, Cool, Heat, Dry, Fan, Auto, Heat/Cool), and **−
   / ＋** around the target (one step each). Each tap sends `POST /house/devices/{id}` and the card shows the state it
   answers; while it waits the card's buttons are off. A failure shows inside the card (`role="alert"`).

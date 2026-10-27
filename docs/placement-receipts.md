@@ -7,6 +7,20 @@ carry its result.
 
 ---
 
+## 2026-10-27 — 🏡 Home device status line larger and full colour, v1.109.2 (placement-advisor)
+
+- **Ask:** MojoSOGO on his phone: "make status larger font and easier to see". The DeviceCard state line (`On`/`Off`;
+  for an AC `{Mode} · Room {n}° · Set {n}°`) goes to 1.25rem at full text colour, the mode in bold (SPEC §8.19).
+- **Verdict:** frontend/src/components/HomeRoom.tsx [EXISTING]
+- **Flow stage:** render
+- **Why:** presentation only, inside the map's owner of the room modal's cards (96/300, one concern, no fan-in).
+  Inline style per convention: theme.css holds shared utilities only and every other one-off larger text is inline
+  (HomeRoom.tsx:50, JoinPage.tsx:82, TaskDone.tsx:18); a theme.css class was rejected as a one-use abstraction.
+  "Not answering" stays muted on purpose.
+- **Caps:** HomeRoom.tsx ~96/300 after; no file newly in the band.
+
+---
+
 ## 2026-10-27 — Steward FIXes, v1.109.1 (worker + reorganizer, steward findings 1–3)
 
 - **Ask:** MojoSOGO picked FIX on the v1.109.0 steward backlog.
