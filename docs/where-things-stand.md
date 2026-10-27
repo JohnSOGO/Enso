@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-10-27, v1.109.0, main = production.*
+*Last updated 2026-10-27, v1.110.0, main = production.*
 
 ## Running where
 
@@ -51,6 +51,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 
 ## Owed
 
+- 🍳 Recipes in Lists (v1.110.0, §8.8, §8.12, Q393 ⚑): the tab bar has six tabs, no 🍳; tap 🛒 Lists → 🍳 Recipes (n) after 📥 Inbox → every recipe is there with its picture and emoji; paste a link → Read it → it opens.
 - 🏡 Home (v1.109.0, §9.2e, §8.19, migration 0065, Q389–Q392 ⚑): on the iPhone, 🏡 Home → his room (an admin adds it in Settings → 🏠 Household first) → ✏ Devices → tick ❄️ Midea AC → Save → the card shows Fan · Room 54° · Set 70°; tap Cool → the AC changes and the card reads Cool; ＋ → Set 71°. The AC's filter alert is on in HA (clean the filter).
 - 🏫 School days off (v1.108.0, §7.13, migration 0064, Q386–Q388 ⚑): scroll to Nov 2026 → 11-11 shows 🏫 by the number, 11-18/19 🕛, 11-23…27 🏫; tap 11-25 → "🏫 Thanksgiving break — No school". Settings → 📅 Calendar → 🏫 School days off → untick → gone from cells and the day sheet. Next school year: swap the rows in `src/shared/school.ts`.
 - 💵 Told to OK (v1.107.0, §7B.9, §8.15a, Q385 ⚑): on one phone tap Chores → 💵 IOUs → a card → Pay back $1 → the other phone gets "💵 Got it?" (phone only, nothing spoken) and shows "💵 … paid you $1.00." at the top of every screen → Got it there removes it. An IOU the other side adds shows the same with OK.

@@ -1,4 +1,4 @@
-// SPEC §8.12 — the 🍳 Recipes tab: paste any recipe link → POST /recipes/from-link (its kind detected, §7E.6; saved at once, then its
+// SPEC §8.12 — Lists → 🍳 Recipes (a fixed view HouseholdLists shows): paste any recipe link → POST /recipes/from-link (its kind detected, §7E.6; saved at once, then its
 // view opens ⚑ Q61; a link already read opens the existing recipe ⚑ Q63), ＋ Type a recipe, and the rows,
 // newest first (thumbnail, my emoji, dish, "watch it" when nothing was found ⚑ Q62), or By emoji (byMyEmoji,
 // §7E.5; the choice kept on this phone ⚑ Q74). Rules are the server's and shared/recipes.ts's (§7E).
@@ -65,7 +65,7 @@ export function Recipes() {
   const rows = list && (sort === 'emoji' ? byMyEmoji(list, me.id) : list);
 
   return (
-    <div className={s.screen}>
+    <>
       {/* noValidate: a link pasted without https:// ("youtu.be/…") is fine (§7E.1, §7E.6); the server decides. */}
       <form className={s.paste} onSubmit={read} noValidate>
         <input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-label="Recipe link"
@@ -107,6 +107,6 @@ export function Recipes() {
         <RecipeForm recipe={open.recipe} onSaved={saved} onDeleted={() => { setOpen(null); load(); }}
           onClose={() => setOpen(open.recipe ? { kind: 'view', recipe: open.recipe } : null)} />
       )}
-    </div>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.96 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
+**Version:** 3.97 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -3667,7 +3667,7 @@ what to buy and what to do, next to the video. **Paste a YouTube link** and the 
 recipe out of the video's own text, or **type one by hand**. Since v1.29.0 (asked by MojoSOGO
 2026-10-05) **any link** works too — a Facebook reel or post, a recipe site, any web page — and the
 kind of link is detected, never chosen (§7E.6). Recipes are household-shared: anyone
-may add a recipe; editing, re-reading or deleting it, or changing its picture, is its creator or an admin (§6.3, Q66). Their own tab, 🍳 Recipes (§8.12).
+may add a recipe; editing, re-reading or deleting it, or changing its picture, is its creator or an admin (§6.3, Q66). They live in 🛒 Lists → 🍳 Recipes (§8.12).
 
 ### 7E.1 A recipe
 
@@ -4491,13 +4491,15 @@ only the grey backdrop):
 |  S   M   T   W   T   F   S          |
 |  ...continuous weeks...             |
 +-------------------------------------+
-| 📅 Calendar ⏰ Alerts 🧹 Chores 🛒 Lists 🍳 Recipes 🏡 Home ⚙ Settings | <- tab bar
+| 📅 Calendar ⏰ Alerts 🧹 Chores 🛒 Lists 🏡 Home ⚙ Settings | <- tab bar
 +-------------------------------------+
 ```
 
-- **Seven tabs**: **🧹 Chores** (§8.15) sits between Alarms and Lists (v1.28.0, ⚑ Q166); 🍳 Recipes after Lists
-  (v1.11.0, ⚑ Q60); **🏡 Home** (§8.19) between Recipes and Settings (v1.109.0, ⚑ Q389). The bar is a grid with one
-  equal column per tab (`grid-auto-flow: column`), icon above label, so all seven fit one line at 320 px without
+- **Six tabs**: **🧹 Chores** (§8.15) sits between Alarms and Lists (v1.28.0, ⚑ Q166); **🏡 Home** (§8.19) between
+  Lists and Settings (v1.109.0, ⚑ Q389). Recipes are not a tab: they are a view inside 🛒 Lists (§8.12, MojoSOGO
+  2026-10-27 "move recipes into lists", Q393). A phone that remembered the old 🍳 Recipes tab opens on Lists with
+  🍳 Recipes chosen. The bar is a grid with one
+  equal column per tab (`grid-auto-flow: column`), icon above label, so all six fit one line at 320 px without
   wrapping or truncating (labels .7rem).
 - **Flush at the bottom** (asked by MojoSOGO 2026-10-10): the app frame is fixed to the whole screen
   (`position: fixed; inset: 0`), never `height: 100%`, which on an installed iPhone left a strip of
@@ -5108,7 +5110,7 @@ picker is a **popup of buttons** (a titled "Lists" modal):
 
 ┌ Lists ─────────────────────── ✕ ┐
 │ [✅ Things to do (4)] [🎬 Movies & shows (6)]│
-│ [📥 Inbox (2)]                   │
+│ [📥 Inbox (2)]     [🍳 Recipes (12)] │
 │ [🛒 Shopping (3)]  [🎁 Wish list (5)]   │
 │ [🔨 Hardware store (1)]          │
 │ [＋ New list…]                   │
@@ -5120,7 +5122,8 @@ picker is a **popup of buttons** (a titled "Lists" modal):
   Tapping the list button opens it too.
 - Buttons in a two-column grid (one column under 360 px), each ≥ 44 px, emoji then name then the open count:
   **✅ Things to do** first (§8.11), **🎬 Movies & shows** second (§8.14) ⚑ Q157 (Today's chores moved to the
-  🧹 Chores tab in v1.28.0, §8.15; a device that remembered Today shows Shopping),
+  🧹 Chores tab in v1.28.0, §8.15; a device that remembered Today shows Shopping), **📥 Inbox** third (§8.8a),
+  **🍳 Recipes** fourth (§8.12, Q393; its count is how many recipes the household has),
   then every list by name with `listEmoji` (§7A.1), then **＋ New list…**. The chosen list's button is marked
   (`aria-pressed`, accent border), so the remembered list is the default: closing the popup (✕, Escape, a tap
   outside) stays on it. Tapping a button opens that list and closes the popup.
@@ -5129,7 +5132,7 @@ picker is a **popup of buttons** (a titled "Lists" modal):
 - **⋯** (accessible name "List options") next to the list button opens **Rename**, **Emoji** (empty = the
   default from the name), **☐ Every day** and **☐ Ping owners** (§7A.4; Ping owners is greyed while Every day
   is off) and **Delete list** for the chosen list, shown only to those allowed (§7A.1) and never
-  for Things to do or Movies & shows. Delete asks first and says how many open items go with it.
+  for Things to do, Movies & shows, 📥 Inbox or 🍳 Recipes. Delete asks first and says how many open items go with it.
 - The choice is remembered per device (by list id), written only when someone picks. If
   the remembered list no longer exists — including the old toggle's `shopping`/`wishlist`
   values — the list button shows **Shopping** (or the first list, if Shopping was deleted).
@@ -5320,7 +5323,15 @@ Pumpkin patch        📅 Sat Oct 12
 - Tapping the photo thumbnail shows it full size (inside the dialog).
 - A thing ending in the past stays listed until done or let go — no red, no nagging (§1.0).
 
-### 8.12 Recipes (the 🍳 tab)
+### 8.12 Recipes (Lists → 🍳 Recipes, §7E)
+
+Recipes live inside the 🛒 Lists tab, as its fourth fixed view (§8.8, MojoSOGO 2026-10-27 "move recipes into lists",
+Q393). Only the screen moved: the recipes, their emojis, pictures and
+links are the same rows, read by the same `/recipes` API. Picking 🍳 Recipes in the Lists popup shows the screen
+below under the list button; there is no ⋯ for it.
+
+**Check:** tap 🛒 Lists → the popup shows **🍳 Recipes (n)** after 📥 Inbox → tap it → every recipe from before is
+there with its picture and my emoji; paste a link → Read it → the recipe opens. The tab bar has six tabs, no 🍳.
 
 ```
 [ Paste a recipe link…          ] [Read it]

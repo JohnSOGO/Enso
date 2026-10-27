@@ -7,6 +7,24 @@ carry its result.
 
 ---
 
+## 2026-10-27 — Recipes into Lists, v1.110.0 (placement-advisor + code-steward AREC)
+
+- **Ask:** the 🍳 Recipes tab goes; Recipes becomes the fourth fixed view in the 🛒 Lists popup ("🍳 Recipes (n)" after
+  📥 Inbox, n = recipe count), rendering Recipes.tsx; a remembered `recipes` tab opens Lists on Recipes; ENSO_DOES
+  wording follows (SPEC §8.1, §8.8, §8.12, Q393). No data, API or migration change.
+- **Verdict:** EXISTING frontend/src/components/HouseholdLists.tsx (RECIPES fixed view, its count from GET /recipes,
+  the render branch, an exported rememberRecipesView so `enso.list` stays its key); App.tsx (NAV to six tabs; a stored
+  `recipes` tab maps to `lists` + rememberRecipesView()); say-reader.ts ENSO_DOES (Recipes folded into the Lists line).
+  Recipes.tsx keeps its body (outer padding wrapper dropped: the Lists screen pads it); ListPicker.tsx unchanged.
+- **Why:** HouseholdLists already composes the ThingsToDo / Shows / Inbox fixed views and pickerEntries takes any fixed
+  entry, so Recipes is one more of the same shape. Steward: no data-loss risk (tables, R2 `recipes/`, API unchanged);
+  nothing similar to build with it. Noted for the next touch: with four fixed views the `special` check and the view
+  ternary could become one lookup.
+- **Caps:** HouseholdLists.tsx ~250/300; App.tsx ~170/300; Recipes.tsx 112/300; say-reader.ts 114/300. Nothing new in
+  the band. Reorganizer: none.
+
+---
+
 ## 2026-10-27 — 🏡 Home status larger, v1.109.2 (placement-advisor)
 
 - **Ask:** MojoSOGO: "make status larger font and easier to see" (the 🏡 Home device cards).
