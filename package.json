@@ -1,6 +1,6 @@
 {
   "name": "enso",
-  "version": "1.111.2",
+  "version": "1.112.1",
   "private": true,
   "type": "module",
   "scripts": {

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.100 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
+**Version:** 3.101 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2052,7 +2052,24 @@ days.
 `src/worker/fishing-days.ts`, read with their own range). A day with a **great** window shows **🎣** in the
 bottom-right corner after the moon; a day with only a fish event (§7.14b) shows **🐟** there ⚑ Q396. The day sheet
 (§8.3) lists each best window as `fishingText`: "🎣🎣🎣 6:20am–8:20am Oceanside Pier · dawn, high tide 7:30am,
-moonset" (in the member's clock, §8.17), a link to the spot's site; then the fish events.
+moonset" (in the member's clock, §8.17); then the fish events.
+
+**Why it scored** (MojoSOGO 2026-10-27: "After tap link, have popup to explain why scored high and then a link to the
+public site at the bottom of the popup. Tell me why I should get excited about that fishing time window"): tapping a
+fishing line opens a popup over the day sheet (`FishingWhy.tsx`, the shared Modal), not the spot's site. Its words are
+`fishingReasons(window, tz, h24)`, plain and with no jargon ⚑ Q402:
+- the title is the rods and a headline: 🎣 "An OK time to fish", 🎣🎣 "A good time to fish!", 🎣🎣🎣 "A great time to
+  fish! Go!";
+- the window's times and spot, then one line per reason, in the order it was rated, each with its emoji: 🌅 dawn or
+  🌇 dusk (fish feed in low light), 🌊 the high or low tide and its time (moving water stirs up food), 🌝 moon overhead
+  or 🌚 underfoot (the two big feeding times), 🌙 moonrise or moonset (a short burst), 🌑/🌕 a new or full moon at a
+  lake (fish feed more), then 💨 windy or 🌊 big waves with the day's mph or feet and "one 🎣 off";
+- on a day nothing took one off and the wind is known, 😌 "Calm: wind up to n mph, waves up to n ft" (no waves at a
+  lake), so the window carries the day's `windMph` and, at sea, `waveFt`;
+- 🎣 what the rods mean (each is one thing going for you: the light, a turning tide or a new or full moon, a moon
+  feeding time), and 🚗 "About n min from home" with the spot's note;
+- the day's fish events (🐟 a trout plant, a derby, a Free Fishing Day) as "Also that day: …";
+- at the bottom, **Visit {spot} ↗**, the spot's public site in a new tab.
 
 **The ping** (per member, `fishing_alert`, off): from **7:00pm** local (`FISHING_PING_TIME`), each active member with it
 on whose range holds a great window or any fish event **tomorrow** gets one push, titled "🎣 Good fishing", one line
@@ -2076,6 +2093,7 @@ first: 🌊 or 🏞️, the name as a link, ~minutes, its note). `GET /settings`
 | FS4 | a lake with a full moon; with 18 mph wind; the pier with 7 ft waves | 2; 1; 1 with "big surf"; no surf at a lake |
 | FS4b | `phaseNear` over October 2026 (🌕 10-25 in Los Angeles) | full on 10-24, 10-25, 10-26; null on 10-23, 10-27 and on a quarter's day |
 | FS5 | `bestWindows` at 15 min, `fishingText`, `fishingPing` | pier 3 then Guajome 2; the text in 12- and 24-hour; the ping's lines; null with nothing great and no event |
+| FS5b | `fishingReasons` for the FS3 dawn; a lake with a full moon and 18 mph wind (24-hour) | "🎣🎣🎣 A great time to fish! Go!", lines 🌅 🌊 (High tide at 7:30am) 🌙 😌 (wind 8 mph, waves 3 ft) 🎣 🚗 (10 min, no license on a public pier); "🎣 An OK time to fish", 🌅 🌕 💨 (18 mph, one 🎣 off) 🎣 🚗 |
 | FS6 | the coast answers | NOAA turns read, an error answer → null; waves 0.94 m → 3.1 ft; unequal lists → null |
 | FA1 | `/me` | showFishing 0, fishingRange 30, fishingAlert false; 50 or 'yes' → 400; each saves; `/settings` has the place |
 | FA2 | coastTick with the fakes, twice a minute apart | once: tides for 9410230 and 9410170 from the day before, waves, wind in mph |
@@ -4717,7 +4735,8 @@ It contains, in order:
 
 1. The day's weather, when there is a forecast for it (§7.11), then its moon phase (§7.12).
 2. The holiday line(s), then the school day line (§7.13), then 📈 (§7.4), then the fishing lines (§7.14): the best
-   window at sea and at a lake, each a link to its spot's site, then each 🐟 fish event.
+   window at sea and at a lake, each opening **why it scored** (§7.14: the reasons, then the spot's site at the
+   bottom), then each 🐟 fish event.
 3. All-day events.
 4. Timed events in time order, each showing time, title, creator chip, assigned
    chips, 🔔 if it has a reminder and 📝 if it has notes (§8.4a). The 📝 shows only on a row the member may open:
