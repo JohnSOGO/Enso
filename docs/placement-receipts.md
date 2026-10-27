@@ -7,6 +7,20 @@ carry its result.
 
 ---
 
+## 2026-10-27 — Steward pass, v1.112.0 scope (code-steward)
+
+- **Run:** post-release, v1.112.0 (🎣 Why it scored), with v1.111.1 and v1.112.1 since the last pass
+- **Verdict:** SOUND
+- **Top finding:** none owed; two LOW fold-ins: FishingWhy.tsx copies fishing.ts's `hm` and writes the time line
+  itself (move it into fishingReasons, one FS5b assertion); the Home lit-mode receipt sits mid-file titled v1.111.2
+  (shipped v1.112.1) and where-things-stand still says v1.112.0
+- **Handoffs:** 2 to worker (time line into fishingReasons; receipt order/version and where-things-stand), 0 to
+  reorganizer, 0 to placement-advisor; offered to MojoSOGO, none fixed without his pick
+- **Restraint:** inline styles on `plain` buttons (the codebase's pattern), the shared high/low tide sentence, the
+  window carrying windMph/waveFt/note, FishingWhy reusing Lists.module.css: all cheap and local
+
+---
+
 ## 2026-10-27 — Why this fishing window, v1.112.0 (placement-advisor)
 
 - **Ask:** MojoSOGO: tapping a fishing line opens a popup that says, in plain words, why the window scored, with the
