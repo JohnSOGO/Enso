@@ -7,6 +7,19 @@ carry its result.
 
 ---
 
+## 2026-10-27 — Steward pass, v1.111.0 scope (code-steward)
+
+- **Run:** post-release, v1.111.0 (🎣 good fishing times, plus the calendar-items.ts descriptor)
+- **Verdict:** MINOR DRIFT
+- **Top finding:** fishing-days.ts decides the lake's ±1-day new/full-moon rule from moon.ts display names; move it into
+  fishing.ts as a pure helper with a test
+- **Handoffs:** 3 to worker (moon-phase rule; tick/Settings/OptionalItems map rows; weather-days onto daily-refresh),
+  0 to reorganizer, 0 to placement-advisor; offered to MojoSOGO, none fixed without his pick
+- **Restraint:** shownFor's two-item special case, the duplicated GREAT check, the ping's regex, computing fishing per
+  call and per member: all cheap and local
+
+---
+
 ## 2026-10-27 — built-in calendar items descriptor (reorganizer)
 
 - **Trigger:** placement-advisor 2026-10-27 (fishing AREC): the five built-in calendar items were listed by hand in
