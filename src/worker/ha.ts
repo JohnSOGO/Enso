@@ -4,6 +4,9 @@
 import type { Env } from './env';
 import { callThroughAccess } from './access';
 
+/** The 503 code when HA isn't set up (`haConfigOf` null), for House and the devices alike. */
+export const HOUSE_NOT_CONFIGURED = 'house_not_configured';
+
 export interface HaConfig { haUrl: string; haToken: string; accessId: string; accessSecret: string }
 
 /** The four settings every HA call needs, or null when any is missing. */

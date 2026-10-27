@@ -4,11 +4,13 @@
 // failed. It also asks HA for its speaker list (§9.2a), giving back the raw answer.
 import type { Env } from './env';
 import { all, first, parseJson } from './db';
-import { haCall, haConfigOf, type HaConfig } from './ha';
+import { HOUSE_NOT_CONFIGURED, haCall, haConfigOf, type HaConfig } from './ha';
 import { everySpeaker, speakerList, splitSpeakers } from '../shared/speakers';
 import type { DeliveryStatus, HouseState } from '../shared/vocab';
 
-export const HOUSE_NOT_CONFIGURED = 'house_not_configured';
+/** The not-set-up code lives in ha.ts; re-exported for House's callers. */
+export { HOUSE_NOT_CONFIGURED };
+
 export const MAX_ATTEMPTS = 3;
 export const DRAIN_BATCH = 5;
 export const RECLAIM_AFTER_MS = 2 * 60_000;

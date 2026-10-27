@@ -1,6 +1,6 @@
 // SPEC §8.19 — picking a room's devices: a Find box and one checkbox line per device Home Assistant lists
 // (GET /house/devices, §9.2e), ticked ones first; one in another room shows "in {room}" and can't be ticked here.
-// Save sends the ticked ids (PUT /rooms/{id}/devices); the server checks them.
+// Save (only once the list is read) sends the ticked ids in the order ticked (PUT /rooms/{id}/devices); the server checks them.
 import { useEffect, useMemo, useState } from 'react';
 import { errorText, get, put } from '../api';
 import { useRooms } from './Rooms';
@@ -56,7 +56,7 @@ export function HomeDevicePicker({ room, picked, onSaved, onCancel }: { room: Ro
         })}
       </ul>
       <div className="row">
-        <button className="primary" disabled={busy} onClick={save}>Save</button>
+        <button className="primary" disabled={busy || choices === null} onClick={save}>Save</button>
         <button disabled={busy} onClick={onCancel}>Cancel</button>
       </div>
     </>

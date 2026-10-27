@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.94 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
+**Version:** 3.95 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -6082,9 +6082,10 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
   reachable shows once at the top of the modal, with **Try again** ⚑ Q392; no new badge.
 - No devices yet → "No devices in this room yet." (+ " Tap ✏ Devices to pick them." for whoever can).
 - **✏ Devices** (the room's creator or an admin, §6.3, ⚑ Q390) swaps the cards for the picker: a **Find** box and one
-  checkbox line per device `GET /house/devices` lists (emoji, name, a dim entity id), ticked ones first; a device in
+  checkbox line per device `GET /house/devices` lists (✏ Devices shows only once the room's devices are read, and
+  Save only once the list is read, so a slow or failed read never saves an empty room) (emoji, name, a dim entity id), ticked ones first; a device in
   another room shows "in {room}", unticked and off ⚑ Q391. **Save** sends `PUT /rooms/{id}/devices` with the ticked
-  ids in the order shown and returns to the cards; **Cancel** returns unchanged. 12 at most.
+  ids in the order they were ticked (an id HA no longer lists stays, unseen) and returns to the cards; **Cancel** returns unchanged. 12 at most.
 - Text fields 16 px, buttons 44 px tall, one card per row at 320 px.
 
 **Check (HD-UI, on the iPhone):** 🏡 Home → John's room → ✏ Devices → tick Midea AC → Save → its card shows the room

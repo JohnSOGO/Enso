@@ -1,7 +1,7 @@
 // SPEC §8.19 — one room's devices, live from Home Assistant (GET /rooms/{id}/devices, §9.2e): a card per device with
 // On / Off, and for an AC its mode buttons, room and set temperature and − / ＋. Each tap sends the intent
 // (POST /house/devices/{id}) and the card shows the state the server answers; it never decides a service itself.
-// ✏ Devices (the room's creator or an admin, §6.3) swaps the cards for HomeDevicePicker.
+// ✏ Devices (the room's creator or an admin, §6.3), once the room's devices are read, swaps the cards for HomeDevicePicker.
 import { useCallback, useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { HomeDevicePicker, DEVICE_EMOJI } from './HomeDevicePicker';
@@ -75,7 +75,7 @@ export function HomeRoom({ room, onClose }: { room: Room; onClose: () => void })
   return (
     <Modal title={room.name} onClose={onClose} dirty={picking}
       footer={<>
-        {canEdit && !picking && <button onClick={() => setPicking(true)}>✏ Devices</button>}
+        {canEdit && !picking && devices !== null && <button onClick={() => setPicking(true)}>✏ Devices</button>}
         <button onClick={onClose}>Close</button>
       </>}>
       {picking ? (

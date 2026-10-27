@@ -7,6 +7,29 @@ carry its result.
 
 ---
 
+## 2026-10-27 — Steward FIXes, v1.109.1 (worker + reorganizer, steward findings 1–3)
+
+- **Ask:** MojoSOGO picked FIX on the v1.109.0 steward backlog.
+- **Verdict:** EXISTING HomeRoom.tsx (✏ Devices only once `devices` is read) and HomeDevicePicker.tsx (Save off until
+  the pick list is read); SPEC §8.19 save-order wording; HOUSE_NOT_CONFIGURED from house.ts to ha.ts (re-exported by
+  house.ts for its callers), so routes/home-devices.ts imports only ha.ts.
+- **Why:** each fix inside the file whose map row already owns it; the constant belongs with haConfigOf, whose null it
+  names. No new owner, no file in the band.
+
+---
+
+## 2026-10-27 — Steward pass, v1.109.0 scope (code-steward)
+
+- **Run:** post-release, v1.109.0 (🏡 Home, HA devices by room)
+- **Verdict:** MINOR DRIFT
+- **Top finding:** ✏ Devices offered before the room's devices load, so Save can send [] and wipe the room
+  (HomeRoom.tsx / HomeDevicePicker.tsx, med)
+- **Handoffs:** 0 to placement-advisor, 2 to worker (the picker guard; the §8.19 save-order wording), 1 to reorganizer
+  (HOUSE_NOT_CONFIGURED into ha.ts, low)
+- **Restraint:** speaker-picker shape copied once (third-use trigger stands); shared JSON-read helpers; UI mode words;
+  PUT race; nothing in the warning band
+---
+
 ## 2026-10-27 — 🏡 Home, Home Assistant devices by room, v1.109.0 (placement-advisor, code-steward, reorganizer)
 
 - **Ask:** MojoSOGO: "have a button for home automation; opens to button list of defined rooms in Enso; then assigned
