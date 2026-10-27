@@ -5,7 +5,7 @@ import { env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Client, member, owner, tickAt } from './helpers';
 import { DECLINED_TITLE, PAYBACK_TITLE, WAITING_TITLE } from '../src/shared/ious';
-import { localToUtc } from '../src/shared/time';
+import { addDays, localToUtc, utcToLocal } from '../src/shared/time';
 import { opsPingsAfter, opsPingsSince } from '../src/worker/deliveries';
 
 let o: Client, sam: Client, mom: Client, kai: Client, S: string, M: string, momName: string, tz: string;
@@ -54,11 +54,12 @@ describe('§7B.9 family IOUs', () => {
   });
 
   it('IO10 + IO11 + IO12 a weekly plan pings at 09:00 on its day, once, phone only; it ends at $0', async () => {
-    const p = await sam.post('/iou-plans', { owedBy: S, owedTo: M, amount: 100, every: 'week', startDate: '2026-10-23' });
+    const day = addDays(utcToLocal(new Date().toISOString(), tz).date, 3); // a plan day ahead of the real clock
+    const p = await sam.post('/iou-plans', { owedBy: S, owedTo: M, amount: 100, every: 'week', startDate: day });
     expect(p.status, JSON.stringify(p.json)).toBe(201);
     const planId = p.json.plan.id;
-    expect(p.json.plan).toMatchObject({ centsEach: 10000, nextDue: '2026-10-23' });
-    const at = (t: string) => localToUtc('2026-10-23', t, tz);
+    expect(p.json.plan).toMatchObject({ centsEach: 10000, nextDue: day });
+    const at = (t: string) => localToUtc(day, t, tz);
     const pings = async () => (await env.DB.prepare('SELECT member_id, channel, title, message FROM deliveries WHERE iou_plan_id = ?').bind(planId).all()).results;
     await tickAt(o, at('08:59'));
     expect(await pings()).toEqual([]);
@@ -72,10 +73,10 @@ describe('§7B.9 family IOUs', () => {
 
     expect((await mom.post('/iou-payments', { owedBy: S, owedTo: M, amount: '1,400', how: 'let_go' })).json).toBeNull();
     expect((await env.DB.prepare('SELECT ended_at FROM iou_plans WHERE id = ?').bind(planId).first<{ ended_at: string | null }>())!.ended_at).not.toBeNull();
-    await tickAt(o, localToUtc('2026-10-30', '09:00', tz));
+    await tickAt(o, localToUtc(addDays(day, 7), '09:00', tz));
     expect(await pings()).toHaveLength(1);
     expect(await pairOf(sam, S, M)).toBeUndefined();
-    expect((await sam.post('/iou-plans', { owedBy: S, owedTo: M, amount: 1, every: 'week', startDate: '2026-10-23' })).status).toBe(409);
+    expect((await sam.post('/iou-plans', { owedBy: S, owedTo: M, amount: 1, every: 'week', startDate: day })).status).toBe(409);
   });
 
   it('deleting: a waiting row by who made it; an OK\'d one by an admin, not while payments need it', async () => {

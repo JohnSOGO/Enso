@@ -7,6 +7,26 @@ carry its result.
 
 ---
 
+## 2026-10-27 — 🏫 School days off, optional built-in item, v1.108.0 (placement-advisor, code-steward, reorganizer)
+
+- **Ask:** MojoSOGO: "Here are the school days off schedule. Add as optional calendar." The Vista Unified 2026–27 days
+  off as an optional calendar item, one switch per member, on by default (SPEC §7.13, §7.2, §7.5, §8.6). This reverses
+  the 2026-10-03 removal (migration 0010), at his ask.
+- **Verdict:** NEW src/shared/school.ts (SCHOOL_DAYS + schoolDaysBetween, pure, imports only time.ts, like markets.ts
+  and moon.ts). EXISTING routes/events.ts (`schoolDays`, one import, one key), auth.ts (`showSchool`), migration 0064,
+  state.tsx, OptionalItems.tsx, DayCell.tsx (`lead`: holiday, 🏫, 📈, at most two), DaySheet.tsx. REORGANIZER FIRST
+  (its own commit): one `shownFor(data, me)` gate in Calendar.tsx, applied at the hand-off, not in buildDays (cached
+  chunks would keep a stale `me`); DayCell and DaySheet drop their show* checks. This was the carried 5th-item trigger.
+- **Why:** a pure leaf with no fan-in; without the gate four copies of the same show* check would become five across
+  two files.
+- **Steward (AREC pass):** not already in Ensō (§7.3 household days off is which public holidays count; optional events
+  §7.5 would need 13 events and 13 switches). Same need: all five built-ins share the switch → /me → OptionalItems →
+  gate path; a shared descriptor list of built-ins (key, pref, label, emoji, where it shows) is the next step if a 6th
+  arrives — backlog, not built. Its "ask John first" for the reversal is met: the ask is his own.
+- **Caps:** routes/events.ts ~128/147 (87%, just under the band); Calendar.tsx ~217/300; school.ts ~40; others well under.
+
+---
+
 ## 2026-10-24 — IOU waiting push + IOU banner, v1.107.0 (placement-advisor, code-steward)
 
 - **Ask:** MojoSOGO: "when an iou payment is made, an ack is required so put it at the top of the app and send an alert

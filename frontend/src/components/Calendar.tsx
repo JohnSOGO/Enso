@@ -1,7 +1,7 @@
 // SPEC §7.1 — continuous calendar: Sunday-first week rows, no month resets, virtualized; each day drawn by DayCell.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { get } from '../api';
-import { useApp } from '../state';
+import { useApp, type Me } from '../state';
 import { addDays, diffDays, startOfWeek } from '../../../src/shared/time';
 import type { WeatherDay } from '../../../src/shared/weather';
 import { DayCell, isMultiDay } from './DayCell';
@@ -18,7 +18,22 @@ export interface DayData {
   publicHolidays: { name: string; emoji: string }[];
   marketDays: { name: string; emoji: string }[];
   moonPhases: { name: string; emoji: string }[]; // §7.12
+  schoolDays: { name: string; emoji: string }[]; // §7.13
   weather?: WeatherDay; // §7.11
+}
+
+/** SPEC §7.2 — the one place a built-in item's switch is read: what is off for `me` is dropped here, at the hand-off,
+ *  not in the cached chunks (a refetch can land before the new `me` does). */
+export function shownFor(data: DayData | undefined, me: Me): DayData | undefined {
+  if (!data) return data;
+  return {
+    ...data,
+    publicHolidays: me.showPublicHolidays ? data.publicHolidays : [],
+    marketDays: me.showOptionsExpiration ? data.marketDays : [],
+    moonPhases: me.showMoon ? data.moonPhases : [],
+    schoolDays: me.showSchool ? data.schoolDays : [],
+    weather: me.showWeather ? data.weather : undefined,
+  };
 }
 
 const WEEKS_BACK = 520; // ±10 years of scrollable weeks
@@ -60,7 +75,7 @@ function buildDays(json: any, from: string, to: string): Map<string, DayData> {
   const days = new Map<string, DayData>();
   const day = (d: string) => {
     let x = days.get(d);
-    if (!x) { x = { items: [], publicHolidays: [], marketDays: [], moonPhases: [] }; days.set(d, x); }
+    if (!x) { x = { items: [], publicHolidays: [], marketDays: [], moonPhases: [], schoolDays: [] }; days.set(d, x); }
     return x;
   };
   for (const o of json.occurrences as Occurrence[]) {
@@ -73,6 +88,7 @@ function buildDays(json: any, from: string, to: string): Map<string, DayData> {
   for (const h of json.publicHolidays) day(h.date).publicHolidays.push({ name: h.name, emoji: h.emoji });
   for (const m of json.marketDays ?? []) day(m.date).marketDays.push({ name: m.name, emoji: m.emoji });
   for (const m of json.moonPhases ?? []) day(m.date).moonPhases.push({ name: m.name, emoji: m.emoji });
+  for (const sd of json.schoolDays ?? []) day(sd.date).schoolDays.push({ name: sd.name, emoji: sd.emoji });
   for (const w of (json.weather ?? []) as WeatherDay[]) day(w.date).weather = w;
   return days;
 }
@@ -153,7 +169,7 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
     for (let i = 0; i < 7; i++) {
       const date = addDays(weekStart, i);
       cells.push(
-        <DayCell key={date} date={date} data={dayData(date, w)} stay={spans.find((sp) => sp.start <= i && i <= sp.end)}
+        <DayCell key={date} date={date} data={shownFor(dayData(date, w), me)} stay={spans.find((sp) => sp.start <= i && i <= sp.end)}
           lanes={lanes} barH={barH} rowH={rowH} cellW={size.w / 7} narrow={narrow} todayStr={todayStr} onOpen={onOpenDay} />,
       );
     }
