@@ -109,6 +109,15 @@ carry its result.
 
 ---
 
+## 2026-10-27 — 🏡 Home active mode lit, v1.111.2 (placement-advisor)
+
+- **Ask:** MojoSOGO: "Highlight the mode that is active; do not show a second text" (the AC card, §8.19).
+- **Verdict:** EXISTING frontend/src/components/HomeRoom.tsx (DeviceCard): the mode line removed, an inline ACTIVE_MODE
+  style beside STATUS on the pressed button; nothing to extract.
+- **Why:** presentation only; the server still decides `c.mode`; the change removes code.
+- **Caps:** HomeRoom.tsx 113/300.
+---
+
 ## 2026-10-27 — 🏡 Home status larger, v1.109.2 (placement-advisor)
 
 - **Ask:** MojoSOGO: "make status larger font and easier to see" (the 🏡 Home device cards).

@@ -19,6 +19,9 @@ const deg = (n: number | null) => (n === null ? '—' : `${n}°`);
 /** §8.19 — the status, big and bright (MojoSOGO 2026-10-27 "make status larger font and easier to see"). */
 const STATUS = { margin: '6px 0 8px', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text)' } as const;
 
+/** §8.19 — the AC's mode shows only as its button, lit (MojoSOGO 2026-10-27 "Highlight the mode that is active; do not show a second text"). */
+const ACTIVE_MODE = { background: 'var(--accent)', borderColor: 'var(--accent)', color: '#fff', fontWeight: 700 } as const;
+
 /** One temperature: a small label over a big figure. */
 const Temp = ({ label, n }: { label: string; n: number | null }) => (
   <div style={{ textAlign: 'center' }}>
@@ -48,14 +51,14 @@ function DeviceCard({ device, onChange }: { device: Device; onChange: (d: Device
       {device.available && !c && <p style={STATUS}>{device.on ? 'On' : 'Off'}</p>}
       {device.available && c && (
         <>
-          <p style={STATUS}>{modeName(c.mode)}</p>
-          <div className="row" style={{ justifyContent: 'space-around', margin: '0 0 10px' }}>
+          <div className="row" style={{ justifyContent: 'space-around', margin: '6px 0 10px' }}>
             <Temp label="Room" n={c.current} />
             <Temp label="Set" n={c.target} />
           </div>
           <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
-            {c.modes.map((m) => (
-              <button key={m} aria-pressed={m === c.mode} disabled={busy} onClick={() => act('mode', { mode: m })}>{modeName(m)}</button>
+            {c.modes.filter((m) => m !== 'off').map((m) => ( // §8.19: off is the Turn off button, top right
+              <button key={m} aria-pressed={m === c.mode} disabled={busy} onClick={() => act('mode', { mode: m })}
+                style={m === c.mode ? ACTIVE_MODE : undefined}>{modeName(m)}</button>
             ))}
           </div>
           {c.target !== null && (
