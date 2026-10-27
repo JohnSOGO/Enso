@@ -7,6 +7,14 @@ carry its result.
 
 ---
 
+## 2026-10-27 — 🏡 Home status larger, v1.109.2 (placement-advisor)
+
+- **Ask:** MojoSOGO: "make status larger font and easier to see" (the 🏡 Home device cards).
+- **Verdict:** EXISTING frontend/src/components/HomeRoom.tsx (`DeviceCard`), inline styles as the file already uses.
+- **Why:** presentation only, inside the component that draws the line; no rule, data or server change.
+- **Caps:** HomeRoom.tsx ~105/300.
+---
+
 ## 2026-10-27 — Steward FIXes, v1.109.1 (worker + reorganizer, steward findings 1–3)
 
 - **Ask:** MojoSOGO picked FIX on the v1.109.0 steward backlog.
