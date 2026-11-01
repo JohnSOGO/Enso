@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.101 · **Date:** 2026-10-27 · **Owner:** MojoSOGO
+**Version:** 3.102 · **Date:** 2026-11-01 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -2918,7 +2918,7 @@ the room should look like when complete … rooms get sections like kitchen alre
 "Living room") holds up to 8 **areas** — "Sink", "Counters", "Floor" — each with a list of **expectations** ("No
 dishes left in the sink", "Faucet wiped dry") and up to 4 **reference photos** of that area done right. A chore may
 name **one room** (or none); its 📋 sheet shows the chore's **Done means…** (§7B.4) and then its room. Several chores
-may share a room. A room also holds the house's **devices** (the AC, lights…), shown on the 🏡 Home tab (§9.2e, §8.19). Areas say what done looks like every time; nothing here changes turns, runs or fires.
+may share a room. A room also holds the house's **devices** (the AC, lights…), shown on the 🏡 Home tab (§9.2e, §8.19), where its areas show too, under the devices. Areas say what done looks like every time; nothing here changes turns, runs or fires.
 
 **The rules** (pure; imports nothing):
 
@@ -6233,6 +6233,10 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
   │ [Cool] [Dry] [FAN] [Auto]      │  <- FAN lit
   │        [ − ]  70°  [ ＋ ]       │
   └───────────────────────────────┘
+  🧽 What clean looks like
+  Sink                                 ✎
+  [photo] [photo]
+  ☐ No dishes left in the sink
   [ ✏ Devices ]                [Close]
 ```
 
@@ -6253,6 +6257,11 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
 - A device HA can't read shows dim with "Not answering" (or the reason), and no buttons. HA not set up / not
   reachable shows once at the top of the modal, with **Try again** ⚑ Q392; no new badge.
 - No devices yet → "No devices in this room yet." (+ " Tap ✏ Devices to pick them." for whoever can).
+- Under the cards, **🧽 What clean looks like** (MojoSOGO 2026-11-01 "I need to see the pictures of the kitchen"): the
+  room's areas, reference photos (tap for full size) and expectations, exactly as in a chore's 📋 sheet (§8.15, the same
+  `RoomSections`), **read-only for everyone**: no ✎ and no ＋ Add an area (MojoSOGO 2026-11-01 "make it accessible as
+  readonly from Home > kitchen cleaning"); areas are changed in Settings → 🏠 Household → the room ⚑ Q403. Ticks work
+  while it is open, never saved (Q165). ✏ Devices hides it.
 - **✏ Devices** (the room's creator or an admin, §6.3, ⚑ Q390) swaps the cards for the picker: a **Find** box and one
   checkbox line per device `GET /house/devices` lists (✏ Devices shows only once the room's devices are read, and
   Save only once the list is read, so a slow or failed read never saves an empty room) (emoji, name, a dim entity id), ticked ones first; a device in
@@ -6261,7 +6270,8 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
 - Text fields 16 px, buttons 44 px tall, one card per row at 320 px.
 
 **Check (HD-UI, on the iPhone):** 🏡 Home → John's room → ✏ Devices → tick Midea AC → Save → its card shows the room
-temperature and mode; Cool → the AC beeps and the card reads Cool; ＋ → Set goes up one.
+temperature and mode; Cool → the AC beeps and the card reads Cool; ＋ → Set goes up one. 🏡 Home → Kitchen → under the
+cards, 🧽 What clean looks like shows the Kitchen's areas with their photos; tap a photo → full size.
 
 
 ## 9. Delivery

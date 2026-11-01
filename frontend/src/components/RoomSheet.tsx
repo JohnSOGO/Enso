@@ -11,9 +11,10 @@ import { canChange } from '../../../src/shared/roles';
 import { AREAS_MAX, ROOM_NAME_MAX, type Room, type RoomArea } from '../../../src/shared/rooms';
 import s from './RoomSheet.module.css';
 
-export function RoomSections({ room, onDirty }: { room: Room; onDirty: (dirty: boolean) => void }) {
+/** `readOnly` (🏡 Home, §8.19) shows the areas with no ✎ or ＋ Add an area, whoever looks. */
+export function RoomSections({ room, onDirty, readOnly = false }: { room: Room; onDirty: (dirty: boolean) => void; readOnly?: boolean }) {
   const { me, refresh } = useApp();
-  const canEdit = canChange(room.createdBy, me);
+  const canEdit = !readOnly && canChange(room.createdBy, me);
   const [areas, setAreas] = useState<RoomArea[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<RoomArea | 'new' | null>(null);
