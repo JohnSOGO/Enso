@@ -2,28 +2,32 @@
 import { describe, expect, it } from 'vitest';
 import {
   DISCUSS_AFTER_H, MESS_NOTE_MAX, NUDGES_MAX, NUDGE_EVERY_MIN, askMessage, askedOf, balancesOf, canDelete, canSee, canSettle, decideError,
-  discussDue, discussMessage, isAnswerable, isDecidable, messStatus, nudgeDue, parseMessInput,
+  NOTED_KEEP_DAYS, askText, discussDue, discussMessage, isAnswerable, isDecidable, isListed, messStatus, nudgeDue, parseMessInput,
 } from '../src/shared/messes';
 import { addMinutes } from '../src/shared/time';
 import { MESS_STATUS } from '../src/shared/vocab';
 
 const T = '2026-10-05T10:00:00.000Z';
 const row = (over: Partial<Parameters<typeof messStatus>[0] & { reported_by: string }> = {}) =>
-  ({ settled_at: null, closed_at: null, claimed_by: null, discuss_at: null, reported_by: 'A', ...over });
+  ({ settled_at: null, closed_at: null, claimed_by: null, discuss_at: null, cleaned: 1, reported_by: 'A', ...over });
 
 describe('§7B.7 messes — rules', () => {
   it('state is derived: settled, closed, owed, discuss, open — first match wins', () => {
     expect(messStatus(row())).toBe('open');
     expect(messStatus(row({ discuss_at: T }))).toBe('discuss');
     expect(messStatus(row({ discuss_at: T, claimed_by: 'B' }))).toBe('owed');
+    expect(messStatus(row({ claimed_by: 'B', cleaned: 0 }))).toBe('noted');
+    expect(messStatus(row({ cleaned: 0 }))).toBe('open');
+    expect(messStatus(row({ claimed_by: 'B', cleaned: 0, closed_at: T }))).toBe('closed');
     expect(messStatus(row({ claimed_by: 'B', closed_at: T }))).toBe('closed');
     expect(messStatus(row({ claimed_by: 'B', settled_at: T }))).toBe('settled');
   });
 
   it('input: the note is trimmed and capped, empty is null; choreId is optional text', () => {
-    expect(parseMessInput({ note: ' pans ', choreId: 'chr_1' })).toEqual({ note: 'pans', choreId: 'chr_1' });
-    expect(parseMessInput({ note: '  ', choreId: '' })).toEqual({ note: null, choreId: null });
-    expect(parseMessInput({})).toEqual({ note: null, choreId: null });
+    expect(parseMessInput({ note: ' pans ', choreId: 'chr_1' })).toEqual({ note: 'pans', choreId: 'chr_1', cleaned: true });
+    expect(parseMessInput({ note: '  ', choreId: '', cleaned: '0' })).toEqual({ note: null, choreId: null, cleaned: false });
+    expect(parseMessInput({ cleaned: '1' })).toEqual({ note: null, choreId: null, cleaned: true });
+    expect(parseMessInput({ cleaned: 'x' })).toMatch(/cleaned/);
     expect(parseMessInput({ note: 'x'.repeat(MESS_NOTE_MAX + 1) })).toMatch(/note/);
     expect(parseMessInput({ note: 5 })).toMatch(/note/);
   });
@@ -35,8 +39,9 @@ describe('§7B.7 messes — rules', () => {
   });
 
   it('who may act: answer while open or discuss; decide also while owed; settle owed by the one owed or an admin', () => {
-    expect(MESS_STATUS.map(isAnswerable)).toEqual([true, true, false, false, false]);
-    expect(MESS_STATUS.map(isDecidable)).toEqual([true, true, true, false, false]);
+    expect(MESS_STATUS.map(isAnswerable)).toEqual([true, true, false, false, false, false]);
+    expect(MESS_STATUS.map(isDecidable)).toEqual([true, true, true, true, false, false]);
+    expect(canSettle({ status: 'noted', reportedBy: 'A' }, { id: 'A', admin: true })).toBe(false);
     const owed = { status: 'owed' as const, reportedBy: 'A' };
     expect(canSettle(owed, { id: 'A', admin: false })).toBe(true);
     expect(canSettle(owed, { id: 'B', admin: true })).toBe(true);
@@ -54,7 +59,9 @@ describe('§7B.7 messes — rules', () => {
   });
 
   it('see: everyone until owed; an owed mess only by an admin, the one owed and the one who owes', () => {
-    const base = { settled_at: null, closed_at: null, claimed_by: null, discuss_at: null, reported_by: 'A' };
+    const base = { settled_at: null, closed_at: null, claimed_by: null, discuss_at: null, cleaned: 1, reported_by: 'A' };
+    expect(canSee({ ...base, claimed_by: 'B', cleaned: 0 }, { id: 'C', admin: false })).toBe(false);
+    expect(canSee({ ...base, claimed_by: 'B', cleaned: 0 }, { id: 'B', admin: false })).toBe(true);
     const owed = { ...base, claimed_by: 'B' };
     expect(canSee(base, { id: 'C', admin: false })).toBe(true);
     expect(canSee({ ...base, discuss_at: '2026-10-06T00:00:00Z' }, { id: 'C', admin: false })).toBe(true);
@@ -68,7 +75,7 @@ describe('§7B.7 messes — rules', () => {
     expect(decideError('B', 'A', ['A', 'B'])).toBeNull();
     expect(decideError('C', 'A', ['A', 'B'])).toBe("memberId must be an active member, or null for nobody's.");
     expect(decideError(5, 'A', ['A', 'B'])).toBe("memberId must be an active member, or null for nobody's.");
-    expect(decideError('A', 'A', ['A', 'B'])).toBe("The one who cleaned it up can't owe themselves.");
+    expect(decideError('A', 'A', ['A', 'B'])).toBe("The one who reported it can't be whose it was.");
   });
 
   it(`asks: at most ${NUDGES_MAX}, ${NUDGE_EVERY_MIN} min apart from the report`, () => {
@@ -99,8 +106,18 @@ describe('§7B.7 messes — rules', () => {
   });
 
   it('the words name the reporter, and the chore and note only when set', () => {
-    expect(askMessage('Sam', 'Kitchen', 'pans')).toBe('Sam cleaned up a mess (Kitchen): pans. Was it yours? Open Ensō to answer.');
-    expect(askMessage('Sam', null, null)).toBe('Sam cleaned up a mess. Was it yours? Open Ensō to answer.');
-    expect(discussMessage('Sam', null, 'cups')).toBe("Nobody has claimed the mess Sam cleaned up: cups. It's on To talk about.");
+    expect(askMessage('Sam', 'Kitchen', 'pans', true)).toBe('Sam cleaned up a mess (Kitchen): pans. Was it yours? Open Ensō to answer.');
+    expect(askMessage('Sam', null, null, true)).toBe('Sam cleaned up a mess. Was it yours? Open Ensō to answer.');
+    expect(discussMessage('Sam', null, 'cups', true)).toBe("Nobody has claimed the mess Sam cleaned up: cups. It's on To talk about.");
+    expect(askText('Sam', 'Bathroom', 'towels', false)).toBe('Sam found a mess (Bathroom): towels. Not cleaned up. Was it yours?');
+    expect(discussMessage('Sam', null, null, false)).toBe("Nobody has claimed the mess Sam found. It's on To talk about.");
+  });
+
+  it('MS16 a noted mess is listed for NOTED_KEEP_DAYS after its claim; the rest always', () => {
+    const now = '2026-11-01T10:00:00.000Z';
+    const noted = (days: number) => ({ ...row({ claimed_by: 'B', cleaned: 0 }), claimed_at: addMinutes(now, -days * 24 * 60) });
+    expect(isListed(noted(0), now)).toBe(true);
+    expect(isListed(noted(NOTED_KEEP_DAYS + 1), now)).toBe(false);
+    expect(isListed({ ...noted(NOTED_KEEP_DAYS + 1), cleaned: 1 }, now)).toBe(true);
   });
 });

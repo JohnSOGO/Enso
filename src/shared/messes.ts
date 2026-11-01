@@ -1,4 +1,4 @@
-// SPEC §7B.7 — whose mess? A mess someone cleaned up: who is asked, when they are asked again, when it goes to To
+// SPEC §7B.7 — whose mess? A mess someone cleaned up (or found and left, Not cleaned): who is asked, when they are asked again, when it goes to To
 // talk about, who may answer, decide, settle or delete it, who owes whom, the push texts and the wire type. Pure; imports only vocab and time.
 import type { MessSettle, MessStatus } from './vocab';
 import { addMinutes } from './time';
@@ -8,6 +8,7 @@ export const NUDGE_EVERY_MIN = 15;
 export const DISCUSS_AFTER_H = 24;
 export const MESS_NOTE_MAX = 120;
 export const MESS_PHOTO_KEEP_DAYS = 30;
+export const NOTED_KEEP_DAYS = 30;
 export const MESS_ASK_TITLE = '🧽 Whose mess?';
 export const MESS_DISCUSS_TITLE = '🗣 To talk about';
 
@@ -16,42 +17,47 @@ export interface MessRow {
   id: string; reported_by: string; chore_id: string | null; note: string | null; photo_key: string | null;
   claimed_by: string | null; claimed_at: string | null; assigned_by: string | null; discuss_at: string | null;
   closed_at: string | null; closed_by: string | null; settled_at: string | null; settled_how: MessSettle | null;
-  settled_by: string | null; deleted_at: string | null; created_at: string;
+  settled_by: string | null; deleted_at: string | null; created_at: string; cleaned: number;
 }
 
 /** A mess as the API sends it. The photo key is never on the wire. */
 export interface Mess {
   id: string; reportedBy: string; choreId: string | null; choreTitle: string | null; note: string | null;
-  hasPhoto: boolean; createdAt: string; status: MessStatus; claimedBy: string | null; assignedBy: string | null;
+  hasPhoto: boolean; cleaned: boolean; createdAt: string; status: MessStatus; claimedBy: string | null; assignedBy: string | null;
   deniedBy: string[]; asked: string[];
 }
 
 /** `from` owes `to` this many points. */
 export interface Balance { from: string; to: string; points: number }
 
-/** The state, derived from the row: the first that holds of settled, closed, owed, discuss, open. */
-export function messStatus(m: Pick<MessRow, 'settled_at' | 'closed_at' | 'claimed_by' | 'discuss_at'>): MessStatus {
+/** The state, derived from the row: the first that holds of settled, closed, noted, owed, discuss, open. */
+export function messStatus(m: Pick<MessRow, 'settled_at' | 'closed_at' | 'claimed_by' | 'discuss_at' | 'cleaned'>): MessStatus {
   if (m.settled_at) return 'settled';
   if (m.closed_at) return 'closed';
-  if (m.claimed_by) return 'owed';
+  if (m.claimed_by) return m.cleaned === 0 ? 'noted' : 'owed';
   if (m.discuss_at) return 'discuss';
   return 'open';
 }
 
-/** Report fields → `{ note, choreId }`, or a message naming the field. */
-export function parseMessInput(b: { note?: unknown; choreId?: unknown }): { note: string | null; choreId: string | null } | string {
+/** Report fields → `{ note, choreId, cleaned }`, or a message naming the field. */
+export function parseMessInput(b: { note?: unknown; choreId?: unknown; cleaned?: unknown }): { note: string | null; choreId: string | null; cleaned: boolean } | string {
   if (b.note != null && typeof b.note !== 'string') return 'note must be text.';
   const note = typeof b.note === 'string' ? b.note.trim() : '';
   if (note.length > MESS_NOTE_MAX) return `note can be at most ${MESS_NOTE_MAX} characters.`;
   if (b.choreId != null && typeof b.choreId !== 'string') return 'choreId must be text.';
-  return { note: note || null, choreId: (b.choreId as string | null | undefined) || null };
+  if (b.cleaned != null && b.cleaned !== '1' && b.cleaned !== '0') return 'cleaned must be 1 or 0.';
+  return { note: note || null, choreId: (b.choreId as string | null | undefined) || null, cleaned: b.cleaned !== '0' };
 }
 
 /** Whether That was me / Not me can still be said, and the reporter may still delete it: open or on To talk about. */
 export const isAnswerable = (s: MessStatus): boolean => s === 'open' || s === 'discuss';
 
-/** Whether an admin can still record whose it was: open, on To talk about, or owed. */
-export const isDecidable = (s: MessStatus): boolean => isAnswerable(s) || s === 'owed';
+/** Whether an admin can still record whose it was: open, on To talk about, owed or noted. */
+export const isDecidable = (s: MessStatus): boolean => isAnswerable(s) || s === 'owed' || s === 'noted';
+
+/** Whether GET /messes lists a mess that is not settled, closed or deleted: all but a noted one claimed NOTED_KEEP_DAYS ago. */
+export const isListed = (m: Parameters<typeof messStatus>[0] & Pick<MessRow, 'claimed_at'>, now: string): boolean =>
+  messStatus(m) !== 'noted' || (m.claimed_at ?? now) > addMinutes(now, -NOTED_KEEP_DAYS * 24 * 60);
 
 /** Who is asking: the member and whether they are an admin. */
 export interface MessViewer { id: string; admin: boolean }
@@ -65,14 +71,14 @@ export const canSettle = (m: MessFacts, viewer: MessViewer): boolean =>
 export const canDelete = (m: MessFacts, viewer: MessViewer): boolean =>
   viewer.admin || (viewer.id === m.reportedBy && isAnswerable(m.status));
 
-/** Who sees a mess in the list: anyone until it is owed; then an admin, the one owed and the one who owes. */
-export const canSee = (m: Pick<MessRow, 'settled_at' | 'closed_at' | 'claimed_by' | 'discuss_at' | 'reported_by'>, viewer: MessViewer): boolean =>
-  messStatus(m) !== 'owed' || viewer.admin || m.reported_by === viewer.id || m.claimed_by === viewer.id;
+/** Who sees a mess in the list: anyone until it is owed or noted; then an admin, the reporter and whose it was. */
+export const canSee = (m: Parameters<typeof messStatus>[0] & Pick<MessRow, 'reported_by'>, viewer: MessViewer): boolean =>
+  !['owed', 'noted'].includes(messStatus(m)) || viewer.admin || m.reported_by === viewer.id || m.claimed_by === viewer.id;
 
 /** An admin's Whose was it? choice (a member, not null) → the refusal text, or null when it can be recorded. */
 export function decideError(memberId: unknown, reportedBy: string, activeIds: readonly string[]): string | null {
   if (typeof memberId !== 'string' || !activeIds.includes(memberId)) return 'memberId must be an active member, or null for nobody\'s.';
-  if (memberId === reportedBy) return 'The one who cleaned it up can\'t owe themselves.';
+  if (memberId === reportedBy) return 'The one who reported it can\'t be whose it was.';
   return null;
 }
 
@@ -110,10 +116,15 @@ export function balancesOf(owed: readonly Pick<MessRow, 'reported_by' | 'claimed
 
 const where = (choreTitle: string | null, note: string | null) => `${choreTitle ? ` (${choreTitle})` : ''}${note ? `: ${note}` : ''}`;
 
+/** The question, as the banner shows it: cleaned up, or found and Not cleaned up. */
+export const askText = (reporter: string, choreTitle: string | null, note: string | null, cleaned: boolean) => cleaned
+  ? `${reporter} cleaned up a mess${where(choreTitle, note)}. Was it yours?`
+  : `${reporter} found a mess${where(choreTitle, note)}. Not cleaned up. Was it yours?`;
+
 /** The ask's push text. */
-export const askMessage = (reporter: string, choreTitle: string | null, note: string | null) =>
-  `${reporter} cleaned up a mess${where(choreTitle, note)}. Was it yours? Open Ensō to answer.`;
+export const askMessage = (reporter: string, choreTitle: string | null, note: string | null, cleaned: boolean) =>
+  `${askText(reporter, choreTitle, note, cleaned)} Open Ensō to answer.`;
 
 /** The admins' push when a mess goes to To talk about. */
-export const discussMessage = (reporter: string, choreTitle: string | null, note: string | null) =>
-  `Nobody has claimed the mess ${reporter} cleaned up${where(choreTitle, note)}. It's on To talk about.`;
+export const discussMessage = (reporter: string, choreTitle: string | null, note: string | null, cleaned: boolean) =>
+  `Nobody has claimed the mess ${reporter} ${cleaned ? 'cleaned up' : 'found'}${where(choreTitle, note)}. It's on To talk about.`;

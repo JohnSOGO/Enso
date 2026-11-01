@@ -7,6 +7,26 @@ carry its result.
 
 ---
 
+## 2026-11-01 — Mess reported not cleaned, v1.114.0 (placement-advisor)
+
+- **Ask:** A mess report can be marked Not cleaned: asked about as usual, whose it was recorded, nobody owed. Messes adds a 30-day Not cleaned list (SPEC §7B.7, §8.15a; AREC arec-mess-not-cleaned.md).
+- **Verdict:** src/shared/messes.ts [EXISTING]: the derived `noted` status (before `owed`), NOTED_KEEP_DAYS and `isListed(m, now)`, one ask-text helper that branches on cleaned (askMessage and discussMessage build on it; MessBanner imports it), canSee and isDecidable take `noted`, balancesOf and canSettle stay owed-only. vocab.ts MESS_STATUS += `noted`. routes/messes.ts [EXISTING]: `?cleaned` through parseMessInput, the GET window through isListed. mess-asks.ts passes cleaned to the texts. my-alerts.ts SELECT adds `m.cleaned`. MessReport.tsx, Messes.tsx and MessBanner.tsx [EXISTING]. Migration 0067 plus its test.
+- **Flow stage:** rules (messes.ts), route and persist (routes/messes.ts, 0067), render (the three PWA files)
+- **Why:** One more derived state of an existing row, inside the owner whose row already names status, visibility, balances and push words. No new concern, low fan-in, every target well under cap. The banner's own copy of the ask sentence moves onto the shared helper (§0.5). Rejected: a stored status column (it is derived), a separate not-cleaned table or owner (the same ask and claim flow), a window rule in the route (a rule belongs in shared).
+- **Caps:** messes.ts 119 → ~135/300; routes/messes.ts 145 → ~152/300; Messes.tsx 147 → ~165/300; MessReport.tsx 50 → ~58/300; MessBanner.tsx 27 → ~27; vocab.ts 118 → 118. No file newly in the band.
+
+---
+
+## 2026-11-01 — Steward check, mess not cleaned (code-steward)
+
+- **Run:** narrow pre-build check of the mess area (AREC step), read-only
+- **Verdict:** build in the existing owners; no extract-first seam
+- **Top finding:** MessBanner.tsx rebuilt the ask sentence by hand (a copy of shared askMessage/where); fixed inside this change through one shared askText. Nobody's closes with no record of whose, so it is not the same feature.
+- **Handoffs:** none
+- **Restraint:** no Messes.tsx split; IOU and bounty untouched
+
+---
+
 ## 2026-11-01 — Home room shows What clean looks like, v1.113.0 (placement-advisor)
 
 - **Ask:** On the 🏡 Home tab's room modal, show the room's areas, reference photos and expectations ("🧽 What clean

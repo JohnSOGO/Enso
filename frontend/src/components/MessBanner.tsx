@@ -2,6 +2,7 @@
 // (§7B.7), with its photo and That was me / Not me. Not red, no sound; answering removes the row.
 import { useApp } from '../state';
 import { AnswerButtons, MessPhoto, useMessAction, useMesses } from './Messes';
+import { askText } from '../../../src/shared/messes';
 import s from './Messes.module.css';
 
 export function MessBanner() {
@@ -17,7 +18,7 @@ export function MessBanner() {
         <div key={m.id} className={s.ask}>
           <MessPhoto m={m} />
           <span className={s.question}>
-            🧽 {memberById(m.reportedBy)?.displayName ?? 'Someone'} cleaned up a mess{m.choreTitle ? ` (${m.choreTitle})` : ''}{m.note ? `: ${m.note}` : ''}. Was it yours?
+            🧽 {askText(memberById(m.reportedBy)?.displayName ?? 'Someone', m.choreTitle, m.note, m.cleaned)}
           </span>
           <AnswerButtons m={m} busy={busy === m.id} act={act} />
         </div>

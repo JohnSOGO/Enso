@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-11-01, v1.113.0, main = production.*
+*Last updated 2026-11-01, v1.114.0, main = production.*
 
 ## Running where
 
@@ -53,6 +53,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 ## Owed
 
 - 🎣 Good fishing times (v1.111.0–v1.112.0, §7.14, §7.14b, migration 0066, Q394–Q401 ⚑): Settings → 📅 Calendar → tick 🎣 Good fishing times → pick How far will we go (try 1 h) → open 📍 spots in reach; tick 🔔 Ping me. The next 7 days show 🎣 bottom right on great days; tap a day → "🎣🎣🎣 6:20am–8:20am Oceanside Pier · dawn, high tide …" and the best lake; tap one → a popup says why it scored (🌅 🌊 🌙 😌 🎣 🚗) with Visit {spot} ↗ at the bottom; 🐟 lines for trout plants (Cuyamaca, Doane Pond) when in range. After 7pm a phone ping for a great tomorrow.
+- 🧽 Mess Not cleaned (v1.114.0, §7B.7, migration 0067, Q404–Q405 ⚑): Chores → 📸 Report a mess → pick Not cleaned → others asked "… found a mess … Not cleaned up. Was it yours?" → That was me → it shows under Not cleaned "Kai's · no point owed"; Balances unchanged.
 - 🧽 What clean looks like on 🏡 Home (v1.113.0, §8.19, Q403): 🏡 Home → Kitchen → under the devices, the room's areas with photos and checks (read-only, no ✎); tap a photo → full size.
 - 🍳 Recipes in Lists (v1.110.0, §8.8, §8.12, Q393 ⚑): the tab bar has six tabs, no 🍳; tap 🛒 Lists → 🍳 Recipes (n) after 📥 Inbox → every recipe is there with its picture and emoji; paste a link → Read it → it opens.
 - 🏡 Home (v1.109.0, §9.2e, §8.19, migration 0065, Q389–Q392 ⚑): on the iPhone, 🏡 Home → his room (an admin adds it in Settings → 🏠 Household first) → ✏ Devices → tick ❄️ Midea AC → Save → the card shows Fan · Room 54° · Set 70°; tap Cool → the AC changes and the card reads Cool; ＋ → Set 71°. The AC's filter alert is on in HA (clean the filter).

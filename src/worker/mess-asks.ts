@@ -36,7 +36,7 @@ export async function moveToDiscuss(env: Env, m: MessRow, now: string): Promise<
   if (!admins.length) return;
   const w = await wordsOf(db, m);
   const rows = admins.map((a) =>
-    pushDelivery(db, { memberId: a.id, message: discussMessage(w.name, w.chore, m.note), title: MESS_DISCUSS_TITLE, messId: m.id }, now));
+    pushDelivery(db, { memberId: a.id, message: discussMessage(w.name, w.chore, m.note, m.cleaned !== 0), title: MESS_DISCUSS_TITLE, messId: m.id }, now));
   await db.batch(rows.map((r) => r.stmt));
   await sendPushDeliveries(env, rows.map((r) => r.id), now);
 }
@@ -52,7 +52,7 @@ export async function askAbout(env: Env, m: MessRow, now: string, activeIds?: st
   if (!due.length) return;
   const w = await wordsOf(db, m);
   const rows = due.map((id) => pushDelivery(db, {
-    memberId: id, message: askMessage(w.name, w.chore, m.note), title: MESS_ASK_TITLE, messId: m.id, alertNumber: (sent.get(id) ?? 0) + 1,
+    memberId: id, message: askMessage(w.name, w.chore, m.note, m.cleaned !== 0), title: MESS_ASK_TITLE, messId: m.id, alertNumber: (sent.get(id) ?? 0) + 1,
   }, now));
   await db.batch(rows.map((r) => r.stmt));
   await sendPushDeliveries(env, rows.map((r) => r.id), now);

@@ -1,4 +1,4 @@
-// SPEC §8.15a — 📸 Report a mess: a photo (required), which chore (optional) and a note, sent as POST /messes with
+// SPEC §8.15a — 📸 Report a mess: a photo (required), which chore (optional), a note and whether I cleaned it, sent as POST /messes with
 // the photo as the body (§7B.7). The server asks everyone else; a refusal shows inside the sheet.
 import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
@@ -14,6 +14,7 @@ export function MessReport({ onClose }: { onClose: () => void }) {
   const [chores, setChores] = useState<Chore[]>([]);
   const [choreId, setChoreId] = useState('');
   const [note, setNote] = useState('');
+  const [cleaned, setCleaned] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { get<Chore[]>('/chores').then(setChores).catch(() => setChores([])); }, []);
@@ -22,7 +23,7 @@ export function MessReport({ onClose }: { onClose: () => void }) {
     if (!photo) return;
     setBusy(true); setError(null);
     try {
-      const q = new URLSearchParams({ ...(choreId ? { choreId } : {}), ...(note.trim() ? { note: note.trim() } : {}) }).toString();
+      const q = new URLSearchParams({ ...(choreId ? { choreId } : {}), ...(note.trim() ? { note: note.trim() } : {}), ...(cleaned ? {} : { cleaned: '0' }) }).toString();
       await upload('POST', `/messes${q ? `?${q}` : ''}`, photo);
       refresh(); onClose();
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
@@ -34,7 +35,7 @@ export function MessReport({ onClose }: { onClose: () => void }) {
         <button className="primary" disabled={!photo || busy} onClick={send}>{busy ? 'Reporting…' : 'Report'}</button>
         <button onClick={onClose}>Cancel</button>
       </>}>
-      <p className="muted">A photo of the mess you cleaned up. Everyone else is asked whether it was theirs.</p>
+      <p className="muted">A photo of the mess you found. Everyone else is asked whether it was theirs.</p>
       <PhotoField savedSrc={null} pending={photo} alt="The mess" onPick={setPhoto} onRemove={() => setPhoto(null)} />
       <label>Which chore?
         <select value={choreId} onChange={(e) => setChoreId(e.target.value)}>
@@ -45,6 +46,11 @@ export function MessReport({ onClose }: { onClose: () => void }) {
       <label>Note
         <input value={note} maxLength={MESS_NOTE_MAX} placeholder="e.g. pans left on the stove" onChange={(e) => setNote(e.target.value)} />
       </label>
+      <fieldset className="plain" style={{ border: 0, padding: 0, margin: 0 }}>
+        <legend>Did you clean it?</legend>
+        <label className="row"><input type="radio" name="cleaned" checked={cleaned} onChange={() => setCleaned(true)} /> I cleaned it up</label>
+        <label className="row"><input type="radio" name="cleaned" checked={!cleaned} onChange={() => setCleaned(false)} /> Not cleaned (on record, nobody owes)</label>
+      </fieldset>
     </Modal>
   );
 }
