@@ -18,7 +18,7 @@ interface Row {
   id: string; message: string; title: string | null; notice: string | null; mess_id: string | null; status: DeliveryStatus;
   detail: string | null; alert_number: number; created_at: string; fire_id: string | null; kind: AlertKind | null; timer_id: string | null; is_alarm: number | null; state: FireState | null;
   m_id: string | null; m_deleted: string | null; reported_by: string; settled_at: string | null; closed_at: string | null;
-  claimed_by: string | null; discuss_at: string | null; denied_me: number;
+  claimed_by: string | null; discuss_at: string | null; cleaned: number; denied_me: number;
 }
 
 const MINE = `channel = 'push' AND member_id = ? AND dismissed_at IS NULL`;
@@ -27,7 +27,7 @@ myAlerts.get('/me/alerts', requireMember, async (c) => {
   const me = c.get('member').id;
   const rows = await all<Row>(c.env.DB,
     `SELECT d.id, d.message, d.title, d.notice, d.mess_id, d.status, d.detail, d.alert_number, d.created_at, d.fire_id, f.kind, f.state, f.timer_id, e.is_alarm,
-            m.id AS m_id, m.deleted_at AS m_deleted, m.reported_by, m.settled_at, m.closed_at, m.claimed_by, m.discuss_at,
+            m.id AS m_id, m.deleted_at AS m_deleted, m.reported_by, m.settled_at, m.closed_at, m.claimed_by, m.discuss_at, m.cleaned,
             EXISTS (SELECT 1 FROM mess_denials x WHERE x.mess_id = d.mess_id AND x.member_id = d.member_id) AS denied_me
        FROM deliveries d LEFT JOIN fires f ON f.id = d.fire_id LEFT JOIN events e ON e.id = f.event_id LEFT JOIN messes m ON m.id = d.mess_id
       WHERE d.channel = 'push' AND d.member_id = ? AND d.dismissed_at IS NULL ORDER BY d.created_at DESC, d.id DESC LIMIT ?`, me, ALERT_HISTORY_MAX);

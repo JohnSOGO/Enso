@@ -3,7 +3,7 @@
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import {
-  askedOf, balancesOf, canDelete, canSee, canSettle, decideError, isAnswerable, isDecidable, messStatus, parseMessInput, type Mess, type MessRow,
+  askedOf, balancesOf, canDelete, canSee, canSettle, decideError, isAnswerable, isDecidable, isListed, messStatus, parseMessInput, type Mess, type MessRow,
 } from '../../shared/messes';
 import { MESS_SETTLE, isOneOf } from '../../shared/vocab';
 import { isAdmin } from '../../shared/roles';
@@ -20,7 +20,7 @@ async function view(db: D1Database, m: MessRow, activeIds: string[]): Promise<Me
   const chore = m.chore_id ? await first<{ title: string }>(db, 'SELECT title FROM chores WHERE id = ?', m.chore_id) : null;
   return {
     id: m.id, reportedBy: m.reported_by, choreId: m.chore_id, choreTitle: chore?.title ?? null, note: m.note,
-    hasPhoto: m.photo_key !== null, createdAt: m.created_at, status: messStatus(m), claimedBy: m.claimed_by,
+    hasPhoto: m.photo_key !== null, cleaned: m.cleaned !== 0, createdAt: m.created_at, status: messStatus(m), claimedBy: m.claimed_by,
     assignedBy: m.assigned_by, deniedBy: denied, asked: askedOf(m, activeIds, denied),
   };
 }
@@ -45,15 +45,15 @@ messes.get('/messes', requireMember, async (c) => {
   const rows = await all<MessRow>(db,
     'SELECT * FROM messes WHERE deleted_at IS NULL AND settled_at IS NULL AND closed_at IS NULL ORDER BY created_at DESC, id');
   const owed = rows.filter((m) => messStatus(m) === 'owed');
-  const viewer = { id: me.id, admin };
-  const shown = rows.filter((m) => canSee(m, viewer));
+  const viewer = { id: me.id, admin }, now = nowIso();
+  const shown = rows.filter((m) => canSee(m, viewer) && isListed(m, now));
   const active = await activeMemberIds(db);
   return c.json({ messes: await Promise.all(shown.map((m) => view(db, m, active))), balances: balancesOf(owed, me.id, admin) });
 });
 
 messes.post('/messes', requireMember, async (c) => {
   const db = c.env.DB;
-  const input = parseMessInput({ note: c.req.query('note'), choreId: c.req.query('choreId') });
+  const input = parseMessInput({ note: c.req.query('note'), choreId: c.req.query('choreId'), cleaned: c.req.query('cleaned') });
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
   if (input.choreId && !(await first(db, 'SELECT id FROM chores WHERE id = ? AND deleted_at IS NULL', input.choreId))) {
     return fail(c, 404, 'not_found', 'That chore no longer exists.');
@@ -62,8 +62,8 @@ messes.post('/messes', requireMember, async (c) => {
   if (photo instanceof Response) return photo;
   const id = newId('mes'), now = nowIso();
   const key = await putPhoto(c.env.PHOTOS, 'messes', id, photo.bytes, photo.type);
-  await db.prepare('INSERT INTO messes (id, reported_by, chore_id, note, photo_key, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .bind(id, c.get('member').id, input.choreId, input.note, key, now).run();
+  await db.prepare('INSERT INTO messes (id, reported_by, chore_id, note, photo_key, cleaned, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, c.get('member').id, input.choreId, input.note, key, input.cleaned ? 1 : 0, now).run();
   await askAbout(c.env, (await loadRow(db, id))!, now);
   return c.json(await viewOf(c, id), 201);
 });

@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.102 · **Date:** 2026-11-01 · **Owner:** MojoSOGO
+**Version:** 3.103 · **Date:** 2026-11-01 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -409,7 +409,7 @@ This table says what each term means.
 | `paid` / `let_go` / `tab` (IOU payment) | An IOU payment (§7B.9): money paid back, outside Ensō / an amount the one owed let go / a split bill taken off the payer's tab instead of a new IOU |
 | `week` / `2weeks` / `month` (payback plan) | How often a payback plan is due (§7B.9): every week, every 2 weeks, every month, from its start date |
 | `open` / `taken` / `pending` / `paid` (bounty) | A one-off bounty (§7B.8): anyone can take it / someone said I'll do it in the last 3 h / done, waiting for an admin's OK / OK'd, its points count — derived, never stored |
-| `open` / `discuss` / `owed` / `closed` / `settled` (mess) | A mess report (§7B.7): asking who left it / on To talk about / claimed or recorded, a point owed / closed as nobody's / the point paid back or let go — derived from the row |
+| `open` / `discuss` / `owed` / `noted` / `closed` / `settled` (mess) | A mess report (§7B.7): asking who left it / on To talk about / claimed or recorded, a point owed / a Not cleaned mess claimed or recorded, nobody owed / closed as nobody's / the point paid back or let go — derived from the row |
 | `sogoai` / `claude` | Who named a snapped item (§7A.3): SogoAI's local vision model (free) / the Claude API (the fallback) |
 | `great` / `steady` / `distracted` / `struggling` / `break` (task mood) | A task check-in answer (§7G.3): 🚀 Great! / 👍 Steady! / 🦋 Got distracted / 😩 Struggling / ☕ Taking a break |
 | `finished` / `stopped` (task outcome) | How a task session ended (§7G.6): Finish / Stop for now. A running, paused or on-break session has none |
@@ -1180,6 +1180,16 @@ Schema: [`migrations/0066_fishing.sql`](migrations/0066_fishing.sql). **Migratio
 [`test/migration-0066.test.ts`](test/migration-0066.test.ts)**):** an existing member has 🎣 off, 30 minutes and no
 ping; the settings row survives with both claims NULL; the three tables start empty; a tide kind other than H or L is
 refused.
+
+### 4.2zzn Schema change — `migrations/0067_mess_not_cleaned.sql`
+
+Asked by MojoSOGO 2026-11-01 ("In the mess area, we need an option for reported NOT cleaned to record instances ; no
+one is owed"): a mess report says whether the reporter cleaned it up (§7B.7). One column, `messes.cleaned`, 1 by
+default, so every mess reported before it reads as cleaned, exactly as it was. Additive; it runs before the deploy.
+
+Schema: [`migrations/0067_mess_not_cleaned.sql`](migrations/0067_mess_not_cleaned.sql). **Migration check (MS-M2,**
+[`test/migration-0067.test.ts`](test/migration-0067.test.ts)**):** a mess written before 0067 survives with
+`cleaned` = 1; `foreign_key_check` empty.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -2983,36 +2993,44 @@ where the perpetrator owes the person … let other people say 'it wasn't me'." 
 rather teaching and enforcing accountability; if nobody claims it, we need a house discussion; mom and dad will deal
 with sibling warfare … the app is a vehicle to help things along because everyone isn't physically present at the
 same time." It is part of chores (a chore someone didn't do), so it lives in the 🧹 Chores tab, not a tab of its own.
+And (2026-11-01): "we need an option for reported NOT cleaned to record instances ; no one is owed" — a mess found
+and left, put on record and owned up to, with no point (AREC `arec-mess-not-cleaned.md`).
 
 **The flow.**
 
-1. Whoever cleaned up the mess (the **reporter**) takes a photo of it in Chores → **📸 Report a mess**, optionally
-   names the chore it belongs to and adds a note ("pans left on the stove").
+1. Whoever found the mess (the **reporter**) takes a photo of it in Chores → **📸 Report a mess**, optionally
+   names the chore it belongs to and adds a note ("pans left on the stove"), and says whether they **cleaned it up**
+   (the usual case, and the default) or left it **Not cleaned** (`cleaned`, §4.2zzn).
 2. Every other active member is **asked** "Was it yours?": a push at once and then every `NUDGE_EVERY_MIN` (15)
    minutes, at most `NUDGES_MAX` (4) pushes in all ⚑ decided by MojoSOGO, until they answer or the mess is settled
    one way or another. While the app is open, a **banner** asks the same question (§8.15a) until they answer.
 3. Each answers **That was me** (they **claim** it) or **Not me** (a **denial**). The reporter is never asked and
    can do neither.
-4. A claim ends the asking: the claimer now **owes** the reporter **1 point** (always 1, ⚑ Q180).
+4. A claim ends the asking. For a mess the reporter cleaned up, the claimer now **owes** the reporter **1 point**
+   (always 1, ⚑ Q180). For a **Not cleaned** mess it is **noted**: on record as theirs, nobody owed, never in
+   Balances and nothing to pay back ⚑ Q404. A Not cleaned mess is asked about exactly like any other ⚑ Q404.
 5. When every member asked has said Not me, or `DISCUSS_AFTER_H` (24) hours after the report with nobody claiming
    it ⚑ Q177, it moves to **To talk about**: the house talks it through in person. The asking stops (the banner
    stays for anyone who hasn't answered), and every active admin gets one push saying so ⚑ Q183. Claiming is still
    open while it waits there.
 6. After the talk an **admin** records the outcome ⚑ Q179: whose it was (they then owe the reporter 1 point,
-   exactly as a claim) or **nobody's** (closed, no point). The app **never** decides by elimination or by whose turn
+   exactly as a claim, or noted when Not cleaned) or **nobody's** (closed, no point). The app **never** decides by elimination or by whose turn
    the chore was.
 7. A point is paid back in person. The one owed — or an admin — marks it **Paid back** or **Let it go** ⚑ Q181.
 
 **State** — `messStatus(m)`, derived from the row, never stored (`MESS_STATUS`, §3), first match wins:
-`settled` (settled_at set) · `closed` (closed_at set: nobody's) · `owed` (claimed_by set) · `discuss` (discuss_at
-set) · `open`. A deleted mess (deleted_at set) is gone from every answer.
+`settled` (settled_at set) · `closed` (closed_at set: nobody's) · `noted` (claimed_by set, cleaned = 0) · `owed`
+(claimed_by set) · `discuss` (discuss_at set) · `open`. A deleted mess (deleted_at set) is gone from every answer.
 
 **The rules** (pure; imports only vocab and time):
 
 - `NUDGES_MAX` = 4, `NUDGE_EVERY_MIN` = 15, `DISCUSS_AFTER_H` = 24, `MESS_NOTE_MAX` = 120,
-  `MESS_PHOTO_KEEP_DAYS` = 30 ⚑ Q185.
-- `parseMessInput({ note, choreId })` → `{ note, choreId }` or a message naming the field: `note` trimmed, empty →
-  null, at most `MESS_NOTE_MAX`; `choreId` absent/empty → null, else a string (the route checks the chore exists).
+  `MESS_PHOTO_KEEP_DAYS` = 30 ⚑ Q185, `NOTED_KEEP_DAYS` = 30 ⚑ Q405.
+- `parseMessInput({ note, choreId, cleaned })` → `{ note, choreId, cleaned }` or a message naming the field: `note`
+  trimmed, empty → null, at most `MESS_NOTE_MAX`; `choreId` absent/empty → null, else a string (the route checks the
+  chore exists); `cleaned` absent → true, `'1'` / `'0'` → true / false, anything else refused.
+- `isListed(m, now)` → whether `GET /messes` lists a mess that is not settled, closed or deleted: every one but a
+  `noted` mess claimed more than `NOTED_KEEP_DAYS` ago ⚑ Q405.
 - `askedOf(m, activeIds, deniedIds)` → who still has to answer: when `open` or `discuss`, the active members other
   than the reporter who have not said Not me; otherwise nobody.
 - `nudgeDue(createdAt, sent, now)` → true when `sent < NUDGES_MAX` and `now ≥ createdAt + sent × NUDGE_EVERY_MIN`.
@@ -3021,12 +3039,14 @@ set) · `open`. A deleted mess (deleted_at set) is gone from every answer.
 - `balancesOf(owed, viewerId, isAdmin)` → `Balance[]` (`{ from, to, points }`, `from` owes `to`): the owed messes
   (`claimed_by` owes `reported_by`) netted per pair of people, pairs at 0 left out. A member sees only the pairs
   they are in; an admin sees every pair ⚑ Q178. Sorted by points, most first, then by `from`, `to`.
-- `askMessage(reporter, choreTitle, note)` → `"{reporter} cleaned up a mess ({chore}): {note}. Was it yours? Open
-  Ensō to answer."` — the chore part and the note part only when set. `discussMessage(...)` → `"Nobody has claimed
-  the mess {reporter} cleaned up ({chore}): {note}. It's on To talk about."`. Titles: `MESS_ASK_TITLE` "🧽 Whose
+- `askText(reporter, choreTitle, note, cleaned)` → `"{reporter} cleaned up a mess ({chore}): {note}. Was it yours?"`,
+  or for Not cleaned `"{reporter} found a mess ({chore}): {note}. Not cleaned up. Was it yours?"` — the chore part
+  and the note part only when set; the banner shows it as it is (§8.15a). `askMessage(…)` (the push) adds `" Open
+  Ensō to answer."`. `discussMessage(reporter, choreTitle, note, cleaned)` → `"Nobody has claimed the mess
+  {reporter} cleaned up ({chore}): {note}. It's on To talk about."` ("… {reporter} found …" when Not cleaned). Titles: `MESS_ASK_TITLE` "🧽 Whose
   mess?", `MESS_DISCUSS_TITLE` "🗣 To talk about".
-- `Mess` — the wire type: `{ id, reportedBy, choreId, choreTitle, note, hasPhoto, createdAt, status, claimedBy,
-  assignedBy, deniedBy: string[], asked: string[] }`. `assignedBy` is the admin who recorded it (null when claimed
+- `Mess` — the wire type: `{ id, reportedBy, choreId, choreTitle, note, hasPhoto, cleaned: boolean, createdAt, status,
+  claimedBy, assignedBy, deniedBy: string[], asked: string[] }`. `assignedBy` is the admin who recorded it (null when claimed
   by the person themselves). The photo key is never on the wire.
 
 **Who may do what.**
@@ -3035,7 +3055,7 @@ set) · `open`. A deleted mess (deleted_at set) is gone from every answer.
 |---|---|---|
 | Report | any member | — |
 | That was me / Not me | any active member but the reporter | `open` or `discuss` |
-| Record the outcome (whose / nobody's) | admins | `open`, `discuss`, or `owed` (a correction ⚑ Q182) |
+| Record the outcome (whose / nobody's) | admins | `open`, `discuss`, `owed` or `noted` (a correction ⚑ Q182) |
 | Paid back / Let it go | the one owed, or an admin | `owed` |
 | Delete | the reporter while `open` or `discuss`; an admin any time | — |
 
@@ -3047,12 +3067,13 @@ house ⚑ Q183. Tapping one opens the app, where the banner is. The `/ops/notify
 **The routes** — `src/worker/routes/messes.ts`; the asking and the To talk about move, shared by the routes and
 `tick`, are `src/worker/mess-asks.ts`:
 
-- `POST /messes?choreId=&note=` — the raw photo is the body (`photoBody`, §7C.3's limits); the fields ride in the
+- `POST /messes?choreId=&note=&cleaned=` — the raw photo is the body (`photoBody`, §7C.3's limits); the fields ride in the
   query because the body is the image. A photo is required. A chore that doesn't exist → 404 "That chore no longer
   exists." → 201 `Mess`. R2 key `messes/{id}/{random}.jpg`, private. The first ask goes to everyone asked in the
   same request.
 - `GET /messes` → `{ messes: Mess[], balances: Balance[] }`: every `open` and `discuss` mess (everyone sees these:
-  the house talks about them), and the `owed` ones the viewer may see (the pair, or any admin), newest first;
+  the house talks about them), and the `owed` and listed `noted` ones (`isListed`) the viewer may see (the pair, or
+  any admin), newest first;
   `balances` = `balancesOf` over the owed messes.
 - `GET /messes/{id}/photo` → the image, `Cache-Control: private, max-age=3600`; 404 when it is gone or deleted.
 - `POST /messes/{id}/claim` → `Mess`. `POST /messes/{id}/deny` → `Mess` (a second Not me is a no-op); when it
@@ -3088,7 +3109,10 @@ the next ask. Then expired photos are deleted.
 | MS12 | a mess 30 days old, still owed; tick | its photo deleted, `hasPhoto` false, still owed |
 | MS13 | no photo; a bad type; a note of 121 chars; an unknown chore | 400; 400; 400 naming note; 404 |
 | MS14 | the ops hourly limit with 30 mess asks in the hour | a ping still goes (mess asks don't count) |
+| MS15 | A reports with `cleaned=0`; C says That was me; an admin then records B; a report with `cleaned=x` | 201 `cleaned: false`; the ask's message "A found a mess …. Not cleaned up. Was it yours? Open Ensō to answer."; `noted`, `claimedBy` C; no balance for anyone; settle → 409; B (not the pair) doesn't see it, A, C and an admin do; after the record still `noted`, `claimedBy` B; 400 naming cleaned |
+| MS16 | a `noted` mess claimed 31 days ago; one claimed today | the first not in `/messes`, the second is |
 | MS-M | migration check (§4.2ze) | rows written before 0032 survive; `deliveries.mess_id` NULL on them; `foreign_key_check` empty |
+| MS-M2 | migration check (§4.2zzn) | a mess written before 0067 has `cleaned` = 1 |
 
 ### 7B.8 Bounties and the score — `src/shared/bounties.ts` (pure)
 
@@ -5853,19 +5877,25 @@ Waiting for answers
 To talk about
   [photo] Living room · Shelly cleaned this up · yesterday
           Whose was it? [ Pick ▾ ]   (admins only)
+Not cleaned
+  [photo] Bathroom: towels on the floor · Sam found this, not cleaned · Tue
+          Kai's · no point owed
 Balances
   Kai owes you 2                                         ▸
   You owe Sam 1                                          ▸
 ```
 
 - **📸 Report a mess** opens a sheet: **📷 Add photo** (required; the phone offers camera or library; shrunk as a
-  thing's photo, §7C.3, and shown once taken), **Which chore?** (a select of the chores, "None" first), **Note** (one line, `maxLength` 120), then
-  **Report** / **Cancel**. A refusal shows inside the sheet.
-- Each mess row: its thumbnail, the chore and note, "{reporter} cleaned this up" ("You cleaned this up" for mine),
-  and when. Who said Not me shows as a dim line. My buttons as on the banner when I am asked.
+  thing's photo, §7C.3, and shown once taken), **Which chore?** (a select of the chores, "None" first), **Note** (one line, `maxLength` 120),
+  **Did you clean it?** (two choices, **I cleaned it up** picked, and **Not cleaned**), then **Report** / **Cancel**.
+  A refusal shows inside the sheet.
+- Each mess row: its thumbnail, the chore and note, "{reporter} cleaned this up" ("You cleaned this up" for mine;
+  "{reporter} found this, not cleaned" for a Not cleaned one), and when. Who said Not me shows as a dim line. My buttons as on the banner when I am asked.
 - **Whose was it?** (admins, on every row of Waiting for answers and To talk about): a select of the active members
   other than the reporter, and **Nobody's**; choosing one records it (§7B.7) after asking "Record that this was
   Kai's?" / "Close this mess as nobody's?".
+- **Not cleaned** (only when there is one): the `noted` messes I may see, newest first, each with "{name}'s · no
+  point owed" ("Yours · no point owed") and, for admins, **Whose was it?** to correct it ⚑ Q405.
 - ✕ **Delete** (accessible name "Delete this mess") on my own unanswered messes, and on every mess for admins;
   it asks first.
 - **Balances**: one line per pair (`balances`), "{name} owes you n" / "You owe {name} n", or for an admin's view of

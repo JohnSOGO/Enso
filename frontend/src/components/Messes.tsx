@@ -1,5 +1,5 @@
 // SPEC §8.15a — the Messes section of the 🧹 Chores tab: 📸 Report a mess, Waiting for answers, To talk about (an
-// admin records whose it was), and Balances (who owes whom, each pair's owed messes, Paid back / Let it go). The
+// admin records whose it was), Not cleaned (noted: on record, nobody owed), and Balances (who owes whom, each pair's owed messes, Paid back / Let it go). The
 // server decides who is asked, the state and the balances (§7B.7); who may answer, settle or delete is the shared rule.
 import { useCallback, useEffect, useState } from 'react';
 import { MessReport } from './MessReport';
@@ -76,9 +76,9 @@ function MessRow({ m, act, busy, owedView }: { m: Mess; act: ReturnType<typeof u
       <MessPhoto m={m} />
       <div className={s.body}>
         <div><b>{messWhat(m)}</b></div>
-        <div className="muted">{m.reportedBy === me.id ? 'You' : name(m.reportedBy)} cleaned this up · {when}</div>
+        <div className="muted">{m.reportedBy === me.id ? 'You' : name(m.reportedBy)} {m.cleaned ? 'cleaned this up' : 'found this, not cleaned'} · {when}</div>
         {m.deniedBy.length > 0 && isAnswerable(m.status) && <div className="muted">Not me: {m.deniedBy.map(name).join(', ')}</div>}
-        {m.status === 'owed' && <div className="muted">{m.claimedBy === me.id ? 'Yours' : `${name(m.claimedBy)}'s`}{m.assignedBy ? ` (recorded by ${name(m.assignedBy)})` : ''}</div>}
+        {(m.status === 'owed' || m.status === 'noted') && <div className="muted">{m.claimedBy === me.id ? 'Yours' : `${name(m.claimedBy)}'s`}{m.assignedBy ? ` (recorded by ${name(m.assignedBy)})` : ''}{m.status === 'noted' ? ' · no point owed' : ''}</div>}
         <div className={s.actions}>
           {m.asked.includes(me.id) && <AnswerButtons m={m} busy={busy} act={act} />}
           {owedView && canSettle(m, viewer) && <>
@@ -128,6 +128,7 @@ export function MessesSection() {
       {data && <>
         {list('Waiting for answers', data.messes.filter((m) => m.status === 'open'))}
         {list('To talk about', data.messes.filter((m) => m.status === 'discuss'))}
+        {list('Not cleaned', data.messes.filter((m) => m.status === 'noted'))}
         <h3 className={s.sub}>Balances</h3>
         {data.balances.length === 0 && <p className="muted">Nobody owes anybody.</p>}
         <ul className={s.list}>

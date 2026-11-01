@@ -189,4 +189,22 @@ describe('M4z whose mess?', () => {
     expect(theirs.balances).toEqual([]);
     expect(theirs.messes.some((m: any) => m.status === 'owed')).toBe(false);
   });
+
+  it('MS15 a Not cleaned report is asked about, then noted: on record, nobody owed', async () => {
+    const { client: e } = await member(a);
+    const before = (await b.get('/messes')).json.balances;
+    const m = await report(b, `?cleaned=0&note=towels`);
+    expect(m).toMatchObject({ status: 'open', cleaned: false });
+    const msg = await env.DB.prepare('SELECT message FROM deliveries WHERE mess_id = ? AND member_id = ?').bind(m.id, C).first<{ message: string }>();
+    expect(msg!.message).toMatch(/ found a mess: towels\. Not cleaned up\. Was it yours\? Open Ensō to answer\.$/);
+    expect((await cc.post(`/messes/${m.id}/claim`)).json).toMatchObject({ status: 'noted', claimedBy: C, asked: [] });
+    expect((await b.get('/messes')).json.balances).toEqual(before);
+    expect((await b.post(`/messes/${m.id}/settle`, { how: 'paid' })).status).toBe(409);
+    expect(await find(e, m.id)).toBeUndefined();
+    for (const x of [a, b, cc]) expect(await find(x, m.id)).toMatchObject({ status: 'noted' });
+    expect((await a.post(`/messes/${m.id}/decide`, { memberId: A })).json).toMatchObject({ status: 'noted', claimedBy: A, assignedBy: A });
+    const bad = await raw(b, 'POST', '/messes?cleaned=x', jpeg);
+    expect(bad.status).toBe(400);
+    expect(JSON.stringify(await bad.json())).toMatch(/cleaned/);
+  });
 });
