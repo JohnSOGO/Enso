@@ -11,7 +11,7 @@ carry its result.
 
 - **Ask:** On the 🏡 Home tab's room modal, show the room's areas, reference photos and expectations ("🧽 What clean
   looks like") under the device cards, through the existing RoomSections, same read-only/edit rules (Q163). Hidden
-  while ✏ Devices is open; Modal dirty = picking || area editor dirty (SPEC §8.19, §8.15, §7B.6).
+  while ✏ Devices is open (SPEC §8.19, §8.15, §7B.6).
 - **Verdict:** frontend/src/components/HomeRoom.tsx [EXISTING]. RoomSections from frontend/src/components/RoomSheet.tsx
   [REUSE-add-nothing].
 - **Flow stage:** render
@@ -19,7 +19,8 @@ carry its result.
   view (fetches areas, gates by canChange, ticks only while open, edits in place, reports onDirty) that ChoreSheet
   reuses the same way. Extracting it first would be classitis (RoomSheet 107/300, fan-in 2→3 on a leaf). Rejected: a
   HomeRoomAreas wrapper; copying the view (§0.5).
-- **Caps:** HomeRoom.tsx 113 → ~120 of 300. RoomSheet.tsx unchanged.
+- **Then (MojoSOGO: read-only from Home):** RoomSections gains an optional `readOnly` prop (hides ✎ / ＋ Add an area); RoomSheet.tsx stays the owner of the view, no new file. HomeRoom passes it; no area-dirty state there.
+- **Caps:** HomeRoom.tsx 113 → ~118 of 300; RoomSheet.tsx 107 → 108.
 
 ---
 

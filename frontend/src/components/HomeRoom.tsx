@@ -2,7 +2,7 @@
 // On / Off, and for an AC its mode buttons, room and set temperature and − / ＋. Each tap sends the intent
 // (POST /house/devices/{id}) and the card shows the state the server answers; it never decides a service itself.
 // ✏ Devices (the room's creator or an admin, §6.3), once the room's devices are read, swaps the cards for HomeDevicePicker.
-// Under the cards, the room's What clean looks like (§8.15, §7B.6): RoomSections, its areas, photos and checks.
+// Under the cards, the room's What clean looks like (§8.15, §7B.6): RoomSections read-only, its areas, photos and checks.
 import { useCallback, useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { HomeDevicePicker, DEVICE_EMOJI } from './HomeDevicePicker';
@@ -83,7 +83,6 @@ export function HomeRoom({ room, onClose }: { room: Room; onClose: () => void })
   const [devices, setDevices] = useState<Device[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
-  const [areaDirty, setAreaDirty] = useState(false);
 
   const load = useCallback(() => {
     setError(null);
@@ -93,9 +92,9 @@ export function HomeRoom({ room, onClose }: { room: Room; onClose: () => void })
   const replace = (d: Device) => setDevices((all) => all?.map((x) => (x.id === d.id ? d : x)) ?? null);
 
   return (
-    <Modal title={room.name} onClose={onClose} dirty={picking || areaDirty}
+    <Modal title={room.name} onClose={onClose} dirty={picking}
       footer={<>
-        {canEdit && !picking && devices !== null && <button onClick={() => { setAreaDirty(false); setPicking(true); }}>✏ Devices</button>}
+        {canEdit && !picking && devices !== null && <button onClick={() => setPicking(true)}>✏ Devices</button>}
         <button onClick={onClose}>Close</button>
       </>}>
       {picking ? (
@@ -110,7 +109,7 @@ export function HomeRoom({ room, onClose }: { room: Room; onClose: () => void })
           {devices?.length === 0 && <p className="muted">No devices in this room yet.{canEdit && ' Tap ✏ Devices to pick them.'}</p>}
           {devices?.map((d) => <DeviceCard key={d.id} device={d} onChange={replace} />)}
           <h2 style={{ fontSize: '1.05rem', margin: '14px 0 6px' }}>🧽 What clean looks like</h2>
-          <RoomSections room={room} onDirty={setAreaDirty} />
+          <RoomSections room={room} onDirty={() => {}} readOnly />
         </>
       )}
     </Modal>

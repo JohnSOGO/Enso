@@ -6259,8 +6259,9 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
 - No devices yet → "No devices in this room yet." (+ " Tap ✏ Devices to pick them." for whoever can).
 - Under the cards, **🧽 What clean looks like** (MojoSOGO 2026-11-01 "I need to see the pictures of the kitchen"): the
   room's areas, reference photos (tap for full size) and expectations, exactly as in a chore's 📋 sheet (§8.15, the same
-  `RoomSections`, the same read-only / ✎ / ＋ Add an area rules, Q163). While an area is edited the device cards stay
-  above it ⚑ Q403; ✏ Devices hides it; leaving with an area edit unsaved asks first.
+  `RoomSections`), **read-only for everyone**: no ✎ and no ＋ Add an area (MojoSOGO 2026-11-01 "make it accessible as
+  readonly from Home > kitchen cleaning"); areas are changed in Settings → 🏠 Household → the room ⚑ Q403. Ticks work
+  while it is open, never saved (Q165). ✏ Devices hides it.
 - **✏ Devices** (the room's creator or an admin, §6.3, ⚑ Q390) swaps the cards for the picker: a **Find** box and one
   checkbox line per device `GET /house/devices` lists (✏ Devices shows only once the room's devices are read, and
   Save only once the list is read, so a slow or failed read never saves an empty room) (emoji, name, a dim entity id), ticked ones first; a device in
