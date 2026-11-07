@@ -39,7 +39,7 @@ afterEach(() => { vi.restoreAllMocks(); });
 describe('NA3 noteMarks', () => {
   it('ready → GET /state, then one LM Studio POST: the model, the prompt, temperature 0, the json_schema, no ttl → the marks', async () => {
     const { f, seen } = pc();
-    expect(await noteMarks(NOTES, { model: MODEL, fetch: f })).toEqual({ ok: true, marks: MARKS });
+    expect(await noteMarks(NOTES, { model: MODEL, fetch: f })).toEqual({ ok: true, marks: MARKS, usage: { model: MODEL, ms: expect.any(Number), inputTokens: 0, outputTokens: 0 } });
     expect(seen.map((s) => `${s.method} ${s.url}`)).toEqual([`GET ${MODEL_MANAGER_URL}/state`, `POST ${LM_STUDIO_URL}`]);
     const body = seen[1].body;
     expect(body).toMatchObject({
@@ -106,7 +106,7 @@ describe('NA4 handle /note-marks', () => {
   it('a good request → 200 with the report; its log line counts the marks and holds no notes or token', async () => {
     const lines = logs();
     const r = await req();
-    expect(r).toEqual({ status: 200, body: { ok: true, marks: MARKS } });
+    expect(r).toEqual({ status: 200, body: { ok: true, marks: MARKS, usage: { model: MODEL, ms: expect.any(Number), inputTokens: 0, outputTokens: 0 } } });
     expect(lines()).toHaveLength(1);
     expect(lines()[0]).toContain('note-marks → 2 marks');
     for (const l of lines()) {

@@ -8,6 +8,7 @@ import type { RecipeSource } from '../shared/vocab';
 import { nowIso, run } from './db';
 import { lookUpComments, lookUpVideo } from './youtube';
 import { readRecipe } from './recipe-reader';
+import { meterFor } from './model-usage';
 import { claudeFailure, countRecipeRead, videoFailure, type RecipeReadFailure } from './recipe-reads';
 import { replacePhoto } from './photo-store';
 
@@ -41,7 +42,7 @@ async function rereadVideo(db: D1Database, keys: { yt: string; ai: string }, row
   };
   const res = await readRecipe({
     apiKey: keys.ai, title: video.title, channel: video.channel, ...read, transcript: given.pasted ?? null,
-  });
+  }, { meter: meterFor(db, 'recipe-reread') });
   if (!res.ok) return claudeFailure(res);
   const reading = cleanRecipeReading(res.raw, video.title);
   if (!reading.found) return { ok: false, kind: 'no_recipe', reason: 'No recipe in that transcript.' };
@@ -64,7 +65,7 @@ async function rereadLink(db: D1Database, aiKey: string, row: RecipeRow, given: 
   const read: VideoText = { description: null, transcript: null, comments: null, ...given };
   const res = await readRecipe({
     apiKey: aiKey, title: row.title, channel: null, site: row.link ? row.channel : null, ...read, transcript: given.pasted ?? null,
-  });
+  }, { meter: meterFor(db, 'recipe-reread') });
   if (!res.ok) return claudeFailure(res);
   const reading = cleanRecipeReading(res.raw, row.title);
   if (!reading.found) return { ok: false, kind: 'no_recipe', reason: 'No recipe in that transcript.' };

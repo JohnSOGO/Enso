@@ -3,7 +3,8 @@
 // a Bearer OPS_NOTIFY_TOKEN, compared in constant time (unset → 503, never open). One fire-less `push`
 // delivery with its own title, sent at once. No house row, ever. The token and the header are never
 // logged, and never put in a message or a detail. §8.18 — GET /ops/requests and PATCH /ops/requests/{id}: a build
-// session's feature-request queue, behind the same guard.
+// session's feature-request queue, behind the same guard. §9.4c — GET /ops/model-usage: the model_calls ledger's
+// totals for the PC model manager, behind the same guard.
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { OPS_NOTIFY_PER_HOUR, opsNotifyError, opsTitle, opsWindowStart } from '../../shared/ops';
@@ -13,6 +14,7 @@ import { body, fail } from '../http';
 import { sendPushDeliveries } from '../push';
 import { cleanNote, closeMove } from '../../shared/feature-requests';
 import { loadFeatureRequest, openFeatureRequests, setStatus } from '../feature-request-rows';
+import { modelUsageTotals } from '../model-usage';
 
 export const ops = new Hono<AppEnv>();
 
@@ -95,4 +97,20 @@ ops.patch('/ops/requests/:id', async (c) => {
   if ('code' in m) return fail(c, m.code, m.code === 400 ? 'invalid_input' : 'invalid_state', m.message);
   if (!(await setStatus(c.env.DB, r.id, r.status, m.status, cleanNote(b.note), nowIso()))) return fail(c, 409, 'invalid_state', 'That request just changed.');
   return c.json((await loadFeatureRequest(c.env.DB, r.id))!);
+});
+
+/** ⚑ Q407 — how many days GET /ops/model-usage covers by default, and at most. */
+export const MODEL_USAGE_DAYS = 30;
+export const MODEL_USAGE_DAYS_MAX = 400;
+
+/** §9.4c — every model call of the last `days` UTC days (today included), summed by day, feature, provider and model. */
+ops.get('/ops/model-usage', async (c) => {
+  const shut = await opsGate(c);
+  if (shut) return shut;
+  const asked = Number(c.req.query('days') ?? MODEL_USAGE_DAYS);
+  if (!Number.isInteger(asked) || asked < 1 || asked > MODEL_USAGE_DAYS_MAX) {
+    return fail(c, 400, 'invalid_input', `days must be a whole number from 1 to ${MODEL_USAGE_DAYS_MAX}.`);
+  }
+  const since = new Date(Date.parse(nowIso().slice(0, 10)) - (asked - 1) * 86_400_000).toISOString();
+  return c.json(await modelUsageTotals(c.env.DB, since));
 });

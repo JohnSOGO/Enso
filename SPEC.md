@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.103 · **Date:** 2026-11-01 · **Owner:** MojoSOGO
+**Version:** 3.104 · **Date:** 2026-11-07 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -178,11 +178,13 @@ dismisses an open request that does not fit.
   |  home/dist/captions-helper.mjs           |   -> readCaptions from the home IP -> the
   |  (Task Scheduler, at startup)            |   CaptionsResult as JSON (§7E.2c)
   |                                          |   POST /identify (an image) -> LM Studio's
-  |                                          |   local vision model at 127.0.0.1:1234 ->
+  |                                          |   local vision model through the PC model
+  |                                          |   manager's chat proxy at 127.0.0.1:8797 ->
   |                                          |   an IdentifyReport as JSON (§7A.3)
   |                                          |   POST /note-marks (notes text) -> the PC
   |                                          |   model manager (127.0.0.1:8793 /state),
-  |                                          |   then LM Studio -> a NoteMarksReport (§8.4a)
+  |                                          |   then the same proxy -> a NoteMarksReport
+  |                                          |   (§8.4a); both carry LM Studio's usage (§9.4c)
   +-----------------------------------------+
 ```
 
@@ -218,8 +220,8 @@ Cloudflare Tunnel + Access**.
 | Push | Web Push (VAPID) from the Worker via **`@block65/webcrypto-web-push` 2.0.0** (pinned exactly) | WebCrypto only. Sends `Content-Encoding: aes128gcm` (RFC 8291) + `Authorization: vapid t=…, k=…` (RFC 8292) — the legacy `aesgcm` that some libraries send is refused by Apple. The 2026-10-03 spike decrypted its output under Node **and** workerd, and cross-checked it with `http_ece`. |
 | House delivery | The Worker calls Home Assistant's REST API through **Cloudflare Tunnel + Access** (§9.2) | `src/worker/house.ts`; no process at home besides HA itself. |
 | Photo storage | Cloudflare **R2** bucket `enso-photos`, binding `PHOTOS` | Eight attachments, all through `src/worker/photo-store.ts`: a thing's photo (`things/…`, §7C.3), a list item's photo (`list-items/…`, §7A.3), room-area photos (`chore-areas/…`, the prefix kept from before rooms, §7B.6), mess photos (`messes/…`, §7B.7), a bounty's picture and its done photo (`bounties/…`, `earnings/…`, §7B.8), a recipe's picture (`recipes/…`, §7E.2b, §8.12) and a shared photo in my Inbox (`inbox/…`, §7H). Private: photos are served only through the API to signed-in members. |
-| Reading photos and recipes | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4, §7A.3, §7E) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). One caller of the SDK: `src/worker/claude.ts`. A snapped list item is read by SogoAI first and by Claude only when SogoAI gives no name (§7A.3). |
-| Naming a snapped item at home | **LM Studio** on SogoAI, `http://127.0.0.1:1234/v1/chat/completions` (OpenAI-compatible), the small vision chat model SogoAI keeps loaded, named by `IDENTIFY_MODEL` (`photo-polish`) (§7A.3) | Free. Reached only by the SogoAI helper, never by the Worker directly. |
+| Reading photos and recipes | **Claude API** via the official `@anthropic-ai/sdk`, model `claude-opus-5-5`, structured output (§7C.4, §7A.3, §7E) | Secret `ANTHROPIC_API_KEY`. Server-side refusal fallback on (`fallbacks: "default"`). One caller of the SDK: `src/worker/claude.ts`. Every request is recorded in the model-call ledger (§9.4c); calls go straight to Anthropic, never through the home PC. A snapped list item is read by SogoAI first and by Claude only when SogoAI gives no name (§7A.3). |
+| Naming a snapped item at home | **LM Studio** on SogoAI, through the PC model manager's chat proxy `http://127.0.0.1:8797/v1/chat/completions` (LM Studio's OpenAI-compatible API; the manager sees and logs every call, §9.4c), the small vision chat model SogoAI keeps loaded, named by `IDENTIFY_MODEL` (`photo-polish`) (§7A.3) | Free. Reached only by the SogoAI helper, never by the Worker directly. |
 | Recipes from videos | **YouTube Data API v3** `videos.list?part=snippet&id=…` and `commentThreads.list?part=snippet&videoId=…&order=relevance&maxResults=20&textFormat=plainText` (§7E) | Secret `YOUTUBE_API_KEY`; 1 quota unit per call, so 2 per read ⚑ Q82. Plus an **unofficial, keyless** captions attempt (YouTube's player endpoint asked as its Android app), which may be blocked — a failure is recorded and shown, never faked. |
 | QR codes | `uqr` (MIT, zero dependencies, renders SVG) | **Loaded lazily** (dynamic `import()`) only when an invite card opens — never in the main bundle. |
 | Tests | **Vitest**; `@cloudflare/vitest-pool-workers` for API tests | API tests apply `migrations/` via `readD1Migrations` / `applyD1Migrations` |
@@ -1190,6 +1192,20 @@ default, so every mess reported before it reads as cleaned, exactly as it was. A
 Schema: [`migrations/0067_mess_not_cleaned.sql`](migrations/0067_mess_not_cleaned.sql). **Migration check (MS-M2,**
 [`test/migration-0067.test.ts`](test/migration-0067.test.ts)**):** a mess written before 0067 survives with
 `cleaned` = 1; `foreign_key_check` empty.
+
+### 4.2zzo Schema change — `migrations/0068_model_calls.sql`
+
+Asked by MojoSOGO 2026-11-07 ("Route all through manager even cloudflare work; I need one place to monitor cost and
+usage for migration to aipc"): one row per model call, so the PC model manager shows what Ensō spends and on what
+(§9.4c). One new table, `model_calls`: when the call ended, its `feature` and `provider` (MODEL_FEATURE,
+MODEL_PROVIDER), the model, whether it answered, how long it took, and the counts the provider reported (tokens in,
+out, cache write and read; web searches and fetches; the clip's bytes and, when told, its seconds). Counts only: no
+prompt, no answer, no member. The estimate is not stored: it is worked out from the price table when read, so a new
+price changes old rows too. Additive; it runs before the deploy.
+
+Schema: [`migrations/0068_model_calls.sql`](migrations/0068_model_calls.sql). **Migration check (MU-M,**
+[`test/migration-0068.test.ts`](test/migration-0068.test.ts)**):** a row with only the required columns takes zero
+counts and a NULL length.
 
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
@@ -2692,8 +2708,8 @@ Access application and bearer. Its check order: a path other than `/captions`, `
 method other than POST → **405**; the bearer (constant time) → **401**; `Content-Type` not `image/*` →
 **400**; a body over `IDENTIFY_BODY_MAX` → **413** (the body is read in `main()`, which keeps no bytes past
 the cap); an empty body → 400; then `identify` (`home/identify.ts`) → **200** with the `IdentifyReport` as
-JSON, whatever its `ok`. `home/identify.ts`: one POST to LM Studio at
-`http://127.0.0.1:1234/v1/chat/completions` — `model` = `IDENTIFY_MODEL` (the helper's env), one user
+JSON, whatever its `ok`, plus `usage` (§9.4c) once LM Studio was asked. `home/identify.ts`: one POST to LM Studio
+through the PC model manager's chat proxy at `http://127.0.0.1:8797/v1/chat/completions` — `model` = `IDENTIFY_MODEL` (the helper's env), one user
 message with a text part `IDENTIFY_PROMPT + " /no_think"` and an `image_url` part holding the image as a
 `data:` URL, `temperature` 0, `max_tokens` `IDENTIFY_MAX_TOKENS` (room for the thinking it does anyway), `ttl`
 `IDENTIFY_TTL_S` (24 h, so LM Studio keeps a model it loaded on demand instead of reloading it for the next
@@ -6979,6 +6995,63 @@ would show (`pushTitle`, §9.5: "Ensō" for a fire, "📢 Announcement" otherwis
 | FH8 | `flagsOf(undefined, true)` / `flagsOf(undefined, false)` / `flagsOf(['house'], true)` | Phone + FunHouse / Phone / House only |
 | FH-M | migration 0042 | §4.2zo's check |
 
+### 9.4c Every model call, in one ledger — `src/shared/model-usage.ts`, `GET /ops/model-usage` — asked by MojoSOGO 2026-11-07
+
+"Route all through manager even cloudflare work; I need one place to monitor cost and usage for migration to aipc."
+The PC model manager on SogoAI (`MODEL-MANAGER-SPEC.md` on the Crossroads share) is that one place. Ensō's model
+calls are of three kinds, and each reaches it a different way (AREC `arec-model-manager-routing.md`; MojoSOGO
+picked CUT 2026-11-07):
+
+| Calls | Runs on | How the manager sees them |
+|---|---|---|
+| Claude API (`claude.ts`: every reader, §7C.4, §7.8–7.9, §7E, §7F.2, §7G.6, §7A.3, §8.18) | the Worker, straight to Anthropic | the ledger, through `GET /ops/model-usage` |
+| Whisper on Workers AI (`speech-to-text.ts`, /say/hear, §8.18 part 2) | the Worker's `AI` binding | the ledger |
+| LM Studio (`home/identify.ts`, `home/note-marks.ts`, §7A.3, §8.4a) | the SogoAI helper | its own chat proxy at `127.0.0.1:8797` (the helper's `LM_STUDIO_URL`), **and** the ledger |
+
+Cloud calls are never sent through the home PC: with SogoAI off or its tunnel down, voice and every reading keep
+working, and the Anthropic key stays a Worker secret only. The manager catches up on its next read. Build now's
+routine fire (§8.18 part 6) is not a model call and is not recorded.
+
+**One row per request** to a model, answered or not (`model_calls`, §4.2zzo), written by
+`src/worker/model-usage.ts` with the feature its route names (MODEL_FEATURE):
+- **Claude:** every request `claude.ts` sends is handed to the reader's Meter: the model that answered (a refusal
+  fallback may name another), `usage`'s input, output, cache write and cache read tokens and
+  `server_tool_use`'s web searches and fetches; `ok` is false on a refusal or a cut-off (still billed) and on a
+  throw (nothing used). A look-up's `pause_turn` re-sends are each their own row. The readers pass the route's
+  Meter on (`ReaderOpts`). The budgets (`photo_reads`, `recipe_reads`) are unchanged: they limit before a read, the
+  ledger records after.
+- **Whisper:** one row per clip: `HEAR_MODEL`, the clip's bytes, and Whisper's `transcription_info.duration` as
+  the seconds when it gives one (else NULL); `ok` false when no words came back or it threw.
+- **SogoAI:** the helper adds `usage: { model, ms, inputTokens, outputTokens }` (LM Studio's `prompt_tokens` /
+  `completion_tokens`) to an /identify or /note-marks answer once LM Studio was asked; the Worker records it as one
+  `sogoai` row (`ok` as the report's). An answer without it (nothing asked: `off`, `busy`, or an older helper) is no row.
+- A failed write is logged and never fails the reading.
+
+**The estimate** (`estimateUsd`, worked out when read): tokens × the published per-million rates of `TOKEN_PRICES`,
+plus `WEB_SEARCH_USD` per search; audio minutes × `AUDIO_MINUTE_USD` (before Workers AI's free daily neurons);
+SogoAI is 0. A model, or a clip length, the table doesn't know is `null` and counted as unpriced ⚑ Q406. It is an
+estimate, not the bill.
+
+**`GET /ops/model-usage?days=N`**, behind §9.4's ops guard (unset token → 503, wrong → 401): `days` a whole number
+1…`MODEL_USAGE_DAYS_MAX` (400), default `MODEL_USAGE_DAYS` (30) ⚑ Q407, else **400 `invalid_input`**. It covers the
+UTC days from `days − 1` days ago through today → **200 `{ since, rows: [{ day, feature, provider, model, calls,
+failed, ms, inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens, webSearches, webFetches, audioSeconds,
+audioBytes, estUsd }], total: { calls, failed, estUsd, unpricedCalls } }`**, newest day first. The PC model manager
+reads it (the SogoAI project builds that panel; asked on the Crossroads Board).
+
+**Acceptance (MU — each row is a test, `test/model-usage.test.ts`):**
+
+| # | Check | Expected |
+|---|---|---|
+| MU1 | `estimateUsd`, `claudeCounts`, `homeUseOf` | 1M in + 100k out + 1M cache read + 3 searches on opus-5-5 = $6.23; an unknown model → null; SogoAI 0; 120 s of Whisper = $0.001, no length → null; missing counts 0; a helper usage without a model → null |
+| MU2 | `POST /say` with a fake Claude | one `say` / `anthropic` / `claude-opus-5-5` row with its tokens |
+| MU3 | a look-up that pauses once; a refusal; a throw | two ok rows with their searches and fetches; one not-ok row with its tokens; one not-ok row with nothing |
+| MU4 | `hearClip` with and without a length, and failing; `POST /say/hear` | the bytes and seconds (or NULL); not ok; a `say-hear` row |
+| MU5 | the helper's LM Studio call | goes to `127.0.0.1:8797`; carries the model and the tokens |
+| MU6 | a helper answer with `usage`; one without | one `sogoai` row; none |
+| MU7 | `GET /ops/model-usage?days=7`; `days=0`, `1.5`; no token | today's rows summed, an old row left out, the estimate and total; 400; 400; 401 |
+| MU-M | migration 0068 | §4.2zzo's check |
+
 ### 9.5 My alerts — `src/shared/alert-history.ts`, `/me/alerts` — asked by MojoSOGO 2026-10-11
 
 "If Ensō sends an alert from Ozy, I tap it but it goes away with no detail." Every push is already a `deliveries`
@@ -7154,6 +7227,7 @@ other push stays until I hide it ⚑ Q284.
 | GET | `/ops/pings?after=` | bearer `OPS_NOTIFY_TOKEN` (no session) | → `{ pings: [{ id, channel, title, text, at }] }`, the founder pings and FunHouse alerts of the last hour after `after`, oldest first, for the FunHouse poller (§9.4a, §9.4b; listed `funhouse` rows become `sent`); 503 / 401 as `/ops/notify` |
 | GET | `/ops/requests` | bearer `OPS_NOTIFY_TOKEN` | → `{ requests: FeatureRequest[] }`, the open ones (`new`, `needs_john`), oldest first (§8.18); 503 / 401 as `/ops/notify` |
 | PATCH | `/ops/requests/{id}` | bearer `OPS_NOTIFY_TOKEN` | `{ status: 'done' \| 'dismissed', note? }` → the request; 404 / 400 / 409 (already closed) |
+| GET | `/ops/model-usage?days=` | bearer `OPS_NOTIFY_TOKEN` | → `{ since, rows, total }`, every model call of the last `days` UTC days (default 30, 1–400) summed by day, feature, provider and model with the estimate (§9.4c); 400 on a bad `days`; 503 / 401 as `/ops/notify` |
 | GET | `/chores` | member | → `Chore[]`: `{ id, title, doneMeans, days, timing, time, sunOffsetMin, nudge, people, steps, channels, renotifyMin, createdBy, thisWeek, nextWeek, areaCount, roomId }` (`thisWeek`/`nextWeek` = member id or null; `areaCount` §7B.6) |
 | POST | `/chores` | member | `{ title, doneMeans?, roomId?, days, timing, time, sunOffsetMin?, nudge?, people, steps, channels, renotifyMin? }` (`sunOffsetMin` null = clock time, §7B.3) → chore (201); 400 an unknown room (§7B.6) |
 | PATCH/DELETE | `/chores/{id}` | creator or owner | same fields, all optional; re-plans unstarted runs (§7B.3); its room stays (§7B.6) |

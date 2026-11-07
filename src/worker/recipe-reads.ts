@@ -16,6 +16,7 @@ import type { ClaudeFailure } from './claude';
 import { readCaptions } from './youtube-captions';
 import { readRecipe } from './recipe-reader';
 import { readRecipeLink } from './recipe-link-reader';
+import { meterFor } from './model-usage';
 import { homeCaptionsConfigOf, readCaptionsFromHome } from './home-captions';
 
 /** The daily cap (§7E.2 step 4, §7E.2b step 5): today's recipe reads, in the household's day, are used up. */
@@ -83,7 +84,7 @@ export async function readVideoRecipe(db: D1Database, env: Env, keys: { yt: stri
   };
   let raw: Record<string, unknown> | null = null;
   if (hasRecipeText(text)) {
-    const r = await readRecipe({ apiKey: keys.ai, title: video.title, channel: video.channel, ...text });
+    const r = await readRecipe({ apiKey: keys.ai, title: video.title, channel: video.channel, ...text }, { meter: meterFor(db, 'recipe-video') });
     if (!r.ok) return claudeFailure(r);
     raw = r.raw;
   }
@@ -97,7 +98,7 @@ export async function readVideoRecipe(db: D1Database, env: Env, keys: { yt: stri
 export async function readPageRecipe(db: D1Database, aiKey: string, link: string, site: string,
   memberId: string, now: string): Promise<PageRead> {
   await countRecipeRead(db, now, memberId);
-  const r = await readRecipeLink({ apiKey: aiKey, link, site });
+  const r = await readRecipeLink({ apiKey: aiKey, link, site }, { meter: meterFor(db, 'recipe-page') });
   if (!r.ok) return claudeFailure(r);
   return {
     ok: true, reading: cleanRecipeReading(r.raw, r.title),

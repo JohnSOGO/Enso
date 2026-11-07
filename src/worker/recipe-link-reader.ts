@@ -3,7 +3,7 @@
 // fetch and web search, then the fill with recipe-reader.ts's schema. Returns the raw reading, the look-up's notes
 // and the fallback title, or an honest failure; no Hono, no D1, never decides what is saved (the route cleans it
 // with cleanRecipeReading).
-import { askClaude, askClaudeResearch, webFetchTool, webSearchTool } from './claude';
+import { askClaude, askClaudeResearch, webFetchTool, webSearchTool, type ReaderOpts } from './claude';
 import { fetchPage } from './page-fetch';
 import { recipeReadingSchema } from './recipe-reader';
 import { RESEARCH_TURNS_MAX, pageExtract, type PageResult } from '../shared/link-reading';
@@ -18,17 +18,17 @@ export type ReadRecipeLinkResult =
   | { ok: false; kind: 'refused' | 'failed'; reason: string };
 
 /** The page (or why not), the look-up, then the fields. `fetch` is for tests only (the page and Claude alike). */
-export async function readRecipeLink(input: ReadRecipeLinkInput, opts: { fetch?: typeof fetch } = {}): Promise<ReadRecipeLinkResult> {
+export async function readRecipeLink(input: ReadRecipeLinkInput, opts: ReaderOpts = {}): Promise<ReadRecipeLinkResult> {
   const fetched = await fetchPage(input.link, opts);
   const page: PageResult = fetched.ok ? { ok: true, page: pageExtract(fetched.html) } : fetched;
   const notes = await askClaudeResearch({
-    apiKey: input.apiKey, fetch: opts.fetch, maxTurns: RESEARCH_TURNS_MAX,
+    apiKey: input.apiKey, fetch: opts.fetch, meter: opts.meter, maxTurns: RESEARCH_TURNS_MAX,
     prompt: recipeResearchPrompt(input.link, input.site, page),
     tools: [webSearchTool(RECIPE_LINK_SEARCHES_MAX), webFetchTool(RECIPE_LINK_FETCHES_MAX)],
   });
   if (!notes.ok) return notes;
   const res = await askClaude({
-    apiKey: input.apiKey, fetch: opts.fetch, content: [], prompt: recipeFillPrompt(input.link, page, notes.value), schema: recipeReadingSchema,
+    apiKey: input.apiKey, fetch: opts.fetch, meter: opts.meter, content: [], prompt: recipeFillPrompt(input.link, page, notes.value), schema: recipeReadingSchema,
   });
   return res.ok ? { ok: true, raw: res.value, notes: notes.value, title: pageTitle(page, input.site) } : res;
 }

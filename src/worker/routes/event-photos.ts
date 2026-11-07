@@ -11,6 +11,7 @@ import { readableLink } from '../../shared/link-reading';
 import { requireMember } from '../session';
 import { readEventLink, readEventPhoto, readEventText, type ReadEventResult } from '../event-reader';
 import { spendPhotoRead } from '../photo-reads';
+import { meterFor } from '../model-usage';
 
 export const eventPhotos = new Hono<AppEnv>();
 
@@ -37,7 +38,7 @@ async function readWith(c: Context<AppEnv>, what: keyof typeof FAILS, ask: (a: {
 eventPhotos.post('/events/read-photo', requireMember, async (c) => {
   const photo = await photoBody(c);
   if (photo instanceof Response) return photo;
-  return readWith(c, 'photo', async (s) => readEventPhoto({ ...s, bytes: photo.bytes, mediaType: photo.type, home: await householdPlace(c.env.DB) }));
+  return readWith(c, 'photo', async (s) => readEventPhoto({ ...s, bytes: photo.bytes, mediaType: photo.type, home: await householdPlace(c.env.DB) }, { meter: meterFor(c.env.DB, 'event-photo') }));
 });
 
 eventPhotos.post('/events/read-text', requireMember, async (c) => {
@@ -45,6 +46,6 @@ eventPhotos.post('/events/read-text', requireMember, async (c) => {
   const text = typeof raw === 'string' ? raw.trim() : '';
   if (!text || text.length > EVENT_TEXT_MAX) return fail(c, 400, 'invalid_input', `Paste some text, up to ${EVENT_TEXT_MAX} characters.`);
   const url = !/\s/.test(text) && readableLink(text); // §7.9 ⚑ Q197: a paste that is just one link reads the page
-  if (url) return readWith(c, 'link', async (s) => readEventLink({ ...s, url, home: await householdPlace(c.env.DB) }));
-  return readWith(c, 'text', async (s) => readEventText({ ...s, text, home: await householdPlace(c.env.DB) }));
+  if (url) return readWith(c, 'link', async (s) => readEventLink({ ...s, url, home: await householdPlace(c.env.DB) }, { meter: meterFor(c.env.DB, 'event-link') }));
+  return readWith(c, 'text', async (s) => readEventText({ ...s, text, home: await householdPlace(c.env.DB) }, { meter: meterFor(c.env.DB, 'event-text') }));
 });

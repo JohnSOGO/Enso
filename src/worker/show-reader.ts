@@ -2,7 +2,7 @@
 // for the prompt, never fatal); for a picture, photo-reader's image block; then a look-up with web search and web
 // fetch, then the structured reading (showReadingSchema). Returns the raw reading or an honest failure; no Hono, no
 // D1, never decides what is saved (the route cleans it with cleanShowReading).
-import { askClaude, askClaudeResearch, webFetchTool, webSearchTool, type ClaudeBlock } from './claude';
+import { askClaude, askClaudeResearch, webFetchTool, webSearchTool, type ClaudeBlock, type ReaderOpts } from './claude';
 import { fetchPage } from './page-fetch';
 import { imageBlock } from './photo-reader';
 import { RESEARCH_TURNS_MAX, pageExtract } from '../shared/link-reading';
@@ -52,7 +52,7 @@ async function videoFacts(videoId: string, key: string | undefined, opts: { fetc
 export type LookUpResult = { ok: true; raw: Record<string, unknown> } | { ok: false; kind: 'refused' | 'failed'; reason: string };
 
 /** The page or picture, the look-up, then the fields. `fetch` is for tests only (the page and Claude alike). */
-export async function lookUpShow(input: LookUpInput, opts: { fetch?: typeof fetch } = {}): Promise<LookUpResult> {
+export async function lookUpShow(input: LookUpInput, opts: ReaderOpts = {}): Promise<LookUpResult> {
   const { ask } = input;
   let query: ShowQuery;
   const content: ClaudeBlock[] = [];
@@ -69,13 +69,13 @@ export async function lookUpShow(input: LookUpInput, opts: { fetch?: typeof fetc
     query = ask;
   }
   const notes = await askClaudeResearch({
-    apiKey: input.apiKey, fetch: opts.fetch, maxTurns: RESEARCH_TURNS_MAX, content,
+    apiKey: input.apiKey, fetch: opts.fetch, meter: opts.meter, maxTurns: RESEARCH_TURNS_MAX, content,
     prompt: showResearchPrompt(query, input.today, input.tz, input.home),
     tools: [webSearchTool(SHOW_SEARCHES_MAX, { country: WATCH_COUNTRY, timezone: input.tz }), webFetchTool(SHOW_FETCHES_MAX)],
   });
   if (!notes.ok) return notes;
   const res = await askClaude({
-    apiKey: input.apiKey, fetch: opts.fetch, content: [], prompt: showFillPrompt(notes.value, input.today), schema: showReadingSchema,
+    apiKey: input.apiKey, fetch: opts.fetch, meter: opts.meter, content: [], prompt: showFillPrompt(notes.value, input.today), schema: showReadingSchema,
   });
   return res.ok ? { ok: true, raw: res.value } : res;
 }

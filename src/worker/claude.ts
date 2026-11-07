@@ -1,9 +1,11 @@
 // The Claude API calls. The ONLY importer of `@anthropic-ai/sdk` and zod, and only lazily (inside each call),
 // so the cron tick and every route that never asks Claude never load them. It holds no prompts, chooses no
 // tools and never decides what is saved: the caller gives the content, the prompt and the schema (or the
-// server tools), and gets back the parsed value (or the text) or an honest failure.
+// server tools), and gets back the parsed value (or the text) or an honest failure. Each request to the API is
+// handed to the caller's Meter, if any (§9.4c): its usage, answered or not.
 import type { BetaContentBlockParam, BetaMessage, BetaMessageParam, BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { ZodType, z as Zod } from 'zod';
+import { claudeCounts, noUse, type Meter } from '../shared/model-usage';
 
 export const CLAUDE_MODEL = 'claude-opus-5-5';
 
@@ -20,7 +22,12 @@ export interface AskClaudeInput<S extends ZodType> {
   schema: (z: typeof Zod) => S;
   /** For tests only, so no test ever reaches the real API. */
   fetch?: typeof fetch;
+  /** Records each request (§9.4c). */
+  meter?: Meter;
 }
+
+/** A reader's options: a test's fetch, and the route's Meter (§9.4c), both passed to every request it makes. */
+export interface ReaderOpts { fetch?: typeof fetch; meter?: Meter }
 
 export type ClaudeFailure = { ok: false; kind: 'refused' | 'failed'; reason: string };
 export type AskClaudeResult<T> = { ok: true; value: T } | ClaudeFailure;
@@ -36,6 +43,13 @@ function stopFailure(res: Pick<BetaMessage, 'stop_reason' | 'stop_details'>): Cl
   }
   if (res.stop_reason === 'max_tokens') return { ok: false, kind: 'failed', reason: 'The reading was cut off before it finished.' };
   return null;
+}
+
+/** One request for the Meter: the model that answered and its usage, or the model asked and nothing, on a throw. */
+async function meterRequest(meter: Meter | undefined, started: number, res: Pick<BetaMessage, 'model' | 'usage' | 'stop_reason'> | null) {
+  if (!meter) return;
+  const ok = !!res && res.stop_reason !== 'refusal' && res.stop_reason !== 'max_tokens';
+  await meter({ ...noUse('anthropic', res?.model || CLAUDE_MODEL, ok, Date.now() - started), ...(res ? claudeCounts(res.usage) : {}) });
 }
 
 /** A thrown error as an honest failure: the API's status and message, or the error's own message. */
@@ -59,6 +73,7 @@ export async function askClaude<S extends ZodType>(input: AskClaudeInput<S>): Pr
   const strict = betaZodOutputFormat(input.schema(z));
   const format = { ...strict, parse: (text: string) => { try { return strict.parse(text); } catch { return null; } } };
   const client = new Anthropic({ apiKey: input.apiKey, ...(input.fetch ? { fetch: input.fetch } : {}) });
+  const started = Date.now();
   try {
     const res = await client.beta.messages.parse({
       model: CLAUDE_MODEL,
@@ -67,11 +82,13 @@ export async function askClaude<S extends ZodType>(input: AskClaudeInput<S>): Pr
       output_config: { effort: 'medium', format },
       messages: [{ role: 'user', content: [...input.content, { type: 'text', text: input.prompt }] }],
     });
+    await meterRequest(input.meter, started, res);
     const stopped = stopFailure(res);
     if (stopped) return stopped;
     if (!res.parsed_output) return { ok: false, kind: 'failed', reason: 'The reading came back in an unexpected shape.' };
     return { ok: true, value: res.parsed_output };
   } catch (err) {
+    await meterRequest(input.meter, started, null);
     return thrownFailure(err);
   }
 }
@@ -96,6 +113,8 @@ export interface AskClaudeResearchInput {
   maxTurns: number;
   /** For tests only. */
   fetch?: typeof fetch;
+  /** Records each request, every `pause_turn` re-send its own (§9.4c). */
+  meter?: Meter;
 }
 
 /**
@@ -106,11 +125,14 @@ export async function askClaudeResearch(input: AskClaudeResearchInput): Promise<
   const { default: Anthropic } = await loadSdk();
   const client = new Anthropic({ apiKey: input.apiKey, ...(input.fetch ? { fetch: input.fetch } : {}) });
   const messages: BetaMessageParam[] = [{ role: 'user', content: [...(input.content ?? []), { type: 'text', text: input.prompt }] }];
+  let started = Date.now();
   try {
     for (let turn = 1; turn <= input.maxTurns; turn++) {
+      started = Date.now();
       const res = await client.beta.messages.create({
         model: CLAUDE_MODEL, max_tokens: 16000, ...fallback(), output_config: { effort: 'medium' }, tools: input.tools, messages,
       });
+      await meterRequest(input.meter, started, res);
       const stopped = stopFailure(res);
       if (stopped) return stopped;
       if (res.stop_reason === 'pause_turn') {
@@ -125,6 +147,7 @@ export async function askClaudeResearch(input: AskClaudeResearchInput): Promise<
     }
     return { ok: false, kind: 'failed', reason: `The look-up didn't finish in ${input.maxTurns} rounds.` };
   } catch (err) {
+    await meterRequest(input.meter, started, null);
     return thrownFailure(err);
   }
 }

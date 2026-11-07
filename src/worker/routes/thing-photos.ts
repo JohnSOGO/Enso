@@ -12,6 +12,7 @@ import { readPhoto } from '../photo-reader';
 import { readLink } from '../link-reader';
 import { spendPhotoRead } from '../photo-reads';
 import { replacePhoto, servePhoto } from '../photo-store';
+import { meterFor } from '../model-usage';
 import { loadThing } from './things';
 
 export const thingPhotos = new Hono<AppEnv>();
@@ -34,7 +35,7 @@ thingPhotos.post('/things/read-photo', requireMember, async (c) => {
   if (photo instanceof Response) return photo;
   const spent = await spendRead(c, 'photo_reading_off', "Reading photos isn't set up yet.");
   if (spent instanceof Response) return spent;
-  const r = await readPhoto({ apiKey: spent.apiKey, tz: spent.tz, today: spent.today, bytes: photo.bytes, mediaType: photo.type });
+  const r = await readPhoto({ apiKey: spent.apiKey, tz: spent.tz, today: spent.today, bytes: photo.bytes, mediaType: photo.type }, { meter: meterFor(c.env.DB, 'thing-photo') });
   if (!r.ok && r.kind === 'refused') return fail(c, 422, 'photo_refused', "Couldn't read that photo.");
   if (!r.ok) return fail(c, 502, 'photo_reading_failed', `Couldn't read that photo: ${r.reason}`);
   return c.json(cleanPhotoReading(r.raw, spent.today));
@@ -47,7 +48,7 @@ thingPhotos.post('/things/read-link', requireMember, async (c) => {
   if (!url) return fail(c, 400, 'invalid_input', "That link can't be read.");
   const spent = await spendRead(c, 'link_reading_off', "Reading links isn't set up yet.");
   if (spent instanceof Response) return spent;
-  const r = await readLink({ apiKey: spent.apiKey, tz: spent.tz, today: spent.today, url, home: await householdPlace(c.env.DB) });
+  const r = await readLink({ apiKey: spent.apiKey, tz: spent.tz, today: spent.today, url, home: await householdPlace(c.env.DB) }, { meter: meterFor(c.env.DB, 'thing-link') });
   if (!r.ok && r.kind === 'refused') return fail(c, 422, 'link_refused', "Couldn't read that link.");
   if (!r.ok) return fail(c, 502, 'link_reading_failed', `Couldn't read that link: ${r.reason}`);
   return c.json(cleanPhotoReading(r.raw, spent.today));

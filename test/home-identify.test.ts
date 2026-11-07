@@ -25,12 +25,12 @@ describe('SN14 identify', () => {
   it('one POST to LM Studio: the model, the prompt + " /no_think", the image as a data URL, temperature 0 → the text as it came', async () => {
     const { f, seen } = lmStudio(chat('<think>\n\n</think>\n\nHeinz Tomato Ketchup 32 oz'));
     const r = await identify(PHOTO, 'image/jpeg', { model: 'qwen-uncensored', fetch: f });
-    expect(r).toEqual({ ok: true, text: '<think>\n\n</think>\n\nHeinz Tomato Ketchup 32 oz' });
+    expect(r).toEqual({ ok: true, text: '<think>\n\n</think>\n\nHeinz Tomato Ketchup 32 oz', usage: { model: 'qwen-uncensored', ms: expect.any(Number), inputTokens: 0, outputTokens: 0 } });
     expect(seen).toHaveLength(1);
     const { req, body, signal } = seen[0];
     expect(req.method).toBe('POST');
     expect(req.url).toBe(LM_STUDIO_URL);
-    expect(LM_STUDIO_URL).toBe('http://127.0.0.1:1234/v1/chat/completions');
+    expect(LM_STUDIO_URL).toBe('http://127.0.0.1:8797/v1/chat/completions'); // §9.4c through the model manager's chat proxy
     expect(req.headers.get('content-type')).toBe('application/json');
     expect(body).toEqual({
       model: 'qwen-uncensored',
@@ -55,7 +55,7 @@ describe('SN14 identify', () => {
     expect(IDENTIFY_MAX_TOKENS).toBeGreaterThanOrEqual(600); // measured 2026-10-04: ~400 tokens of thinking before the name
     const cut = () => new Response(JSON.stringify({ choices: [{ finish_reason: 'length', message: { role: 'assistant', content: '' } }] }));
     expect(await identify(PHOTO, 'image/jpeg', { model: 'm', fetch: lmStudio(cut).f }))
-      .toEqual({ ok: false, kind: 'failed', reason: 'The local model ran out of room before it answered.' });
+      .toEqual({ ok: false, kind: 'failed', reason: 'The local model ran out of room before it answered.', usage: { model: 'm', ms: expect.any(Number), inputTokens: 0, outputTokens: 0 } });
   });
 
   it('IDENTIFY_MODEL unset or empty → off, and LM Studio is never called', async () => {

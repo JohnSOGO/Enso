@@ -7,6 +7,7 @@
 import { NOTE_MARKS_PROMPT, NOTE_MARKS_SCHEMA, parseNoteMarksReport, type NoteMarksReport } from '../src/shared/note-marks';
 import { chatCompletion } from './lm-studio';
 import { modelReady } from './model-manager';
+import type { HomeUse } from '../src/shared/model-usage';
 
 /** ⚑ Q370 — how long the helper waits for LM Studio. */
 export const NOTE_MARKS_TIMEOUT_MS = 15_000;
@@ -30,14 +31,15 @@ export const noteMarksPayload = (model: string, text: string) => ({
 });
 
 /** One notes text → the model's marks, or an honest failure: `off`, `busy` or `failed`, each with its reason. */
-export async function noteMarks(text: string, deps: NoteMarksDeps): Promise<NoteMarksReport> {
+export async function noteMarks(text: string, deps: NoteMarksDeps): Promise<NoteMarksReport & { usage?: HomeUse }> {
   if (!deps.model) return { ok: false, kind: 'off', reason: "IDENTIFY_MODEL isn't set on SogoAI." };
   const ready = await modelReady(deps.model, { fetch: deps.fetch });
   if (!ready.ok) return ready;
   const r = await chatCompletion(noteMarksPayload(deps.model, text), { timeoutMs: NOTE_MARKS_TIMEOUT_MS, fetch: deps.fetch });
-  if (!r.ok) return { ok: false, kind: 'failed', reason: r.reason };
+  const usage = r.usage ? { usage: r.usage } : {}; // §9.4c: what LM Studio was asked, for the Worker's ledger
+  if (!r.ok) return { ok: false, kind: 'failed', reason: r.reason, ...usage };
   let answer: unknown;
-  try { answer = JSON.parse(r.content); } catch { return { ok: false, kind: 'failed', reason: 'The local model answered something that is not JSON.' }; }
+  try { answer = JSON.parse(r.content); } catch { return { ok: false, kind: 'failed', reason: 'The local model answered something that is not JSON.', ...usage }; }
   const report = parseNoteMarksReport({ ok: true, marks: (answer as { marks?: unknown } | null)?.marks });
-  return typeof report === 'string' ? { ok: false, kind: 'failed', reason: `The local model's answer: ${report}` } : report;
+  return typeof report === 'string' ? { ok: false, kind: 'failed', reason: `The local model's answer: ${report}`, ...usage } : { ...report, ...usage };
 }

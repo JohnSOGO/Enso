@@ -2,7 +2,7 @@
 // failure kept as a note, never fatal), a look-up with web search and web fetch, then the structured
 // reading with the photo reader's schema. Returns the raw reading or an honest failure; never HTTP, no
 // Hono, never decides what is saved (the route cleans it with cleanPhotoReading).
-import { askClaude, askClaudeResearch, webFetchTool, webSearchTool } from './claude';
+import { askClaude, askClaudeResearch, webFetchTool, webSearchTool, type ReaderOpts } from './claude';
 import { fetchPage } from './page-fetch';
 import { thingReadingSchema } from './photo-reader';
 import {
@@ -17,17 +17,17 @@ export type ReadLinkResult =
   | { ok: false; kind: 'refused' | 'failed'; reason: string };
 
 /** The page (or why not), the look-up, then the fields. `fetch` is for tests only (the page and Claude alike). */
-export async function readLink(input: ReadLinkInput, opts: { fetch?: typeof fetch } = {}): Promise<ReadLinkResult> {
+export async function readLink(input: ReadLinkInput, opts: ReaderOpts = {}): Promise<ReadLinkResult> {
   const fetched = await fetchPage(input.url, opts);
   const page: PageResult = fetched.ok ? { ok: true, page: pageExtract(fetched.html) } : fetched;
   const notes = await askClaudeResearch({
-    apiKey: input.apiKey, fetch: opts.fetch, maxTurns: RESEARCH_TURNS_MAX,
+    apiKey: input.apiKey, fetch: opts.fetch, meter: opts.meter, maxTurns: RESEARCH_TURNS_MAX,
     prompt: researchPrompt(input.url, page, input.today, input.tz, input.home),
     tools: [webSearchTool(LINK_SEARCHES_MAX, { timezone: input.tz }), webFetchTool(LINK_FETCHES_MAX)],
   });
   if (!notes.ok) return notes;
   const res = await askClaude({
-    apiKey: input.apiKey, fetch: opts.fetch, content: [],
+    apiKey: input.apiKey, fetch: opts.fetch, meter: opts.meter, content: [],
     prompt: fillPrompt(input.url, page, notes.value, input.today, input.tz, input.home), schema: thingReadingSchema,
   });
   return res.ok ? { ok: true, raw: { ...res.value, url: input.url } } : res;

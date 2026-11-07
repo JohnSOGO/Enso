@@ -7,6 +7,25 @@ carry its result.
 
 ---
 
+## 2026-11-07 — One ledger of model calls, v1.115.0 (placement-advisor)
+
+- **Ask:** One record of every model call (Claude, Whisper, LM Studio at home) for the SogoAI model-manager dashboard (SPEC §9.4c, §4.2zzo; AREC arec-model-manager-routing.md, CUT).
+- **Verdict:** `src/worker/model-usage.ts` [NEW row: the model_calls rows, meterFor, modelUsageTotals]; `src/shared/model-usage.ts` [NEW row: ModelUse, Meter, the price table and estimate, claudeCounts, homeUseOf, pure so home/ may import its types]; `routes/ops.ts`, `claude.ts`, `speech-to-text.ts`, `home/lm-studio.ts` [EXISTING]; NEEDS-SPEC first (written).
+- **Flow stage:** persist (ledger), route (ops read), deliver (home proxy).
+- **Why:** The callers have no D1, so recording goes through a Meter and the API wrappers stay free of I/O. One leaf owner keeps prices and totals in one place. Spreading recording across 7 readers was rejected (drift); merging it with photo-reads was rejected (a budget and a ledger are different jobs); a new ops file was rejected (it would copy the guard). The pure half moved to src/shared so the helper's usage shape is not restated in home/.
+- **Caps:** all targets at most 152 of 300 lines; none newly in the band. `routes/recipes.ts` (87 %) and `routes/events.ts` (88 %) take no ledger logic.
+
+---
+
+## 2026-11-07 — Steward check, model calls (code-steward)
+
+- **Run:** narrow pre-build check of every model call (AREC step), read-only
+- **Verdict:** build in the existing owners; no extract-first seam; arch:audit quiet
+- **Findings:** build-fire.ts is a routine fire, out of scope; recipe_reads is a second Claude budget beside photo_reads, both stay; research readers make two or more requests per read, so the ledger records requests, not reads; item-photos and notes reach SogoAI through home-captions.ts → home/lm-studio.ts, the one LM Studio seam.
+- **Handoffs:** none
+
+---
+
 ## 2026-11-01 — Mess reported not cleaned, v1.114.0 (placement-advisor)
 
 - **Ask:** A mess report can be marked Not cleaned: asked about as usual, whose it was recorded, nobody owed. Messes adds a 30-day Not cleaned list (SPEC §7B.7, §8.15a; AREC arec-mess-not-cleaned.md).

@@ -137,7 +137,7 @@ couldn't be read: from home: captions from home aren't set up."
 
 **Snap an item (SPEC §7A.3).** The same helper names a photographed list item: the Worker sends the image to
 `POST https://sogoai.sogodojo.com/identify` (same Access token, same bearer, 20 s), and the helper asks **LM
-Studio** on SogoAI (`http://127.0.0.1:1234/v1/chat/completions`, OpenAI-compatible) with the always-loaded
+Studio** on SogoAI through the PC model manager's chat proxy (`http://127.0.0.1:8797/v1/chat/completions`, OpenAI-compatible) with the always-loaded
 vision model named by `IDENTIFY_MODEL` (`photo-polish`), the prompt plus ` /no_think`, the image as a data
 URL, 15 s. It answers `{ ok: true, text }` or `{ ok: false, kind: off | failed, reason }`; the Worker cleans the
 text into a name. Only when SogoAI gives no name — not set up, failed, or "UNKNOWN" — does the Worker pay for

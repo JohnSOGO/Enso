@@ -123,8 +123,8 @@ describe('SN13 handle /identify', () => {
     const lines = logs();
     const lm = lmStudio();
     const r = await identifyReq({}, lm.f);
-    expect(r).toEqual({ status: 200, body: { ok: true, text: 'Heinz Tomato Ketchup 32 oz' } });
-    expect(lm.calls).toEqual(['http://127.0.0.1:1234/v1/chat/completions']);
+    expect(r).toEqual({ status: 200, body: { ok: true, text: 'Heinz Tomato Ketchup 32 oz', usage: { model: expect.any(String), ms: expect.any(Number), inputTokens: 0, outputTokens: 0 } } });
+    expect(lm.calls).toEqual(['http://127.0.0.1:8797/v1/chat/completions']);
     const said = lines();
     expect(said).toHaveLength(1);
     expect(said[0]).toContain('Heinz Tomato Ketchup');

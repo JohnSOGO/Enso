@@ -10,6 +10,7 @@ import { fail, photoBody } from '../http';
 import { requireMember } from '../session';
 import { readDonePhoto } from '../photo-reader';
 import { spendPhotoRead } from '../photo-reads';
+import { meterFor } from '../model-usage';
 import { loadMine } from './tasks';
 
 export const taskPhotos = new Hono<AppEnv>();
@@ -27,7 +28,7 @@ taskPhotos.post('/tasks/:id/check-photo', requireMember, async (c) => {
       ? fail(c, 429, 'rate_limited', `Photos and links can be read ${READS_PER_DAY} times a day, and today's are used up. Tick the lines by hand.`)
       : fail(c, 503, 'photo_reading_off', "Reading photos isn't set up yet. Tick the lines by hand.");
   }
-  const r = await readDonePhoto({ apiKey: spent.apiKey, bytes: photo.bytes, mediaType: photo.type, title: t.timer.title, lines });
+  const r = await readDonePhoto({ apiKey: spent.apiKey, bytes: photo.bytes, mediaType: photo.type, title: t.timer.title, lines }, { meter: meterFor(c.env.DB, 'done-photo') });
   if (!r.ok && r.kind === 'refused') return fail(c, 422, 'photo_refused', "Couldn't read that photo.");
   if (!r.ok) return fail(c, 502, 'photo_reading_failed', `Couldn't read that photo: ${r.reason}`);
   return c.json(cleanDoneCheck(r.raw, lines));
