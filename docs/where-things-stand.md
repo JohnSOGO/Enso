@@ -40,6 +40,11 @@ committed) allows these steps by name: typecheck, test, arch:audit, build:home, 
 check still refuses, say so in the thread: that is the trigger for slice 2 of
 `/mnt/project-files/arec-pc-job-runner.md` (a named-job runner on the PC).
 
+**SogoAI as a fallback (since 2026-11-07):** its Enso checkout (`C:\Users\Public\git\Enso`) has its own wrangler OAuth
+login on the same Cloudflare account (`d8daaab7…`, `wrangler d1 list` shows `enso` 85c0e2a9…). So migrate and deploy
+can run there when SogoGamerPC is off; SogoGamerPC stays the main machine. A 7403 error from wrangler means the PC it
+ran on has no login: run `npx wrangler whoami`, and `npx wrangler login` (one Allow click in the browser) if needed.
+
 1. Merge the topic branch to `main`, then run `npm run typecheck && npm test && npm run arch:audit`. A test-run crash
    with exit -1073740791 is a known flake; rerun it.
 2. Additive migration: `CI=1 npm run db:migrate:remote`, **then** `npm run deploy`. Dropping migrations go after the deploy.
