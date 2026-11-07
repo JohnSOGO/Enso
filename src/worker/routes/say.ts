@@ -14,6 +14,7 @@ import { requireMember } from '../session';
 import { readSay } from '../say-reader';
 import { hearClip } from '../speech-to-text';
 import { spendPhotoRead } from '../photo-reads';
+import { meterFor } from '../model-usage';
 
 const DAY_NAME = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -38,7 +39,7 @@ say.post('/say', requireMember, async (c) => {
   const r = await readSay({
     apiKey: spent.apiKey, text, today: spent.today, weekday: DAY_NAME[weekdayOf(spent.today)], nowTime: utcToLocal(now, spent.tz).time,
     tz: spent.tz, me: me.display_name, members: members.map((m) => m.name), after,
-  });
+  }, { meter: meterFor(c.env.DB, 'say') });
   if (!r.ok && r.kind === 'refused') return fail(c, 422, 'say_refused', "Ensō couldn't help with that.");
   if (!r.ok) return fail(c, 502, 'say_failed', `Ensō couldn't read that: ${r.reason}`);
   const reading = cleanSayReading(r.raw, { tz: spent.tz, now, meId: me.id, members });
@@ -51,7 +52,7 @@ say.post('/say/hear', requireMember, async (c) => {
   if (!c.env.AI) return fail(c, 503, 'hear_off', "Ensō can't write down recordings: it isn't set up.");
   const clip = await audioBody(c);
   if (clip instanceof Response) return clip;
-  const r = await hearClip(c.env.AI, clip.bytes);
+  const r = await hearClip(c.env.AI, clip.bytes, meterFor(c.env.DB, 'say-hear'));
   if (!r.ok) return fail(c, 502, 'hear_failed', "Ensō couldn't write that down. Try again, or use the keyboard's 🎤.");
   return c.json({ text: r.text });
 });

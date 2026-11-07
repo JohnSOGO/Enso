@@ -11,6 +11,7 @@ import { body, fail } from '../http';
 import { requireMember } from '../session';
 import { homeCaptionsConfigOf, noteMarksFromHome } from '../home-captions';
 import { rememberMarks, rememberedMarks } from '../note-marks-rows';
+import { meterFor } from '../model-usage';
 
 export const notes = new Hono<AppEnv>();
 
@@ -23,7 +24,7 @@ notes.post('/notes/marks', requireMember, async (c) => {
   if (remembered) return c.json<NoteMarks>({ via: 'sogoai', marks: remembered });
   const cfg = homeCaptionsConfigOf(c.env);
   if (!cfg) return c.json<NoteMarks>({ via: 'patterns', why: 'unset', reason: "SogoAI isn't set up." });
-  const r = await noteMarksFromHome(cfg, text);
+  const r = await noteMarksFromHome(cfg, text, { meter: meterFor(c.env.DB, 'note-marks') });
   if (!r.ok) return c.json<NoteMarks>({ via: 'patterns', why: r.kind, reason: r.reason });
   const marks = validMarks(text, r.marks);
   await rememberMarks(c.env.DB, text, marks, nowIso());

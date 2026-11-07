@@ -3,7 +3,7 @@
 // schemas and the image block (the item prompt is IDENTIFY_PROMPT, src/shared/item-reading.ts). It returns the raw
 // answer or an honest failure; it never decides what is saved — the routes clean the answer (cleanPhotoReading,
 // cleanItemName) and the person reviews it.
-import { askClaude, type ClaudeBlock } from './claude';
+import { askClaude, type ClaudeBlock, type ReaderOpts } from './claude';
 import { IDENTIFY_PROMPT } from '../shared/item-reading';
 import type { z as Zod } from 'zod';
 
@@ -55,12 +55,12 @@ export function imageBlock(bytes: ArrayBuffer, mediaType: string): ClaudeBlock |
 }
 
 /** One photo, one structured-output request through askClaude. `fetch` is for tests only. */
-export async function readPhoto(input: ReadPhotoInput, opts: { fetch?: typeof fetch } = {}): Promise<ReadPhotoResult> {
+export async function readPhoto(input: ReadPhotoInput, opts: ReaderOpts = {}): Promise<ReadPhotoResult> {
   const image = imageBlock(input.bytes, input.mediaType);
   if ('ok' in image) return image;
   const res = await askClaude({
     apiKey: input.apiKey,
-    fetch: opts.fetch,
+    fetch: opts.fetch, meter: opts.meter,
     content: [image],
     prompt: prompt(input.today, input.tz),
     schema: thingReadingSchema,
@@ -73,11 +73,11 @@ export type ReadItemPhotoResult = { ok: true; name: string } | { ok: false; kind
 /** A snapped list item (§7A.3): one request with IDENTIFY_PROMPT and the schema { name } → the raw name (the route
  *  runs cleanItemName), or an honest failure. `fetch` is for tests only. */
 export async function readItemPhoto(input: { apiKey: string; bytes: ArrayBuffer; mediaType: string },
-  opts: { fetch?: typeof fetch } = {}): Promise<ReadItemPhotoResult> {
+  opts: ReaderOpts = {}): Promise<ReadItemPhotoResult> {
   const image = imageBlock(input.bytes, input.mediaType);
   if ('ok' in image) return image;
   const res = await askClaude({
-    apiKey: input.apiKey, fetch: opts.fetch, content: [image], prompt: IDENTIFY_PROMPT,
+    apiKey: input.apiKey, fetch: opts.fetch, meter: opts.meter, content: [image], prompt: IDENTIFY_PROMPT,
     schema: (z) => z.object({ name: z.string() }),
   });
   return res.ok ? { ok: true, name: res.value.name } : res;
@@ -88,11 +88,11 @@ export type ReadDonePhotoResult = { ok: true; raw: { lines?: unknown; note?: unk
 /** §7G.6 — the done check: does the photo look like each line of "what done looks like"? One request, the image block
  *  before a prompt naming each numbered line; → the raw answer (tasks.ts cleanDoneCheck cleans it), or an honest failure. */
 export async function readDonePhoto(input: { apiKey: string; bytes: ArrayBuffer; mediaType: string; title: string; lines: string[] },
-  opts: { fetch?: typeof fetch } = {}): Promise<ReadDonePhotoResult> {
+  opts: ReaderOpts = {}): Promise<ReadDonePhotoResult> {
   const image = imageBlock(input.bytes, input.mediaType);
   if ('ok' in image) return image;
   const res = await askClaude({
-    apiKey: input.apiKey, fetch: opts.fetch, content: [image],
+    apiKey: input.apiKey, fetch: opts.fetch, meter: opts.meter, content: [image],
     prompt: `Someone just finished a household task, "${input.title}", and took this photo to check it. They said done looks like:\n` +
       input.lines.map((l, i) => `${i + 1}. ${l}`).join('\n') +
       `\nFor each numbered line, say whether the photo shows it done: "yes", "no", or "unsure" when the photo can't tell. ` +

@@ -13,6 +13,7 @@ import { canChange, cannotChangeText } from '../../shared/roles';
 import { homeCaptionsConfigOf, identifyFromHome } from '../home-captions';
 import { readItemPhoto } from '../photo-reader';
 import { spendPhotoRead } from '../photo-reads';
+import { meterFor } from '../model-usage';
 import { replacePhoto, servePhoto } from '../photo-store';
 import { ITEM_GONE, loadItem } from './list-items';
 
@@ -24,7 +25,7 @@ export const itemPhotos = new Hono<AppEnv>();
 async function askHome(c: Context<AppEnv>, photo: { bytes: ArrayBuffer; type: string }): Promise<{ name: string } | { why: string }> {
   const cfg = homeCaptionsConfigOf(c.env);
   if (!cfg) return { why: "it isn't set up" };
-  const r = await identifyFromHome(cfg, photo.bytes, photo.type);
+  const r = await identifyFromHome(cfg, photo.bytes, photo.type, { meter: meterFor(c.env.DB, 'item-name') });
   if (!r.ok) return { why: r.reason };
   const name = cleanItemName(r.text);
   return name ? { name } : { why: "it couldn't tell what it is" };
@@ -42,7 +43,7 @@ itemPhotos.post('/list-items/read-photo', requireMember, async (c) => {
     return fail(c, 429, 'rate_limited', `Photos can be read ${READS_PER_DAY} times a day, and today's are used up. Try again tomorrow, or type it in.`);
   }
   if (!spent.ok) return fail(c, 503, 'photo_reading_off', "Reading photos isn't set up yet.");
-  const r = await readItemPhoto({ apiKey: spent.apiKey, bytes: photo.bytes, mediaType: photo.type });
+  const r = await readItemPhoto({ apiKey: spent.apiKey, bytes: photo.bytes, mediaType: photo.type }, { meter: meterFor(c.env.DB, 'item-name') });
   if (!r.ok && r.kind === 'refused') return fail(c, 422, 'photo_refused', "Couldn't read that photo.");
   if (!r.ok) return fail(c, 502, 'photo_reading_failed', `Couldn't read that photo: ${r.reason} (SogoAI: ${home.why})`);
   const name = cleanItemName(r.name);

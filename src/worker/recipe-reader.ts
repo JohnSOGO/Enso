@@ -3,7 +3,7 @@
 // importer of the Anthropic SDK). This file owns the recipe prompt and its schema. It returns the raw
 // fields or an honest failure; it never decides what is saved — the route cleans the answer with
 // cleanRecipeReading (src/shared/recipe-reading.ts). Claude is told never to invent a recipe from the title.
-import { askClaude } from './claude';
+import { askClaude, type ReaderOpts } from './claude';
 import { RECIPE_IN_ENGLISH, TRANSCRIPT_MAX, type Screenshot } from '../shared/recipe-reading';
 import type { z as Zod } from 'zod';
 
@@ -55,7 +55,7 @@ const POST_SCREENSHOTS_LINE =
   `and ignore the app around it.`;
 
 /** One structured-output request through askClaude. `fetch` is for tests only. */
-export async function readRecipe(input: ReadRecipeInput, opts: { fetch?: typeof fetch } = {}): Promise<ReadRecipeResult> {
+export async function readRecipe(input: ReadRecipeInput, opts: ReaderOpts = {}): Promise<ReadRecipeResult> {
   const byHand = input.site !== undefined;
   const text = [
     `${byHand ? 'Title' : 'Video title'}: ${input.title ?? '(none)'}`,
@@ -66,7 +66,7 @@ export async function readRecipe(input: ReadRecipeInput, opts: { fetch?: typeof 
   ].join('\n\n');
   const res = await askClaude({
     apiKey: input.apiKey,
-    fetch: opts.fetch,
+    fetch: opts.fetch, meter: opts.meter,
     content: [
       ...(input.screenshots ?? []).map((s) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: s.type, data: s.data } })),
       { type: 'text', text },

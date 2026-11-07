@@ -14,6 +14,7 @@ import { body, fail, photoBody } from '../http';
 import { requireMember } from '../session';
 import { canChange, cannotChangeText } from '../../shared/roles';
 import { spendPhotoRead } from '../photo-reads';
+import { meterFor } from '../model-usage';
 import { lookUpShow, type ShowAsk } from '../show-reader';
 
 const GONE = 'That show is no longer on the list.';
@@ -36,7 +37,7 @@ async function lookUp(c: Context<AppEnv>, ask: ShowAsk, url: string | null) {
   }
   if (!spent.ok) return fail(c, 503, 'show_lookup_off', "Looking up movies and shows isn't set up yet.");
   const r = await lookUpShow({ apiKey: spent.apiKey, tz: spent.tz, today: spent.today, ask, home: await householdPlace(db),
-    youtubeKey: c.env.YOUTUBE_API_KEY });
+    youtubeKey: c.env.YOUTUBE_API_KEY }, { meter: meterFor(db, 'show') });
   if (!r.ok && r.kind === 'refused') return fail(c, 422, 'show_refused', "Couldn't look that up.");
   if (!r.ok) return fail(c, 502, 'show_lookup_failed', `Couldn't look that up: ${r.reason}`);
   return c.json(cleanShowReading(r.raw, url, nowIso()));

@@ -2,7 +2,7 @@
 // schema, photo-reader.ts's image block (or the text; for a link the page, a look-up and its notes), then askClaude
 // → the raw answer or an honest failure. No Hono, no D1; never decides what is filled or
 // saved (the route cleans with cleanEventReading and the person reviews the form).
-import { askClaude, askClaudeResearch, webFetchTool, webSearchTool } from './claude';
+import { askClaude, askClaudeResearch, webFetchTool, webSearchTool, type ReaderOpts } from './claude';
 import { fetchPage } from './page-fetch';
 import { LINK_FETCHES_MAX, LINK_SEARCHES_MAX, RESEARCH_TURNS_MAX, pageExtract, pageSection, researchPrompt, type PageResult } from '../shared/link-reading';
 import { imageBlock } from './photo-reader';
@@ -45,20 +45,20 @@ export const eventPrompt = (today: string, tz: string, home: Place | null, sourc
   `${nearestClause(home)}${home ? ' If a place name could mean more than one place, take the one nearest the household.' : ''} Use null for anything not shown.`;
 
 /** One screenshot, one structured-output request through askClaude. `fetch` is for tests only. */
-export async function readEventPhoto(input: ReadEventPhotoInput, opts: { fetch?: typeof fetch } = {}): Promise<ReadEventResult> {
+export async function readEventPhoto(input: ReadEventPhotoInput, opts: ReaderOpts = {}): Promise<ReadEventResult> {
   const image = imageBlock(input.bytes, input.mediaType);
   if ('ok' in image) return image;
   const res = await askClaude({
-    apiKey: input.apiKey, fetch: opts.fetch, content: [image],
+    apiKey: input.apiKey, fetch: opts.fetch, meter: opts.meter, content: [image],
     prompt: eventPrompt(input.today, input.tz, input.home), schema: eventReadingSchema,
   });
   return res.ok ? { ok: true, raw: res.value } : res;
 }
 
 /** §7.9 — copied text, the same prompt and schema with no image. `fetch` is for tests only. */
-export async function readEventText(input: Omit<ReadEventPhotoInput, 'bytes' | 'mediaType'> & { text: string }, opts: { fetch?: typeof fetch } = {}): Promise<ReadEventResult> {
+export async function readEventText(input: Omit<ReadEventPhotoInput, 'bytes' | 'mediaType'> & { text: string }, opts: ReaderOpts = {}): Promise<ReadEventResult> {
   const res = await askClaude({
-    apiKey: input.apiKey, fetch: opts.fetch, content: [{ type: 'text', text: input.text }],
+    apiKey: input.apiKey, fetch: opts.fetch, meter: opts.meter, content: [{ type: 'text', text: input.text }],
     prompt: eventPrompt(input.today, input.tz, input.home, 'text'), schema: eventReadingSchema,
   });
   return res.ok ? { ok: true, raw: res.value } : res;
@@ -66,17 +66,17 @@ export async function readEventText(input: Omit<ReadEventPhotoInput, 'bytes' | '
 
 /** §7.9 — a pasted link: the page (or why not), the look-up (§7C.4b's limits), then the event's fields. `fetch` is
  *  for tests only (the page and Claude alike). */
-export async function readEventLink(input: Omit<ReadEventPhotoInput, 'bytes' | 'mediaType'> & { url: string }, opts: { fetch?: typeof fetch } = {}): Promise<ReadEventResult> {
+export async function readEventLink(input: Omit<ReadEventPhotoInput, 'bytes' | 'mediaType'> & { url: string }, opts: ReaderOpts = {}): Promise<ReadEventResult> {
   const fetched = await fetchPage(input.url, opts);
   const page: PageResult = fetched.ok ? { ok: true, page: pageExtract(fetched.html) } : fetched;
   const notes = await askClaudeResearch({
-    apiKey: input.apiKey, fetch: opts.fetch, maxTurns: RESEARCH_TURNS_MAX,
+    apiKey: input.apiKey, fetch: opts.fetch, meter: opts.meter, maxTurns: RESEARCH_TURNS_MAX,
     prompt: researchPrompt(input.url, page, input.today, input.tz, input.home),
     tools: [webSearchTool(LINK_SEARCHES_MAX, { timezone: input.tz }), webFetchTool(LINK_FETCHES_MAX)],
   });
   if (!notes.ok) return notes;
   const res = await askClaude({
-    apiKey: input.apiKey, fetch: opts.fetch,
+    apiKey: input.apiKey, fetch: opts.fetch, meter: opts.meter,
     content: [{ type: 'text', text: `Link: ${input.url}\n\nWhat the page says:\n\n${pageSection(page)}\n\nNotes from looking it up:\n${notes.value.trim() || '(none)'}` }],
     prompt: eventPrompt(input.today, input.tz, input.home, 'link'), schema: eventReadingSchema,
   });

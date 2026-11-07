@@ -3,12 +3,14 @@
 // the image, checked by parseIdentifyReport) and a notes text's marks (POST /note-marks, checked by
 // parseNoteMarksReport). Each is one request with Bearer CAPTIONS_TOKEN through access.ts (the
 // Access headers, redirect 'manual', 2xx only, a timeout). Never throws, never names a secret, never decides whether
-// to ask or what is saved (the routes do). No D1, no Hono. A leaf sibling of house.ts.
+// to ask or what is saved (the routes do). The `usage` an /identify or /note-marks answer carries (what SogoAI's
+// LM Studio was asked) goes to the route's Meter (§9.4c). No D1, no Hono. A leaf sibling of house.ts.
 import type { Env } from './env';
 import { parseCaptionsReport } from '../shared/recipe-reading';
 import { parseIdentifyReport } from '../shared/item-reading';
 import { parseNoteMarksReport, type NoteMarksReport } from '../shared/note-marks';
 import { callThroughAccess } from './access';
+import { homeUseOf, noUse, type Meter } from '../shared/model-usage';
 
 /** ⚑ Q96 — how long the Worker waits for SogoAI. */
 export const HOME_CAPTIONS_TIMEOUT_MS = 20_000;
@@ -46,12 +48,18 @@ export async function readCaptionsFromHome(cfg: HomeCaptionsConfig, videoId: str
   return report.ok ? { ok: true, text: report.text } : { ok: false, reason: report.reason };
 }
 
+/** A helper answer's usage → one sogoai row; no usage (an older helper, or no model asked) → nothing. */
+async function meterHome(meter: Meter | undefined, body: unknown, ok: boolean) {
+  const u = meter && homeUseOf((body as { usage?: unknown } | null)?.usage);
+  if (u) await meter!({ ...noUse('sogoai', u.model, ok, u.ms), inputTokens: u.inputTokens, outputTokens: u.outputTokens });
+}
+
 export type HomeIdentify = { ok: true; text: string } | { ok: false; reason: string };
 
 /** One POST of the image to `{url}/identify` → the local model's raw text (the route cleans it), or an honest
  *  reason: "HTTP n: body", "error: message", the parse message, or the home's own reason. */
 export async function identifyFromHome(cfg: HomeCaptionsConfig, photo: ArrayBuffer, type: string,
-  opts: { fetch?: typeof fetch } = {}): Promise<HomeIdentify> {
+  opts: { fetch?: typeof fetch; meter?: Meter } = {}): Promise<HomeIdentify> {
   const res = await callThroughAccess(cfg, `${cfg.url}/identify`, {
     method: 'POST', timeoutMs: HOME_IDENTIFY_TIMEOUT_MS, body: photo, fetch: opts.fetch,
     headers: { Authorization: `Bearer ${cfg.token}`, 'Content-Type': type },
@@ -60,6 +68,7 @@ export async function identifyFromHome(cfg: HomeCaptionsConfig, photo: ArrayBuff
   let body: unknown;
   try { body = JSON.parse(res.text); } catch { return { ok: false, reason: 'The helper answered something that is not JSON.' }; }
   const report = parseIdentifyReport(body);
+  await meterHome(opts.meter, body, typeof report !== 'string' && report.ok);
   if (typeof report === 'string') return { ok: false, reason: report };
   return report.ok ? { ok: true, text: report.text } : { ok: false, reason: report.reason };
 }
@@ -68,7 +77,7 @@ export async function identifyFromHome(cfg: HomeCaptionsConfig, photo: ArrayBuff
  *  from off); the transport or a bad answer → `failed` with the reason. The marks are as the model gave them
  *  (validMarks decides). */
 export async function noteMarksFromHome(cfg: HomeCaptionsConfig, text: string,
-  opts: { fetch?: typeof fetch } = {}): Promise<NoteMarksReport> {
+  opts: { fetch?: typeof fetch; meter?: Meter } = {}): Promise<NoteMarksReport> {
   const res = await callThroughAccess(cfg, `${cfg.url}/note-marks`, {
     method: 'POST', timeoutMs: HOME_NOTE_MARKS_TIMEOUT_MS, body: JSON.stringify({ text }), fetch: opts.fetch,
     headers: { Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'application/json' },
@@ -77,5 +86,6 @@ export async function noteMarksFromHome(cfg: HomeCaptionsConfig, text: string,
   let body: unknown;
   try { body = JSON.parse(res.text); } catch { return { ok: false, kind: 'failed', reason: 'The helper answered something that is not JSON.' }; }
   const report = parseNoteMarksReport(body);
+  await meterHome(opts.meter, body, typeof report !== 'string' && report.ok);
   return typeof report === 'string' ? { ok: false, kind: 'failed', reason: report } : report;
 }

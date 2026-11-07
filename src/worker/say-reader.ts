@@ -4,7 +4,7 @@
 // raw answer or an honest failure. No Hono, no D1; never decides what is saved (the route cleans with cleanSayReading
 // and the person says Yes). WHEN A TAB OR SECTION IS ADDED, ADD IT TO ENSO_DOES; WHEN SPEC §1.3 CHANGES, CHANGE
 // ENSO_SCOPE (the code-steward checks both).
-import { askClaude } from './claude';
+import { askClaude, type ReaderOpts } from './claude';
 import { FEATURE_REQUEST_SIZE, SAY_KIND } from '../shared/vocab';
 import { AFTER_LABEL, WHEN_CHOICE, type After } from '../shared/reminders';
 import type { z as Zod } from 'zod';
@@ -105,9 +105,9 @@ export const sayPrompt = (i: Omit<ReadSayInput, 'apiKey' | 'text'>) =>
   `It does not fit when it is about:\n${ENSO_SCOPE.outside.map((l) => `- ${l}`).join('\n')}`;
 
 /** One structured-output request through askClaude. `fetch` is for tests only. */
-export async function readSay(input: ReadSayInput, opts: { fetch?: typeof fetch } = {}): Promise<ReadSayResult> {
+export async function readSay(input: ReadSayInput, opts: ReaderOpts = {}): Promise<ReadSayResult> {
   const res = await askClaude({
-    apiKey: input.apiKey, fetch: opts.fetch, content: [{ type: 'text', text: input.text }],
+    apiKey: input.apiKey, fetch: opts.fetch, meter: opts.meter, content: [{ type: 'text', text: input.text }],
     prompt: sayPrompt(input), schema: sayReadingSchema,
   });
   return res.ok ? { ok: true, raw: res.value } : res;

@@ -4,6 +4,7 @@
 // lm-studio.ts and src/shared/item-reading.ts only (§2.5).
 import { IDENTIFY_PROMPT, type IdentifyReport } from '../src/shared/item-reading';
 import { chatCompletion } from './lm-studio';
+import type { HomeUse } from '../src/shared/model-usage';
 
 export { LM_STUDIO_URL } from './lm-studio';
 
@@ -47,8 +48,9 @@ export const identifyPayload = (model: string, photo: Uint8Array, type: string) 
 });
 
 /** One photo → the model's text, or an honest failure: `off` without IDENTIFY_MODEL, else `failed` with the reason. */
-export async function identify(photo: Uint8Array, type: string, deps: IdentifyDeps): Promise<IdentifyReport> {
+export async function identify(photo: Uint8Array, type: string, deps: IdentifyDeps): Promise<IdentifyReport & { usage?: HomeUse }> {
   if (!deps.model) return { ok: false, kind: 'off', reason: "IDENTIFY_MODEL isn't set on SogoAI." };
   const r = await chatCompletion(identifyPayload(deps.model, photo, type), { timeoutMs: IDENTIFY_TIMEOUT_MS, fetch: deps.fetch });
-  return r.ok ? { ok: true, text: r.content } : { ok: false, kind: 'failed', reason: r.reason };
+  const usage = r.usage ? { usage: r.usage } : {}; // §9.4c: what LM Studio was asked, for the Worker's ledger
+  return r.ok ? { ok: true, text: r.content, ...usage } : { ok: false, kind: 'failed', reason: r.reason, ...usage };
 }

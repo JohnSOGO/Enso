@@ -28,6 +28,11 @@ export const NOTE_MARK = ['time', 'date', 'phone', 'money', 'link', 'email', 'ad
 export const NOTE_MARKS_FAILURE = ['off', 'busy', 'failed'] as const; // §8.4a why SogoAI gave no marks for a notes text
 export const NOTE_MARKS_WHY = ['unset', ...NOTE_MARKS_FAILURE] as const; // §8.4a why the sheet shows patterns ('unset': the Worker has no helper settings)
 export const NOTE_MARKS_VIA = ['sogoai', 'patterns'] as const; // §8.4a who marked the notes
+export const MODEL_PROVIDER = ['anthropic', 'workers-ai', 'sogoai'] as const; // §9.4c who ran a model call (model_calls.provider)
+export const MODEL_FEATURE = [
+  'thing-photo', 'thing-link', 'item-name', 'done-photo', 'event-photo', 'event-text', 'event-link',
+  'recipe-video', 'recipe-page', 'recipe-reread', 'show', 'say', 'say-hear', 'note-marks',
+] as const; // §9.4c what a model call was for (model_calls.feature)
 export const LOGIN_REQUEST_STATUS = ['pending', 'approved', 'denied', 'used'] as const; // §6.6 login_requests.status
 export const LOGIN_VIEW = ['pending', 'approved', 'denied', 'expired'] as const; // §6.6 what the waiting browser / the phone is told — derived, never stored
 export const NOTICE_KIND = ['login', 'new_sign_in'] as const; // §6.6 deliveries.notice — a sign-in notice push, never an ALERT_KIND
@@ -77,6 +82,8 @@ export type NoteMark = (typeof NOTE_MARK)[number];
 export type NoteMarksFailure = (typeof NOTE_MARKS_FAILURE)[number];
 export type NoteMarksWhy = (typeof NOTE_MARKS_WHY)[number];
 export type NoteMarksVia = (typeof NOTE_MARKS_VIA)[number];
+export type ModelProvider = (typeof MODEL_PROVIDER)[number];
+export type ModelFeature = (typeof MODEL_FEATURE)[number];
 export type LoginRequestStatus = (typeof LOGIN_REQUEST_STATUS)[number];
 export type LoginView = (typeof LOGIN_VIEW)[number];
 export type NoticeKind = (typeof NOTICE_KIND)[number];
