@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.104 · **Date:** 2026-11-07 · **Owner:** MojoSOGO
+**Version:** 3.105 · **Date:** 2026-11-07 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -1833,7 +1833,11 @@ approval (they just approved it), not after signup or setup. Push only, never ho
 - **Month boundaries:**
   - Alternating months use two background tones (`--month-a`, `--month-b`).
   - The 1st of each month shows the month abbreviation in its cell ("Oct 1").
-  - A sticky header shows the month and year of the top visible row.
+  - A sticky header shows the month and year of **today while today is on screen** (so on load and after **Today**);
+    scrolled away, the month that owns the most visible days, ties to the earlier one (`frontend/src/header-month.ts`;
+    v1.115.1, MojoSOGO 2026-11-07 "Show the current month at the top? I don't know why October is at the top": today's
+    week sits in the second row, so the old top-row rule named the month before). Checks HM1–HM4
+    (`test/header-month.test.ts`).
   - There are no prev/next month arrows.
 - **Opening and scrolling:**
   - On open, the week containing today is the second visible row.

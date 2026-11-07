@@ -7,6 +7,13 @@ carry its result.
 
 ---
 
+## 2026-11-07 — Calendar header names the current month, v1.115.1 (placement-advisor)
+
+- **Ask:** where the pure month-for-the-calendar-header picker goes (SPEC §7.1; MojoSOGO "I don't know why October is at the top").
+- **Verdict:** `frontend/src/header-month.ts` [NEW owner row], test `test/header-month.test.ts`. No reorganizer.
+- **Considerations:** Calendar.tsx at 220/300 had room, but a test importing it pulls in React, api and state; time.ts owns wall time ⇄ UTC, not a view rule; follows the `day-lines.ts` precedent.
+- **Built:** the advisor's rule (most visible days) plus today's month while today is on screen, so a phone's 9 rows late in a month still name the month of today.
+
 ## 2026-11-07 — One ledger of model calls, v1.115.0 (placement-advisor)
 
 - **Ask:** One record of every model call (Claude, Whisper, LM Studio at home) for the SogoAI model-manager dashboard (SPEC §9.4c, §4.2zzo; AREC arec-model-manager-routing.md, CUT).

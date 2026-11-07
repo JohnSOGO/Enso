@@ -7,6 +7,7 @@ import type { WeatherDay } from '../../../src/shared/weather';
 import type { FishingDay } from '../../../src/shared/fishing';
 import { CALENDAR_ITEMS } from '../../../src/shared/calendar-items';
 import { DayCell, isMultiDay } from './DayCell';
+import { headerMonth } from '../header-month';
 import s from './Calendar.module.css';
 
 export interface Occurrence {
@@ -139,7 +140,8 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
   const first = Math.max(0, Math.floor(scrollTop / rowH) - OVERSCAN);
   const last = Math.min(TOTAL_WEEKS - 1, Math.floor((scrollTop + size.h) / rowH) + OVERSCAN);
   const topWeek = Math.min(TOTAL_WEEKS - 1, Math.max(0, Math.floor((scrollTop + 1) / rowH)));
-  const headerDate = addDays(origin, topWeek * 7 + 4); // the week's Thursday names its month
+  const bottomWeek = Math.min(TOTAL_WEEKS - 1, Math.max(topWeek, Math.floor((scrollTop + size.h - 1) / rowH)));
+  const headerYm = headerMonth(addDays(origin, topWeek * 7), (bottomWeek - topWeek + 1) * 7, todayStr);
 
   // Load the chunks covering the visible weeks; refetch stale ones after any refresh.
   useEffect(() => {
@@ -199,7 +201,7 @@ export function Calendar({ onOpenDay }: { onOpenDay: (date: string, data: DayDat
     );
   }
 
-  const [hy, hm] = headerDate.split('-').map(Number);
+  const [hy, hm] = headerYm.split('-').map(Number);
   return (
     <section className={s.root} aria-label="Calendar">
       <div className={s.head}>
