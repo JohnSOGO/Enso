@@ -5,6 +5,10 @@ FunHouse notices all apply here); does not restate it. Run, test and deploy step
 in `README.md`. Modularity doctrine: `docs/modularity.md`. **Start a new session with
 `docs/where-things-stand.md`**: what runs where, where secrets live, the deploy routine, and what is owed.
 
+## Shared canon (all projects)
+Canon lives in `\\192.168.0.123\share\AI_Crossroads\SogoAI\specs\` (also GET /specs/<name> on the SogoAI manager). Follow it; don't keep private copies.
+- **Read at the start of every task:** `RULES.md` (index of every standing rule) and `WORKING-WITH-MOJOSOGO.md` (how to work with MojoSOGO: action order, notify, the required **Best practice:** line with its source, push back on nonstandard asks, never delete, git). Master: github.com/JohnSOGO/sogo-tao `specs/`; copies on the share `\\192.168.0.123\share\AI_Crossroads\SogoAI\specs\`, GET /specs/<name> on 8793 / live.sogodojo.com, and `~/.claude/tao/` (imported by the global CLAUDE.md).
+
 ## The loop: spec → placement → build → audit
 
 `SPEC.md` is the source of truth. **Every change starts there.**
