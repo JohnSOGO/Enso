@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import worker from '../src/worker/index';
 import type { Env } from '../src/worker/env';
 import { HEAR_MODEL, type SpeechAi } from '../src/worker/speech-to-text';
-import { SAY_AUDIO_MAX_BYTES } from '../src/shared/say-reading';
+import { SAY_AUDIO_MAX_BYTES } from '../src/shared/hearing';
 import { BASE, Client, owner } from './helpers';
 
 let o: Client;
