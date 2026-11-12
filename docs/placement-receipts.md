@@ -7,6 +7,16 @@ carry its result.
 
 ---
 
+## 2026-11-12 — Steward pass, v1.116.0 scope (code-steward)
+
+- **Run:** post-release, v1.116.0 (🎤 clips written down on SogoAI first, Workers AI fallback; PR #199)
+- **Verdict:** SOUND (typecheck green, 1131 tests green, arch:audit quiet; top file EventForm.tsx 88% unchanged)
+- **Top finding:** every new helper path means editing three places in `home/captions-helper.ts` (METHOD, answerFor, outcome) and copying the request/parse/meter block in `src/worker/home-captions.ts`. LOW; give it to the reorganizer as extract-first when a fifth helper path is placed, not now.
+- **Handoffs:** 1 to the reorganizer (deferred until the next helper path), 0 to the worker, 0 to the placement-advisor
+- **Restraint:** did not flag the trust-boundary re-check in hear.ts/parseHearReport, the route's home-first fallback (follows the item-photos precedent), the dropped home reason on fallback (as the spec says), or the wording of the map row's heading. The 4 MB helper body cap was checked against the 2 MB clip cap and is fine.
+
+---
+
 ## 2026-11-12 — Hear a clip at home first, Whisper as fallback, v1.116.0 (placement-advisor)
 
 - **Ask:** POST /say/hear asks SogoAI (the helper's new POST /hear → the model manager's transcriptions, with member names as hotwords) first, then Workers AI Whisper (SPEC §8.18 part 2, ⚑ Q408; MojoSOGO 2026-11-11 "I have a better method for VTT using SogoAI; look for it and use it"; AREC arec-sogoai-voice-to-text.md).
