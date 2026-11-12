@@ -1,4 +1,5 @@
-// SPEC §8.18 — POST /say/hear: a recorded clip written down (speech-to-text.ts). POST /say: what was said to the Ensō button, read by Claude (say-reader.ts) and cleaned
+// SPEC §8.18 — POST /say/hear: a recorded clip written down, on SogoAI first (home-captions.ts hearFromHome), else
+// Workers AI (speech-to-text.ts) ⚑ Q408. POST /say: what was said to the Ensō button, read by Claude (say-reader.ts) and cleaned
 // (cleanSayReading). The §7C.4 check order (signed in → the text → daily cap → key → count → read). Nothing saved;
 // the words are never stored or logged.
 import { Hono } from 'hono';
@@ -13,10 +14,17 @@ import { audioBody, body, fail } from '../http';
 import { requireMember } from '../session';
 import { readSay } from '../say-reader';
 import { hearClip } from '../speech-to-text';
+import { hearFromHome, homeCaptionsConfigOf } from '../home-captions';
+import { hotwordsOf } from '../../shared/hearing';
 import { spendPhotoRead } from '../photo-reads';
 import { meterFor } from '../model-usage';
 
 const DAY_NAME = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** The active members, oldest first: who /say may name, and /say/hear's hotwords. */
+const activeMembers = async (db: D1Database) =>
+  (await all<{ id: string; display_name: string }>(db, 'SELECT id, display_name FROM members WHERE disabled_at IS NULL ORDER BY created_at'))
+    .map((m) => ({ id: m.id, name: m.display_name }));
 
 export const say = new Hono<AppEnv>();
 
@@ -32,8 +40,7 @@ say.post('/say', requireMember, async (c) => {
       ? fail(c, 429, 'rate_limited', `Ensō can't read any more today (${READS_PER_DAY} a day, shared with photos and links). Try again tomorrow.`)
       : fail(c, 503, 'photo_reading_off', "Ensō can't read what you said yet: it isn't set up.");
   }
-  const members = (await all<{ id: string; display_name: string }>(c.env.DB, 'SELECT id, display_name FROM members WHERE disabled_at IS NULL ORDER BY created_at'))
-    .map((m) => ({ id: m.id, name: m.display_name }));
+  const members = await activeMembers(c.env.DB);
   const p = await first<{ kind: string | null; time: string | null }>(c.env.DB, 'SELECT after_kind AS kind, after_time AS time FROM member_prefs WHERE member_id = ?', me.id);
   const after = afterOf({ admin: isAdmin(me), kind: p?.kind ?? null, time: p?.time ?? null }); // §8.5b: "after work" is theirs
   const r = await readSay({
@@ -47,12 +54,17 @@ say.post('/say', requireMember, async (c) => {
   return c.json(reading);
 });
 
-// §8.18 part 2 ⚑ Q378 — a recorded clip written down; not a Claude read, no cap of its own (⚑ Q379).
+// §8.18 part 2 ⚑ Q378 ⚑ Q408 — a recorded clip written down (home first); not a Claude read, no cap of its own (⚑ Q379).
 say.post('/say/hear', requireMember, async (c) => {
-  if (!c.env.AI) return fail(c, 503, 'hear_off', "Ensō can't write down recordings: it isn't set up.");
+  const home = homeCaptionsConfigOf(c.env);
+  if (!home && !c.env.AI) return fail(c, 503, 'hear_off', "Ensō can't write down recordings: it isn't set up.");
   const clip = await audioBody(c);
   if (clip instanceof Response) return clip;
-  const r = await hearClip(c.env.AI, clip.bytes, meterFor(c.env.DB, 'say-hear'));
+  const meter = meterFor(c.env.DB, 'say-hear');
+  const names = home ? hotwordsOf((await activeMembers(c.env.DB)).map((m) => m.name)) : [];
+  const atHome = home ? await hearFromHome(home, clip.bytes, clip.type, names, { meter }) : null;
+  if (atHome?.ok) return c.json({ text: atHome.text });
+  const r = c.env.AI ? await hearClip(c.env.AI, clip.bytes, meter) : { ok: false as const };
   if (!r.ok) return fail(c, 502, 'hear_failed', "Ensō couldn't write that down. Try again, or use the keyboard's 🎤.");
   return c.json({ text: r.text });
 });
