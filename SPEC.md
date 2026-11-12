@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.105 · **Date:** 2026-11-07 · **Owner:** MojoSOGO
+**Version:** 3.106 · **Date:** 2026-11-11 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -7010,7 +7010,7 @@ picked CUT 2026-11-07):
 |---|---|---|
 | Claude API (`claude.ts`: every reader, §7C.4, §7.8–7.9, §7E, §7F.2, §7G.6, §7A.3, §8.18) | the Worker, straight to Anthropic | the ledger, through `GET /ops/model-usage` |
 | Whisper on Workers AI (`speech-to-text.ts`, /say/hear, §8.18 part 2) | the Worker's `AI` binding | the ledger |
-| LM Studio (`home/identify.ts`, `home/note-marks.ts`, §7A.3, §8.4a) | the SogoAI helper | its own chat proxy at `127.0.0.1:8797` (the helper's `LM_STUDIO_URL`), **and** the ledger |
+| LM Studio (`home/identify.ts`, `home/note-marks.ts`, §7A.3, §8.4a) | the SogoAI helper | its own chat proxy at `127.0.0.1:8797` (the helper's `LM_STUDIO_URL`, each call named by the header `X-Sogo-App: enso`, the manager's app name), **and** the ledger |
 
 Cloud calls are never sent through the home PC: with SogoAI off or its tunnel down, voice and every reading keep
 working, and the Anthropic key stays a Worker secret only. The manager catches up on its next read. Build now's
@@ -7051,7 +7051,7 @@ reads it (the SogoAI project builds that panel; asked on the Crossroads Board).
 | MU2 | `POST /say` with a fake Claude | one `say` / `anthropic` / `claude-opus-5-5` row with its tokens |
 | MU3 | a look-up that pauses once; a refusal; a throw | two ok rows with their searches and fetches; one not-ok row with its tokens; one not-ok row with nothing |
 | MU4 | `hearClip` with and without a length, and failing; `POST /say/hear` | the bytes and seconds (or NULL); not ok; a `say-hear` row |
-| MU5 | the helper's LM Studio call | goes to `127.0.0.1:8797`; carries the model and the tokens |
+| MU5 | the helper's LM Studio call | goes to `127.0.0.1:8797` with `X-Sogo-App: enso`; carries the model and the tokens |
 | MU6 | a helper answer with `usage`; one without | one `sogoai` row; none |
 | MU7 | `GET /ops/model-usage?days=7`; `days=0`, `1.5`; no token | today's rows summed, an old row left out, the estimate and total; 400; 400; 401 |
 | MU-M | migration 0068 | §4.2zzo's check |

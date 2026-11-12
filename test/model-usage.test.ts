@@ -111,8 +111,11 @@ describe('MU4 Whisper', () => {
 describe('MU5–MU6 SogoAI', () => {
   it('MU5 the helper goes through the model manager\'s chat proxy and reports what LM Studio used', async () => {
     expect(LM_STUDIO_URL).toBe('http://127.0.0.1:8797/v1/chat/completions');
-    const f: typeof fetch = async () => Response.json({ choices: [{ message: { content: 'Milk' } }], usage: { prompt_tokens: 50, completion_tokens: 3 } });
+    let sent: Headers | undefined;
+    const f: typeof fetch = async (_u, init) => { sent = new Headers(init?.headers);
+      return Response.json({ choices: [{ message: { content: 'Milk' } }], usage: { prompt_tokens: 50, completion_tokens: 3 } }); };
     const r = await chatCompletion({ model: 'photo-polish' }, { timeoutMs: 1000, fetch: f });
+    expect(sent?.get('x-sogo-app')).toBe('enso'); // the manager names the app on proxied calls
     expect(r).toMatchObject({ ok: true, content: 'Milk', usage: { model: 'photo-polish', inputTokens: 50, outputTokens: 3 } });
     const down = await chatCompletion({ model: 'photo-polish' }, { timeoutMs: 1000, fetch: async () => { throw new Error('refused'); } });
     expect(down).toEqual({ ok: false, reason: 'LM Studio error: refused' });
