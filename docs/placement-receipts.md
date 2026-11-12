@@ -7,6 +7,13 @@ carry its result.
 
 ---
 
+## 2026-11-11 — X-Sogo-App header on the home LM Studio call, v1.115.2 (placement-advisor)
+
+- **Ask:** the SogoAI home helper's LM Studio chat call (POST 127.0.0.1:8797/v1/chat/completions) sends `X-Sogo-App: enso` so the PC model manager names Ensō on proxied calls (SPEC §9.4c, MU5; asked by SogoAI on Crossroads XR-0017).
+- **Verdict:** `home/lm-studio.ts` `chatCompletion()` [EXISTING]; the header is an exported constant beside `LM_STUDIO_URL`; test extends MU5 in `test/model-usage.test.ts`. No reorganizer.
+- **Flow stage:** deliver (the outbound transport at home).
+- **Why:** the single owner of the one LM Studio request, so every caller gets the header unchanged. A wire label for an outside system, not Ensō vocabulary, so not `vocab.ts` (home/ can't import it anyway). Per-caller headers were rejected (they would drift).
+- **Caps:** 47 → 49 of 300 lines; nothing enters the warning band.
 ## 2026-11-07 — Calendar header names the current month, v1.115.1 (placement-advisor)
 
 - **Ask:** where the pure month-for-the-calendar-header picker goes (SPEC §7.1; MojoSOGO "I don't know why October is at the top").

@@ -6,6 +6,8 @@
 import type { HomeUse } from '../src/shared/model-usage';
 
 export const LM_STUDIO_URL = 'http://127.0.0.1:8797/v1/chat/completions';
+/** The manager's app header: names Ensō on every proxied call (§9.4c; asked by SogoAI on Crossroads XR-0017). */
+export const SOGO_APP_HEADERS = { 'x-sogo-app': 'enso' } as const;
 
 const BODY_MAX = 200;
 
@@ -19,7 +21,7 @@ export async function chatCompletion(payload: { model: string }, opts: { timeout
   try {
     const res = await opts.fetch(LM_STUDIO_URL, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...SOGO_APP_HEADERS },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(opts.timeoutMs),
     });
