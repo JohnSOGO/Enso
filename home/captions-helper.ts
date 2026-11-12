@@ -3,9 +3,10 @@
 // GET /captions?v=… with the CaptionsResult that the SAME youtube-captions.ts reads from the home IP (the
 // Worker asks it in-line when YouTube blocks the Worker), and POST /identify (an image) with the IdentifyReport
 // identify.ts gets from LM Studio's local vision model, and POST /note-marks (JSON { text }) with the NoteMarksReport
-// note-marks.ts gets after asking the PC model manager (§8.4a). Bearer CAPTIONS_TOKEN, compared in constant time.
-// One log line per request; the token and the notes are never logged. youtube-captions.ts, item-reading.ts,
-// note-marks.ts (both), identify.ts, node:http and Node globals only (§2.5) — `npm run build:home` bundles it into home/dist/captions-helper.mjs. Config:
+// note-marks.ts gets after asking the PC model manager (§8.4a), and POST /hear (a recorded clip) with the HearReport
+// hear.ts gets from the manager's speech-to-text (§8.18 part 2). Bearer CAPTIONS_TOKEN, compared in constant time.
+// One log line per request; the token, the notes, the clip and its words are never logged. youtube-captions.ts,
+// item-reading.ts, note-marks.ts (both), hearing.ts, identify.ts, hear.ts, node:http and Node globals only (§2.5) — `npm run build:home` bundles it into home/dist/captions-helper.mjs. Config:
 // CAPTIONS_TOKEN and IDENTIFY_MODEL from the environment (captions-helper.env, via node --env-file).
 import { createServer } from 'node:http';
 import { readCaptions } from '../src/worker/youtube-captions';
@@ -13,6 +14,8 @@ import { IDENTIFY_BODY_MAX } from '../src/shared/item-reading';
 import { identify } from './identify';
 import { NOTE_MARKS_TEXT_MAX } from '../src/shared/note-marks';
 import { noteMarks } from './note-marks';
+import { SAY_AUDIO_MAX_BYTES, SAY_AUDIO_TYPES, hotwordsOf } from '../src/shared/hearing';
+import { hear } from './hear';
 
 export const HOST = '127.0.0.1';
 export const PORT = 8790;
@@ -49,7 +52,7 @@ export async function handle(req: HelperRequest, deps: HelperDeps): Promise<Help
 }
 
 /** Each path and the one method it answers. */
-const METHOD: Record<string, string> = { '/captions': 'GET', '/identify': 'POST', '/note-marks': 'POST' };
+const METHOD: Record<string, string> = { '/captions': 'GET', '/identify': 'POST', '/note-marks': 'POST', '/hear': 'POST' };
 
 async function answerFor(req: HelperRequest, deps: HelperDeps): Promise<HelperAnswer> {
   const url = new URL(req.url, `http://${HOST}`);
@@ -60,6 +63,7 @@ async function answerFor(req: HelperRequest, deps: HelperDeps): Promise<HelperAn
   if (!(await sameSecret(given, deps.token))) return { status: 401, body: { error: 'unauthorized' } };
   if (url.pathname === '/identify') return identifyAnswer(req, deps);
   if (url.pathname === '/note-marks') return noteMarksAnswer(req, deps);
+  if (url.pathname === '/hear') return hearAnswer(req, url, deps);
   const v = url.searchParams.get('v') ?? '';
   if (!VIDEO_ID.test(v)) return { status: 400, body: { error: 'invalid_video_id' } };
   return { status: 200, body: await readCaptions(v, { fetch: deps.fetch }) };
@@ -87,8 +91,24 @@ async function noteMarksAnswer(req: HelperRequest, deps: HelperDeps): Promise<He
   return { status: 200, body: await noteMarks(text, { model: deps.model, fetch: deps.fetch }) };
 }
 
+/** §8.18 part 2 — after the bearer: a recorded type (400), within the clip cap (413), not empty (400), then hear with
+ *  the `w` names as hotwords. */
+async function hearAnswer(req: HelperRequest, url: URL, deps: HelperDeps): Promise<HelperAnswer> {
+  const type = (req.contentType ?? '').split(';')[0].trim().toLowerCase();
+  if (!(SAY_AUDIO_TYPES as readonly string[]).includes(type)) return { status: 400, body: { error: 'not_audio' } };
+  if (req.body === 'too_large' || (req.body?.length ?? 0) > SAY_AUDIO_MAX_BYTES) return { status: 413, body: { error: 'too_large' } };
+  if (!req.body?.length) return { status: 400, body: { error: 'empty_body' } };
+  return { status: 200, body: await hear(req.body, hotwordsOf(url.searchParams.getAll('w')), { fetch: deps.fetch }) };
+}
+
 /** What one log line says came of a request: never the token, never a header, never the image, never the notes. */
 function outcome(req: HelperRequest, answer: HelperAnswer): string {
+  if (new URL(req.url, `http://${HOST}`).pathname === '/hear') {
+    const r = answer.body as { ok?: boolean; text?: string; reason?: string; error?: string };
+    if (answer.status !== 200) return `${req.method} hear → ${answer.status} ${r.error ?? ''}`.trim();
+    const bytes = req.body instanceof Uint8Array ? req.body.length : 0;
+    return `hear ${bytes} bytes → ${r.ok ? `${(r.text ?? '').split(' ').filter(Boolean).length} words` : `failed: ${r.reason}`}`;
+  }
   if (new URL(req.url, `http://${HOST}`).pathname === '/note-marks') {
     const r = answer.body as { ok?: boolean; marks?: unknown[]; kind?: string; reason?: string; error?: string };
     if (answer.status !== 200) return `${req.method} note-marks → ${answer.status} ${r.error ?? ''}`.trim();

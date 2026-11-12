@@ -30,8 +30,8 @@ export const LAYERS: Layer[] = [
   { from: 'frontend/src/', banned: ['src/worker/', 'scripts/', 'home/'], why: 'the PWA talks to the Worker over HTTP only' },
   {
     from: 'home/', banned: ['src/', 'frontend/', 'scripts/', 'package:'],
-    allowed: ['src/worker/youtube-captions.ts', 'src/shared/item-reading.ts', 'src/shared/note-marks.ts', 'src/shared/model-usage.ts', 'package:node:http', 'package:node:fs'],
-    why: 'youtube-captions.ts, item-reading.ts, note-marks.ts, model-usage.ts (types), its own siblings, node:http, node:fs and Node globals only (§7E.2c, §7A.3, §8.4a, §9.4a, §9.4c)',
+    allowed: ['src/worker/youtube-captions.ts', 'src/shared/item-reading.ts', 'src/shared/note-marks.ts', 'src/shared/model-usage.ts', 'src/shared/hearing.ts', 'package:node:http', 'package:node:fs'],
+    why: 'youtube-captions.ts, item-reading.ts, note-marks.ts, model-usage.ts (types), hearing.ts (the clip bounds its POST /hear holds a recording to), its own siblings, node:http, node:fs and Node globals only (§7E.2c, §7A.3, §8.4a, §9.4a, §9.4c, §8.18 part 2)',
   },
 ];
 

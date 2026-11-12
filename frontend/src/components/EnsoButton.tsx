@@ -15,7 +15,8 @@ import { isAdmin } from '../../../src/shared/roles';
 import { speak, stopSpeaking, unlockSpeech, useRecord } from './useSpeech';
 import { errorText, post, upload } from '../api';
 import { canBuild, type FeatureRequest } from '../../../src/shared/feature-requests';
-import { SAY_CHECK, SAY_CLIP_MAX_MS, SAY_TEXT_MAX, clarified, type SayEvent, type SayReading, type SayReminder } from '../../../src/shared/say-reading';
+import { SAY_CHECK, SAY_TEXT_MAX, clarified, type SayEvent, type SayReading, type SayReminder } from '../../../src/shared/say-reading';
+import { SAY_CLIP_MAX_MS } from '../../../src/shared/hearing';
 import s from './EnsoButton.module.css';
 
 type Phase = 'closed' | 'listen' | 'reading' | 'answer' | 'saved';

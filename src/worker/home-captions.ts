@@ -1,14 +1,15 @@
-// SPEC §7E.2c, §7A.3, §8.4a — asking the SogoAI helper, in-line, through Cloudflare Access and the `sogoai` tunnel:
-// one video's captions (GET /captions, checked by parseCaptionsReport), a snapped item's name (POST /identify with
-// the image, checked by parseIdentifyReport) and a notes text's marks (POST /note-marks, checked by
-// parseNoteMarksReport). Each is one request with Bearer CAPTIONS_TOKEN through access.ts (the
+// SPEC §7E.2c, §7A.3, §8.4a, §8.18 part 2 — asking the SogoAI helper, in-line, through Cloudflare Access and the `sogoai`
+// tunnel: one video's captions (GET /captions, checked by parseCaptionsReport), a snapped item's name (POST /identify with
+// the image, checked by parseIdentifyReport), a notes text's marks (POST /note-marks, checked by
+// parseNoteMarksReport) and a recorded clip's words (POST /hear, checked by parseHearReport). Each is one request with Bearer CAPTIONS_TOKEN through access.ts (the
 // Access headers, redirect 'manual', 2xx only, a timeout). Never throws, never names a secret, never decides whether
-// to ask or what is saved (the routes do). The `usage` an /identify or /note-marks answer carries (what SogoAI's
-// LM Studio was asked) goes to the route's Meter (§9.4c). No D1, no Hono. A leaf sibling of house.ts.
+// to ask or what is saved (the routes do). The `usage` an /identify, /note-marks or /hear answer carries (what SogoAI's
+// LM Studio or the manager's Whisper was asked) goes to the route's Meter (§9.4c). No D1, no Hono. A leaf sibling of house.ts.
 import type { Env } from './env';
 import { parseCaptionsReport } from '../shared/recipe-reading';
 import { parseIdentifyReport } from '../shared/item-reading';
 import { parseNoteMarksReport, type NoteMarksReport } from '../shared/note-marks';
+import { parseHearReport, type HearReport } from '../shared/hearing';
 import { callThroughAccess } from './access';
 import { homeUseOf, noUse, type Meter } from '../shared/model-usage';
 
@@ -18,6 +19,8 @@ export const HOME_CAPTIONS_TIMEOUT_MS = 20_000;
 export const HOME_IDENTIFY_TIMEOUT_MS = 20_000;
 /** ⚑ Q370 — how long the Worker waits for SogoAI to mark a notes text: more than its 5 s + 15 s. */
 export const HOME_NOTE_MARKS_TIMEOUT_MS = 25_000;
+/** ⚑ Q409 — how long the Worker waits for SogoAI to write a clip down, before Workers AI does. */
+export const HOME_HEAR_TIMEOUT_MS = 15_000;
 
 export interface HomeCaptionsConfig { url: string; accessId: string; accessSecret: string; token: string }
 
@@ -49,9 +52,12 @@ export async function readCaptionsFromHome(cfg: HomeCaptionsConfig, videoId: str
 }
 
 /** A helper answer's usage → one sogoai row; no usage (an older helper, or no model asked) → nothing. */
-async function meterHome(meter: Meter | undefined, body: unknown, ok: boolean) {
+async function meterHome(meter: Meter | undefined, body: unknown, ok: boolean, audioBytes = 0) {
   const u = meter && homeUseOf((body as { usage?: unknown } | null)?.usage);
-  if (u) await meter!({ ...noUse('sogoai', u.model, ok, u.ms), inputTokens: u.inputTokens, outputTokens: u.outputTokens });
+  if (u) {
+    await meter!({ ...noUse('sogoai', u.model, ok, u.ms), inputTokens: u.inputTokens, outputTokens: u.outputTokens,
+      ...(u.audioSeconds !== undefined ? { audioSeconds: u.audioSeconds, audioBytes } : {}) });
+  }
 }
 
 export type HomeIdentify = { ok: true; text: string } | { ok: false; reason: string };
@@ -88,4 +94,21 @@ export async function noteMarksFromHome(cfg: HomeCaptionsConfig, text: string,
   const report = parseNoteMarksReport(body);
   await meterHome(opts.meter, body, typeof report !== 'string' && report.ok);
   return typeof report === 'string' ? { ok: false, kind: 'failed', reason: report } : report;
+}
+
+/** One POST of the clip to `{url}/hear?w=…` (each name a hotword) → its words, or an honest reason (the transport,
+ *  the parse message, or the home's own); an empty hearing is a failure, so the route can fall back. */
+export async function hearFromHome(cfg: HomeCaptionsConfig, clip: ArrayBuffer, type: string, names: readonly string[],
+  opts: { fetch?: typeof fetch; meter?: Meter } = {}): Promise<HearReport> {
+  const q = new URLSearchParams(names.map((n) => ['w', n]));
+  const res = await callThroughAccess(cfg, `${cfg.url}/hear${names.length ? `?${q}` : ''}`, {
+    method: 'POST', timeoutMs: HOME_HEAR_TIMEOUT_MS, body: clip, fetch: opts.fetch,
+    headers: { Authorization: `Bearer ${cfg.token}`, 'Content-Type': type },
+  });
+  if (!res.ok) return res;
+  let body: unknown;
+  try { body = JSON.parse(res.text); } catch { return { ok: false, reason: 'The helper answered something that is not JSON.' }; }
+  const report = parseHearReport(body);
+  await meterHome(opts.meter, body, typeof report !== 'string' && report.ok, clip.byteLength);
+  return typeof report === 'string' ? { ok: false, reason: report } : report;
 }

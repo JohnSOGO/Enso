@@ -9,7 +9,7 @@ import type { Env } from '../src/worker/env';
 import { claudeCounts, estimateUsd, homeUseOf, noUse, type ModelUse } from '../src/shared/model-usage';
 import { askClaudeResearch } from '../src/worker/claude';
 import { HEAR_MODEL, hearClip, type SpeechAi } from '../src/worker/speech-to-text';
-import { noteMarksFromHome } from '../src/worker/home-captions';
+import { hearFromHome, noteMarksFromHome } from '../src/worker/home-captions';
 import { chatCompletion, LM_STUDIO_URL } from '../home/lm-studio';
 import { BASE, Client, owner } from './helpers';
 import { claudeMessage, keyedEnv, warmClaude } from './recipe-fakes';
@@ -127,6 +127,20 @@ describe('MU5–MU6 SogoAI', () => {
     await noteMarksFromHome(cfg, 'x', { meter: m.meter, fetch: answer({ ok: true, marks: [], usage: { model: 'photo-polish', ms: 80, inputTokens: 40, outputTokens: 9 } }) });
     await noteMarksFromHome(cfg, 'x', { meter: m.meter, fetch: answer({ ok: false, kind: 'busy', reason: 'r' }) });
     expect(m.seen).toEqual([{ ...noUse('sogoai', 'photo-polish', true, 80), inputTokens: 40, outputTokens: 9 }]);
+  });
+  it('MU4 a clip heard at home is one sogoai row with its seconds and bytes; failing at home then Whisper is two', async () => {
+    const m = collect();
+    const cfg = { url: 'https://sogoai.test', accessId: 'i', accessSecret: 's', token: 't' };
+    const answer = (body: object): typeof fetch => async () => Response.json(body);
+    const usage = { model: 'whisper-large-v3-turbo@gamerpc', ms: 700, inputTokens: 0, outputTokens: 0, audioSeconds: 2.5 };
+    await hearFromHome(cfg, new Uint8Array(6).buffer, 'audio/mp4', ['Roxy'], { meter: m.meter, fetch: answer({ ok: true, text: 'hi', usage }) });
+    await hearFromHome(cfg, new Uint8Array(6).buffer, 'audio/mp4', [], { meter: m.meter, fetch: answer({ ok: false, reason: 'r', usage: { ...usage, model: 'whisper-large-v3-turbo@cpu' } }) });
+    await hearClip({ run: async () => ({ text: 'hi', transcription_info: { duration: 2.5 } }) }, new Uint8Array(6).buffer, m.meter);
+    expect(m.seen.map((u) => [u.provider, u.model, u.ok, u.audioSeconds, u.audioBytes])).toEqual([
+      ['sogoai', 'whisper-large-v3-turbo@gamerpc', true, 2.5, 6], ['sogoai', 'whisper-large-v3-turbo@cpu', false, 2.5, 6],
+      ['workers-ai', HEAR_MODEL, true, 2.5, 6]]);
+    expect(homeUseOf({ model: 'w', audioSeconds: -1 })).toMatchObject({ audioSeconds: null });
+    expect(homeUseOf({ model: 'w' })).not.toHaveProperty('audioSeconds');
   });
 });
 

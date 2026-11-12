@@ -7,6 +7,22 @@ carry its result.
 
 ---
 
+## 2026-11-12 — Hear a clip at home first, Whisper as fallback, v1.116.0 (placement-advisor)
+
+- **Ask:** POST /say/hear asks SogoAI (the helper's new POST /hear → the model manager's transcriptions, with member names as hotwords) first, then Workers AI Whisper (SPEC §8.18 part 2, ⚑ Q408; MojoSOGO 2026-11-11 "I have a better method for VTT using SogoAI; look for it and use it"; AREC arec-sogoai-voice-to-text.md).
+- **Verdict:** `src/shared/hearing.ts` [NEW row: clip bounds moved from say-reading.ts, HearReport / parseHearReport, hotwordsOf] and `home/hear.ts` [NEW row]. EXISTING: `home-captions.ts` hearFromHome, `home/captions-helper.ts` POST /hear, `routes/say.ts` (the fallback), `shared/model-usage.ts` (HomeUse.audioSeconds), `scripts/arch.ts` LAYERS home allowed list. speech-to-text.ts unchanged. Reorganizer first: move the clip bounds out of say-reading.ts. Spec first.
+- **Flow stage:** rules (hearing.ts), deliver (home-captions.ts, home/hear.ts), route (say.ts picks who to ask).
+- **Why:** follows how /identify and /note-marks are split; the route picks who to ask, as in item-photos and notes. Rejected: the fallback in speech-to-text.ts (a second job and a home-captions import); HearReport in item-reading.ts or say-reading.ts (home/ would pull in reminders, time and feature-requests); restating 2 MB in home/.
+- **Built:** as placed, with one simplification: no HEAR_FAILURE kinds in vocab (a HearReport failure is `{ ok: false, reason }`, like the captions report; the route only needs ok or not).
+- **Caps:** say.ts ~75/300, home-captions.ts ~115/300, captions-helper.ts ~172/300, model-usage.ts ~88/300, hearing.ts ~50, home/hear.ts ~50; none in the band. captions-helper outcome() has a branch per path; noted for the steward.
+
+## 2026-11-12 — the clip bounds move to src/shared/hearing.ts (reorganizer)
+
+- **Trigger:** placement-advisor 2026-11-12, SogoAI hearing (SPEC §8.18 part 2): the home/ helper's POST /hear needs the clip bounds, which sat in say-reading.ts (not importable by home/), so it ruled extract-first.
+- **Seam moved:** SAY_AUDIO_TYPES, SAY_AUDIO_MAX_BYTES, SAY_CLIP_MAX_MS from `src/shared/say-reading.ts` to `src/shared/hearing.ts` [NEW row]; hearing.ts added to home/'s LAYERS allowed list. Commit f775823.
+- **Room opened:** say-reading.ts 135 → 131 lines; the room that matters is the layer: home/ may import the bounds without the reading logic.
+- **Behavior:** preserved; typecheck, npm test (170 files / 1122 tests) and arch:audit green.
+
 ## 2026-11-11 — X-Sogo-App header on the home LM Studio call, v1.115.2 (placement-advisor)
 
 - **Ask:** the SogoAI home helper's LM Studio chat call (POST 127.0.0.1:8797/v1/chat/completions) sends `X-Sogo-App: enso` so the PC model manager names Ensō on proxied calls (SPEC §9.4c, MU5; asked by SogoAI on Crossroads XR-0017).

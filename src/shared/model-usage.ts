@@ -69,13 +69,18 @@ export function claudeCounts(usage: unknown): Pick<ModelUse, 'inputTokens' | 'ou
   };
 }
 
-/** The SogoAI helper's `usage` on an /identify or /note-marks answer (§9.4c): what LM Studio was asked. */
-export interface HomeUse { model: string; ms: number; inputTokens: number; outputTokens: number }
+/** The SogoAI helper's `usage` on an /identify, /note-marks or /hear answer (§9.4c): what LM Studio or the manager's
+ *  Whisper was asked; `audioSeconds` the clip's length on /hear (null when unknown), absent otherwise. */
+export interface HomeUse { model: string; ms: number; inputTokens: number; outputTokens: number; audioSeconds?: number | null }
 
 /** A helper answer's `usage` field → a HomeUse, or null when it carries none (an older helper) or a bad one. */
 export function homeUseOf(v: unknown): HomeUse | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
   const r = v as Record<string, unknown>;
   if (typeof r.model !== 'string' || !r.model.trim()) return null;
-  return { model: r.model.trim().slice(0, 100), ms: count(r.ms), inputTokens: count(r.inputTokens), outputTokens: count(r.outputTokens) };
+  const audio = typeof r.audioSeconds === 'number' && Number.isFinite(r.audioSeconds) && r.audioSeconds >= 0 ? r.audioSeconds : null;
+  return {
+    model: r.model.trim().slice(0, 100), ms: count(r.ms), inputTokens: count(r.inputTokens), outputTokens: count(r.outputTokens),
+    ...('audioSeconds' in r ? { audioSeconds: audio } : {}),
+  };
 }

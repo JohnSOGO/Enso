@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { PHOTO_MAX_BYTES, PHOTO_TYPES } from '../shared/photos';
-import { SAY_AUDIO_MAX_BYTES, SAY_AUDIO_TYPES } from '../shared/say-reading';
+import { SAY_AUDIO_MAX_BYTES, SAY_AUDIO_TYPES } from '../shared/hearing';
 import { isOneOf } from '../shared/vocab';
 
 /** Every error response: { error, message } with a non-empty message (SPEC §10). */

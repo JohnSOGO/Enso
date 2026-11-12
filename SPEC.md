@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.106 · **Date:** 2026-11-11 · **Owner:** MojoSOGO
+**Version:** 3.107 · **Date:** 2026-11-12 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -156,6 +156,7 @@ dismisses an open request that does not fit.
   |   - House delivery   (house.ts, §9.2)        |
   |   - Captions from home (§7E.2c)              |
   |   - Snap an item: SogoAI first (§7A.3)       |
+  |   - Write a clip down: SogoAI first (§8.18)  |
   |            |                                 |
   |           D1 (SQLite)                        |
   +---------------------------------------------+
@@ -165,6 +166,7 @@ dismisses an open request that does not fit.
             |    https://sogoai.sogodojo.com/captions + Bearer CAPTIONS_TOKEN  (in-line, §7E.2c)
             |    https://sogoai.sogodojo.com/identify + Bearer CAPTIONS_TOKEN  (in-line, §7A.3)
             |    https://sogoai.sogodojo.com/note-marks + Bearer CAPTIONS_TOKEN (in-line, §8.4a)
+            |    https://sogoai.sogodojo.com/hear + Bearer CAPTIONS_TOKEN       (in-line, §8.18 part 2)
             v
   +---------------------------+  Cloudflare Tunnel +-------------------------+
   |  Cloudflare Access         | -----------------> |  Home Assistant          |
@@ -185,6 +187,9 @@ dismisses an open request that does not fit.
   |                                          |   model manager (127.0.0.1:8793 /state),
   |                                          |   then the same proxy -> a NoteMarksReport
   |                                          |   (§8.4a); both carry LM Studio's usage (§9.4c)
+  |                                          |   POST /hear (a recorded clip) -> the PC
+  |                                          |   model manager's /v1/audio/transcriptions
+  |                                          |   -> a HearReport (§8.18 part 2)
   +-----------------------------------------+
 ```
 
@@ -286,10 +291,11 @@ Enso/
 │   ├── vite.config.ts
 │   └── src/
 ├── home/                   # runs on SogoAI, not in the Worker (§7E.2c)
-│   ├── captions-helper.ts  # 127.0.0.1:8790 GET /captions?v=… → readCaptions from the home IP; POST /identify → identify.ts; POST /note-marks → note-marks.ts
+│   ├── captions-helper.ts  # 127.0.0.1:8790 GET /captions?v=… → readCaptions from the home IP; POST /identify → identify.ts; POST /note-marks → note-marks.ts; POST /hear → hear.ts
 │   ├── identify.ts         # §7A.3 one photo → LM Studio's local vision model → an IdentifyReport
 │   ├── note-marks.ts       # §8.4a a notes text → model-manager.ts, then LM Studio → a NoteMarksReport
 │   ├── model-manager.ts    # §8.4a may the loaded model be used now? (the PC model manager's GET /state)
+│   ├── hear.ts             # §8.18 part 2 a recorded clip → the PC model manager's speech-to-text → a HearReport
 │   ├── lm-studio.ts        # §7A.3, §8.4a the one LM Studio chat-completions call
 │   ├── captions-helper.cmd # the Task Scheduler launcher (node --env-file, appends to a log)
 │   ├── tsconfig.json       # Node types; part of `npm run typecheck`
@@ -335,8 +341,8 @@ against the deployed Worker. On iPhone, push works only after
 | `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` (secrets) | Worker | The Cloudflare Access **service token** (`enso-worker`) for `ha.sogodojo.com` **and** `sogoai.sogodojo.com`, sent as `CF-Access-Client-Id` / `CF-Access-Client-Secret` (§9.2, §7E.2c). One token, two Access applications. Never logged. Tests pin them empty (House and captions from home are then not configured). |
 | `HA_URL`, `ECHO_TARGETS` (JSON array), `ECHO_TYPE`, `SATELLITE_ENTITY` (vars, `wrangler.toml`) | Worker | Where House speaks (§9.2). `ECHO_TARGETS` + `SATELLITE_ENTITY` are the **default speakers**: what a house delivery uses when someone it is for has not chosen their own (§9.2a). |
 | `YOUTUBE_API_KEY` (secret) | Worker | A Google Cloud API key with the YouTube Data API v3 enabled, for reading a recipe video's title and description (§7E). Set it with `npx wrangler secret put YOUTUBE_API_KEY` **in a real PowerShell window**. Never logged, never in an error message. Reading recipes also needs `ANTHROPIC_API_KEY`; without either, `POST /recipes/from-video` is 503 `recipe_reading_off` and typed recipes still work. Tests pin it empty. |
-| `CAPTIONS_TOKEN` (secret) | Worker **and** SogoAI's `C:\Enso\captions-helper.env` | The bearer the Worker sends to the SogoAI helper (`Authorization: Bearer …`, §7E.2c), checked by the helper in constant time — a second lock behind Access. A long random string, set with `npx wrangler secret put CAPTIONS_TOKEN` in a real PowerShell window and the same value in the helper's env file (never in the repo). Unset or empty on the Worker → captions from home are not set up (§7E.2c) and a snapped item goes straight to Claude (§7A.3); unset on SogoAI → the helper does not start. The same bearer guards `/identify` (§7A.3). Never logged, by the Worker or the helper. Tests pin a test-only value. |
-| `HOME_CAPTIONS_URL` (var, `wrangler.toml`) | Worker | Where the SogoAI helper is reached: `https://sogoai.sogodojo.com` (§7E.2c), for `/captions`, `/identify` (§7A.3) and `/note-marks` (§8.4a) alike. Tests pin `https://sogoai.test`, which only a fetch spy answers. |
+| `CAPTIONS_TOKEN` (secret) | Worker **and** SogoAI's `C:\Enso\captions-helper.env` | The bearer the Worker sends to the SogoAI helper (`Authorization: Bearer …`, §7E.2c), checked by the helper in constant time — a second lock behind Access. A long random string, set with `npx wrangler secret put CAPTIONS_TOKEN` in a real PowerShell window and the same value in the helper's env file (never in the repo). Unset or empty on the Worker → captions from home are not set up (§7E.2c) and a snapped item goes straight to Claude (§7A.3); unset on SogoAI → the helper does not start. The same bearer guards `/identify` (§7A.3), `/note-marks` (§8.4a) and `/hear` (§8.18 part 2). Never logged, by the Worker or the helper. Tests pin a test-only value. |
+| `HOME_CAPTIONS_URL` (var, `wrangler.toml`) | Worker | Where the SogoAI helper is reached: `https://sogoai.sogodojo.com` (§7E.2c), for `/captions`, `/identify` (§7A.3), `/note-marks` (§8.4a) and `/hear` (§8.18 part 2) alike. Tests pin `https://sogoai.test`, which only a fetch spy answers. |
 | `IDENTIFY_MODEL` (SogoAI's `C:\Enso\captions-helper.env`, not a Worker setting) | SogoAI helper | The LM Studio model id `/identify` and `/note-marks` ask (§7A.3, §8.4a): `photo-polish`, the one small vision chat model SogoAI keeps loaded ⚑ Q115. `/note-marks` asks it only while the PC model manager shows it loaded. Unset or empty → `/identify` answers `{ ok: false, kind: "off" }` (the Worker then asks Claude) and `/note-marks` answers `off` (patterns); captions keep working and the helper still starts. Not a secret. |
 | `OPS_NOTIFY_TOKEN` (secret) | Worker **and** MojoSOGO's machines (`%USERPROFILE%\.enso\ops-notify-token`) | The bearer a Claude Code session sends to `POST /ops/notify` to push a message to the founder's phone (§9.4), checked in constant time. A long random string, set with `npx wrangler secret put OPS_NOTIFY_TOKEN` in a real PowerShell window and the same value in the token file (never in the repo). Unset or empty → `/ops/notify` is 503 `ops_notify_off` (never open). Never logged, never in a message or a delivery's detail. Tests pin a test-only value. |
 | `TIDES_URL`, `MARINE_URL`, `FISH_PLANTS_URL`, `PARKS_ICAL_URL` (vars, `wrangler.toml`) | Worker | Good fishing times (§7.14, §7.14b): the NOAA CO-OPS and Open-Meteo marine base addresses, and the CDFW trout plants query and the county parks iCal feed. Free, no key. Empty turns that part off; tests pin them empty and reach only fakes. |
@@ -360,7 +366,7 @@ Source files are everything under `src/`, `frontend/src/`, `scripts/` and `home/
   imports only its own siblings (no packages, no I/O); the worker and the frontend
   never import each other; nothing imports `scripts/` or `home/`; `home/` (the SogoAI
   helper, §7E.2c, §7A.3) imports nothing from the repo **except** `src/worker/youtube-captions.ts`
-  `src/shared/item-reading.ts` and `src/shared/note-marks.ts` (and its own siblings), and no package **except** `node:http`
+  `src/shared/item-reading.ts`, `src/shared/note-marks.ts` and `src/shared/hearing.ts` (and its own siblings), and no package **except** `node:http`
   (the helper's one server) — a layer may name exact repo
   paths, or `package:<name>`, in `allowed`, which the ban then skips;
 - a `src/shared/` file uses `Date.now(`, `new Date()`, `fetch(` or `D1Database`
@@ -2708,7 +2714,7 @@ Why SogoAI gave no name, in that 502: "it isn't set up", its failure reason, or 
 secret, and never decides; the route runs `cleanItemName`.
 
 **The helper** — `POST /identify` on the same `home/captions-helper.ts` server (§7E.2c), the same tunnel,
-Access application and bearer. Its check order: a path other than `/captions`, `/identify` or `/note-marks` (§8.4a) → 404; a
+Access application and bearer. Its check order: a path other than `/captions`, `/identify`, `/note-marks` (§8.4a) or `/hear` (§8.18 part 2) → 404; a
 method other than POST → **405**; the bearer (constant time) → **401**; `Content-Type` not `image/*` →
 **400**; a body over `IDENTIFY_BODY_MAX` → **413** (the body is read in `main()`, which keeps no bytes past
 the cap); an empty body → 400; then `identify` (`home/identify.ts`) → **200** with the `IdentifyReport` as
@@ -4102,7 +4108,7 @@ secret, and never decides whether to ask or what is saved. No D1, no Hono.
 one file, `home/dist/captions-helper.mjs`, copied to `C:\Enso\` on SogoAI with
 `home/captions-helper.cmd` and a `captions-helper.env` holding **`CAPTIONS_TOKEN`** and **`IDENTIFY_MODEL`** (never
 in the repo; README). It imports only `src/worker/youtube-captions.ts`, `src/shared/item-reading.ts`,
-`src/shared/note-marks.ts`, its own siblings in `home/`, `node:http` and Node's globals (§2.5).
+`src/shared/note-marks.ts`, `src/shared/hearing.ts`, its own siblings in `home/`, `node:http` and Node's globals (§2.5).
 
 - `handle(req: { method, url, authorization? }, deps: { token, fetch })` → `{ status, body }` (no
   `node:http` in it): a path other than `/captions` → **404**; a method other than GET → **405**; the
@@ -4114,6 +4120,10 @@ in the repo; README). It imports only `src/worker/youtube-captions.ts`, `src/sha
   Port and host are constants. `CAPTIONS_TOKEN` unset → it logs that and exits with code 1.
 - One log line per request (the video id, the outcome); the token is never logged. The helper never
   decides what is saved.
+- `POST /hear` (§8.18 part 2): after the bearer, `Content-Type` one of `SAY_AUDIO_TYPES` → else **400**; a body
+  over `SAY_AUDIO_MAX_BYTES` → **413**; empty → **400**; the `w` query parameters through `hotwordsOf`; then
+  `hear` (`home/hear.ts`) → **200** with the HearReport, whatever its `ok`. Its log line gives the clip's bytes and
+  the word count, never the words.
 
 **PWA** (§8.12) — nothing is pending: the recipe comes back complete. The transcript box shows on a
 video recipe that is "watch it" or whose `captionsError` is set, as before.
@@ -6141,11 +6151,11 @@ want without needing to know if the current build is capable"; "a big Ensō icon
 voice … also a text pop-up … yes clarify cancel" (the asks in full, and how this grew: `docs/history.md` §14). Photos and
 links keep filling things in as they do (§7.8, §7C.4b, §7E, §7H).
 
-**Reused, nothing reinvented:** the phone's own recorder (MediaRecorder) with Cloudflare's speech-to-text on Ensō's
-own account (part 2), or the 🎤 on the iPhone keyboard, the phone's own voices (speechSynthesis; on the iPhone, Settings → Accessibility → Spoken Content →
+**Reused, nothing reinvented:** the phone's own recorder (MediaRecorder) with the home PC's speech-to-text (SogoAI's
+model manager), Cloudflare's on Ensō's own account when the home can't answer (part 2), or the 🎤 on the iPhone keyboard, the phone's own voices (speechSynthesis; on the iPhone, Settings → Accessibility → Spoken Content →
 Voices → an **Enhanced** or **Premium** voice sounds human), the Claude reading every other "fill it in" uses (§7.9),
-and the reminder form (§8.5b, §8.5c). No paid voice for speaking ⚑ Q331; writing down a recording costs pennies
-(⚑ Q378).
+and the reminder form (§8.5b, §8.5c). No paid voice for speaking ⚑ Q331; writing down a recording is free at home and
+costs pennies on Cloudflare (⚑ Q378, ⚑ Q408).
 
 **1. The mark.** A round Ensō mark (the app icon, 84 px), centred just above the tab bar on every tab ⚑ Q332. A **tap**
 opens the popup, not listening yet ⚑ Q360 (MojoSOGO 2026-10-20 "tap to open input… tap enso to speak and again to stop").
@@ -6165,10 +6175,28 @@ keyboard away first, so the keyboard's own 🎤 never holds the mic. The phone's
 recording, so the voice and the mic never fight. Admins also see **💡 Requests** here (part 5).
 
 **Writing it down.** `POST /say/hear` takes the clip as it was recorded (audio/mp4 from the iPhone, audio/webm
-elsewhere, at most 2 MB) and Cloudflare's speech-to-text (Workers AI Whisper, on Ensō's own Cloudflare account, about
-$0.0005 a minute of talk) returns the words. Nothing is stored or logged: not the clip, not the words. It doesn't count
-against the daily Claude reads (§7C.4), and there is no daily cap of its own ⚑ Q379 (a member must be signed in; 60
-seconds and 2 MB bound each clip).
+elsewhere, at most 2 MB; the bounds live in `src/shared/hearing.ts`) and writes it down **at home first** ⚑ Q408
+(MojoSOGO 2026-11-11 "I have a better method for VTT using SogoAI; look for it and use it"; AREC
+`arec-sogoai-voice-to-text.md`):
+- **At home.** With the SogoAI helper set up (§7E.2c), the Worker sends the clip through Access and the `sogoai` tunnel
+  to the helper's `POST /hear` (Bearer `CAPTIONS_TOKEN`, the clip as the body, each active member's name as a
+  repeated `w` query parameter). The helper asks the PC model manager's `POST /v1/audio/transcriptions` (JSON
+  `{ audio: base64, language: "en", hotwords }`, header `X-Sogo-App: enso`; Whisper large-v3-turbo on the gaming PC's
+  GPU in its AI mode, else SogoAI's CPU) and answers a HearReport: `{ ok: true, text }` or `{ ok: false, reason }`
+  (`parseHearReport`), with `usage: { model: "whisper-large-v3-turbo@<where>", ms, audioSeconds }` once the
+  manager was asked. The names are **hotwords**, so Whisper spells the family's names right ("Roxy", "Michelle"):
+  trimmed, de-duplicated, at most `HEAR_HOTWORDS_MAX` (`hotwordsOf`). No model check first: the manager picks the
+  GPU or the CPU itself and loads nothing in LM Studio.
+- **On Cloudflare.** When the helper isn't set up, doesn't answer within `HOME_HEAR_TIMEOUT_MS` (⚑ Q409, 15 s; the
+  helper gives the manager `HEAR_TIMEOUT_MS`, 14 s), fails, or hears no words, Workers AI Whisper (on Ensō's own
+  Cloudflare account, about $0.0005 a minute of talk) writes it down as before. So voice keeps working with the PC
+  off; in the gaming PC's Game mode the CPU is about real time, so a long clip may wait the 15 s and then go to
+  Cloudflare. An older helper answers 404 on `/hear`, which is the same fallback.
+- **Off** (503 `hear_off`) only when neither is set up; **502 `hear_failed`** when every one asked failed.
+
+Nothing is stored or logged: not the clip, not the words (the helper's log line gives the clip's size and the word
+count only). Each model asked leaves one ledger row (§9.4c). It doesn't count against the daily Claude reads (§7C.4),
+and there is no daily cap of its own ⚑ Q379 (a member must be signed in; 60 seconds and 2 MB bound each clip).
 
 **3. The reading.** `POST /say { text }`: Claude fixes the words (spelling, grammar, what was misheard) into "heard",
 reads one of four, and says it back the way an AREC opens ⚑ Q380 (MojoSOGO 2026-10-23 "something very similar to
@@ -6263,7 +6291,9 @@ section updates the list; a change to §1.3 updates the scope (the code-steward 
 | SY10 | POST /say as a member whose After is school at 15:00; as an admin with no After set | the prompt gives "after school" = 15:00; "after work" = 17:30 |
 | SY11 | POST /feature-requests/{id}/build as an admin on a new request (fire answered 200); as a plain member; on a needs_john one; with BUILD_FIRE_TOKEN unset; fire answered 500 | 202 `{ started: true }`, one POST to BUILD_FIRE_URL with the Bearer and the id + title in `text`; 403; 409; 503 `build_now_off`, no fire; 502 `build_failed` and one log line naming the id and `HTTP 500`, never the token |
 | SY8 | POST /feature-requests `{ …, outside: true }`; GET /ops/requests; founder …/ok on it; an admin …/dismiss on another | 201 status `outside`, listed in GET /feature-requests after 30 days too; not in /ops/requests; `new`; `dismissed` |
-| SY12 | POST /say/hear as a member with an audio/mp4 clip (fake AI answers " Remind me at nine. "); signed out; an image/jpeg body; an empty clip; a clip over 2 MB; the AI throws; no AI binding | 200 `{ text: 'Remind me at nine.' }` and the AI got the clip as base64; 401; 400; 400; 400; 502 `hear_failed`; 503 `hear_off` |
+| SY12 | POST /say/hear as a member with no helper set up and an audio/mp4 clip (fake AI answers " Remind me at nine. "); signed out; an image/jpeg body; an empty clip; a clip over 2 MB; the AI throws; no AI binding and no helper | 200 `{ text: 'Remind me at nine.' }` and the AI got the clip as base64; 401; 400; 400; 400; 502 `hear_failed`; 503 `hear_off` |
+| SY14 | POST /say/hear with the helper set up (fake helper): it answers `{ ok: true, text: ' Roxy needs a mat. ' }`; it answers HTTP 500, `{ ok: false }`, an empty text, or times out; no AI binding and the helper fails | 200 `{ text: 'Roxy needs a mat.' }`, one POST to `{url}/hear` with the Access headers, the Bearer, the clip's type and bytes and every active member's name as `w`, the AI never asked; the AI's text; 502 `hear_failed` |
+| SY15 | the helper's POST /hear (fake manager): an audio/webm clip; without the Bearer; image/png; an empty or over-2 MB clip; the manager answers 500 or no text, or throws | 200 `{ ok: true, text, usage: { model: 'whisper-large-v3-turbo@gamerpc', ms, audioSeconds } }`, one POST to `127.0.0.1:8793/v1/audio/transcriptions` with `X-Sogo-App: enso` and `{ audio: base64, language: 'en', hotwords }`, a log line without the words; 401; 400; 400 / 413; `{ ok: false, reason }` (with usage when the manager answered) |
 | SY13 | Claude answers a reminder with want and three steps; with no want and no steps; a request (big) and an outside with steps of its own; seven steps | 200 with `want` and `steps` as given; `want` = heard, `steps` = [say]; `steps` = `requestSteps('big')` / `outsideSteps(where)`, never Claude's; the first four. `say` = "I will a, b and c. Did I get that right?"; with no steps, Claude's say + "Did I get that right?"; a request `requestSay` + the question; an outside `outsideSay` alone |
 | SY-M | on the iPhone | tap the Ensō button, tap Ensō in the box, say "weekdays 8 to 11 remind me to book the car check", see "You want:" with the gist and "I will:" with numbered steps, hear "I will … Did I get that right?", Yes → the form with 🎲 Weekdays 8–11, Save; say "make the fridge order groceries" → Yes → Settings → 💡 Requests shows it as Needs John; tap the mark → the box opens quiet; tap Ensō in it → the phone asks for the mic once, then "Listening…"; say "remind me tomorrow at 9 to call mom", tap Ensō again → it stops, Done → the answer; a fresh opening of the app never asks for the mic; say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests; on any answer ✏️ Edit → the box holds what was heard, fix a word, Done → the new answer; tap Ensō, talk, tap Ensō, tap it again and talk more → the new words show too |
 
@@ -7009,7 +7039,8 @@ picked CUT 2026-11-07):
 | Calls | Runs on | How the manager sees them |
 |---|---|---|
 | Claude API (`claude.ts`: every reader, §7C.4, §7.8–7.9, §7E, §7F.2, §7G.6, §7A.3, §8.18) | the Worker, straight to Anthropic | the ledger, through `GET /ops/model-usage` |
-| Whisper on Workers AI (`speech-to-text.ts`, /say/hear, §8.18 part 2) | the Worker's `AI` binding | the ledger |
+| Whisper on SogoAI (`home/hear.ts`, /say/hear first, §8.18 part 2) | the SogoAI helper → the manager's `/v1/audio/transcriptions` | the manager's own log (app `enso`, kind `stt`), **and** the ledger |
+| Whisper on Workers AI (`speech-to-text.ts`, /say/hear's fallback, §8.18 part 2) | the Worker's `AI` binding | the ledger |
 | LM Studio (`home/identify.ts`, `home/note-marks.ts`, §7A.3, §8.4a) | the SogoAI helper | its own chat proxy at `127.0.0.1:8797` (the helper's `LM_STUDIO_URL`, each call named by the header `X-Sogo-App: enso`, the manager's app name), **and** the ledger |
 
 Cloud calls are never sent through the home PC: with SogoAI off or its tunnel down, voice and every reading keep
@@ -7027,8 +7058,9 @@ routine fire (§8.18 part 6) is not a model call and is not recorded.
 - **Whisper:** one row per clip: `HEAR_MODEL`, the clip's bytes, and Whisper's `transcription_info.duration` as
   the seconds when it gives one (else NULL); `ok` false when no words came back or it threw.
 - **SogoAI:** the helper adds `usage: { model, ms, inputTokens, outputTokens }` (LM Studio's `prompt_tokens` /
-  `completion_tokens`) to an /identify or /note-marks answer once LM Studio was asked; the Worker records it as one
-  `sogoai` row (`ok` as the report's). An answer without it (nothing asked: `off`, `busy`, or an older helper) is no row.
+  `completion_tokens`) to an /identify or /note-marks answer once LM Studio was asked, and `usage: { model, ms,
+  audioSeconds }` (the manager's `duration`) to a /hear answer once the manager was asked; the Worker records it as
+  one `sogoai` row (`ok` as the report's; a /hear row also carries the clip's bytes). An answer without it (nothing asked: `off`, `busy`, or an older helper) is no row.
 - A failed write is logged and never fails the reading.
 
 **The estimate** (`estimateUsd`, worked out when read): tokens × the published per-million rates of `TOKEN_PRICES`,
@@ -7050,7 +7082,7 @@ reads it (the SogoAI project builds that panel; asked on the Crossroads Board).
 | MU1 | `estimateUsd`, `claudeCounts`, `homeUseOf` | 1M in + 100k out + 1M cache read + 3 searches on opus-5-5 = $6.23; an unknown model → null; SogoAI 0; 120 s of Whisper = $0.001, no length → null; missing counts 0; a helper usage without a model → null |
 | MU2 | `POST /say` with a fake Claude | one `say` / `anthropic` / `claude-opus-5-5` row with its tokens |
 | MU3 | a look-up that pauses once; a refusal; a throw | two ok rows with their searches and fetches; one not-ok row with its tokens; one not-ok row with nothing |
-| MU4 | `hearClip` with and without a length, and failing; `POST /say/hear` | the bytes and seconds (or NULL); not ok; a `say-hear` row |
+| MU4 | `hearClip` with and without a length, and failing; `POST /say/hear`; `POST /say/hear` heard at home, and at home failing then Whisper | the bytes and seconds (or NULL); not ok; a `say-hear` row; one `sogoai` `whisper-large-v3-turbo@gamerpc` row with the seconds and bytes; a not-ok `sogoai` row then a `workers-ai` row |
 | MU5 | the helper's LM Studio call | goes to `127.0.0.1:8797` with `X-Sogo-App: enso`; carries the model and the tokens |
 | MU6 | a helper answer with `usage`; one without | one `sogoai` row; none |
 | MU7 | `GET /ops/model-usage?days=7`; `days=0`, `1.5`; no token | today's rows summed, an old row left out, the estimate and total; 400; 400; 401 |
@@ -7188,7 +7220,7 @@ other push stays until I hide it ⚑ Q284.
 | GET | `/reminders` | member | → open reminders (§8.5b), soonest first: `{ id, title, date, time, channels, renotifyMin, assignedTo, createdBy, state: 'due' \| 'ringing' \| 'missed', dueAt, window: { days: Weekday[], from, to } \| null }` (`dueAt` = the open fire's due time, else the reminder's own; a window's next ring, §8.5c) |
 | POST | `/reminders` | member | `{ title, date, time: "HH:MM", channels, renotifyMin?, assignedTo? }` or `{ title, window: { days, from, to }, channels, assignedTo? }` (§8.5c) → reminder (201); 400 when not after now, or a bad window |
 | PATCH/DELETE | `/reminders/{id}` | creator or owner | POST fields, all optional, merged; either shape (`window: null` back to a set time, §8.5c); re-plans like an alarm edit |
-| POST | `/say/hear` | member | the raw recorded clip (audio/mp4, audio/webm, audio/ogg, audio/wav; ≤ 2 MB) → 200 `{ text }` (§8.18 part 2); nothing stored or logged; 400 wrong type / empty / too big, 502 couldn't write it down, 503 no AI binding |
+| POST | `/say/hear` | member | the raw recorded clip (audio/mp4, audio/webm, audio/ogg, audio/wav; ≤ 2 MB) → 200 `{ text }`, written down on SogoAI first, else Workers AI (§8.18 part 2); nothing stored or logged; 400 wrong type / empty / too big, 502 couldn't write it down, 503 neither the helper nor the AI binding set up |
 | POST | `/say` | member | `{ text }` → 200, every reading with `heard, want, say, steps` (⚑ Q380), and: `{ kind: 'reminder', reminder }` / `{ kind: 'exists', where }` / `{ kind: 'request', request: { title, summary, size } }` / `{ kind: 'event', event: { title, date, time, assignedTo } }` / `{ kind: 'outside', where (or null), request: { title, summary, size } }` (§8.18, §1.3); nothing saved; 400 blank, 429 reads used up, 503 no key, 502 / 422 reading failed |
 | GET/POST | `/feature-requests` | admin / member | → `FeatureRequest[]` newest first, last 30 days for done / dismissed: `{ id, text, title, summary, size, status, note, createdBy, createdAt }`; POST `{ text, title, summary, size, outside? }` → 201, status from size, or `outside` (§8.18, §1.3) |
 | POST | `/feature-requests/{id}/ok` · `/dismiss` | founder · admin | → the request; `ok` only from `needs_john` → `new`; `dismiss` from `new` / `needs_john`; else 409 |
