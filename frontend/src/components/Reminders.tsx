@@ -16,6 +16,7 @@ import {
 } from '../../../src/shared/reminders';
 import type { SayReminder } from '../../../src/shared/say-reading';
 import s from './Lists.module.css';
+import { useAsk } from './Ask';
 
 /** GET /reminders (§10). */
 export interface Reminder {
@@ -82,6 +83,7 @@ export function RemindersSection() {
 
 /** The reminder form; the Ensō button (§8.18) opens it with `start`, what was said, to check and Save. */
 export function ReminderForm({ reminder, start, onClose }: { reminder: Reminder | null; start?: SayReminder; onClose: () => void }) {
+  const ask = useAsk();
   const { me, members, tz, refresh } = useApp();
   const founder = useIsFounder();
   /** ⚑ Q316 — the one person ticked under Remind decides After work / After school; none or several, mine. */
@@ -173,7 +175,7 @@ export function ReminderForm({ reminder, start, onClose }: { reminder: Reminder 
       </fieldset>
       {reminder && canEdit && (
         <div className="row wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-          <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete reminder "${reminder.title}"?`)) run(() => del(`/reminders/${reminder.id}`)); }}>Delete reminder</button>
+          <button className="danger" disabled={busy} onClick={async () => { if (await ask(`Delete reminder "${reminder.title}"?`)) run(() => del(`/reminders/${reminder.id}`)); }}>Delete reminder</button>
         </div>
       )}
     </Modal>

@@ -58,6 +58,8 @@ interface Ctx {
   /** Bumps on every refresh so views re-read their own data. */
   version: number;
   refresh: () => void;
+  /** §8.2 optimistic: a fire acted on leaves `ringing` at once; the next refresh is the truth (a failure brings it back). */
+  settleRinging: (id: string) => void;
   today: () => string;
   /** §8.17: a local 'HH:MM' in my clock. */
   clock: (hhmm: string) => string;
@@ -104,6 +106,7 @@ export function AppProvider({ me, onMe, children }: { me: Me; onMe: (m: Me | nul
   }, [onMe]);
 
   const refresh = useCallback(() => { setVersion((v) => v + 1); }, []);
+  const settleRinging = useCallback((id: string) => setRinging((r) => r.filter((f) => f.id !== id)), []);
 
   useEffect(() => { load(); }, [load, version]);
 
@@ -120,7 +123,7 @@ export function AppProvider({ me, onMe, children }: { me: Me; onMe: (m: Me | nul
   }, [refresh]);
 
   const value = useMemo<Ctx>(() => ({
-    me, members, tz: settings.timezone, householdName: settings.householdName, ringing, status, version, refresh,
+    me, members, tz: settings.timezone, householdName: settings.householdName, ringing, status, version, refresh, settleRinging,
     today: () => utcToLocal(new Date().toISOString(), settings.timezone).date,
     clock: (hhmm: string) => clockText(hhmm, me.clock24h),
     localTime: (iso: string) => clockText(utcToLocal(iso, settings.timezone).time, me.clock24h),

@@ -183,13 +183,15 @@ receipt in `docs/placement-receipts.md`, then the code.
 
 | Module | Owns (one concern) |
 |---|---|
-| `frontend/src/components/AppRefresh.tsx` | Always-fresh (§8.10): reload on resume unless a `dialog[open]` exists, pull-to-refresh gesture on the active scroll area + its pill — no app state, no data fetching |
-| `frontend/src/main.tsx` | React root mount; starts the service worker registration (push-client.ts) |
+| `frontend/src/components/AppRefresh.tsx` | Always-fresh (§8.10): reload on resume unless a `dialog[open]` exists, pull-to-refresh gesture on the active scroll area + its pill, and starting SogoLive (public/live.js) once: self-update and the Offline banner, held while a dialog is open, a field has focus or sound plays — no app state, no data fetching |
+| `frontend/src/main.tsx` | React root mount: wraps the app in AskHost and ToastHost; starts the service worker registration (push-client.ts) |
+| `frontend/src/components/Ask.tsx` | The in-app confirm (§8): AskHost, mounted once by main.tsx, a context holding the one open question and its own `<dialog>` (a `dialog[open]`, so reloads hold) with a CONFIRM / WARNING badge, Enter = Yes, Esc = No; useAsk() → ask(text, { tone, ok, no }) → Promise<boolean>; replaces every browser confirm(). No fetch, no app data |
+| `frontend/src/components/Toast.tsx` | Toasts (§8): ToastHost, mounted once by main.tsx, a context holding the short queue drawn in a `role="status"` region (never a `<dialog>`), each gone after 4 s; useToast() → toast(text, { tone }). No fetch, no app data |
 | `frontend/src/push-client.ts` | Browser push plumbing (§9.1): registers `/sw.js` (scope `/`, updateViaCache none), this browser's facts (supported, iOS-not-standalone, permission, current subscription), Turn on (permission → subscribe → POST /push/subscriptions) and Turn off (unsubscribe → DELETE) via api.ts — no React, no app state |
 | `frontend/src/App.tsx` | The frame (§8.1): the Ensō button (EnsoButton, §8.18), Ringing bar, the 💪 Enso box (TaskSaid, §8.5a), mess banner, IOU banner, badges, the six tabs (🏡 Home → HomeTab, §8.19; the 💪 running mark on ⏰ Alarms, Q309), ＋ button; opens Settings → Alerts for an alert link (useAlertLink, §9.5) |
 | `frontend/src/components/Splash.tsx` | The opening screen in the app (§8.10; the screen itself is plain HTML in index.html #splash): removes it once App knows who this is (`ready`), at least SPLASH_MIN_MS after page start. Never asks for the mic (⚑ Q360); no state, no fetch |
 | `frontend/src/api.ts` | HTTP transport to the Worker; every failure an `ApiError` with a message |
-| `frontend/src/state.tsx` | App-wide state context + freshness polling (§10) — the home for cross-cutting client state; taskSheet / showTask (the 💪 Enso box, §8.5a) |
+| `frontend/src/state.tsx` | App-wide state context + freshness polling (§10) — the home for cross-cutting client state; taskSheet / showTask (the 💪 Enso box, §8.5a); settleRinging (a fire acted on leaves `ringing` at once until the next refresh, §8.2) |
 | `frontend/src/theme.css` | Theme tokens (§8.7) and global base styles |
 | `frontend/src/css-modules.d.ts` | Type shim for `*.module.css` imports |
 | `frontend/src/build-stamp.d.ts` | Ambient type for `__ENSO_BUILD__`, the §8.10 build stamp Vite `define` injects from vite.config.ts buildStamp() |
@@ -302,7 +304,7 @@ receipt in `docs/placement-receipts.md`, then the code.
 | `frontend/src/components/ApproveLogin.tsx` | The approve screen at `/approve-login#{id}` (§8.13): keepApproveRequest (the fragment → sessionStorage `enso.approveLogin`, the fragment cleared — called by App.tsx at start so the id survives a sign-in first), GET the request, browser / place / time, three number buttons and "This wasn't me" → POST approve / deny, every outcome and refusal in place, Done forgets the id |
 | `frontend/src/components/JoinPage.tsx` | The join page at `/join#CODE`: read + clear the fragment, preview, signup form, dead-link state (§8.9) |
 | `frontend/src/components/Welcome.tsx` | The one-time welcome card and its per-member-per-device seen flag (§8.9) |
-| `frontend/src/components/Modal.tsx` | The one `<dialog>` modal primitive: centred, or full screen with `full` (§8.4a) |
+| `frontend/src/components/Modal.tsx` | The one `<dialog>` modal primitive: centred, full screen with `full` (§8.4a), or a bottom sheet lifted above the keyboard on a coarse pointer (§8); its dirty-close ask goes through useAsk |
 | `frontend/src/*.module.css` | Styles for the same-named component |
 | `frontend/src/components/*.module.css` | Styles for the same-named component; `Lists.module.css` = shared single-line list tables and tick rows |
 

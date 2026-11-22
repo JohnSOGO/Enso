@@ -18,6 +18,7 @@ import type { Channel, ThingStatus } from '../../../src/shared/vocab';
 import {
   ADDRESS_MAX, COST_MAX, NOTE_MAX, PHONE_MAX, PLACE_MAX, THING_REMIND_TIME, TITLE_MAX, URL_MAX, webLink, type PhotoReading, type Thing,
 } from '../../../src/shared/things';
+import { useAsk } from './Ask';
 
 /** "Oct 10", or "Sat Oct 12" with the weekday — a local YYYY-MM-DD date as Things to do shows it. */
 export const shortDate = (d: string, weekday = false) =>
@@ -62,6 +63,7 @@ const formOf = (t: Thing | null, founder = false) => ({
 type Form = ReturnType<typeof formOf>;
 
 export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: () => void }) {
+  const ask = useAsk();
   const { me, refresh } = useApp();
   const founder = useIsFounder();
   const [init, setInit] = useState(() => formOf(thing, founder));
@@ -222,7 +224,7 @@ export function ThingForm({ thing, onClose }: { thing: Thing | null; onClose: ()
             {(status === 'done' || status === 'dropped') && (
               <button disabled={busy || !f.title.trim()} onClick={() => run(() => persist('idea'))}>Put back</button>
             )}
-            <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete “${saved.title}”?`)) run(() => del(`/things/${saved.id}`)); }}>Delete</button>
+            <button className="danger" disabled={busy} onClick={async () => { if (await ask(`Delete “${saved.title}”?`)) run(() => del(`/things/${saved.id}`)); }}>Delete</button>
           </div>
         )}
       </Modal>

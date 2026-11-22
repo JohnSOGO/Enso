@@ -14,6 +14,7 @@ import { Modal } from './Modal';
 import { FireActions } from './FireActions';
 import { AnswerButtons, MessPhoto, useMessAction, useMesses } from './Messes';
 import s from './Lists.module.css';
+import { useAsk } from './Ask';
 
 interface MyAlert {
   id: string; title: string; message: string; source: string; kind: AlertKind | null; alertNumber: number | null; fireId: string | null; messId: string | null;
@@ -33,6 +34,7 @@ export function useAlertLink(): [string | null, () => void] {
 const RED_X = { background: 'none', border: 0, padding: '0 6px', minHeight: 44, flex: 'none' } as const;
 
 export function MyAlerts({ openId, onOpened }: { openId: string | null; onOpened: () => void }) {
+  const ask = useAsk();
   const { me, tz, today, version, ringing, clock } = useApp();
   const [alerts, setAlerts] = useState<MyAlert[] | null>(null);
   const [card, setCard] = useState<MyAlert | null>(null);
@@ -60,8 +62,8 @@ export function MyAlerts({ openId, onOpened }: { openId: string | null; onOpened
     await del(`/me/alerts/${encodeURIComponent(id)}`);
     setAlerts((a) => a && a.filter((x) => x.id !== id));
   });
-  const clearAll = () => {
-    if (confirm('Clear all your alerts?')) run(async () => { await del('/me/alerts'); setAlerts([]); });
+  const clearAll = async () => {
+    if (await ask('Clear all your alerts?')) run(async () => { await del('/me/alerts'); setAlerts([]); });
   };
 
   return (

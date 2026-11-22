@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { inviteLink } from '../../../src/shared/invite-link';
 import { Modal } from './Modal';
 import s from './InviteCard.module.css';
+import { useAsk } from './Ask';
 
 /** "Sat Oct 10" — an invite's expiry, as the card and the invites list show it. */
 export const untilDate = (iso: string) =>
@@ -17,6 +18,7 @@ const THIS_COMPUTER_ONLY = ['localhost', '127.0.0.1', '[::1]'];
 type Qr = { size: number; path: string } | 'loading' | 'failed';
 
 export function InviteCard({ name, code, expiresAt, onClose }: { name: string; code: string; expiresAt: string; onClose: () => void }) {
+  const ask = useAsk();
   const link = inviteLink(location.origin, code);
   const localOnly = THIS_COMPUTER_ONLY.includes(location.hostname);
   const [qr, setQr] = useState<Qr>('loading');
@@ -61,7 +63,7 @@ export function InviteCard({ name, code, expiresAt, onClose }: { name: string; c
     }
   };
 
-  const close = () => { if (confirm(CLOSE_TEXT)) onClose(); };
+  const close = async () => { if (await ask(CLOSE_TEXT)) onClose(); };
 
   return (
     <Modal title={`Invite for ${name}`} onClose={onClose} dirty confirmCloseText={CLOSE_TEXT} error={error}

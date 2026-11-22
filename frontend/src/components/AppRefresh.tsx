@@ -9,6 +9,23 @@ const ARM_PX = 72;
 
 const dialogOpen = () => document.querySelector('dialog[open]') !== null;
 
+/** §8.10 hold: no reload while a dialog is open, a field has focus, or sound plays. */
+const holding = () => dialogOpen() || !!document.activeElement?.closest('input, textarea, select, [contenteditable="true"]')
+  || [...document.querySelectorAll('audio, video')].some((m) => !(m as HTMLMediaElement).paused);
+
+declare global {
+  interface Window { SogoLive?: { start: (opts: Record<string, unknown>) => void } }
+}
+
+/** §8.10: start the shared SogoLive once — self-update (the pulsing logo) and the Offline banner only. Data stays with
+ *  state.tsx's own refresh, so its poll is a no-op and its stale-data refetch and reload are off. */
+function startLive() {
+  const live = window.SogoLive;
+  if (!live || document.documentElement.dataset.live) return;
+  document.documentElement.dataset.live = 'on';
+  live.start({ poll: async () => true, everyMs: 600_000, refetchMs: Infinity, reloadMs: Infinity, logo: '/icon-192.png', busy: holding });
+}
+
 /** The nearest vertically scrollable ancestor of `el` — the screen's scroll area — or null. */
 function scrollArea(el: Element | null): HTMLElement | null {
   for (let n = el instanceof HTMLElement ? el : null; n && n !== document.body; n = n.parentElement) {
@@ -21,6 +38,11 @@ function scrollArea(el: Element | null): HTMLElement | null {
 export function AppRefresh() {
   const [pull, setPull] = useState(0);
   const drag = useRef<{ y: number; area: HTMLElement | null; dy: number } | null>(null);
+
+  useEffect(() => {
+    if (window.SogoLive) startLive();
+    else window.addEventListener('load', startLive, { once: true }); // the deferred live.js runs after the module
+  }, []);
 
   // Coming back → reload, unless a dialog is open (it is skipped; the next return without one reloads).
   useEffect(() => {

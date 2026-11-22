@@ -6,6 +6,7 @@ import { errorText, get, post } from '../api';
 import { useApp } from '../state';
 import type { CookKind, MachineState } from '../../../src/shared/vocab';
 import s from './Lists.module.css';
+import { useAsk } from './Ask';
 
 /** GET /cooking (§10) — `state` is the server's, never re-derived here; `free` shows as "off". */
 export interface Cooking {
@@ -18,6 +19,7 @@ const BADGE: Record<MachineState, { mood: string; text: string }> = {
 };
 
 export function CookingSection() {
+  const ask = useAsk();
   const { version, localTime, memberById, refresh } = useApp();
   const [timers, setTimers] = useState<Cooking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export function CookingSection() {
   }, [version]);
 
   async function act(t: Cooking, what: 'off' | 'stop' | 'start' | 'close') {
-    if (what === 'close' && t.state === 'running' && !confirm(`Close ${t.label}? It won't ring.`)) return;
+    if (what === 'close' && t.state === 'running' && !(await ask(`Close ${t.label}? It won't ring.`))) return;
     setError(null);
     try { await post(`/cooking/${t.id}/${what}`); refresh(); } catch (e) { setError(errorText(e)); refresh(); }
   }

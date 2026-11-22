@@ -8,6 +8,7 @@ import { useApp } from '../state';
 import { askAgainError, centsText, declineError, deleteError, letGoError, okError, waitsOn, type IouItem, type IouKind, type IouPair, type IouPayment } from '../../../src/shared/ious';
 import { isAdmin } from '../../../src/shared/roles';
 import s from './Messes.module.css';
+import { useAsk } from './Ask';
 
 const EVERY_TEXT = { week: 'every week', '2weeks': 'every 2 weeks', month: 'every month' } as const;
 const HOW_TEXT = { paid: 'Paid', let_go: 'Let go', tab: 'Off the tab' } as const;
@@ -27,11 +28,12 @@ export type IouAct = (send: () => Promise<unknown>, ask?: string) => Promise<voi
 
 /** Runs one IOU write (asking first when `ask` is given), then refreshes the app; a refusal comes back as text. */
 export function useIouAction() {
+  const askNow = useAsk();
   const { refresh } = useApp();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const act: IouAct = useCallback(async (send, ask) => {
-    if (ask && !confirm(ask)) return;
+    if (ask && !(await askNow(ask))) return;
     setBusy(true); setError(null);
     try { await send(); } catch (e) { setError(errorText(e)); } finally { setBusy(false); refresh(); }
   }, [refresh]);

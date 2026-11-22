@@ -1,0 +1,12 @@
+/* SPEC §8 "Asking and telling": toasts sit just above the tab bar, centred, over everything but dialogs. */
+.stack {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 50; pointer-events: none;
+  bottom: calc(var(--tabbar-h) + 84px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 6px; width: min(420px, calc(100vw - 24px));
+}
+.toast {
+  padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text); box-shadow: 0 6px 18px rgba(0, 0, 0, .45);
+}
+.bad { border-color: var(--bad); }
+.good { border-color: var(--good); }

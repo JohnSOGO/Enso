@@ -19,6 +19,7 @@ import { utcToLocal, weekdayOf } from '../../../src/shared/time';
 import { canChange } from '../../../src/shared/roles';
 import { ALERT_TITLE_MAX } from '../../../src/shared/alert-limits';
 import s from './Lists.module.css';
+import { useAsk } from './Ask';
 
 export interface Alarm {
   id: string; title: string; time: string; days: Weekday[]; channels: Channel[];
@@ -82,6 +83,7 @@ function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
 }
 
 export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: () => void }) {
+  const ask = useAsk();
   const { me, members, refresh } = useApp();
   const founder = useIsFounder();
   const init = useMemo(() => ({
@@ -139,7 +141,7 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
       </fieldset>
       {alarm && canEdit && (
         <div className="row wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-          <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete alarm "${alarm.title}"?`)) run(() => del(`/alarms/${alarm.id}`)); }}>Delete alarm</button>
+          <button className="danger" disabled={busy} onClick={async () => { if (await ask(`Delete alarm "${alarm.title}"?`)) run(() => del(`/alarms/${alarm.id}`)); }}>Delete alarm</button>
         </div>
       )}
     </Modal>
