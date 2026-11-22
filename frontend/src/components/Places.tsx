@@ -8,10 +8,12 @@ import { EVENT_ADDRESS_MAX } from '../../../src/shared/alert-limits';
 import { PLACES_MAX, PLACE_NAME_MAX, PLACE_NOTES_MAX, type Place } from '../../../src/shared/places';
 import { usePlaces } from './PlacePicker';
 import { useAction } from './useAction';
+import { useAsk } from './Ask';
 
 const NEW = { name: '', address: '', notes: '', words: '' };
 
 function PlaceForm({ place, onDone }: { place: Place | null; onDone: () => void }) {
+  const ask = useAsk();
   const { me, refresh } = useApp();
   const [f, setF] = useState(place ? { name: place.name, address: place.address, notes: place.notes ?? '', words: place.words.join(', ') } : NEW);
   const { run, busy, errorEl } = useAction();
@@ -38,7 +40,7 @@ function PlaceForm({ place, onDone }: { place: Place | null; onDone: () => void 
       <div className="row wrap">
         {canEdit && <button className="primary" disabled={busy || !f.name.trim() || !f.address.trim()} onClick={save}>Save</button>}
         <button disabled={busy} onClick={onDone}>Cancel</button>
-        {place && canEdit && <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete “${place.name}”?`)) done(() => del(`/places/${place.id}`)); }}>Delete place</button>}
+        {place && canEdit && <button className="danger" disabled={busy} onClick={async () => { if (await ask(`Delete “${place.name}”?`)) done(() => del(`/places/${place.id}`)); }}>Delete place</button>}
       </div>
     </>
   );

@@ -11,6 +11,7 @@ import { PhotoField } from './PhotoField';
 import { apiUrl, del, errorText, get, patch, post, upload } from '../api';
 import { RECIPE_TITLE_MAX, SERVINGS_MAX, TIME_MAX, recipePhotoPath, type Recipe } from '../../../src/shared/recipes';
 import s from './Recipes.module.css';
+import { useAsk } from './Ask';
 
 const formOf = (r: Recipe | null) => ({
   title: r?.title ?? '', ingredients: r?.ingredients.join('\n') ?? '', steps: r?.steps.join('\n') ?? '',
@@ -21,6 +22,7 @@ const linesOf = (text: string) => text.split('\n').map((l) => l.trim()).filter(B
 interface Props { recipe: Recipe | null; onSaved: (r: Recipe) => void; onDeleted: () => void; onClose: () => void }
 
 export function RecipeForm({ recipe, onSaved, onDeleted, onClose }: Props) {
+  const ask = useAsk();
   const [init] = useState(() => formOf(recipe));
   const [f, setF] = useState(init);
   const [busy, setBusy] = useState(false);
@@ -52,8 +54,8 @@ export function RecipeForm({ recipe, onSaved, onDeleted, onClose }: Props) {
     }
     onSaved(await get<Recipe>(`/recipes/${r.id}`)); // hasPhoto and updatedAt after the picture change
   });
-  const remove = () => {
-    if (recipe && confirm(`Delete “${recipe.title}”?`)) run(async () => { await del(`/recipes/${recipe.id}`); onDeleted(); });
+  const remove = async () => {
+    if (recipe && await ask(`Delete “${recipe.title}”?`)) run(async () => { await del(`/recipes/${recipe.id}`); onDeleted(); });
   };
 
   return (

@@ -7,6 +7,7 @@ import type { ChoreTiming } from '../../../src/shared/vocab';
 import type { ChoreStep } from '../../../src/shared/chores';
 import ls from './Lists.module.css';
 import s from './ChoresToday.module.css';
+import { useToast } from './Toast';
 
 /** One run as GET /chores/today returns it (§10). */
 export interface Run {
@@ -33,16 +34,20 @@ export function ChoresToday({ onOpenAreas }: { onOpenAreas: (choreId: string) =>
   const [runs, setRuns] = useState<Run[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  /** §8.15 optimistic: the run tapped Done shows ☑ at once, until the refresh brings the server's answer. */
+  const [pending, setPending] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => { try { localStorage.setItem(STORE_KEY, scope); } catch { /* storage may be blocked */ } }, [scope]);
   useEffect(() => {
     get<{ date: string; runs: Run[] }>('/chores/today')
-      .then((d) => { setRuns(d.runs); setError(null); }).catch((e) => setError(errorText(e)));
+      .then((d) => { setRuns(d.runs); setPending(null); setError(null); }).catch((e) => setError(errorText(e)));
   }, [version]);
 
   async function act(r: Run, what: 'done' | 'undo') {
-    setBusy(r.id); setError(null);
-    try { await post(`/chore-runs/${r.id}/${what}`); } catch (e) { setError(`${r.title}: ${errorText(e)}`); }
+    if (busy) return;
+    setBusy(r.id); setError(null); if (what === 'done') setPending(r.id);
+    try { await post(`/chore-runs/${r.id}/${what}`); } catch (e) { setPending(null); toast(`Not saved: ${r.title}: ${errorText(e)}`); }
     finally { setBusy(null); refresh(); }
   }
 
@@ -67,7 +72,7 @@ export function ChoresToday({ onOpenAreas }: { onOpenAreas: (choreId: string) =>
     const multi = r.steps.length > 1;
     const body = (
       <>
-        <span aria-hidden className={ls.box}>{finished ? '☑' : '☐'}</span>
+        <span aria-hidden className={ls.box}>{finished || pending === r.id ? '☑' : '☐'}</span>
         <span className={s.what}>
           <span className={ls.title}>
             {r.title}
@@ -85,7 +90,7 @@ export function ChoresToday({ onOpenAreas }: { onOpenAreas: (choreId: string) =>
         {finished
           ? <div className={`${ls.item} ${ls.main}`}>{body}</div>
           : (
-            <button className={`${ls.item} ${ls.main}`} disabled={busy === r.id} onClick={() => act(r, 'done')}
+            <button className={`${ls.item} ${ls.main}`} aria-busy={busy === r.id} onClick={() => act(r, 'done')}
               aria-label={`Done: ${r.title}${multi ? ` — ${r.steps[r.step]?.title}` : ''}`}>
               {body}
             </button>

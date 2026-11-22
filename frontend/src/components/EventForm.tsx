@@ -19,6 +19,7 @@ import { NotesField } from './NotesSheet';
 import { RepeatFields, ownWeek, repeatOf, toRecurrence, weeksOf, type RepeatValue } from './RepeatFields';
 import { EventFlags } from './EventFlags';
 import { ReminderFields, reminderError, reminderOf, toReminder, type ReminderValue } from './ReminderFields';
+import { useAsk } from './Ask';
 
 interface Form extends RepeatValue, ReminderValue {
   title: string; address: string; bring: string[]; notes: string; date: string; allDay: boolean; startTime: string; endTime: string; endDate: string;
@@ -65,6 +66,7 @@ interface Props {
 }
 
 export function EventForm({ eventId, date, start, onClose }: Props) {
+  const ask = useAsk();
   const { me, members, refresh } = useApp();
   const founder = useIsFounder();
   const [form, setForm] = useState<Form | null>(eventId ? null : blank(date, founder, start));
@@ -108,8 +110,8 @@ export function EventForm({ eventId, date, start, onClose }: Props) {
     catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   };
 
-  const deleteSeries = () => { if (confirm(meta?.recurring ? 'Delete every occurrence of this event?' : 'Delete this event?')) run(() => del(`/events/${eventId}`)); };
-  const deleteOne = () => { if (confirm(`Delete only ${longDate(date)}?`)) run(() => post(`/events/${eventId}/exdates`, { date })); };
+  const deleteSeries = async () => { if (await ask(meta?.recurring ? 'Delete every occurrence of this event?' : 'Delete this event?')) run(() => del(`/events/${eventId}`)); };
+  const deleteOne = async () => { if (await ask(`Delete only ${longDate(date)}?`)) run(() => post(`/events/${eventId}/exdates`, { date })); };
 
   const title = eventId ? (form ? `Edit: ${form.title || 'event'}` : 'Loading event…') : `New event · ${longDate(date)}`;
 

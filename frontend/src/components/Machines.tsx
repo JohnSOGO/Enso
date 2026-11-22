@@ -10,6 +10,7 @@ import { MACHINE_LABEL, finishLabel, isLaundry, loadBountyTitle, machineMinutes,
 import { isAdmin } from '../../../src/shared/roles';
 import type { MachineId, MachineState } from '../../../src/shared/vocab';
 import s from './Lists.module.css';
+import { useAsk } from './Ask';
 
 /** GET /machines (§10) — `state` is the server's, never re-derived here. */
 export interface Machine {
@@ -106,6 +107,7 @@ export function MachineChooser({ from, mode, ownerId, onClose }: {
 
 /** The 🧺 Washing machines section of the Alarms tab (SPEC §8.5): one card per machine, in `MACHINE` order. */
 export function MachinesSection() {
+  const ask = useAsk();
   const { me, version, localTime, memberById, refresh } = useApp();
   const [machines, setMachines] = useState<Machine[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +119,7 @@ export function MachinesSection() {
   }, [version]);
 
   async function act(m: Machine, what: 'finish' | 'clear' | 'remind' | 'done') {
-    if (what === 'clear' && !confirm(`Clear the ${lower(m.id)}? Nothing will ring.`)) return;
+    if (what === 'clear' && !(await ask(`Clear the ${lower(m.id)}? Nothing will ring.`))) return;
     setError(null);
     try { await post(`/machines/${m.id}/${what}`); refresh(); } catch (e) { setError(errorText(e)); refresh(); }
   }

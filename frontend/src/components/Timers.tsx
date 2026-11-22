@@ -9,6 +9,7 @@ import { utcToLocal, weekdayOf } from '../../../src/shared/time';
 import { canChange } from '../../../src/shared/roles';
 import { ALERT_TITLE_MAX, TIMER_INTERVAL_MAX, TIMER_INTERVAL_MIN } from '../../../src/shared/alert-limits';
 import s from './Lists.module.css';
+import { useAsk } from './Ask';
 
 export interface Timer {
   id: string; title: string; intervalMin: number; channels: Channel[]; renotifyMin: number | null; maxAlerts: number;
@@ -105,6 +106,7 @@ export function TimersSection({ onEdit }: { onEdit: (t: Timer | null) => void })
 }
 
 export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: () => void }) {
+  const ask = useAsk();
   const { me, members, refresh } = useApp();
   const founder = useIsFounder();
   const init = useMemo(() => ({
@@ -139,7 +141,7 @@ export function TimerForm({ timer, onClose }: { timer: Timer | null; onClose: ()
         {canEdit && <button className="primary" disabled={busy || !f.title.trim()} onClick={save}>Save</button>}
         <button onClick={onClose} disabled={busy}>Cancel</button>
         <span className="spacer" />
-        {timer && canEdit && <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete timer "${timer.title}"?`)) run(() => del(`/timers/${timer.id}`)); }}>Delete</button>}
+        {timer && canEdit && <button className="danger" disabled={busy} onClick={async () => { if (await ask(`Delete timer "${timer.title}"?`)) run(() => del(`/timers/${timer.id}`)); }}>Delete</button>}
       </>}>
       <fieldset disabled={!canEdit || busy} style={{ border: 0, padding: 0 }}>
         <label className="field"><span>Title</span>

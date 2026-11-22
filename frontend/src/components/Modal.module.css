@@ -56,3 +56,18 @@
   padding: 10px 14px;
   border-top: 1px solid var(--border);
 }
+
+/* §8 (S1UX 5.7): on a phone every dialog is a bottom sheet: full width, rounded top, full-width buttons, and lifted
+   above the on-screen keyboard by --kb (set by Modal.tsx from visualViewport). The notes sheet stays full screen. */
+@media (pointer: coarse) {
+  .dialog:not(.full) {
+    margin: auto auto var(--kb, 0px);
+    width: 100vw;
+    max-width: none;
+    border-radius: 16px 16px 0 0;
+    border-bottom: 0;
+    max-height: calc(100dvh - 12px - env(safe-area-inset-top) - var(--kb, 0px));
+  }
+  .dialog:not(.full) .panel { padding-bottom: env(safe-area-inset-bottom); }
+  .dialog:not(.full) .foot > button { flex: 1 1 auto; }
+}

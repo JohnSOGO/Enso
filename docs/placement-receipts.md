@@ -5,6 +5,14 @@ reorganizer and code-steward runs, newest first.
 The receipt records the decision; `docs/module-ownership.md` and `scripts/arch.ts`
 carry its result.
 
+## 2026-11-22 — S1UX alignment: in-app confirm, phone sheet, type size, live.js, toasts, v1.117.0 (placement-advisor)
+
+- **Ask:** bring the PWA in line with sogo-tao UI-RULES (S1UX): every browser confirm() becomes a dark in-app ask(); Modal is a bottom sheet on a coarse pointer, lifted above the keyboard; body text 16px, buttons 44px; the shared live.js for self-update and the Offline banner; toasts and optimistic taps on list tick, chore done and fire actions (SPEC §8, §8.2, §8.7, §8.8, §8.10, §8.15).
+- **Verdict:** NEW rows `frontend/src/components/Ask.tsx` (AskHost + useAsk) and `frontend/src/components/Toast.tsx` (ToastHost + useToast), both mounted by main.tsx. EXISTING: Modal.tsx + Modal.module.css (sheet, visualViewport lift), theme.css (16px / 44px, --muted/--crit/--card aliases), AppRefresh.tsx (starts SogoLive; busy = dialogOpen() or typing or sound), state.tsx (settleRinging), FireActions.tsx, ChoresToday.tsx (local pending run, no step re-derivation), HouseholdLists.tsx (error → toast), plus the confirm swap in 24 files. No reorganizer.
+- **Flow stage:** render.
+- **Why:** confirm and toast are UI primitives, each one concern, held in React context (no module globals), not state.tsx (app data). Ask renders its own `<dialog>`, not through Modal, so Modal → Ask has no cycle. live.js goes in AppRefresh so "never reload over a dialog" keeps one owner. The optimistic fire drop lives in state.tsx because it owns `ringing`. live.js and index.html are outside the scan roots.
+- **Caps:** EventForm.tsx 197 → 199/223 (held under the band); HouseholdLists.tsx ~256/300; others well under. No CEILINGS change.
+
 ---
 
 ## 2026-11-12 — Steward pass, v1.116.0 scope (code-steward)
