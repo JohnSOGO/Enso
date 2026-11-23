@@ -63,7 +63,7 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q56 | The Ringing bar row of a sun item | ⚑ `· sunset` where an all-day reminder shows `· all day` |
 | Q57 | The household place | ⚑ 33.20 / −117.29 (ZIP 92056, Oceanside), set by migration 0016; no edit UI |
 | Q58 | Who edits or deletes the goat item | ⚑ Only coordinator SQL; the event routes give 404 |
-| Q59 | Sunrise too? | ⚑ No — sunset only |
+| Q59 | Sunrise too? | ~~⚑ No — sunset only~~ **Retired** 2026-11-23: John approved sunrise reminders (feature request "goats out at sunrise until Sunday"); see Q415–Q417, SPEC §8.5d |
 | Q60 | Where do recipes live (§8.1, §8.12)? | ⚑ Their own tab, "Recipes" 🍳, between Lists and Settings; five tabs fit at 320 px (Q12's "no fifth tab" was about chores) — **replaced by Q393** (v1.110.0) |
 | Q61 | Pasting a link | ⚑ Saves the recipe at once, then opens its view with the source note; ✎ fixes it |
 | Q62 | A recipe row | ⚑ A small thumbnail + the dish's name, plus a "watch it" badge when nothing was found; newest first |
@@ -417,3 +417,6 @@ Moved out of `SPEC.md` §13 in SPEC 2.78 (2026-10-11). Every Q-numbered question
 | Q412 | What "done at once" looks like on a chore run (§8.15, v1.117.0) | ⚑ Its box shows ☑ until the refresh brings the next step or Done today |
 | Q413 | live.js reads `--muted`, `--crit`, `--card`, which Ensō lacks (§8.7) | ⚑ Aliases of `--text-dim`, `--bad`, `--surface`; palette unchanged until PAL |
 | Q414 | S1UX dialogs and asks (§8, v1.117.0; MojoSOGO 2026-11-22 "ALL" after the S1UX check) | Dark in-app ask sheet replaces every browser confirm (CONFIRM/WARNING badge, Enter Yes, Esc No); every Modal a bottom sheet on a coarse pointer, lifted above the keyboard; 16 px body, 44 px buttons; toasts for refused quick taps |
+| Q415 | A new 🌅 sun reminder (§8.5d) | ⚑ starts **at** sunrise / sunset (0 min), Every day, no Until; minutes 0–240 before or after; reached by 🌅 Sunrise / 🌇 Sunset chips beside the clock chips in When |
+| Q416 | Until on repeats (§8.5) | ⚑ one optional date box (`UntilField`) on every ⏰ alarm, 🎲 window and 🌅 sun reminder, under the days, with ✕ to clear; inclusive; a date before the start is refused; rows read `· until Sun Nov 29`; an ended alarm stays listed as **ended**, an ended reminder leaves the list |
+| Q417 | Done on a 🌅 sun reminder | ⚑ closes that day's ring only; it rings again the next chosen day (unlike 🎲, Q329, which Done ends) |

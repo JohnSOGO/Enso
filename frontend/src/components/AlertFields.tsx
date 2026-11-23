@@ -1,6 +1,7 @@
-// SPEC §8.5 — fields shared by the alarm, timer and chore forms: day chips + days text,
+// SPEC §8.5 — fields shared by the alarm, reminder, timer and chore forms: day chips + days text, the Until box (⚑ Q416),
 // channel checkboxes and the flags ⇄ channels mapping (§9.4b), repeat-alert options. Each form keeps its own state and labels.
 import { CHANNEL, WEEKDAY, type Channel, type Weekday } from '../../../src/shared/vocab';
+import { weekdayOf } from '../../../src/shared/time';
 import { useIsFounder } from '../state';
 
 export const SHORT: Record<Weekday, string> = { SU: 'Sun', MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat' };
@@ -31,6 +32,25 @@ export function DayChips({ days, onChange }: { days: Weekday[]; onChange: (days:
       <div className="row wrap" style={{ marginTop: 6 }}>
         <button type="button" onClick={() => onChange([...WEEKDAY])}>Every day</button>
         <button type="button" onClick={() => onChange([...WEEKDAYS])}>Weekdays</button>
+      </div>
+    </div>
+  );
+}
+
+/** "until Sun Nov 29" for a repeat's last day (§8.5 ⚑ Q416). */
+export function untilText(until: string): string {
+  const md = new Date(`${until}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  return `until ${SHORT[WEEKDAY[weekdayOf(until)]]} ${md}`;
+}
+
+/** §8.5 ⚑ Q416 — the optional Until date of an alarm or a repeating reminder: empty = no end; ✕ clears it. */
+export function UntilField({ until, min, onChange }: { until: string | null; min: string; onChange: (until: string | null) => void }) {
+  return (
+    <div className="field">
+      <span className="muted" style={{ fontSize: '.8rem' }}>Until (last day; empty = no end)</span>
+      <div className="row" style={{ marginTop: 4 }}>
+        <input type="date" aria-label="Until" value={until ?? ''} min={min} onChange={(e) => onChange(e.target.value || null)} style={{ flex: 1, minWidth: 0 }} />
+        {until && <button type="button" aria-label="No end date" title="No end date" onClick={() => onChange(null)}>✕</button>}
       </div>
     </div>
   );

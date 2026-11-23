@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.108 · **Date:** 2026-11-22 · **Owner:** MojoSOGO
+**Version:** 3.109 · **Date:** 2026-11-23 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -58,7 +58,7 @@ A calendar PWA for one household. It has three kinds of alert:
 | **Scheduled alarm** | Fires at a set time on chosen **days of the week**, every week. Not a calendar entry. | **Alerts** tab, not drawn on the calendar | "Take out trash" Tue 19:00 · "Morning meds" every day 08:00 |
 | **Chore** | A job on chosen days, **rotating** weekly between people, either *at* a time (rings) or *by* a time (quiet). It can be a **loop** of steps that hand off. | **🧹 Chores** tab: Today (tick off), All chores (set up), What done looks like from its **room** (§7B.6, §8.15) | "Laundry": start the washer → move to dryer (60 min later) → fold & put away |
 | **Rolling timer** ⚑ name | A countdown that **restarts when acknowledged**, not on a fixed clock. | **Alerts** tab | "Check on the dog", 60 min |
-| **Reminder** | A one-off: rings once at a time, then **again and again until someone taps Done** (§8.5b). A scheduled alarm with no repeat. Or random times inside a window on chosen days until Done (§8.5c). | **Alerts** tab → 📌 Reminders | "Get bird food" today after work |
+| **Reminder** | A one-off: rings once at a time, then **again and again until someone taps Done** (§8.5b). A scheduled alarm with no repeat. Or random times inside a window on chosen days until Done (§8.5c), or at sunrise / sunset on chosen days (§8.5d); a repeating one can have an Until date. | **Alerts** tab → 📌 Reminders | "Get bird food" today after work |
 
 **Why scheduled alarms are not calendar events:** a daily alarm drawn on the
 calendar puts the same chip on every single day and buries the real events. Alarms
@@ -252,7 +252,7 @@ Enso/
 │   ├── 0013_retire_relay.sql    # §4.2l
 │   ├── 0014_machines.sql        # §4.2m
 │   ├── 0015_timer_window.sql    # §4.2n
-│   ├── 0016_sun_alerts.sql      # §4.2o
+│   ├── 0016_sun_alerts.sql      # §4.2o (start_sun replaced by 0069, §4.2zzp)
 │   ├── 0017_recipes.sql         # §4.2p
 │   ├── 0018_recipe_emojis.sql   # §4.2q
 │   ├── 0019_recipe_comments.sql # §4.2r
@@ -403,7 +403,7 @@ This table says what each term means.
 | `washer` / `dryer` | The two laundry machines, shown as **Clothes washer** / **Clothes dryer** (§7D); the washer's load moves on to the dryer |
 | `dishwasher` | The **Dish washer** (§7D.6): started and done like the laundry machines, on its own (no next machine) |
 | `free` / `running` / `done` | A machine's state (§7D): no load / a load, before done-at / a load, done-at passed — derived from the row and `now` |
-| `sunset` | An event whose start is the day's local sunset (§7.7, `events.start_sun`); there is no sunrise |
+| `sunrise` / `sunset` | An event whose start is the day's local sunrise / sunset (`SUN_EVENT`, §7.7, `events.start_sun`) |
 | `H` / `L` | A high / low tide turn (`TIDE_KIND`, `tide_turns.kind`, §7.14), NOAA's own letters |
 | `description` / `captions` | A recipe was read from the video's description / its captions (§7E); a recipe can carry both |
 | `page` | A recipe read from a link that is not a YouTube video: a Facebook reel or post, a recipe site, any web page (§7E.6) |
@@ -592,7 +592,8 @@ null). `from > to` is an overnight window (22:00–06:00).
 Schema: [`migrations/0016_sun_alerts.sql`](migrations/0016_sun_alerts.sql). The migration is the schema; it is not copied here.
 
 Notes on it:
-- §7.7 — sun-timed alerts: the household's place, and an event whose start is the sunset.
+- §7.7 — sun-timed alerts: the household's place, and an event whose start is the sunset. (Its `start_sun` column is
+  replaced by 0069, §4.2zzp, which also allows sunrise.)
 
 `settings.latitude` / `longitude` are degrees (north / east positive); both NULL = no place, and
 then no sun-timed reminder is planned (§7.7). There is no edit UI ⚑ Q57. `events.start_sun`
@@ -1213,6 +1214,20 @@ Schema: [`migrations/0068_model_calls.sql`](migrations/0068_model_calls.sql). **
 [`test/migration-0068.test.ts`](test/migration-0068.test.ts)**):** a row with only the required columns takes zero
 counts and a NULL length.
 
+### 4.2zzp Schema change — `migrations/0069_sunrise.sql`
+
+Asked by John 2026-11-23 (feature request "During this week, until Sunday, I need a reminder to let the goats out at
+sunrise"; his OK lifted Q59 "sunset only"): `events.start_sun` takes `'sunrise'` as well as `'sunset'` (§7.7, §8.5d).
+SQLite cannot change a column's CHECK in place and a rebuild of `events` would touch every row and every reference to
+it, so the column is **replaced** without a rebuild: the old one is renamed aside, a new `start_sun` with
+`CHECK (start_sun IN ('sunrise', 'sunset'))` is added, the values are copied across, then the renamed one is dropped
+(a column's own CHECK does not stop `DROP COLUMN`; no index, view or trigger names it). The code keeps reading
+`start_sun`. Nothing else changes; the goat item keeps `'sunset'`. A D1 export is taken before it runs in production.
+
+Schema: [`migrations/0069_sunrise.sql`](migrations/0069_sunrise.sql). **Migration check (SR-M,**
+[`test/migration-0069.test.ts`](test/migration-0069.test.ts)**):** every event survives with the same columns and
+values (a `'sunset'` row keeps `'sunset'`); afterwards `'sunrise'` is taken and `'noon'` is refused.
+
 ### 4.3 Recurrence (subset of RFC 5545 RRULE, as JSON)
 
 ```ts
@@ -1282,10 +1297,11 @@ nextTimerDue(base: string, intervalMin: number, win?: TimerWindow): string
 ```
 
 **`planReminderFires` and the sun (§7.7):** an occurrence's start is `start_time` (or
-`ALL_DAY_REMIND_TIME` for an all-day event) in `tz` — except when `start_sun` is `'sunset'`:
-then it is `sunsetUtc(date, place)`. An occurrence whose sunset cannot be computed (no place,
-or the sun does not set that day) is **skipped** — never planned at 09:00 or any other
-substitute time. `due = start − remind_offset_min` as for every reminder.
+`ALL_DAY_REMIND_TIME` for an all-day event) in `tz` — except when `start_sun` is set: then it is
+`sunUtcOf(date, place, start_sun)`, that day's sunrise or sunset. An occurrence whose sunrise or sunset cannot be
+computed (no place, or the sun does not rise or set that day) is **skipped** — never planned at 09:00 or any other
+substitute time. `due = start − remind_offset_min` as for every reminder; only a sun row may have a negative offset
+(minutes **after** sunrise or sunset, §8.5d).
 
 **`planReminderFires` and Random time (§8.4):** when the event has a Random time window, the due day is still the
 local date of `start − remind_offset_min`, but the time on that day is `randomTimeIn(eventId|occurrenceDate, from,
@@ -1478,11 +1494,11 @@ For one alert of one fire:
     machine before it holds a done load (§7D.3). Built by `machines.ts` `doneMessage`;
     recipients are every active member, and the house row goes to every speaker
     (`machines.ts` `machineAlert`: nobody assigned, `allSpeakers`), waiting for the alert hours (§7D.5).
-  - sun-timed reminder (§7.7): `"{title} — sunset at {time}"` (time per §8.17) — the occurrence's sunset in
-    the household tz, in the receiving member's clock (§8.17; was 12-hour with no am/pm, ⚑ Q52); when that sunset cannot
-    be computed at alert time, `"{title} — before sunset"`. `alertMessage(kind, title, n,
-    chore?, startsToday?, sunsetAt?)` takes it as a trailing `sunsetAt` (local `HH:MM`, or
-    `null` = could not be computed; absent = not a sun event). No emoji in the text.
+  - sun-timed reminder (§7.7): `"{title} — sunrise at {time}"` / `"{title} — sunset at {time}"` (time per §8.17) —
+    the occurrence's sunrise or sunset in the household tz, in the receiving member's clock (§8.17; was 12-hour with
+    no am/pm, ⚑ Q52); when it cannot be computed at alert time, `"{title} — sunrise"` / `"{title} — before sunset"`.
+    `alertMessage(kind, title, n, chore?, startsToday?, sun?)` takes it as a trailing `sun: { at: SunEvent, time }`
+    (`time` local `HH:MM`, or `null` = could not be computed; absent = not a sun event). No emoji in the text.
   - from the second alert on, append `" (alert {n})"`
 
 A delivery with **no fire** is an announcement (§9.3, `POST /announce`), a sign-in notice (§6.6), a
@@ -2248,34 +2264,40 @@ an alert says **"Put the goats away — sunset at 6:42pm"**. Each person opts in
 default (Shelly and John will opt in). Phone + House. It is **not on the calendar**: it is only
 findable in **Optional calendar items** (§7.5), where people turn it on.
 
-**The model:** an ordinary **optional event** (§7.5) whose start is the sunset —
-`events.start_sun = 'sunset'` (§4.2o). Everything optional events already do applies
-unchanged: the opt-in switch, the audience (push to the opted-in members, House only when that
-audience is not empty), Done / Snooze, renotify, `missed`. What is new:
+**Sunrise too** (John 2026-11-23, "a reminder to let the goats out at sunrise"; lifts Q59): anyone can make a
+📌 reminder that rings at sunrise or sunset, a number of minutes before or after, on chosen days (§8.5d). The goat
+alert above stays as it is; both use the one model below.
 
-- **Sunset** is computed locally from the household place (`settings.latitude` /
+**The model:** an event whose start is that day's sunrise or sunset — `events.start_sun = 'sunrise' | 'sunset'`
+(`SUN_EVENT`, §4.2o, §4.2zzp). The goat alert is an ordinary **optional event** (§7.5) with `'sunset'`: everything
+optional events already do applies unchanged: the opt-in switch, the audience (push to the opted-in members, House
+only when that audience is not empty), Done / Snooze, renotify, `missed`. A sun 📌 reminder is an alarm event
+(§4.2a, §8.5d). What is new:
+
+- **Sunrise and sunset** are computed locally from the household place (`settings.latitude` /
   `longitude`, §4.2o; ZIP 92056, Oceanside, 33.20 / −117.29) with the **NOAA general solar
   position algorithm**: fractional year γ, equation of time, declination, and the hour angle
   at zenith 90.833°; evaluated at the date's local solar noon, then refined once at the
-  sunset that gives. Rounded to the nearest minute ⚑ Q53.
-- **`sun.ts`** exports `interface Place { lat: number; lon: number }` and
-  `sunsetUtc(date: string, place: Place): string | null` → the UTC ISO instant of sunset on that
-  local date, or **null** when the sun does not set (polar day or night). Never a substitute
-  time. Pure: no clock, no fetch; imports nothing but `time.ts`.
-- **Planning** (§5.1): start = `sunsetUtc(date, place)`; no place or no sunset → that
-  occurrence is skipped (never 09:00).
-- **Text** (§5.7): `"{title} — sunset at {time}"` (§8.17); sunset not computable at alert time →
-  `"{title} — before sunset"`.
+  sunrise or sunset that gives. Rounded to the nearest minute ⚑ Q53.
+- **`sun.ts`** exports `interface Place { lat: number; lon: number }`,
+  `sunsetUtc(date: string, place: Place): string | null` and `sunriseUtc` → the UTC ISO instant of sunset / sunrise on
+  that local date, or **null** when the sun does not set / rise (polar day or night), and `sunUtcOf(date, place, at)`,
+  the one of the two that `at` (a `SunEvent`) names. Never a substitute time. Pure: no clock, no fetch; imports
+  nothing but `time.ts` (and the `SunEvent` type).
+- **Planning** (§5.1): start = `sunUtcOf(date, place, start_sun)`; no place, or no sunrise / sunset that day → that
+  occurrence is skipped (never 09:00). `remind_offset_min` is minutes **before**; a sun row may also have a negative
+  one, minutes **after** (§8.5d).
+- **Text** (§5.7): `"{title} — sunrise at {time}"` / `"{title} — sunset at {time}"` (§8.17); not computable at alert
+  time → `"{title} — sunrise"` / `"{title} — before sunset"`.
 - **Never on the calendar, by rule** ⚑ Q54: `/calendar` (and so the day sheet), and
   `GET/PATCH/DELETE /events/{id}` and `/events/{id}/exdates`, treat a `start_sun` event as absent
   (404 for the event routes). `/optional-events` and `PUT/DELETE /events/{id}/optin` list and
-  switch it like any optional event. It is created, edited and deleted only by coordinator SQL
-  ⚑ Q58; the label stays "Optional calendar items" ⚑ Q55.
-- **Ringing bar** (§8.2): its row reads `🔔 Put the goats away · sunset` ⚑ Q56.
+  switch it like any optional event. The goat item is created, edited and deleted only by coordinator SQL
+  ⚑ Q58; the label stays "Optional calendar items" ⚑ Q55. A sun 📌 reminder is an alarm event, which the
+  calendar never shows anyway (§4.2a); it is made and changed in 📌 Reminders (§8.5d).
+- **Ringing bar** (§8.2): its row reads `🔔 Put the goats away · sunset` ⚑ Q56, or `· sunrise` for a sunrise one.
 - **Repeats** ⚑ Q51: the goat row carries `renotify_min = 15`, `max_alerts = 3` — alerts at
   −30, −15 and at sunset, until someone taps Done.
-- **Sunset only** ⚑ Q59: there is no sunrise alert. (`sunriseUtc`, the same algorithm, exists only for the fishing
-  windows, §7.14.)
 
 **Acceptance (M4n — each row is a test):**
 
@@ -2291,6 +2313,8 @@ audience is not empty), Done / Snooze, renotify, `missed`. What is new:
 | G5 | one member opted in; tick at sunset − 30, then 15 min on | that member gets a push each time and the house one row from the second alert (§9.2d), all with the text `"Put the goats away — sunset at h:mmpm"` (that day's sunset) |
 | G6 | nobody opted in; tick | the fire steps, no deliveries |
 | G7 | `GET /fires` carries `startSun: 'sunset'` for its fire; `GET /events/{id}` → 404 | |
+| S4 | `sunUtcOf(d, place, 'sunrise')` / `'sunset'` for Oceanside on 2026-11-24 | equal to `sunriseUtc` / `sunsetUtc` for that date (about 6:29am / 4:44pm PST) |
+| S5 | `alertMessage('reminder', 'Goats out', 1, …, { at: 'sunrise', time: '06:29' })`; the same with `time: null` | `"Goats out — sunrise at 6:29am"`; `"Goats out — sunrise"` |
 
 ---
 
@@ -5043,17 +5067,34 @@ Time   Alarm                    Days            Next
 ```
 
 - **Days** text: all 7 → "Every day"; Mon–Fri → "Weekdays"; Sat+Sun → "Weekends";
-  otherwise short names in week order ("Mon Wed Fri").
+  otherwise short names in week order ("Mon Wed Fri"); with an Until date, `· until Sun Nov 29` after it.
 - **Next** = the alarm's next due time in household local time (weekday + time), or a
   red `ringing` badge **instead** while it rings. Fires are planned only 36 h ahead
   (§5.2), so an alarm with nothing planned yet shows a dim **later** (tooltip
-  "Planned up to 36 hours ahead") — an honest gap, not a computed guess.
+  "Planned up to 36 hours ahead") — an honest gap, not a computed guess. An alarm whose Until date has passed shows a
+  dim **ended** (it is kept, so it can be given a later date or deleted).
 - Tapping a row opens the **alarm form** (modal): title · time · day chips (Sun…Sat,
-  plus "Every day" / "Weekdays" shortcuts) · channels (☐ Phone ☐ House) · repeat
+  plus "Every day" / "Weekdays" shortcuts) · **Until** · channels (☐ Phone ☐ House) · repeat
   alert every (Off / 5 / 10 / 15 / 30 min) · assigned to · Save / Cancel / Delete.
+- **Until — one box for everything that repeats** (John 2026-11-23, "until Sunday"; ⚑ Q416): every ⏰ alarm, 🎲 window
+  reminder (§8.5c) and 🌅 sun reminder (§8.5d) has an optional **Until** date box (`UntilField`, under the day chips,
+  with a **✕** to clear it). Empty = no end, as before. A date = the last day it may ring, inclusive; it is the
+  recurrence's `until` (§4.3), which the engine already honours, so nothing new rings after it. The API takes
+  `until: 'YYYY-MM-DD' | null` on POST and PATCH of `/alarms` and `/reminders` and returns it; the server refuses a date
+  before the start (today for a new one) with 400 "Pick an Until date from today on." (`untilError`,
+  `src/shared/recurrence.ts`, the one rule both routes use). One-off 📌 reminders have no Until.
 - Editing an alarm changes it **in place** — its future fires are re-planned
   (§5.6 event edits); nothing has to be deleted and re-created.
 - At least one day must be chosen; the form says so in the dialog if not.
+
+**Acceptance (UN1–UN4 tests):**
+
+| # | Check | Expected |
+|---|---|---|
+| UN1 | `untilError` with a start of 2026-11-23: `'2026-11-29'`, `'2026-11-23'`, `'2026-11-22'`, `'Sunday'`, `null` | null; null; "Pick an Until date from today on."; "Until must be YYYY-MM-DD."; null |
+| UN2 | POST /alarms with `until` 6 days ahead; GET /alarms; PATCH `until: null` | 201 and listed with that `until`; after the PATCH `until` is null |
+| UN3 | an alarm every day with `until` = tomorrow; ticks through the day after | rings today and tomorrow, not after; GET /alarms then shows `ended: true`, `nextDueAt` null |
+| UN4 | POST /alarms or /reminders (window) with `until` yesterday | 400 "Pick an Until date from today on." |
 
 **Rolling timers** — as before: `⏱ Check on the dog · 60 min · 08:00–21:00`, a
 status badge (running / ringing / stopped), **Next** and **[Start]/[Stop]**; tapping a row
@@ -5194,6 +5235,8 @@ both hide inside something else. A reminder is the plain one-off.
   - **When** — quick chips **In 1 hour** · **After work** / **After school** (that person's own time, below) · **Tonight** (8pm) · **Tomorrow morning** (8am) ⚑ Q311,
     then a **Date** and a **Time** box showing the pick, both editable. A chip picks its next time: today while it is
     still ahead, else tomorrow (Tomorrow morning: always tomorrow; In 1 hour: now + 60 min, up to the next 5 minutes). A new form starts on After work.
+    Two more chips, **🌅 Sunrise** and **🌇 Sunset**, make it a sun reminder instead (§8.5d): the Date and Time boxes
+    give way to the sun fields; tapping a clock chip again goes back.
   - **Remind** — member chips, **me** preselected ⚑ Q313; none ticked = everyone.
 - **After work / After school is each person's own** (v1.84.0, MojoSOGO 2026-10-19: "After work for John is 3:30 and
   should be specific to the account and kids as after school"). Each member has a kind and a time, set in Settings →
@@ -5237,10 +5280,13 @@ reminder (§8.5b) can ring at random times inside a window on chosen days instea
   `randomTimeIn(eventId|date)` (§8.4, the same pick as an event reminder's Random time), so a different time each day.
   An unanswered ring stays silently in the Ringing bar and the next day's ring replaces it (§5.6 `superseded`). A day
   that passes with no ring (an outage) is simply skipped: a window reminder is never **missed**.
+- **Until** (§8.5, ⚑ Q416): under the Days, the shared optional Until box: the window rings on its days up to and
+  including that date, then leaves the list.
 - **Done** (or Ack) on any day's ring ends it ⚑ Q329: the server sets its repeat's `until` to that day and closes its
   later scheduled fires `removed`, so no day rings again, and it leaves the list. Snooze works as on any reminder.
 - **The list row:** `🎲 Weekdays 8:00am–11:00am · Book car check · John`; days read as **Every day**, **Weekdays**,
-  **Weekends**, else the short day names ("Mon Wed Fri"). The time of the next ring is not shown.
+  **Weekends**, else the short day names ("Mon Wed Fri"); with an Until date, `until Sun Nov 29` after them. The time
+  of the next ring is not shown. Once no ring is left before its Until date, it is not listed.
 - **Stored as** an alarm event (§4.2a) with `recurrence` WEEKLY on the days, `start_date` = today, `start_time` =
   From, `remind_offset_min` 0, `remind_random_from` / `remind_random_to` = the window, `renotify_min` NULL,
   `max_alerts` 1. No migration. `GET /alarms` leaves out any row with a Random window; `GET /reminders` lists it.
@@ -5257,6 +5303,45 @@ reminder (§8.5b) can ring at random times inside a window on chosen days instea
 | RW3 | Done on Monday's ring, then ticks through Wednesday | GET /reminders leaves it out; the event's `until` = Monday; no new fire, Tuesday's planned fire closed `removed` |
 | RW4 | POST a window with no days; From after To | 400; 400 |
 | RW-M | on the iPhone at 320 px | Alerts → 📌 Reminders → ＋ Add, tick 🎲, Weekdays 8–11, Save; a push comes once between 8 and 11 on the next weekday; Done clears it |
+
+### 8.5d 🌅 Sunrise and sunset reminders — on chosen days, each day until Done — asked by John 2026-11-23
+
+"During this week, until Sunday, I need a reminder to let the goats out at sunrise." A 📌 reminder (§8.5b) can ring at
+that day's sunrise or sunset (§7.7), a number of minutes before or after, on chosen days, each day afresh.
+
+- **The form:** the When chips **🌅 Sunrise** / **🌇 Sunset** (§8.5b) swap the Date and Time boxes for one line
+  **[ 0 ] min [ before ▾ / after ▾ ] [ sunrise ▾ / sunset ▾ ]**, then **Days** (the `DayChips` of §8.5c) and the shared
+  **Until** box (§8.5). A new one starts on **at** sunrise / sunset (0 min), **Every day**, no Until ⚑ Q415. Minutes
+  are 0–240 ⚑ Q415. **Repeat until Done** stays (as §8.5b).
+- **How it rings:** on each chosen day from today on (up to Until), at `sunUtcOf(date, place, at)` minus the minutes
+  before (or plus the minutes after), through the reminder pipeline as §8.5b: push `"Goats out — sunrise at 6:29am"`
+  (§5.7), repeats every 15 / 30 / 60 min up to `REMINDER_MAX_ALERTS` while unanswered, the Ringing bar's `· sunrise`.
+  The next day's ring replaces an unanswered one (§5.6 `superseded`). No place, or no sunrise that day → no ring that
+  day (§7.7); never missed.
+- **Done** closes **that day's** ring only ⚑ Q417 (the goats go out every day; unlike 🎲, §8.5c Q329, it does not end
+  the reminder). It ends at its Until date, or when it is deleted.
+- **The list row:** `🌅 Every day · at sunrise · until Sun Nov 29 · Goats out · John` (🌇 for sunset; `30 min after
+  sunrise`, `15 min before sunset`); a red **ringing** badge while it rings. Sorted with the rest by its next ring.
+  Once no ring is left before its Until date, it is not listed.
+- **Stored as** an alarm event (§4.2a): `start_sun` = `'sunrise'` / `'sunset'` (§4.2zzp), `start_time` NULL,
+  `recurrence` WEEKLY on the days (+ `until`), `start_date` = today, `remind_offset_min` = minutes before (negative =
+  after), `renotify_min` and `max_alerts` as §8.5b. `GET /alarms` leaves out any row with `start_sun`; `GET /reminders`
+  lists it with `sun: { at, offsetMin, days }` (`offsetMin` positive = before) and `until`.
+- **API:** POST / PATCH /reminders `{ title, sun: { at, offsetMin, days }, until?, channels, renotifyMin, assignedTo }`.
+  Server checks (`sunReminderError`, `src/shared/reminders.ts`): `at` is a `SUN_EVENT`, `offsetMin` an integer −240…240,
+  at least one day; `until` by `untilError`. A PATCH may switch between a set time, a window and the sun (as Q330).
+
+**Acceptance (SR1–SR6 tests, SR-M migration, SR-X manual):**
+
+| # | Check | Expected |
+|---|---|---|
+| SR1 | `planReminderFires` for a sunrise row, every day, offset −30 (30 after), Oceanside, 2026-11-24 → 26 | one fire a day, `due_at` = that day's `sunriseUtc` + 30 min; with `until` 2026-11-25 nothing on the 26th |
+| SR2 | POST /reminders `{ title: 'Goats out', sun: { at: 'sunrise', offsetMin: 0, days: all }, until }` then GET /reminders and GET /alarms | 201; listed with its `sun` and `until`, `state: 'due'`, `dueAt` = the next sunrise; GET /alarms leaves it out |
+| SR3 | ticks at that sunrise, then +30 | alert 1 `"Goats out — sunrise at h:mmam"` to the reminded member; alert 2 at +30 |
+| SR4 | Done on today's ring, then a tick at tomorrow's sunrise | it rings again tomorrow; still listed |
+| SR5 | POST with `offsetMin` 300; no days; `at: 'noon'` | 400 each |
+| SR6 | PATCH a sun reminder to a set time `{ date, time, sun: null }` | it becomes a one-off (`sun` null, `start_sun` NULL); GET /alarms still leaves it out |
+| SR-X | on the iPhone at 320 px | Alerts → 📌 Reminders → ＋ Add, 🌅 Sunrise, Until Sunday, Save; the row reads `🌅 Every day · at sunrise · until Sun Nov 29`; the push comes at sunrise |
 
 ### 8.5a 💪 Task buddy (Alerts → 💪 Task buddy, §7G)
 

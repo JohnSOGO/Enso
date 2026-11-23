@@ -1,10 +1,11 @@
 // SPEC §8.5b — one-off reminders: an alarm with no repeat that rings until Done. The When chips, the "later than
-// now" check and the listed state; §8.5c — random times in a window on chosen days. Pure: `now` and `tz` are always passed in.
-import { AFTER_KIND, WEEKDAY, isOneOf, type Action, type AfterKind, type ReminderState, type Weekday } from './vocab';
+// now" check and the listed state; §8.5c — random times in a window on chosen days; §8.5d — at sunrise or sunset on chosen days. Pure: `now` and `tz` are always passed in.
+import { AFTER_KIND, SUN_EVENT, WEEKDAY, isOneOf, type Action, type AfterKind, type ReminderState, type SunEvent, type Weekday } from './vocab';
 import { addDays, addMinutes, isDate, isTime, iso, localToUtc, ms, utcToLocal } from './time';
 import { randomWindowError } from './random-time';
 import { planReminderFires, type ReminderEvent } from './engine';
 import type { Recurrence } from './recurrence';
+import type { Place } from './sun';
 
 /** ⚑ Q312 — alerts before it waits silently in the Ringing bar until Done. */
 export const REMINDER_MAX_ALERTS = 12;
@@ -60,12 +61,18 @@ export function reminderTimeError(date: unknown, time: unknown, tz: string, now:
   return ms(localToUtc(date, time, tz)) > ms(now) ? null : 'Pick a time later than now.';
 }
 
-/** The listed state from the fire facts, or null for a done reminder (not listed). A window (§8.5c) is never missed. */
-export function reminderState(f: { done: boolean; ringing: boolean; openDueAt: string | null; startAt: string; window?: boolean }, now: string): ReminderState | null {
+/**
+ * The listed state from the fire facts, or null when not listed: a done reminder, or a repeating one (a 🎲 window §8.5c
+ * or 🌅 sun §8.5d) with no open fire and no ring left (`next` null: its Until date passed). A repeating one is never missed.
+ */
+export function reminderState(
+  f: { done: boolean; ringing: boolean; openDueAt: string | null; startAt: string; repeating?: boolean; next?: string | null }, now: string,
+): ReminderState | null {
   if (f.done) return null;
   if (f.ringing) return 'ringing';
-  if (f.openDueAt || f.window || ms(f.startAt) > ms(now)) return 'due';
-  return 'missed';
+  if (f.openDueAt) return 'due';
+  if (f.repeating) return f.next ? 'due' : null;
+  return ms(f.startAt) > ms(now) ? 'due' : 'missed';
 }
 
 /** §8.5c — a window reminder's days and [from, to). */
@@ -84,9 +91,27 @@ export function windowError(w: unknown): string | null {
 /** The days in week order, each once. */
 export const windowDays = (days: Weekday[]): Weekday[] => WEEKDAY.filter((d) => days.includes(d));
 
-/** §8.5c — the next ring the tick will plan: the same planReminderFires pick, over the next 8 days; null when none. */
-export function nextWindowRing(ev: ReminderEvent, now: string, tz: string): string | null {
-  return planReminderFires(ev, tz, now, addMinutes(now, 8 * 1440))[0]?.due_at ?? null;
+/** §8.5c, §8.5d — a repeating reminder's next ring as the tick will plan it, over the next 8 days; null when none. */
+export function nextRing(ev: ReminderEvent, now: string, tz: string, place: Place | null): string | null {
+  return planReminderFires(ev, tz, now, addMinutes(now, 8 * 1440), place)[0]?.due_at ?? null;
+}
+
+/** §8.5d — a sun reminder: sunrise or sunset, minutes before (negative = after), on these days. */
+export interface ReminderSun { at: SunEvent; offsetMin: number; days: Weekday[] }
+/** ⚑ Q415 — minutes before or after, at most. */
+export const SUN_REMINDER_MAX_MIN = 240;
+/** ⚑ Q415 — a new one: at sunrise / sunset, every day. */
+export const sunDefault = (at: SunEvent): ReminderSun => ({ at, offsetMin: 0, days: [...WEEKDAY] });
+
+/** null, or the 400 message for a sun reminder's `sun`. */
+export function sunReminderError(x: unknown): string | null {
+  if (!x || typeof x !== 'object') return 'A sunrise or sunset reminder needs sunrise or sunset, minutes and days.';
+  const v = x as Record<string, unknown>;
+  if (!isOneOf(SUN_EVENT, v.at)) return `at must be one of: ${SUN_EVENT.join(', ')}.`;
+  const m = v.offsetMin;
+  if (!Number.isInteger(m) || Math.abs(m as number) > SUN_REMINDER_MAX_MIN) return `Minutes before or after must be 0–${SUN_REMINDER_MAX_MIN}.`;
+  if (!Array.isArray(v.days) || v.days.length === 0 || !v.days.every((d) => isOneOf(WEEKDAY, d))) return 'Pick at least one day.';
+  return null;
 }
 
 /** ⚑ Q329 — Done or Ack on a window reminder's ring ends it: its repeat with `until` that day, else null. */

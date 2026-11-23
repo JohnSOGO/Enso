@@ -11,7 +11,7 @@ import { Tasks } from './Tasks';
 import { RemindersSection } from './Reminders';
 import { Announce } from './Announce';
 import { HouseQuiet } from './HouseQuiet';
-import { ChannelChecks, DayChips, RenotifySelect, SHORT, channelsOf, daysText, flagsOf, pickOneWay } from './AlertFields';
+import { ChannelChecks, DayChips, RenotifySelect, SHORT, UntilField, channelsOf, daysText, flagsOf, pickOneWay, untilText } from './AlertFields';
 import { del, errorText, get, patch, post } from '../api';
 import { useApp, useIsFounder } from '../state';
 import { WEEKDAY, type Channel, type Weekday } from '../../../src/shared/vocab';
@@ -24,6 +24,8 @@ import { useAsk } from './Ask';
 export interface Alarm {
   id: string; title: string; time: string; days: Weekday[]; channels: Channel[];
   renotifyMin: number | null; assignedTo: string[]; createdBy: string; nextDueAt: string | null; ringing: boolean;
+  /** §8.5 ⚑ Q416: the last day it may ring (null = no end); `ended` once that day has passed. */
+  until: string | null; ended: boolean;
 }
 
 function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
@@ -36,6 +38,7 @@ function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
 
   const next = (a: Alarm) => {
     if (a.ringing) return <span className="badge bad">ringing</span>;
+    if (a.ended) return <span className="muted">ended</span>;
     if (!a.nextDueAt) return <span className="muted" title="Planned up to 36 hours ahead">later</span>;
     const l = utcToLocal(a.nextDueAt, tz);
     return `${SHORT[WEEKDAY[weekdayOf(l.date)]]} ${clock(l.time)}`;
@@ -47,7 +50,7 @@ function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
         <span style={{ flex: 1 }} />
         <button onClick={() => onEdit(null)}>＋ Add</button>
       </div>
-      <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>Ring at a set time on the days you pick, every week. Kept off the calendar.</p>
+      <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>Ring at a set time on the days you pick, every week, or until a date. Kept off the calendar.</p>
       {error && <div role="alert" className="alert-error">{error}</div>}
       {alarms === null && !error && <p className="muted">Loading…</p>}
       {alarms?.length === 0 && <p className="muted">No scheduled alarms yet.</p>}
@@ -71,7 +74,7 @@ function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
                     {a.title}
                   </button>
                 </th>
-                <td className={s.rigid}>{daysText(a.days)}</td>
+                <td className={s.rigid}>{daysText(a.days)}{a.until && <span className="muted"> · {untilText(a.until)}</span>}</td>
                 <td className={s.rigid}>{next(a)}</td>
               </tr>
             ))}
@@ -84,10 +87,11 @@ function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
 
 export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: () => void }) {
   const ask = useAsk();
-  const { me, members, refresh } = useApp();
+  const { me, members, refresh, tz } = useApp();
   const founder = useIsFounder();
+  const today = utcToLocal(new Date().toISOString(), tz).date;
   const init = useMemo(() => ({
-    title: alarm?.title ?? '', time: alarm?.time ?? '08:00', days: alarm?.days ?? ([] as Weekday[]),
+    title: alarm?.title ?? '', time: alarm?.time ?? '08:00', days: alarm?.days ?? ([] as Weekday[]), until: alarm?.until ?? null,
     ...flagsOf(alarm?.channels, founder),
     renotify: alarm?.renotifyMin ? String(alarm.renotifyMin) : 'off', assignedTo: alarm?.assignedTo ?? [],
   }), [alarm, founder]);
@@ -105,7 +109,8 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
     const channels = channelsOf(f);
     if (!f.days.length) throw new Error('Pick at least one day of the week.');
     if (!channels.length) throw new Error(pickOneWay('alert'));
-    const body = { title: f.title, time: f.time, days: f.days, channels, renotifyMin: f.renotify === 'off' ? null : Number(f.renotify), assignedTo: f.assignedTo };
+    const body = { title: f.title, time: f.time, days: f.days, channels, renotifyMin: f.renotify === 'off' ? null : Number(f.renotify), assignedTo: f.assignedTo,
+      ...(f.until !== init.until || !alarm ? { until: f.until } : {}) }; // §8.5: an unchanged Until is not re-checked
     if (alarm) await patch(`/alarms/${alarm.id}`, body); else await post('/alarms', body);
   });
 
@@ -124,6 +129,7 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
           <input type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} />
         </label>
         <DayChips days={f.days} onChange={(days) => setF({ ...f, days })} />
+        <UntilField until={f.until} min={today} onChange={(until) => setF({ ...f, until })} />
         <ChannelChecks value={f} onChange={(c) => setF({ ...f, ...c })} />
         <RenotifySelect label="Repeat the alert until handled" value={f.renotify} onChange={(renotify) => setF({ ...f, renotify })} />
         <div className="field" role="group" aria-label="Assigned to">

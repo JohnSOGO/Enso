@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
 import { WEEKDAY, isOneOf, type Channel, type Weekday } from '../../shared/vocab';
 import { addDays, isTime, localToUtc, ms, utcToLocal } from '../../shared/time';
-import { occurrences, type Recurrence } from '../../shared/recurrence';
+import { hasEnded, occurrences, untilError, type Recurrence } from '../../shared/recurrence';
 import { all, first, newId, nowIso, parseJson, run } from '../db';
 import { body, fail } from '../http';
 import { requireMember } from '../session';
@@ -29,11 +29,13 @@ function nextDue(e: AlarmRow, tz: string, now: string): string | null {
 
 function alarmView(e: AlarmRow, tz: string) {
   const r = parseJson<Recurrence | null>(e.recurrence, null);
+  const now = nowIso();
+  const ended = e.ringing !== 1 && hasEnded(r, utcToLocal(now, tz).date); // §8.5 ⚑ Q416: kept, shown as ended
   return {
     id: e.id, title: e.title, time: e.start_time, days: r?.byDay ?? [],
     channels: parseJson<Channel[]>(e.remind_channels, []), renotifyMin: e.renotify_min,
     assignedTo: parseJson<string[]>(e.assigned_to, []), createdBy: e.created_by,
-    nextDueAt: e.ringing === 1 ? null : nextDue(e, tz, nowIso()), ringing: e.ringing === 1,
+    nextDueAt: e.ringing === 1 || ended ? null : nextDue(e, tz, now), ringing: e.ringing === 1, until: r?.until ?? null, ended,
   };
 }
 
@@ -41,18 +43,21 @@ const SELECT_ALARMS = `
   SELECT e.*,
     (SELECT MIN(f.due_at) FROM fires f WHERE f.event_id = e.id AND f.state = 'scheduled') AS next_due_at,
     EXISTS (SELECT 1 FROM fires f WHERE f.event_id = e.id AND f.state = 'ringing') AS ringing
-  FROM events e WHERE e.is_alarm = 1 AND e.recurrence IS NOT NULL AND e.remind_random_from IS NULL AND e.deleted_at IS NULL`; // §8.5b, §8.5c: reminders are not alarms
+  FROM events e WHERE e.is_alarm = 1 AND e.recurrence IS NOT NULL AND e.remind_random_from IS NULL AND e.start_sun IS NULL
+    AND e.deleted_at IS NULL`; // §8.5b, §8.5c, §8.5d: reminders are not alarms
 
-/** Alarm fields → the event body parseEventInput understands. Returns an error message or the body. */
-function toEventBody(b: Record<string, unknown>, startDate: string): Record<string, unknown> | string {
+/** Alarm fields → the event body parseEventInput understands. Returns an error message or the body. `today`: Until's earliest (§8.5). */
+function toEventBody(b: Record<string, unknown>, startDate: string, today: string): Record<string, unknown> | string {
   if (!isTime(b.time)) return 'Time must be HH:MM.';
   const days = b.days;
   if (!Array.isArray(days) || days.length === 0) return 'Pick at least one day of the week.';
   if (!days.every((d) => isOneOf(WEEKDAY, d))) return `Days must be from: ${WEEKDAY.join(', ')}.`;
   const byDay = WEEKDAY.filter((d) => days.includes(d)) as Weekday[];
+  const untilErr = untilError(b.until, today);
+  if (untilErr) return untilErr;
   return {
     title: b.title, startDate, startTime: b.time, endTime: null,
-    recurrence: { freq: 'WEEKLY', byDay }, assignedTo: b.assignedTo ?? [],
+    recurrence: { freq: 'WEEKLY', byDay, ...(b.until ? { until: b.until } : {}) }, assignedTo: b.assignedTo ?? [],
     reminder: { offsetMin: 0, channels: b.channels, renotifyMin: b.renotifyMin ?? null },
   };
 }
@@ -78,7 +83,7 @@ alarms.get('/alarms', requireMember, async (c) => {
 alarms.post('/alarms', requireMember, async (c) => {
   const tz = await householdTz(c.env.DB);
   const today = utcToLocal(nowIso(), tz).date;
-  const eventBody = toEventBody(await body(c), today);
+  const eventBody = toEventBody(await body(c), today, today);
   if (typeof eventBody === 'string') return fail(c, 400, 'invalid_input', eventBody);
   const input = await parseEventInput(c.env.DB, eventBody);
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);
@@ -96,8 +101,11 @@ alarms.patch('/alarms/:id', requireMember, async (c) => {
   const a = await loadAlarm(c, true);
   if (a instanceof Response) return a;
   const tz = await householdTz(c.env.DB);
-  const merged = { ...alarmView(a, tz), ...(await body(c)) };
-  const eventBody = toEventBody(merged, a.start_date);
+  const patchBody = await body(c);
+  const view = alarmView(a, tz);
+  // An unchanged Until is kept as it is, even when passed; a new one must be from today on (§8.5).
+  const today = 'until' in patchBody ? utcToLocal(nowIso(), tz).date : '0000-01-01';
+  const eventBody = toEventBody({ ...view, ...patchBody }, a.start_date, today);
   if (typeof eventBody === 'string') return fail(c, 400, 'invalid_input', eventBody);
   const input = await parseEventInput(c.env.DB, eventBody);
   if (typeof input === 'string') return fail(c, 400, 'invalid_input', input);

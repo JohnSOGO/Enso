@@ -1,5 +1,5 @@
 // SPEC §5.6, §7B.3 — the fire, reminder-planning and chore-run rows, shared by tick and the routes. No Hono; never steps or delivers.
-import { newChoreFire, planReminderFires, timerWindow, type AlertConfig, type ChoreAlertText, type FireRow, type NewFire } from '../shared/engine';
+import { newChoreFire, planReminderFires, timerWindow, type AlertConfig, type ChoreAlertText, type FireRow, type NewFire, type SunAt } from '../shared/engine';
 import { DEFAULT_MAX_ALERTS, choreFireContext, choreFromRow, planChoreRuns, type Chore, type ChoreRow, type ChoreRun } from '../shared/chores';
 import { isStartReminder, type ThingRow } from '../shared/things';
 import { doneMessage, isMachineId, isStillLoaded, machineAlert, waitingLoad, type MachineRow } from '../shared/machines';
@@ -10,7 +10,7 @@ import { isTaskId, taskFromRow, type TaskRow } from '../shared/tasks';
 import { checkinText } from '../shared/task-replies';
 import type { Recurrence } from '../shared/recurrence';
 import { utcToLocal } from '../shared/time';
-import { sunsetUtc, type Place } from '../shared/sun';
+import { sunUtcOf, type Place } from '../shared/sun';
 import { FOUNDER_SQL, all, first, newId, parseJson, placeOf } from './db';
 import { onMemberIds } from './event-rows';
 import { audience } from '../shared/optins';
@@ -102,8 +102,8 @@ interface Source {
   title: string; assignedTo: string[]; cfg: AlertConfig; chore?: ChoreAlertText; startsToday?: boolean;
   /** §7.5: a reminder of an optional event, and the members who have it on. */
   optional?: boolean; onIds?: string[];
-  /** §7.7: a sun reminder's local sunset HH:MM, or null when it cannot be computed. */
-  sunsetAt?: string | null;
+  /** §7.7: a sun reminder's local sunrise / sunset HH:MM, or null when it cannot be computed. */
+  sun?: SunAt;
   /** §7D.3: spoken on every speaker HA lists, whatever anyone ticked. */
   allSpeakers?: boolean;
   /** §7.10: an event reminder's things to bring. */
@@ -176,7 +176,7 @@ export async function sourceOf(
   if (!row) return null;
   const window = timerWindow(row.active_from, row.active_to, row.tz);
   const place = placeOf(row.lat, row.lon);
-  const sunset = row.start_sun && fire.occurrence_date && place ? sunsetUtc(fire.occurrence_date, place) : null;
+  const sunAt = row.start_sun && fire.occurrence_date && place ? sunUtcOf(fire.occurrence_date, place, row.start_sun) : null;
   return {
     title: row.title,
     assignedTo: parseJson<string[]>(row.assigned_to, []),
@@ -189,7 +189,7 @@ export async function sourceOf(
     },
     ...(row.optional === 1 ? { optional: true, onIds: await onMemberIds(db, fire.event_id) } : {}),
     ...(row.bring ? { bring: parseJson<string[]>(row.bring, []) } : {}),
-    ...(row.start_sun ? { sunsetAt: sunset && row.tz ? utcToLocal(sunset, row.tz).time : null } : {}),
+    ...(row.start_sun ? { sun: { at: row.start_sun, time: sunAt && row.tz ? utcToLocal(sunAt, row.tz).time : null } } : {}),
     ...(isTaskId(fire.timer_id) ? await taskSay(db, fire.timer_id, row.title, row.interval_min ?? 0, now) : {}),
   };
 }

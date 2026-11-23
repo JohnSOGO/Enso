@@ -25,6 +25,30 @@ carry its result.
 
 ---
 
+## 2026-11-23 — 🌅 Sunrise and sunset reminders, and Until on every repeat, v1.118.0 (placement-advisor)
+
+- **Ask:** 📌 Reminders gain a sun shape (chosen days at sunrise or sunset ± up to 240 min, an is_alarm event with
+  start_sun, start_time NULL, signed remind_offset_min); migration 0069 lets start_sun take 'sunrise'; an optional
+  Until on every ⏰ alarm, 🎲 window and 🌅 sun reminder (SPEC 3.109 §7.7, §8.5, §8.5c, §8.5d, §4.2zzp; feature request
+  req_6vc9p3fac2yryzne; lifts ⚑ Q59).
+- **Verdict:** EXISTING owners throughout: `src/shared/sun.ts` sunUtcOf; `src/shared/engine.ts` planReminderFires picks
+  the sun event, alertMessage's `sun` replaces `sunsetAt`; `src/shared/reminders.ts` ReminderSun, sunReminderError,
+  sunDefault, reminderState (repeating + next), nextRing (with place); `src/shared/recurrence.ts` untilError, hasEnded;
+  `src/worker/event-rows.ts` startSun + signed offset only for a sun caller, start_sun in the insert;
+  `routes/reminders.ts` the sun shape, view and SELECT; `routes/alarms.ts` until, ended, sun rows left out;
+  `fire-rows.ts` / `tick.ts` the sun text (rename only); `vocab.ts` SUN_EVENT; `AlertFields.tsx` UntilField +
+  untilText; `Reminders.tsx`, `Alarms.tsx`, `RingingBar.tsx`. Migration 0069 + its test. No reorganizer.
+- **Flow stage:** rules (sun, engine, reminders, recurrence), route/persist (reminders, alarms, event-rows, migration),
+  deliver text (fire-rows, tick), render (AlertFields, Reminders, Alarms, RingingBar).
+- **Why:** each piece already had a row whose one concern covers it; recurrence.ts already defines `until`; sunUtcOf
+  avoids an `at ? sunrise : sunset` ternary in three places; the listed state stays a shared rule.
+- **Built:** as placed, with one scoping choice the advisor asked to settle in the spec: untilError is called by the
+  alarms and reminders routes (§8.5 "the one rule both routes use"), not by parseEventInput, so the calendar event
+  form's own until is unchanged. A sun reminder's fires are left out of the reminders `done` flag (Q417: Done ends the
+  day only). Ensō-button sun reminders (§8.18) were not placed: not in the spec yet.
+- **Caps:** engine.ts 268/300 (net +3, under the band); tick.ts 121/148 net zero; Reminders.tsx 220/300; arch:audit
+  quiet, nothing in the warning band.
+
 ## 2026-11-12 — Hear a clip at home first, Whisper as fallback, v1.116.0 (placement-advisor)
 
 - **Ask:** POST /say/hear asks SogoAI (the helper's new POST /hear → the model manager's transcriptions, with member names as hotwords) first, then Workers AI Whisper (SPEC §8.18 part 2, ⚑ Q408; MojoSOGO 2026-11-11 "I have a better method for VTT using SogoAI; look for it and use it"; AREC arec-sogoai-voice-to-text.md).
