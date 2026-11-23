@@ -6,7 +6,8 @@
 // algorithm (fractional year γ) — a different formulation, so agreement is a real check.
 import { describe, expect, it } from 'vitest';
 import { sunsetUtc, type Place } from '../src/shared/sun';
-import { alertMessage, planReminderFires, type ReminderEvent } from '../src/shared/engine';
+import { planReminderFires, type ReminderEvent } from '../src/shared/engine';
+import { alertMessage } from '../src/shared/alert-text';
 import { utcToLocal } from '../src/shared/time';
 
 const OCEANSIDE: Place = { lat: 33.2, lon: -117.29 };

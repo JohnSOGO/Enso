@@ -1,5 +1,6 @@
 // SPEC §5.6, §7B.3 — the fire, reminder-planning and chore-run rows, shared by tick and the routes. No Hono; never steps or delivers.
-import { newChoreFire, planReminderFires, timerWindow, type AlertConfig, type ChoreAlertText, type FireRow, type NewFire, type SunAt } from '../shared/engine';
+import { newChoreFire, planReminderFires, timerWindow, type AlertConfig, type FireRow, type NewFire } from '../shared/engine';
+import type { ChoreAlertText, SunAt } from '../shared/alert-text';
 import { DEFAULT_MAX_ALERTS, choreFireContext, choreFromRow, planChoreRuns, type Chore, type ChoreRow, type ChoreRun } from '../shared/chores';
 import { isStartReminder, type ThingRow } from '../shared/things';
 import { doneMessage, isMachineId, isStillLoaded, machineAlert, waitingLoad, type MachineRow } from '../shared/machines';

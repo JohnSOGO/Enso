@@ -9,7 +9,8 @@ import {
   isStillLoaded, loadBountyTitle, moveMachine, parseDoneNow, parseMove, parseStart, refusalText, remindMachine, startMachine, waitingLoad, type MachineRow,
 } from '../src/shared/machines';
 import { DEFAULT_MACHINE_HOURS, machineQuietUntil, parseMachineHours } from '../src/shared/machine-hours';
-import { alertMessage, applyAction, newMachineFire, pushActions, stepFire, type FireRow } from '../src/shared/engine';
+import { applyAction, newMachineFire, pushActions, stepFire, type FireRow } from '../src/shared/engine';
+import { alertMessage } from '../src/shared/alert-text';
 import { machineWrites } from '../src/worker/routes/machines';
 import { addMinutes, localToUtc } from '../src/shared/time';
 

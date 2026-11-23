@@ -1,9 +1,10 @@
 // SPEC §5.8 — every row is a test.
 import { describe, expect, it } from 'vitest';
 import {
-  alertMessage, applyAction, applyTimerCmd, inside, newChoreFire, newThingFire, newTimerFire, nextTimerDue, planReminderFires,
+  applyAction, applyTimerCmd, inside, newChoreFire, newThingFire, newTimerFire, nextTimerDue, planReminderFires,
   stepFire, timerWindow, timerWindowError, type AlertConfig, type FireRow, type NewFire, type ReminderEvent,
 } from '../src/shared/engine';
+import { alertMessage } from '../src/shared/alert-text';
 import { localToUtc } from '../src/shared/time';
 
 const D = '2026-10-06T';
