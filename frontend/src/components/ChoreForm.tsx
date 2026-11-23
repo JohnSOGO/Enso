@@ -10,6 +10,7 @@ import { CHORE_TIMING, type ChoreTiming } from '../../../src/shared/vocab';
 import { DONE_MEANS_MAX, PEOPLE_MAX, STEPS_MAX, SUN_OFFSET_MAX, TITLE_MAX, WAIT_MAX } from '../../../src/shared/chores';
 import { canChange } from '../../../src/shared/roles';
 import { useRooms } from './Rooms';
+import { useAsk } from './Ask';
 
 interface StepDraft { title: string; wait: string; memberId: string | null }
 
@@ -20,6 +21,7 @@ const TIMING_LABEL: Record<ChoreTiming, [string, string]> = {
 const chip = { padding: '4px 10px', minHeight: 44 } as const;
 
 export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: () => void }) {
+  const ask = useAsk();
   const { me, members, refresh } = useApp();
   const founder = useIsFounder();
   const { rooms } = useRooms();
@@ -194,7 +196,7 @@ export function ChoreForm({ chore, onClose }: { chore: Chore | null; onClose: ()
       </fieldset>
       {chore && canEdit && (
         <div className="row wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-          <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete chore "${chore.title}"? Its room stays.`)) run(() => del(`/chores/${chore.id}`)); }}>Delete chore</button>
+          <button className="danger" disabled={busy} onClick={async () => { if (await ask(`Delete chore "${chore.title}"? Its room stays.`)) run(() => del(`/chores/${chore.id}`)); }}>Delete chore</button>
         </div>
       )}
     </Modal>

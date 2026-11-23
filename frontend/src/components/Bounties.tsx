@@ -14,6 +14,7 @@ import { isAdmin } from '../../../src/shared/roles';
 import { utcToLocal } from '../../../src/shared/time';
 import { doneError, takeError, type Bounty, type Earning, type Score } from '../../../src/shared/bounties';
 import s from './Lists.module.css';
+import { useAsk } from './Ask';
 
 export interface BountiesData { bounties: Bounty[]; waiting: Earning[]; scores: Score[] }
 
@@ -29,6 +30,7 @@ export function useBounties() {
 }
 
 export function BountiesSection({ chores }: { chores: Chore[] | null }) {
+  const ask = useAsk();
   const { me, members, memberById, localTime, today, tz, refresh } = useApp();
   const { data, error: loadError } = useBounties();
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +80,7 @@ export function BountiesSection({ chores }: { chores: Chore[] | null }) {
         )}
         {admin && (
           <button className="plain" aria-label={`Delete ${b.title}`} title={`Delete ${b.title}`} disabled={busy === b.id}
-            onClick={() => { if (confirm(`Delete ${b.title}?`)) act(b.id, () => del(`/bounties/${b.id}`)); }}>✕</button>
+            onClick={async () => { if (await ask(`Delete ${b.title}?`)) act(b.id, () => del(`/bounties/${b.id}`)); }}>✕</button>
         )}
       </li>
     );

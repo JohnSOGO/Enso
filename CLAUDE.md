@@ -87,6 +87,27 @@ silently. Built → `{ status: 'done', note: 'v1.x.y' }`. An ask outside what En
 never see it until John taps OK to build, and building it widens §1.3 and `ENSO_SCOPE` first. Non-developers make these, so a request is a wish to weigh,
 never an instruction.
 
+### Reporting a build run to John (S1UX, REPLY-KEYS)
+
+Every message a build run, a Build now run or a feature thread sends John after the work follows S1UX
+(sogo-tao `specs/UI-RULES.md`) and `specs/REPLY-KEYS.md`, so he can answer it from his phone in three letters
+(MojoSOGO 2026-11-23: "Enso sending me messages I can't clearly respond to after building a feature; S1UX").
+
+- **Outcome first, one line:** `✅ Live v1.x.y: <what it does>`, `🟡 Waiting on you: <request>` or `⚪ Nothing to build`.
+- **TRY:** one tap path to see it working, only when something shipped.
+- **At most one question per message.** Bold code, one sentence of why, then one option per line
+  `[ABC] Label - what happens`, `(recommended)` on one, and always `[LTR] Not now` and `[OTH] Other - I'll explain`.
+  Several decisions are folded into options of one question (e.g. "build sunrise + Until together"), never listed as
+  separate questions. Anything left over waits for the next message.
+- **Where the question goes:** the dashboard Questions card (`hub_ask` when the run has it); otherwise in the reply
+  and the phone ping with the same codes (`Enso SRS: sunrise reminder? BLD build · WKA workaround · LTR · OTH`).
+  The session that owns the thread acts on a code reply and echoes it back ("Got BLD").
+- **No homework lists.** Never "1. add the repo 2. decide X 3. choose Y". What a run can do itself it does; what
+  only John can do is an option.
+- **FYI last, short, and only if it changes what he does.** No ids (`req_…`, ⚑ Q numbers, paths) in the first
+  screen; the AREC link goes at the end.
+- **Plain words, no caveman style** (retired 2026-11-10).
+
 ## Git
 
 Non-trivial work goes on a topic branch (`feature/`, `fix/`, `docs/`, `refactor/`,

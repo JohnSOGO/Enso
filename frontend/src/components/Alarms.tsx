@@ -19,11 +19,12 @@ import { utcToLocal, weekdayOf } from '../../../src/shared/time';
 import { canChange } from '../../../src/shared/roles';
 import { ALERT_TITLE_MAX } from '../../../src/shared/alert-limits';
 import s from './Lists.module.css';
+import { useAsk } from './Ask';
 
 export interface Alarm {
   id: string; title: string; time: string; days: Weekday[]; channels: Channel[];
   renotifyMin: number | null; assignedTo: string[]; createdBy: string; nextDueAt: string | null; ringing: boolean;
-  /** §8.5 ⚑ Q411: the last day it may ring (null = no end); `ended` once that day has passed. */
+  /** §8.5 ⚑ Q416: the last day it may ring (null = no end); `ended` once that day has passed. */
   until: string | null; ended: boolean;
 }
 
@@ -85,6 +86,7 @@ function ScheduledSection({ onEdit }: { onEdit: (a: Alarm | null) => void }) {
 }
 
 export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: () => void }) {
+  const ask = useAsk();
   const { me, members, refresh, tz } = useApp();
   const founder = useIsFounder();
   const today = utcToLocal(new Date().toISOString(), tz).date;
@@ -145,7 +147,7 @@ export function AlarmForm({ alarm, onClose }: { alarm: Alarm | null; onClose: ()
       </fieldset>
       {alarm && canEdit && (
         <div className="row wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-          <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete alarm "${alarm.title}"?`)) run(() => del(`/alarms/${alarm.id}`)); }}>Delete alarm</button>
+          <button className="danger" disabled={busy} onClick={async () => { if (await ask(`Delete alarm "${alarm.title}"?`)) run(() => del(`/alarms/${alarm.id}`)); }}>Delete alarm</button>
         </div>
       )}
     </Modal>

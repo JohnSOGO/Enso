@@ -10,6 +10,7 @@ import { useApp } from '../state';
 import { canChange } from '../../../src/shared/roles';
 import { AREAS_MAX, ROOM_NAME_MAX, type Room, type RoomArea } from '../../../src/shared/rooms';
 import s from './RoomSheet.module.css';
+import { useAsk } from './Ask';
 
 /** `readOnly` (🏡 Home, §8.19) shows the areas with no ✎ or ＋ Add an area, whoever looks. */
 export function RoomSections({ room, onDirty, readOnly = false }: { room: Room; onDirty: (dirty: boolean) => void; readOnly?: boolean }) {
@@ -73,6 +74,7 @@ export function RoomSections({ room, onDirty, readOnly = false }: { room: Room; 
 
 /** A room opened from Settings → 🏠 Household: its areas, and ✎ Rename / Delete room for its creator or an admin. */
 export function RoomSheet({ room, onClose }: { room: Room; onClose: () => void }) {
+  const ask = useAsk();
   const { me, refresh } = useApp();
   const canEdit = canChange(room.createdBy, me);
   const [name, setName] = useState(room.name);
@@ -86,8 +88,8 @@ export function RoomSheet({ room, onClose }: { room: Room; onClose: () => void }
     try { await fn(); refresh(); if (close) onClose(); else setRenaming(false); } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
   const rename = () => act(() => patch(`/rooms/${room.id}`, { name }), false);
-  const remove = () => {
-    if (confirm(`Delete the room "${room.name}" and its areas and photos? Its chores stay, with no room.`)) act(() => del(`/rooms/${room.id}`), true);
+  const remove = async () => {
+    if (await ask(`Delete the room "${room.name}" and its areas and photos? Its chores stay, with no room.`)) act(() => del(`/rooms/${room.id}`), true);
   };
 
   return (

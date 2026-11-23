@@ -8,6 +8,7 @@ import { useApp } from '../state';
 import { canDelete, canSettle, isAnswerable, type Balance, type Mess } from '../../../src/shared/messes';
 import { isAdmin } from '../../../src/shared/roles';
 import s from './Messes.module.css';
+import { useAsk } from './Ask';
 
 const NOBODY = 'nobody'; // the "Whose was it?" choice that closes a mess as nobody's
 
@@ -61,15 +62,16 @@ export function AnswerButtons({ m, busy, act }: { m: Mess; busy: boolean; act: R
 }
 
 function MessRow({ m, act, busy, owedView }: { m: Mess; act: ReturnType<typeof useMessAction>['act']; busy: boolean; owedView?: boolean }) {
+  const ask = useAsk();
   const { me, members, memberById, localTime, today, tz } = useApp();
   const name = (id: string | null) => (id ? memberById(id)?.displayName ?? 'unknown member' : 'nobody');
   const admin = isAdmin(me);
   const date = new Date(m.createdAt).toLocaleDateString(undefined, { timeZone: tz });
   const when = new Date(m.createdAt).toLocaleDateString('en-CA', { timeZone: tz }) === today() ? localTime(m.createdAt) : date;
   const viewer = { id: me.id, admin };
-  const decide = (choice: string) => {
+  const decide = async (choice: string) => {
     const who = choice === NOBODY ? null : choice;
-    if (confirm(who ? `Record that this was ${name(who)}'s?` : 'Close this mess as nobody\'s?')) act(m.id, () => post(`/messes/${m.id}/decide`, { memberId: who }));
+    if (await ask(who ? `Record that this was ${name(who)}'s?` : 'Close this mess as nobody\'s?')) act(m.id, () => post(`/messes/${m.id}/decide`, { memberId: who }));
   };
   return (
     <li className={s.mess}>
@@ -94,7 +96,7 @@ function MessRow({ m, act, busy, owedView }: { m: Mess; act: ReturnType<typeof u
           )}
           {canDelete(m, viewer) && (
             <button className="plain" aria-label="Delete this mess" title="Delete this mess" disabled={busy}
-              onClick={() => { if (confirm('Delete this mess?')) act(m.id, () => del(`/messes/${m.id}`)); }}>✕</button>
+              onClick={async () => { if (await ask('Delete this mess?')) act(m.id, () => del(`/messes/${m.id}`)); }}>✕</button>
           )}
         </div>
       </div>

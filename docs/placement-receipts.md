@@ -5,13 +5,31 @@ reorganizer and code-steward runs, newest first.
 The receipt records the decision; `docs/module-ownership.md` and `scripts/arch.ts`
 carry its result.
 
+## 2026-11-22 — S1UX alignment: in-app confirm, phone sheet, type size, live.js, toasts, v1.117.0 (placement-advisor)
+
+- **Ask:** bring the PWA in line with sogo-tao UI-RULES (S1UX): every browser confirm() becomes a dark in-app ask(); Modal is a bottom sheet on a coarse pointer, lifted above the keyboard; body text 16px, buttons 44px; the shared live.js for self-update and the Offline banner; toasts and optimistic taps on list tick, chore done and fire actions (SPEC §8, §8.2, §8.7, §8.8, §8.10, §8.15).
+- **Verdict:** NEW rows `frontend/src/components/Ask.tsx` (AskHost + useAsk) and `frontend/src/components/Toast.tsx` (ToastHost + useToast), both mounted by main.tsx. EXISTING: Modal.tsx + Modal.module.css (sheet, visualViewport lift), theme.css (16px / 44px, --muted/--crit/--card aliases), AppRefresh.tsx (starts SogoLive; busy = dialogOpen() or typing or sound), state.tsx (settleRinging), FireActions.tsx, ChoresToday.tsx (local pending run, no step re-derivation), HouseholdLists.tsx (error → toast), plus the confirm swap in 24 files. No reorganizer.
+- **Flow stage:** render.
+- **Why:** confirm and toast are UI primitives, each one concern, held in React context (no module globals), not state.tsx (app data). Ask renders its own `<dialog>`, not through Modal, so Modal → Ask has no cycle. live.js goes in AppRefresh so "never reload over a dialog" keeps one owner. The optimistic fire drop lives in state.tsx because it owns `ringing`. live.js and index.html are outside the scan roots.
+- **Caps:** EventForm.tsx 197 → 199/223 (held under the band); HouseholdLists.tsx ~256/300; others well under. No CEILINGS change.
+
 ---
 
-## 2026-11-23 — 🌅 Sunrise and sunset reminders, and Until on every repeat, v1.117.0 (placement-advisor)
+## 2026-11-12 — Steward pass, v1.116.0 scope (code-steward)
+
+- **Run:** post-release, v1.116.0 (🎤 clips written down on SogoAI first, Workers AI fallback; PR #199)
+- **Verdict:** SOUND (typecheck green, 1131 tests green, arch:audit quiet; top file EventForm.tsx 88% unchanged)
+- **Top finding:** every new helper path means editing three places in `home/captions-helper.ts` (METHOD, answerFor, outcome) and copying the request/parse/meter block in `src/worker/home-captions.ts`. LOW; give it to the reorganizer as extract-first when a fifth helper path is placed, not now.
+- **Handoffs:** 1 to the reorganizer (deferred until the next helper path), 0 to the worker, 0 to the placement-advisor
+- **Restraint:** did not flag the trust-boundary re-check in hear.ts/parseHearReport, the route's home-first fallback (follows the item-photos precedent), the dropped home reason on fallback (as the spec says), or the wording of the map row's heading. The 4 MB helper body cap was checked against the 2 MB clip cap and is fine.
+
+---
+
+## 2026-11-23 — 🌅 Sunrise and sunset reminders, and Until on every repeat, v1.118.0 (placement-advisor)
 
 - **Ask:** 📌 Reminders gain a sun shape (chosen days at sunrise or sunset ± up to 240 min, an is_alarm event with
   start_sun, start_time NULL, signed remind_offset_min); migration 0069 lets start_sun take 'sunrise'; an optional
-  Until on every ⏰ alarm, 🎲 window and 🌅 sun reminder (SPEC 3.108 §7.7, §8.5, §8.5c, §8.5d, §4.2zzp; feature request
+  Until on every ⏰ alarm, 🎲 window and 🌅 sun reminder (SPEC 3.109 §7.7, §8.5, §8.5c, §8.5d, §4.2zzp; feature request
   req_6vc9p3fac2yryzne; lifts ⚑ Q59).
 - **Verdict:** EXISTING owners throughout: `src/shared/sun.ts` sunUtcOf; `src/shared/engine.ts` planReminderFires picks
   the sun event, alertMessage's `sun` replaces `sunsetAt`; `src/shared/reminders.ts` ReminderSun, sunReminderError,
@@ -26,7 +44,7 @@ carry its result.
   avoids an `at ? sunrise : sunset` ternary in three places; the listed state stays a shared rule.
 - **Built:** as placed, with one scoping choice the advisor asked to settle in the spec: untilError is called by the
   alarms and reminders routes (§8.5 "the one rule both routes use"), not by parseEventInput, so the calendar event
-  form's own until is unchanged. A sun reminder's fires are left out of the reminders `done` flag (Q412: Done ends the
+  form's own until is unchanged. A sun reminder's fires are left out of the reminders `done` flag (Q417: Done ends the
   day only). Ensō-button sun reminders (§8.18) were not placed: not in the spec yet.
 - **Caps:** engine.ts 268/300 (net +3, under the band); tick.ts 121/148 net zero; Reminders.tsx 220/300; arch:audit
   quiet, nothing in the warning band.

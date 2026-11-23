@@ -9,6 +9,7 @@ import { apiUrl, del, errorText, patch, upload } from '../api';
 import { useApp } from '../state';
 import { NOTE_MAX, TEXT_MAX } from '../../../src/shared/lists';
 import { canChange, cannotChangeText } from '../../../src/shared/roles';
+import { useAsk } from './Ask';
 
 /** One item as GET /lists/{id} returns it (§10). */
 export interface Item {
@@ -25,6 +26,7 @@ const chip = { padding: '4px 10px', minHeight: 44 } as const;
 
 /** Item form (§8.8): text, Time (every day lists only), note, Assigned to, Save / Cancel / Delete. */
 export function ItemForm({ item, daily, onClose, onSaved }: { item: Item; daily: boolean; onClose: () => void; onSaved: () => void }) {
+  const ask = useAsk();
   const { me, members } = useApp();
   const canEdit = canChange(item.createdBy, me);
   const init = useMemo(() => ({ text: item.text, time: item.time ?? '', note: item.note ?? '', assigneeId: item.assigneeId }), [item]);
@@ -90,7 +92,7 @@ export function ItemForm({ item, daily, onClose, onSaved }: { item: Item; daily:
         </div>
       </fieldset>
       {canEdit && <div className="row wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
-        <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete “${item.text}”?`)) run(() => del(`/list-items/${item.id}`)); }}>Delete</button>
+        <button className="danger" disabled={busy} onClick={async () => { if (await ask(`Delete “${item.text}”?`)) run(() => del(`/list-items/${item.id}`)); }}>Delete</button>
       </div>}
     </Modal>
   );

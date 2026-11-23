@@ -8,6 +8,7 @@ import { shrinkPicked, usePhotoPick } from './usePhotoPick';
 import { apiUrl, del, errorText, patch, post, upload } from '../api';
 import { AREA_NAME_MAX, AREA_PHOTOS_MAX, type RoomArea } from '../../../src/shared/rooms';
 import s from './RoomSheet.module.css';
+import { useAsk } from './Ask';
 
 export const areaPhotoSrc = (photoId: string) => apiUrl(`/room-area-photos/${photoId}`);
 
@@ -17,6 +18,7 @@ interface Pending { blob: Blob; url: string }
 export function RoomAreaForm({ roomId, area, onDirty, onSaved, onCancel }: {
   roomId: string; area: RoomArea | null; onDirty: (dirty: boolean) => void; onSaved: () => void; onCancel: () => void;
 }) {
+  const ask = useAsk();
   const [saved, setSaved] = useState(area);
   const [name, setName] = useState(area?.name ?? '');
   const [lines, setLines] = useState(area?.expectations.join('\n') ?? '');
@@ -64,7 +66,7 @@ export function RoomAreaForm({ roomId, area, onDirty, onSaved, onCancel }: {
   }
 
   async function remove() {
-    if (!saved || !confirm(`Delete the area "${saved.name}" and its photos?`)) return;
+    if (!saved || !(await ask(`Delete the area "${saved.name}" and its photos?`))) return;
     setBusy('Deleting…'); setError(null);
     try { await del(`/room-areas/${saved.id}`); onSaved(); } catch (e) { setError(errorText(e)); setBusy(null); }
   }
@@ -104,7 +106,7 @@ export function RoomAreaForm({ roomId, area, onDirty, onSaved, onCancel }: {
       {busy && <p className="muted" role="status">{busy}</p>}
       <div className="row wrap">
         <button className="primary" disabled={!!busy || !name.trim()} onClick={save}>Save</button>
-        <button disabled={!!busy} onClick={() => { if (!dirty || confirm('Discard your changes?')) onCancel(); }}>Cancel</button>
+        <button disabled={!!busy} onClick={async () => { if (!dirty || await ask('Discard your changes?')) onCancel(); }}>Cancel</button>
         {saved && <button className="danger" disabled={!!busy} onClick={remove}>Delete area</button>}
       </div>
     </div>

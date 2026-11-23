@@ -9,32 +9,37 @@ import { isCookId } from '../../../src/shared/cooking';
 import type { MachineId } from '../../../src/shared/vocab';
 import { isTaskId } from '../../../src/shared/tasks';
 import { TaskCheckin } from './TaskCheckin';
+import { useToast } from './Toast';
 
 export function FireActions({ fire: f, onActed, onError }: {
   fire: Fire; onActed?: () => void; onError: (message: string | null) => void;
 }) {
-  const { refresh } = useApp();
+  const { refresh, settleRinging } = useApp();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [moving, setMoving] = useState<{ from: MachineId; ownerId: string | null } | null>(null);
 
-  async function send(path: string, body: object) {
+  /** §8.2: `settles` (Done, Ack, Snooze, Off, the last machine's finish) shows done at once: the fire leaves the bar and
+   *  the card closes before the answer; a refusal puts it back (the refresh) with a toast. Away waits for its answer. */
+  async function send(path: string, body: object, settles = false) {
     setBusy(true); onError(null);
-    try { await post(path, body); refresh(); onActed?.(); }
-    catch (e) { onError(`${f.title}: ${errorText(e)}`); refresh(); }
+    if (settles) { settleRinging(f.id); onActed?.(); }
+    try { await post(path, body); refresh(); if (!settles) onActed?.(); }
+    catch (e) { if (settles) toast(`Not saved: ${f.title}: ${errorText(e)}`); else onError(`${f.title}: ${errorText(e)}`); refresh(); }
     finally { setBusy(false); }
   }
-  const act = (action: 'done' | 'snooze' | 'ack') => send(`/fires/${f.id}/actions`, { action });
+  const act = (action: 'done' | 'snooze' | 'ack') => send(`/fires/${f.id}/actions`, { action }, true);
 
   /** §8.2: a machine fire is closed only by /machines (or /cooking) — Move to the next machine, Unload Clothes Dryer on the last, Off on a cooking timer. */
   const machineButton = () => {
-    if (isCookId(f.machineId)) return <button className="primary" disabled={busy} onClick={() => send(`/cooking/${f.machineId}/off`, {})}>Off</button>; // §7D.8
+    if (isCookId(f.machineId)) return <button className="primary" disabled={busy} onClick={() => send(`/cooking/${f.machineId}/off`, {}, true)}>Off</button>; // §7D.8
     if (!isMachineId(f.machineId)) return null;
     const from = f.machineId, next = nextMachine(from);
     return next
       ? <button className="primary" disabled={busy} onClick={() => setMoving({ from, ownerId: f.personId ?? null })}>
           Move to {MACHINE_LABEL[next].toLowerCase()}
         </button>
-      : <button className="primary" disabled={busy} onClick={() => send(`/machines/${from}/finish`, {})}>{finishLabel(from)}</button>;
+      : <button className="primary" disabled={busy} onClick={() => send(`/machines/${from}/finish`, {}, true)}>{finishLabel(from)}</button>;
   };
 
   return (

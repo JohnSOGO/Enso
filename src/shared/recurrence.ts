@@ -49,7 +49,7 @@ export function recurrenceError(r: unknown): string | null {
   return null;
 }
 
-/** §8.5 ⚑ Q411 — the Until box of an alarm or a repeating reminder: null (no end) or a date from `earliest` on (today for a new one). */
+/** §8.5 ⚑ Q416 — the Until box of an alarm or a repeating reminder: null (no end) or a date from `earliest` on (today for a new one). */
 export function untilError(until: unknown, earliest: string): string | null {
   if (until === null || until === undefined) return null;
   if (!isDate(until)) return 'Until must be YYYY-MM-DD.';

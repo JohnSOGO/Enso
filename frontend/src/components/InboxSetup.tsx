@@ -5,19 +5,21 @@ import { useEffect, useState } from 'react';
 import { del, get, post } from '../api';
 import { useAction } from './useAction';
 import s from './Inbox.module.css';
+import { useAsk } from './Ask';
 
 /** Copy inside the tap (phones allow the clipboard only during a gesture). */
 export const copyText = (t: string) => navigator.clipboard?.writeText(t).catch(() => undefined);
 
 export function InboxSetup() {
+  const ask = useAsk();
   const [state, setState] = useState<{ on: boolean; createdAt: string | null } | null>(null);
   const [key, setKey] = useState<string | null>(null);
   const { run, busy, errorEl } = useAction();
   const load = () => run(async () => setState(await get('/share/key')));
   useEffect(() => { load(); }, []);
 
-  const make = () => {
-    if (state?.on && !confirm('Make a new key? The Shortcut with the old key will stop working.')) return;
+  const make = async () => {
+    if (state?.on && !(await ask('Make a new key? The Shortcut with the old key will stop working.'))) return;
     run(async () => { const r = await post<{ key: string; createdAt: string }>('/share/key'); setKey(r.key); setState({ on: true, createdAt: r.createdAt }); });
   };
   const off = () => run(async () => { await del('/share/key'); setKey(null); setState({ on: false, createdAt: null }); });

@@ -6,15 +6,17 @@ import { ADMIN_ROLE, isAdmin } from '../../../src/shared/roles';
 import { useAction } from './useAction';
 import { Invites, shortDate } from './Invites';
 import s from './SettingsMembers.module.css';
+import { useAsk } from './Ask';
 
 export function SettingsMembers() {
+  const ask = useAsk();
   const { me, members, refresh } = useApp();
   const { run, busy, errorEl } = useAction();
   /** §6.3 — make or remove an admin; asks first, and warns when you are removing yourself. */
-  const setAdmin = (id: string, name: string, make: boolean) => {
-    const ask = make ? `Make ${name} an admin? They will have the same powers as you, except over the owner.`
+  const setAdmin = async (id: string, name: string, make: boolean) => {
+    const q = make ? `Make ${name} an admin? They will have the same powers as you, except over the owner.`
       : id === me.id ? 'Remove your own admin role? You will lose these settings straight away.' : `Remove ${name}'s admin role?`;
-    if (confirm(ask)) run(async () => { await patch(`/members/${id}`, { role: make ? ADMIN_ROLE : 'member' }); refresh(); });
+    if (await ask(q)) run(async () => { await patch(`/members/${id}`, { role: make ? ADMIN_ROLE : 'member' }); refresh(); });
   };
 
   return (

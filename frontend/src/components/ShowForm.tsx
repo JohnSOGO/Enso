@@ -14,6 +14,7 @@ import {
 import { webLink } from '../../../src/shared/things';
 import type { ShowKind, ShowStatus, WatchHow } from '../../../src/shared/vocab';
 import s from './Shows.module.css';
+import { useAsk } from './Ask';
 
 /** §8.14 — each way to watch as the list and form show it. */
 export const WATCH_GLYPH: Record<WatchHow, string> = { theater: '🎟️', stream: '📺', tv: '📡', rent: '💵', buy: '💵' };
@@ -43,6 +44,7 @@ interface Props {
 }
 
 export function ShowForm({ show, reading = null, typed, onClose, onSaved }: Props) {
+  const ask = useAsk();
   const { me } = useApp();
   const canEdit = !show || canChange(show.createdBy, me);
   const [init] = useState(() => formOf(show));
@@ -178,7 +180,7 @@ export function ShowForm({ show, reading = null, typed, onClose, onSaved }: Prop
           {show.status === 'want'
             ? <button disabled={busy || !f.title.trim()} onClick={() => persist('watched')}>Watched</button>
             : <button disabled={busy || !f.title.trim()} onClick={() => persist('want')}>Want to see it again</button>}
-          {canEdit && <button className="danger" disabled={busy} onClick={() => { if (confirm(`Delete “${show.title}”?`)) run(() => del(`/shows/${show.id}`)); }}>Delete</button>}
+          {canEdit && <button className="danger" disabled={busy} onClick={async () => { if (await ask(`Delete “${show.title}”?`)) run(() => del(`/shows/${show.id}`)); }}>Delete</button>}
         </div>
       )}
     </Modal>

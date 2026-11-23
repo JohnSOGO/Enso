@@ -1,8 +1,9 @@
-// MOJOSOGO-PREFERENCES "Modals": native <dialog> + showModal, explicitly centred, scrolls internally,
+// MOJOSOGO-PREFERENCES "Modals": native <dialog> + showModal, centred (a bottom sheet on a phone, §8), scrolls internally,
 // titled, dirty form asks before closing, focus returns to the opener, failures render inside.
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { PointAtButton } from './PointAtButton';
+import { useAsk } from './Ask';
 import s from './Modal.module.css';
 
 interface Props {
@@ -24,6 +25,7 @@ export function Modal({ title, onClose, dirty = false, confirmCloseText = 'Disca
   const errRef = useRef<HTMLDivElement>(null);
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
+  const ask = useAsk();
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -41,12 +43,21 @@ export function Modal({ title, onClose, dirty = false, confirmCloseText = 'Disca
     return () => opener?.focus?.();
   }, []);
 
+  // §8 bottom sheet: on a phone the sheet rides above the on-screen keyboard (it covers the layout viewport's bottom).
+  useEffect(() => {
+    const vv = window.visualViewport, dialog = ref.current;
+    if (!vv || !dialog || !matchMedia('(pointer: coarse)').matches) return;
+    const lift = () => dialog.style.setProperty('--kb', `${Math.max(0, window.innerHeight - vv.height - vv.offsetTop)}px`);
+    vv.addEventListener('resize', lift); vv.addEventListener('scroll', lift); lift();
+    return () => { vv.removeEventListener('resize', lift); vv.removeEventListener('scroll', lift); };
+  }, []);
+
   useEffect(() => {
     if (error) errRef.current?.scrollIntoView({ block: 'nearest' });
   }, [error]);
 
-  const requestClose = () => {
-    if (dirtyRef.current && !confirm(confirmCloseText)) return;
+  const requestClose = async () => {
+    if (dirtyRef.current && !(await ask(confirmCloseText))) return;
     onClose();
   };
 

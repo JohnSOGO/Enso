@@ -1,6 +1,6 @@
 # Ensō — Specification v2
 
-**Version:** 3.108 · **Date:** 2026-11-23 · **Owner:** MojoSOGO
+**Version:** 3.109 · **Date:** 2026-11-23 · **Owner:** MojoSOGO
 **Supersedes:** v1.0-draft (kept at `docs/archive/SPEC-v1.0-draft.md` for reference only — do not build from it)
 
 Items marked **⚑ DEFAULT** are best guesses awaiting MojoSOGO's confirmation. Build
@@ -4688,9 +4688,32 @@ Steps (the app fills in this server's address and shows my key with 📋 Copy):
 
 ## 8. Screens
 
-General rules come from `MOJOSOGO-PREFERENCES.md`: chips are entities, badges are
-statuses, modals are native `<dialog>` explicitly centred, failures render inside
-the dialog with `role="alert"`, and there are no wizards.
+General rules come from `MOJOSOGO-PREFERENCES.md` and the shared S1UX rules (sogo-tao `specs/UI-RULES.md`): chips
+are entities, badges are statuses, modals are native `<dialog>`, failures render inside the dialog with
+`role="alert"`, and there are no wizards. Body text is 16 px and every button at least 44 px tall (`theme.css`,
+S1UX 1.15 and 5.2).
+
+**Dialogs: centred on a PC, a bottom sheet on a phone** (S1UX 5.7, MojoSOGO 2026-11-22 "ALL", ⚑ Q414). On a coarse
+pointer (`@media (pointer: coarse)`) every `Modal` except the full-screen notes sheet (§8.4a) is pinned to the bottom,
+full width, rounded at the top, its footer buttons full width, and it rides above the on-screen keyboard (lifted by
+`visualViewport`, so the field being typed in stays visible, S1UX 5.8). Owner: `Modal.tsx` + `Modal.module.css`.
+
+**Asking and telling** (S1UX 1.23 and 1.4, ⚑ Q414):
+- **Never a browser `confirm`/`alert`/`prompt`.** Every "are you sure" (Delete, Revoke, Clear, Close a running
+  timer, Discard your changes?) is the app's own dark sheet (`Ask.tsx`): a **CONFIRM** badge, or **WARNING** for a
+  risky step (delete, revoke, discard, clear, close, remove), the question, then **No** and **Yes** (Yes focused, so
+  Enter is Yes and Esc is No; a tap on the backdrop is No). It is the same sheet on a phone, centred on a PC. It is
+  a `dialog[open]`, so nothing reloads under it (§8.10).
+- **Quick taps show done at once** and are put back with a toast when the server refuses: ticking a list item
+  (§8.8), Done on a chore run (§8.15), and Done, Ack, Snooze, Off and the last machine's finish in the Ringing bar
+  and My alerts (§8.2) ⚑ Q411, Q412. The toast (`Toast.tsx`) is one short line just above the tab bar,
+  `⚠ Not saved: Milk: {reason}`, gone after 4 s; it never blocks a tap. Forms keep saving in place: their
+  refusal renders inside the dialog, as above.
+
+**Acceptance (manual, phone and PC):** Delete a list item → the dark sheet asks (WARNING), No keeps it, Yes deletes;
+no white browser box anywhere (`grep confirm(` finds none in `frontend/src`). On the phone every form opens from the
+bottom, and typing in its last field keeps the field above the keyboard. With the network off, tick a list item →
+it ticks, then comes back with a `Not saved` toast.
 
 **iPhone rules** (found 2026-10-03 on an iPhone 16 Pro Max — the ⋯ list options showed
 only the grey backdrop):
@@ -4795,6 +4818,9 @@ whose source is gone still shows, so it can be closed ⚑ Q347.
   every kind ⚑ Q246.
 - **Away** (§9.2c) on every row not yet away: "I've seen it, I'm not home." The speakers and phones stop for that alert;
   the row stays. An away row shows `· away ({name})` instead of the button.
+- **Done, Ack, Snooze, Off** and the last machine's finish (Unload, Emptied) take the row away at once and close My
+  alerts' card before the answer; a refusal brings it back with a toast (§8 Asking and telling) ⚑ Q411. **Away** and
+  **Move to …** wait for their answer, as before (Away keeps the row; Move opens a chooser).
 - Buttons are at least 44px tall. When the stack exceeds 3 rows it collapses to
   "3 more ringing ▾".
 
@@ -5050,7 +5076,7 @@ Time   Alarm                    Days            Next
 - Tapping a row opens the **alarm form** (modal): title · time · day chips (Sun…Sat,
   plus "Every day" / "Weekdays" shortcuts) · **Until** · channels (☐ Phone ☐ House) · repeat
   alert every (Off / 5 / 10 / 15 / 30 min) · assigned to · Save / Cancel / Delete.
-- **Until — one box for everything that repeats** (John 2026-11-23, "until Sunday"; ⚑ Q411): every ⏰ alarm, 🎲 window
+- **Until — one box for everything that repeats** (John 2026-11-23, "until Sunday"; ⚑ Q416): every ⏰ alarm, 🎲 window
   reminder (§8.5c) and 🌅 sun reminder (§8.5d) has an optional **Until** date box (`UntilField`, under the day chips,
   with a **✕** to clear it). Empty = no end, as before. A date = the last day it may ring, inclusive; it is the
   recurrence's `until` (§4.3), which the engine already honours, so nothing new rings after it. The API takes
@@ -5254,7 +5280,7 @@ reminder (§8.5b) can ring at random times inside a window on chosen days instea
   `randomTimeIn(eventId|date)` (§8.4, the same pick as an event reminder's Random time), so a different time each day.
   An unanswered ring stays silently in the Ringing bar and the next day's ring replaces it (§5.6 `superseded`). A day
   that passes with no ring (an outage) is simply skipped: a window reminder is never **missed**.
-- **Until** (§8.5, ⚑ Q411): under the Days, the shared optional Until box: the window rings on its days up to and
+- **Until** (§8.5, ⚑ Q416): under the Days, the shared optional Until box: the window rings on its days up to and
   including that date, then leaves the list.
 - **Done** (or Ack) on any day's ring ends it ⚑ Q329: the server sets its repeat's `until` to that day and closes its
   later scheduled fires `removed`, so no day rings again, and it leaves the list. Snooze works as on any reminder.
@@ -5285,14 +5311,14 @@ that day's sunrise or sunset (§7.7), a number of minutes before or after, on ch
 
 - **The form:** the When chips **🌅 Sunrise** / **🌇 Sunset** (§8.5b) swap the Date and Time boxes for one line
   **[ 0 ] min [ before ▾ / after ▾ ] [ sunrise ▾ / sunset ▾ ]**, then **Days** (the `DayChips` of §8.5c) and the shared
-  **Until** box (§8.5). A new one starts on **at** sunrise / sunset (0 min), **Every day**, no Until ⚑ Q410. Minutes
-  are 0–240 ⚑ Q410. **Repeat until Done** stays (as §8.5b).
+  **Until** box (§8.5). A new one starts on **at** sunrise / sunset (0 min), **Every day**, no Until ⚑ Q415. Minutes
+  are 0–240 ⚑ Q415. **Repeat until Done** stays (as §8.5b).
 - **How it rings:** on each chosen day from today on (up to Until), at `sunUtcOf(date, place, at)` minus the minutes
   before (or plus the minutes after), through the reminder pipeline as §8.5b: push `"Goats out — sunrise at 6:29am"`
   (§5.7), repeats every 15 / 30 / 60 min up to `REMINDER_MAX_ALERTS` while unanswered, the Ringing bar's `· sunrise`.
   The next day's ring replaces an unanswered one (§5.6 `superseded`). No place, or no sunrise that day → no ring that
   day (§7.7); never missed.
-- **Done** closes **that day's** ring only ⚑ Q412 (the goats go out every day; unlike 🎲, §8.5c Q329, it does not end
+- **Done** closes **that day's** ring only ⚑ Q417 (the goats go out every day; unlike 🎲, §8.5c Q329, it does not end
   the reminder). It ends at its Until date, or when it is deleted.
 - **The list row:** `🌅 Every day · at sunrise · until Sun Nov 29 · Goats out · John` (🌇 for sunset; `30 min after
   sunrise`, `15 min before sunset`); a red **ringing** badge while it rings. Sorted with the rest by its next ring.
@@ -5465,7 +5491,7 @@ every 30 s while visible (§10 Freshness).
   wasn't saved: {reason}. Open ✎ to add it again."
 - Open items: most recently added or changed first (so a re-added item comes back to
   the top), one line each. **Tapping the row ticks it** (≥ 44 px); a ticked item leaves
-  the open list straight away. The row shows 📝 when there is a note, **📷** when there is a
+  the open list straight away, and a refusal puts it back with a toast (§8 Asking and telling). The row shows 📝 when there is a note, **📷** when there is a
   photo (§7A.3, "Has a photo") ⚑ Q121, and the
   **assignee's chip** when there is one (the chip truncates; the row stays one line).
 - **✎** on each row (accessible name "Edit Milk") opens the **item form** (modal): text,
@@ -5570,12 +5596,23 @@ down"). Fresh means the newest build *and* the newest data, i.e. a full page rel
   top, dragging down shows a small pill at the top — "↓ Pull to refresh", then at 72 px
   "↻ Release to refresh"; releasing past that reloads the page; releasing short of it does
   nothing. Not inside dialogs. The pill uses the existing surface/text tokens.
+- **Updates itself while open** (S1UX 1.13, MojoSOGO 2026-11-22 "ALL", ⚑ Q410): the shared **SogoLive**
+  (`frontend/public/live.js`, an unchanged copy of sogo-tao `specs/shared/live.js` v1.0.2, loaded by `index.html`)
+  re-reads the page every 30 s and on return; when a new build is out it shows the update screen (the ensō
+  floating, pulsing and slowly turning, "Updating…") and reloads, keeping the scroll place. Never while a dialog is
+  open, a field has focus, or sound plays (the same hold as coming back).
+- **Offline banner** (S1UX 1.12): when the phone loses signal an amber "⚠ Offline: showing the last data" strip sits
+  across the top until it is back. Nothing else of SogoLive is used: no heartbeat dot or ↻ (Ensō is not a
+  live-data page; pull to refresh is its refresh), and its data poll is a no-op with its stale-data refetch and
+  reload off, because `state.tsx` keeps the app's own 30 s refresh.
 - Owner: `frontend/src/components/AppRefresh.tsx`, mounted once at the app root (signed in
-  or not).
+  or not); it starts SogoLive once.
 
 **Acceptance (M4f — manual on the iPhone):** Add to Home Screen shows the Ensō icon and
 name; it opens full screen; deploy a change, switch away and back → the change is there;
-pull down on Lists → it reloads; open ✎, switch away and back → the dialog is still there.
+pull down on Lists → it reloads; open ✎, switch away and back → the dialog is still there; with the app open,
+deploy a change → the pulsing ensō shows and the new build loads, but not while a form is open; airplane mode →
+the Offline strip, gone when the signal is back.
 
 ### 8.11 Things to do (Lists → Things to do)
 
@@ -5911,7 +5948,8 @@ their modal.
   `by 19:00`, `rings 08:40` (a pending wait) or a red `ringing` badge; the person's
   chip. **Done means** is the dim second line. **📋** (accessible name "What done looks like for Laundry",
   ≥ 44 px) when the chore has a Done means or areas: it opens the sheet below.
-- Tapping the row marks the **current step** done (≥ 44 px). A ↶ button (accessible
+- Tapping the row marks the **current step** done (≥ 44 px): its box shows ☑ at once, until the refresh brings the
+  run's next step or its place under Done today; a refusal puts the ☐ back with a toast ⚑ Q412. A ↶ button (accessible
   name "Undo last step of Laundry") appears on runs that have a step done.
 - **Done today** is collapsed by default; its rows show who finished (`doneBy`), are
   not tappable (another Done would only be refused), and keep ↶ to undo the last step.
@@ -6196,6 +6234,10 @@ Dark by default. Colors are defined as tokens on `:root`:
 | `--month-b` | `#162033` |
 | `--holiday-public-cell` | `rgba(250, 204, 21, .16)` — a faint yellow tint over the dark cell, the same 16% strength as a multi-day event's tint; normal light text |
 | `--holiday-public-swatch` | `#FACC15` — the legend's public-holiday square |
+
+`--muted`, `--crit` and `--card` are aliases of `--text-dim`, `--bad` and `--surface`: the names the shared `live.js`
+reads (§8.10), so it draws in Ensō's colours ⚑ Q413. The palette itself waits on MojoSOGO's S1UX palette question
+(PAL); until then it stays as above.
 
 ### 8.17 Clock: 12-hour or 24-hour — asked by MojoSOGO 2026-10-12
 

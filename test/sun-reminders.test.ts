@@ -84,7 +84,7 @@ it('SR2–SR4: a sunrise reminder is listed apart from alarms, rings at sunrise,
   expect((await fires(r.json.id)).find((f: any) => f.id === ring.id).alert_count).toBe(2);
 
   expect((await o.post(`/fires/${ring.id}/actions`, { action: 'done' })).status).toBe(200);
-  expect((await o.get('/reminders')).json.map((x: any) => x.id)).toContain(r.json.id); // ⚑ Q412: Done ends the day only
+  expect((await o.get('/reminders')).json.map((x: any) => x.id)).toContain(r.json.id); // ⚑ Q417: Done ends the day only
   const ev = (await env.DB.prepare('SELECT recurrence FROM events WHERE id = ?').bind(r.json.id).first<any>())!;
   expect(JSON.parse(ev.recurrence).until).toBe(until);
   const rise2 = sunriseUtc(d2, p)!;

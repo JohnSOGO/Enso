@@ -98,9 +98,9 @@ export function nextRing(ev: ReminderEvent, now: string, tz: string, place: Plac
 
 /** §8.5d — a sun reminder: sunrise or sunset, minutes before (negative = after), on these days. */
 export interface ReminderSun { at: SunEvent; offsetMin: number; days: Weekday[] }
-/** ⚑ Q410 — minutes before or after, at most. */
+/** ⚑ Q415 — minutes before or after, at most. */
 export const SUN_REMINDER_MAX_MIN = 240;
-/** ⚑ Q410 — a new one: at sunrise / sunset, every day. */
+/** ⚑ Q415 — a new one: at sunrise / sunset, every day. */
 export const sunDefault = (at: SunEvent): ReminderSun => ({ at, offsetMin: 0, days: [...WEEKDAY] });
 
 /** null, or the 400 message for a sun reminder's `sun`. */

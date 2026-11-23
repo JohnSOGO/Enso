@@ -1,4 +1,4 @@
-// SPEC §8.5 — fields shared by the alarm, reminder, timer and chore forms: day chips + days text, the Until box (⚑ Q411),
+// SPEC §8.5 — fields shared by the alarm, reminder, timer and chore forms: day chips + days text, the Until box (⚑ Q416),
 // channel checkboxes and the flags ⇄ channels mapping (§9.4b), repeat-alert options. Each form keeps its own state and labels.
 import { CHANNEL, WEEKDAY, type Channel, type Weekday } from '../../../src/shared/vocab';
 import { weekdayOf } from '../../../src/shared/time';
@@ -37,13 +37,13 @@ export function DayChips({ days, onChange }: { days: Weekday[]; onChange: (days:
   );
 }
 
-/** "until Sun Nov 29" for a repeat's last day (§8.5 ⚑ Q411). */
+/** "until Sun Nov 29" for a repeat's last day (§8.5 ⚑ Q416). */
 export function untilText(until: string): string {
   const md = new Date(`${until}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
   return `until ${SHORT[WEEKDAY[weekdayOf(until)]]} ${md}`;
 }
 
-/** §8.5 ⚑ Q411 — the optional Until date of an alarm or a repeating reminder: empty = no end; ✕ clears it. */
+/** §8.5 ⚑ Q416 — the optional Until date of an alarm or a repeating reminder: empty = no end; ✕ clears it. */
 export function UntilField({ until, min, onChange }: { until: string | null; min: string; onChange: (until: string | null) => void }) {
   return (
     <div className="field">

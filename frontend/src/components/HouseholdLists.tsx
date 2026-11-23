@@ -14,6 +14,7 @@ import { PickFace } from './PickGrid';
 import { ItemPhoto, type Snap } from './ItemPhoto';
 import { errorText, get, patch, post, upload } from '../api';
 import { useApp } from '../state';
+import { useToast } from './Toast';
 import { SHOPPING_LIST_ID, TEXT_MAX } from '../../../src/shared/lists';
 import { canChange } from '../../../src/shared/roles';
 import type { ListAddResult } from '../../../src/shared/vocab';
@@ -129,6 +130,7 @@ export function HouseholdLists({ pickRequest }: { pickRequest: number }) {
 /** One list's body: add box, open rows, Done, and the item form. */
 function ListPanel({ list, onItemsChanged }: { list: ListSummary; onItemsChanged: () => void }) {
   const { me, version, tz, memberById, clock } = useApp();
+  const toast = useToast();
   const [data, setData] = useState<ListData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState('');
@@ -186,7 +188,7 @@ function ListPanel({ list, onItemsChanged }: { list: ListSummary; onItemsChanged
     setData((d) => d && (checked
       ? { ...d, open: d.open.filter((i) => i.id !== item.id), checked: [{ ...item, checkedAt: new Date().toISOString(), checkedBy: me.id }, ...d.checked] }
       : { ...d, open: [{ ...item, checkedAt: null }, ...d.open], checked: d.checked.filter((i) => i.id !== item.id) }));
-    try { await patch(`/list-items/${item.id}`, { checked }); } catch (e) { setError(errorText(e)); }
+    try { await patch(`/list-items/${item.id}`, { checked }); } catch (e) { toast(`Not saved: ${item.text}: ${errorText(e)}`); } // §8.8: changed() puts it back
     changed();
   }
 

@@ -30,7 +30,7 @@ function nextDue(e: AlarmRow, tz: string, now: string): string | null {
 function alarmView(e: AlarmRow, tz: string) {
   const r = parseJson<Recurrence | null>(e.recurrence, null);
   const now = nowIso();
-  const ended = e.ringing !== 1 && hasEnded(r, utcToLocal(now, tz).date); // §8.5 ⚑ Q411: kept, shown as ended
+  const ended = e.ringing !== 1 && hasEnded(r, utcToLocal(now, tz).date); // §8.5 ⚑ Q416: kept, shown as ended
   return {
     id: e.id, title: e.title, time: e.start_time, days: r?.byDay ?? [],
     channels: parseJson<Channel[]>(e.remind_channels, []), renotifyMin: e.renotify_min,

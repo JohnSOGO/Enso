@@ -6,6 +6,7 @@ import { useState, type FormEvent } from 'react';
 import { Modal } from './Modal';
 import { del, errorText, patch, post } from '../api';
 import { LIST_NAME_MAX, defaultListEmoji } from '../../../src/shared/lists';
+import { useAsk } from './Ask';
 
 /** One row of GET /lists (§10). */
 export interface ListSummary {
@@ -66,6 +67,7 @@ export function NewListForm({ onClose, onCreated }: { onClose: () => void; onCre
 export function ListOptions({ list, onClose, onChanged, onDeleted }: {
   list: ListSummary; onClose: () => void; onChanged: () => void; onDeleted: () => void;
 }) {
+  const ask = useAsk();
   const [name, setName] = useState(list.name);
   const [emoji, setEmoji] = useState(list.emoji ?? '');
   const [daily, setDaily] = useState(list.daily);
@@ -85,10 +87,10 @@ export function ListOptions({ list, onClose, onChanged, onDeleted }: {
     act(() => patch(`/lists/${list.id}`, { name, emoji: emojiOut(emoji), daily, pingOwners }), () => { onChanged(); onClose(); });
   };
 
-  const remove = () => {
+  const remove = async () => {
     const n = list.openCount;
     const goes = n === 0 ? 'It has no open items.' : n === 1 ? 'Its 1 open item goes with it.' : `Its ${n} open items go with it.`;
-    if (confirm(`Delete the list “${list.name}”? ${goes}`)) act(() => del(`/lists/${list.id}`), onDeleted);
+    if (await ask(`Delete the list “${list.name}”? ${goes}`)) act(() => del(`/lists/${list.id}`), onDeleted);
   };
 
   return (

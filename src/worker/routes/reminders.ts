@@ -30,7 +30,7 @@ const SELECT_REMINDERS = `
     EXISTS (SELECT 1 FROM fires f WHERE f.event_id = e.id AND f.state = 'closed' AND f.close_reason IN ('done', 'acked')
       AND e.start_sun IS NULL) AS done
   FROM events e WHERE e.is_alarm = 1 AND (e.recurrence IS NULL OR e.remind_random_from IS NOT NULL OR e.start_sun IS NOT NULL)
-    AND e.deleted_at IS NULL`; // §8.5d ⚑ Q412: Done on a sun ring closes that day only, so it is never "done"
+    AND e.deleted_at IS NULL`; // §8.5d ⚑ Q417: Done on a sun ring closes that day only, so it is never "done"
 
 function reminderView(e: ReminderRow, tz: string, now: string, place: Place | null) {
   const startAt = e.start_time ? localToUtc(e.start_date, e.start_time, tz) : now;
@@ -53,7 +53,7 @@ function reminderView(e: ReminderRow, tz: string, now: string, place: Place | nu
   };
 }
 
-/** The WEEKLY repeat of a window or sun reminder: its days and its Until (§8.5 ⚑ Q411), or the refusal. */
+/** The WEEKLY repeat of a window or sun reminder: its days and its Until (§8.5 ⚑ Q416), or the refusal. */
 function weekly(days: Weekday[], until: unknown, today: string): Recurrence | string {
   return untilError(until, today) ?? { freq: 'WEEKLY', byDay: windowDays(days), ...(until ? { until: until as string } : {}) };
 }

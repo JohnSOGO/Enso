@@ -4,6 +4,7 @@ import { del, get, post } from '../api';
 import { useAction } from './useAction';
 import { InviteCard, untilDate } from './InviteCard';
 import s from './Lists.module.css';
+import { useAsk } from './Ask';
 
 /** §8.9 — a revoked invite drops off the list a day after it was revoked (MojoSOGO 2026-10-12). */
 const REVOKED_SHOWN_MS = 24 * 3600_000;
@@ -22,6 +23,7 @@ function stateOf(i: Invite, now: number): { text: string; mood: string; waiting:
 }
 
 export function Invites() {
+  const ask = useAsk();
   const [invites, setInvites] = useState<Invite[]>([]);
   const [card, setCard] = useState<{ name: string; code: string; expiresAt: string } | null>(null);
   const [inviteName, setInviteName] = useState('');
@@ -36,8 +38,8 @@ export function Invites() {
     const r = await post('/invites', { displayName: name });
     setCard({ name, code: r.code, expiresAt: r.expiresAt }); setInviteName(''); await refresh();
   });
-  const revoke = (i: Invite) => {
-    if (!confirm(`Revoke the invite for ${i.displayName}? Its link and code will stop working.`)) return;
+  const revoke = async (i: Invite) => {
+    if (!(await ask(`Revoke the invite for ${i.displayName}? Its link and code will stop working.`))) return;
     run(async () => { await del(`/invites/${i.id}`); await refresh(); });
   };
 
