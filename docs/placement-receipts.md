@@ -5,25 +5,19 @@ reorganizer and code-steward runs, newest first.
 The receipt records the decision; `docs/module-ownership.md` and `scripts/arch.ts`
 carry its result.
 
-## 2026-11-22 — S1UX alignment: in-app confirm, phone sheet, type size, live.js, toasts, v1.117.0 (placement-advisor)
+## 2026-11-23 — Steward pass, v1.118.0 scope (code-steward)
 
-- **Ask:** bring the PWA in line with sogo-tao UI-RULES (S1UX): every browser confirm() becomes a dark in-app ask(); Modal is a bottom sheet on a coarse pointer, lifted above the keyboard; body text 16px, buttons 44px; the shared live.js for self-update and the Offline banner; toasts and optimistic taps on list tick, chore done and fire actions (SPEC §8, §8.2, §8.7, §8.8, §8.10, §8.15).
-- **Verdict:** NEW rows `frontend/src/components/Ask.tsx` (AskHost + useAsk) and `frontend/src/components/Toast.tsx` (ToastHost + useToast), both mounted by main.tsx. EXISTING: Modal.tsx + Modal.module.css (sheet, visualViewport lift), theme.css (16px / 44px, --muted/--crit/--card aliases), AppRefresh.tsx (starts SogoLive; busy = dialogOpen() or typing or sound), state.tsx (settleRinging), FireActions.tsx, ChoresToday.tsx (local pending run, no step re-derivation), HouseholdLists.tsx (error → toast), plus the confirm swap in 24 files. No reorganizer.
-- **Flow stage:** render.
-- **Why:** confirm and toast are UI primitives, each one concern, held in React context (no module globals), not state.tsx (app data). Ask renders its own `<dialog>`, not through Modal, so Modal → Ask has no cycle. live.js goes in AppRefresh so "never reload over a dialog" keeps one owner. The optimistic fire drop lives in state.tsx because it owns `ringing`. live.js and index.html are outside the scan roots.
-- **Caps:** EventForm.tsx 197 → 199/223 (held under the band); HouseholdLists.tsx ~256/300; others well under. No CEILINGS change.
-
----
-
-## 2026-11-12 — Steward pass, v1.116.0 scope (code-steward)
-
-- **Run:** post-release, v1.116.0 (🎤 clips written down on SogoAI first, Workers AI fallback; PR #199)
-- **Verdict:** SOUND (typecheck green, 1131 tests green, arch:audit quiet; top file EventForm.tsx 88% unchanged)
-- **Top finding:** every new helper path means editing three places in `home/captions-helper.ts` (METHOD, answerFor, outcome) and copying the request/parse/meter block in `src/worker/home-captions.ts`. LOW; give it to the reorganizer as extract-first when a fifth helper path is placed, not now.
-- **Handoffs:** 1 to the reorganizer (deferred until the next helper path), 0 to the worker, 0 to the placement-advisor
-- **Restraint:** did not flag the trust-boundary re-check in hear.ts/parseHearReport, the route's home-first fallback (follows the item-photos precedent), the dropped home reason on fallback (as the spec says), or the wording of the map row's heading. The 4 MB helper body cap was checked against the 2 MB clip cap and is fine.
-
----
+- **Run:** post-release, v1.118.0 (🌅 sunrise/sunset 📌 reminders, Until on every repeat)
+- **Verdict:** MINOR DRIFT (typecheck green, 1140 tests green, arch:audit quiet; engine.ts 268/300 = 89%, one line below the band)
+- **Top finding:** engine.ts holds both the alert state machine and the alert wording; alertMessage has grown to 8
+  positional parameters. Extract alertMessage + SunAt / ChoreAlertText into src/shared/alert-text.ts and lower the
+  engine cap. Backlog for MojoSOGO to pick.
+- **Fixed in the release thread (its own loose ends):** the 240-minute sun limit had a second copy in event-rows.ts
+  (now imports SUN_REMINDER_MAX_MIN); Reminders.tsx maps SUN_EVENT; where-things-stand moved to v1.118.0; receipts put
+  back in newest-first order.
+- **Restraint:** did not flag the three-shape branch in routes/reminders.ts, the alarms PATCH skip for an unchanged
+  Until, the separate calendar Until input (deliberate), the older 1–240 repeat-alert duplication, or the deferred
+  captions-helper item.
 
 ## 2026-11-23 — 🌅 Sunrise and sunset reminders, and Until on every repeat, v1.118.0 (placement-advisor)
 
@@ -48,6 +42,26 @@ carry its result.
   day only). Ensō-button sun reminders (§8.18) were not placed: not in the spec yet.
 - **Caps:** engine.ts 268/300 (net +3, under the band); tick.ts 121/148 net zero; Reminders.tsx 220/300; arch:audit
   quiet, nothing in the warning band.
+
+## 2026-11-22 — S1UX alignment: in-app confirm, phone sheet, type size, live.js, toasts, v1.117.0 (placement-advisor)
+
+- **Ask:** bring the PWA in line with sogo-tao UI-RULES (S1UX): every browser confirm() becomes a dark in-app ask(); Modal is a bottom sheet on a coarse pointer, lifted above the keyboard; body text 16px, buttons 44px; the shared live.js for self-update and the Offline banner; toasts and optimistic taps on list tick, chore done and fire actions (SPEC §8, §8.2, §8.7, §8.8, §8.10, §8.15).
+- **Verdict:** NEW rows `frontend/src/components/Ask.tsx` (AskHost + useAsk) and `frontend/src/components/Toast.tsx` (ToastHost + useToast), both mounted by main.tsx. EXISTING: Modal.tsx + Modal.module.css (sheet, visualViewport lift), theme.css (16px / 44px, --muted/--crit/--card aliases), AppRefresh.tsx (starts SogoLive; busy = dialogOpen() or typing or sound), state.tsx (settleRinging), FireActions.tsx, ChoresToday.tsx (local pending run, no step re-derivation), HouseholdLists.tsx (error → toast), plus the confirm swap in 24 files. No reorganizer.
+- **Flow stage:** render.
+- **Why:** confirm and toast are UI primitives, each one concern, held in React context (no module globals), not state.tsx (app data). Ask renders its own `<dialog>`, not through Modal, so Modal → Ask has no cycle. live.js goes in AppRefresh so "never reload over a dialog" keeps one owner. The optimistic fire drop lives in state.tsx because it owns `ringing`. live.js and index.html are outside the scan roots.
+- **Caps:** EventForm.tsx 197 → 199/223 (held under the band); HouseholdLists.tsx ~256/300; others well under. No CEILINGS change.
+
+---
+
+## 2026-11-12 — Steward pass, v1.116.0 scope (code-steward)
+
+- **Run:** post-release, v1.116.0 (🎤 clips written down on SogoAI first, Workers AI fallback; PR #199)
+- **Verdict:** SOUND (typecheck green, 1131 tests green, arch:audit quiet; top file EventForm.tsx 88% unchanged)
+- **Top finding:** every new helper path means editing three places in `home/captions-helper.ts` (METHOD, answerFor, outcome) and copying the request/parse/meter block in `src/worker/home-captions.ts`. LOW; give it to the reorganizer as extract-first when a fifth helper path is placed, not now.
+- **Handoffs:** 1 to the reorganizer (deferred until the next helper path), 0 to the worker, 0 to the placement-advisor
+- **Restraint:** did not flag the trust-boundary re-check in hear.ts/parseHearReport, the route's home-first fallback (follows the item-photos precedent), the dropped home reason on fallback (as the spec says), or the wording of the map row's heading. The 4 MB helper body cap was checked against the 2 MB clip cap and is fine.
+
+---
 
 ## 2026-11-12 — Hear a clip at home first, Whisper as fallback, v1.116.0 (placement-advisor)
 

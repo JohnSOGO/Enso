@@ -5,7 +5,7 @@ restate them. **SPEC.md is the source of truth** for behavior; `docs/history.md`
 (§14) and `docs/decisions.md` every Q and the ⚑ defaults MojoSOGO hasn't confirmed. Run, test and deploy steps live in README.md, ownership in `docs/module-ownership.md`, and
 the working agreement in `CLAUDE.md`.
 
-*Last updated 2026-11-01, v1.114.0, main = production.*
+*Last updated 2026-11-23, v1.118.0, main = production.*
 
 ## Running where
 
@@ -99,6 +99,7 @@ check still refuses, say so in the thread: that is the trigger for slice 2 of
 - 📥 Send to Enso (v1.85.0, §7H, §8.8a, migration 0055): on the iPhone, Lists → 📥 Inbox → Set up → Make my key, build the
   Shortcut from the steps, then share a Safari link, a text and a photo; each shows "✅ Saved to your Enso Inbox" and lands in the Inbox. Q319–Q326 are ⚑ defaults.
 - The Ensō button (v1.87.0–v1.96.0, §8.18, migrations 0056–0057): on the iPhone, tap the Ensō mark above the tabs, tap Ensō in the box (the mic is asked here, once), say "weekdays 8 to 11 remind me to book the car check", tap Ensō to stop, Done, hear the answer, Yes → the form with 🎲, Save; say something Ensō can't do → Yes → Settings → 💡 Requests (SY-M). Say "order our groceries from Amazon" → Outside, OK → Out of scope in 💡 Requests (Q339). Say "dinner on the 23rd for John and Michelle at 8 PM" → Yes opens the new-event form (Q341). ✏️ Edit on an answer fixes misheard words (Q361). Q331–Q338 are ⚑ defaults. If an old launch picture shows first, remove and re-add the home-screen icon. Build sessions: read `GET /ops/requests` first (CLAUDE.md "Feature requests").
+- 🌅 Sunrise reminders and Until (v1.118.0, §8.5d, §8.5): on the iPhone, Alerts → 📌 Reminders → ＋ Add, 🌅 Sunrise, Until Sunday, Save; the row reads `🌅 Every day · at sunrise · until Sun …` and the push comes at sunrise (SR-X). A ⏰ alarm whose Until has passed shows **ended**. John's "Let the goats out" (evt_614crsfu6lqmy5zm) rings daily at sunrise through 2026-11-29. Q415–Q417 are ⚑ defaults.
 - 🎲 Window reminders (v1.86.0, §8.5c): on the iPhone, Alerts → 📌 Reminders → ＋ Add, tick 🎲, Weekdays 8–11, Save; one push comes between 8 and 11 on the next weekday; Done clears it (RW-M). Q327–Q330 are ⚑ defaults.
 - Alert cards (v1.74.0–v1.75.0, §9.5, §8.15a): on the iPhone, tap a Whose mess? push → the card shows the photo and That was me with Not me under it, at the right; answer → the card closes and the line is gone from Settings → Alerts. Same for a ringing alert's Ack. Tap a ping's push → Ack (left) clears it, Close (right) just closes. Q283–Q284 are ⚑ defaults.
 - Each person once / Family (v1.73.0, §7.1/§8.3): on the iPhone, an event for everyone shows one green Family chip in the day sheet and one green dot

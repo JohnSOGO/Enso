@@ -6,7 +6,7 @@ import { Modal } from './Modal';
 import { ChannelChecks, DayChips, SHORT, UntilField, channelsOf, daysText, flagsOf, pickOneWay, untilText } from './AlertFields';
 import { del, errorText, get, patch, post } from '../api';
 import { useApp, useIsFounder } from '../state';
-import { WEEKDAY, type Channel, type ReminderState, type SunEvent } from '../../../src/shared/vocab';
+import { SUN_EVENT, WEEKDAY, type Channel, type ReminderState, type SunEvent } from '../../../src/shared/vocab';
 import { addDays, utcToLocal, weekdayOf } from '../../../src/shared/time';
 import { canChange, cannotChangeText } from '../../../src/shared/roles';
 import { ALERT_TITLE_MAX } from '../../../src/shared/alert-limits';
@@ -166,7 +166,7 @@ export function ReminderForm({ reminder, start, onClose }: { reminder: Reminder 
           <span className="muted" style={{ fontSize: '.8rem' }}>When</span>
           <div className="row wrap" style={{ marginTop: 4 }}>
             {WHEN_CHOICE.map((w) => <button key={w.id} type="button" onClick={() => pick(w.id)}>{w.id === 'work' ? AFTER_LABEL[after.kind] : w.label}</button>)}
-            {(['sunrise', 'sunset'] as const).map((at) => (
+            {SUN_EVENT.map((at) => (
               <button key={at} type="button" aria-pressed={f.sun?.at === at} className={f.sun?.at === at ? 'primary' : undefined} onClick={() => pickSun(at)}>
                 {SUN_ICON[at]} {at === 'sunrise' ? 'Sunrise' : 'Sunset'}
               </button>
