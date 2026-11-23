@@ -21,6 +21,7 @@ export const CEILINGS: Record<string, number> = {
   'src/worker/routes/events.ts': 107 + WORKING_BUFFER,
   'src/worker/routes/recipes.ts': 229 + WORKING_BUFFER,
   'src/worker/tick.ts': 108 + WORKING_BUFFER,
+  'src/shared/engine.ts': 242 + WORKING_BUFFER, // 2026-11-23: alert wording moved to alert-text.ts (steward, TDY)
 };
 
 /** Layering bans: files under `from` must not import anything matching `banned`. */

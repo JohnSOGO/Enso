@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { owner, tickAt } from './helpers';
 import { EVENT_BRING_ITEM_MAX, EVENT_BRING_MAX } from '../src/shared/alert-limits';
 import { bringText } from '../src/shared/bring';
-import { alertMessage } from '../src/shared/engine';
+import { alertMessage } from '../src/shared/alert-text';
 
 describe('§7.10 things to bring', () => {
   const base = { title: 'Soccer', startDate: '2026-10-17', startTime: '09:00' };

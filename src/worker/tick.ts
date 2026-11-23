@@ -1,5 +1,6 @@
 // SPEC §5.6 — orchestration only: load rows, call the pure engine, write results.
-import { MATERIALIZE_AHEAD_H, alertMessage, stepFire, type FireRow } from '../shared/engine';
+import { MATERIALIZE_AHEAD_H, stepFire, type FireRow } from '../shared/engine';
+import { alertMessage } from '../shared/alert-text';
 import { choreFromRow, type ChoreRow } from '../shared/chores';
 import { planThingFires, type ThingRow } from '../shared/things';
 import { addMinutes } from '../shared/time';

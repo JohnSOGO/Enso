@@ -5,6 +5,19 @@ reorganizer and code-steward runs, newest first.
 The receipt records the decision; `docs/module-ownership.md` and `scripts/arch.ts`
 carry its result.
 
+## 2026-11-23 — Alert wording extracted from the engine (placement-advisor + reorganizer)
+
+- **Ask:** steward finding #1 (2026-11-23, MojoSOGO TDY). Move alertMessage, ChoreAlertText, SunAt and SUN_UNKNOWN out
+  of src/shared/engine.ts into a new pure module, with no change in behavior (SPEC §5.7, §7.7, §7.10, §8.17).
+- **Verdict:** `src/shared/alert-text.ts` [NEW row]; engine.ts keeps the state machine and pushActions and does not
+  re-export; the positional signature is kept (an options object would be a later, separate refactor).
+- **Flow stage:** rules (the wording that delivery speaks).
+- **Why:** engine.ts was 268/300 (89%) with two concerns; the wording is a leaf with low fan-in (tick.ts, fire-rows.ts,
+  tests). Re-export rejected (keeps the hub, hides the seam); moving pushActions rejected (§9.1 action table).
+- **Seam moved:** engine.ts 268 → 242, pinned in CEILINGS at 242 + WORKING_BUFFER; alert-text.ts 31. Callers and five
+  tests changed imports only; no assertion changed. bring.ts row now names alert-text as its importer.
+- **Behavior:** preserved; typecheck, npm test and arch:audit green.
+
 ## 2026-11-23 — Steward pass, v1.118.0 scope (code-steward)
 
 - **Run:** post-release, v1.118.0 (🌅 sunrise/sunset 📌 reminders, Until on every repeat)

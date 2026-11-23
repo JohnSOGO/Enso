@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { owner, tickAt } from './helpers';
 import { addDays, addMinutes, utcToLocal } from '../src/shared/time';
 import { sunUtcOf, sunriseUtc, sunsetUtc, type Place } from '../src/shared/sun';
-import { alertMessage, planReminderFires, type ReminderEvent } from '../src/shared/engine';
+import { planReminderFires, type ReminderEvent } from '../src/shared/engine';
+import { alertMessage } from '../src/shared/alert-text';
 import { hasEnded, untilError } from '../src/shared/recurrence';
 import { sunReminderError } from '../src/shared/reminders';
 
