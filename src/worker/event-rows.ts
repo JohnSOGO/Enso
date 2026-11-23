@@ -8,7 +8,7 @@ import { emojiError } from '../shared/emoji';
 import { ALERT_TITLE_MAX, EVENT_ADDRESS_MAX, EVENT_BRING_ITEM_MAX, EVENT_BRING_MAX } from '../shared/alert-limits';
 import { cleanBring } from '../shared/bring';
 import { randomWindowError } from '../shared/random-time';
-import { windowEnd } from '../shared/reminders';
+import { SUN_REMINDER_MAX_MIN, windowEnd } from '../shared/reminders';
 import { privateNeedsGoingText } from '../shared/event-access';
 import { all, first, parseJson } from './db';
 import { intIn, optStr, str } from './http';
@@ -50,9 +50,6 @@ export function eventView(e: EventRow) {
 }
 
 export type EventInput = Omit<EventRow, 'id' | 'exdates' | 'created_by' | 'created_at' | 'updated_at' | 'deleted_at' | 'is_alarm' | 'thing_id'>;
-
-/** §8.5d — a sun reminder's offset may be minutes after (negative), up to this many either way. */
-export const SUN_OFFSET_MAX = 240;
 
 /** Validates untrusted event input → row fields, or an error message. `sun`: the caller (📌 reminders, §8.5d) may set `startSun`. */
 export async function parseEventInput(db: D1Database, b: Record<string, unknown>, sun = false): Promise<EventInput | string> {
@@ -99,8 +96,8 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
     { remind_offset_min: null, remind_channels: null, renotify_min: null, max_alerts: 4, remind_random_from: null, remind_random_to: null };
   if (b.reminder !== null && b.reminder !== undefined) {
     const r = b.reminder as Record<string, unknown>;
-    const offset = startSun ? intIn(r.offsetMin, -SUN_OFFSET_MAX, SUN_OFFSET_MAX) : intIn(r.offsetMin, 0, 1440);
-    if (offset === null) return startSun ? `Minutes before or after must be 0–${SUN_OFFSET_MAX}.` : 'Reminder offset must be 0–1440 minutes.';
+    const offset = startSun ? intIn(r.offsetMin, -SUN_REMINDER_MAX_MIN, SUN_REMINDER_MAX_MIN) : intIn(r.offsetMin, 0, 1440);
+    if (offset === null) return startSun ? `Minutes before or after must be 0–${SUN_REMINDER_MAX_MIN}.` : 'Reminder offset must be 0–1440 minutes.';
     const channels = r.channels;
     if (!Array.isArray(channels) || channels.length === 0 || !channels.every((ch) => isOneOf(CHANNEL, ch))) {
       return `Reminder channels must be a non-empty list of: ${CHANNEL.join(', ')}.`;
