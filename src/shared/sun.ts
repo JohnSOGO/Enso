@@ -2,6 +2,7 @@
 // algorithm (fractional year γ, equation of time, declination, hour angle at zenith 90.833°).
 // Pure: no clock, no I/O; imports nothing but time.ts.
 import { iso } from './time';
+import type { SunEvent } from './vocab';
 
 export interface Place { lat: number; lon: number }
 
@@ -33,6 +34,9 @@ export const sunsetUtc = (date: string, place: Place): string | null => sunUtc(d
 
 /** The UTC instant of sunrise on local date `date` at `place`, the same way (§7.14 good fishing times). */
 export const sunriseUtc = (date: string, place: Place): string | null => sunUtc(date, place, -1);
+
+/** §7.7, §8.5d — sunrise or sunset, whichever `at` names. */
+export const sunUtcOf = (date: string, place: Place, at: SunEvent): string | null => sunUtc(date, place, at === 'sunrise' ? -1 : 1);
 
 function sunUtc(date: string, place: Place, sign: 1 | -1): string | null {
   const [y, m, d] = date.split('-').map(Number);

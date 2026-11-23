@@ -2,7 +2,7 @@
 import type { Action, AlertKind, Channel, CloseReason, FireState, SunEvent, TimerCmd } from './vocab';
 import { addDays, addMinutes, clockText, localToUtc, ms, utcToLocal } from './time';
 import { occurrences, type Recurrence } from './recurrence';
-import { sunsetUtc, type Place } from './sun';
+import { sunUtcOf, type Place } from './sun';
 import { bringText } from './bring';
 import { randomTimeIn } from './random-time';
 
@@ -93,7 +93,7 @@ export interface ReminderEvent {
   /** §8.4 Random time: the local window the alert time is picked in (both or neither). */
   remind_random_from?: string | null;
   remind_random_to?: string | null;
-  /** §7.7: the start is that day's sunset at the household place. */
+  /** §7.7: the start is that day's sunrise or sunset at the household place. */
   start_sun?: SunEvent | null;
 }
 
@@ -140,7 +140,7 @@ export function planReminderFires(ev: ReminderEvent, tz: string, fromUtc: string
   const toDate = addDays(utcToLocal(toUtc, tz).date, 2); // offsets are ≤ 1 day, so due falls on the start's day or the one before
   const out: NewFire[] = [];
   for (const date of occurrences(ev, fromDate, toDate)) {
-    const start = ev.start_sun ? place && sunsetUtc(date, place) : localToUtc(date, ev.start_time ?? ALL_DAY_REMIND_TIME, tz);
+    const start = ev.start_sun ? place && sunUtcOf(date, place, ev.start_sun) : localToUtc(date, ev.start_time ?? ALL_DAY_REMIND_TIME, tz);
     if (!start) continue; // §7.7: never a substitute time
     let due = addMinutes(start, -ev.remind_offset_min);
     // §8.4 Random time: keep the day of `start − offset`, pick the time in the window. A sun start ignores it (§7.7).
@@ -238,17 +238,20 @@ export function applyTimerCmd(
 /** Who a chore alert names and which step it is on (§5.7). */
 export interface ChoreAlertText { personName: string | null; stepTitle: string; stepCount: number }
 
+/** §7.7 — a sun reminder's local sunrise / sunset HH:MM (null: not computable), and the text when it is null. */
+export interface SunAt { at: SunEvent; time: string | null }
+const SUN_UNKNOWN: Record<SunEvent, string> = { sunrise: 'sunrise', sunset: 'before sunset' };
 /**
- * §5.7 — alert message text. `startsToday`: a thing's start reminder (§7C.2). `sunsetAt`: a sun
- * reminder's local sunset HH:MM, or null when it cannot be computed (§7.7); absent otherwise. `clock24h`: the
+ * §5.7 — alert message text. `startsToday`: a thing's start reminder (§7C.2). `sun`: a sun reminder's sunrise or
+ * sunset, local HH:MM or null when it cannot be computed (§7.7); absent otherwise. `clock24h`: the
  * receiving member's clock (§8.17).
  */
 export function alertMessage(
-  kind: AlertKind, title: string, alertNumber: number, chore?: ChoreAlertText, startsToday = false, sunsetAt?: string | null,
+  kind: AlertKind, title: string, alertNumber: number, chore?: ChoreAlertText, startsToday = false, sun?: SunAt,
   bring?: string[] | null, clock24h = false,
 ): string {
   const base = kind === 'reminder'
-    ? (sunsetAt !== undefined ? `${title} — ${sunsetAt === null ? 'before sunset' : `sunset at ${clockText(sunsetAt, clock24h)}`}` : `Reminder: ${title}`)
+    ? (sun ? `${title} — ${sun.time === null ? SUN_UNKNOWN[sun.at] : `${sun.at} at ${clockText(sun.time, clock24h)}`}` : `Reminder: ${title}`)
       + (bring?.length ? ` — ${bringText(bring)}` : '')
     : kind === 'timer' ? `Timer: ${title}`
     : kind === 'thing' ? `To do: ${title}${startsToday ? ' — starts today' : ''}`

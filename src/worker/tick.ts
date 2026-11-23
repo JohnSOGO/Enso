@@ -66,8 +66,8 @@ export async function tick(env: Env, now: string): Promise<TickSummary> {
     if (dayEnded && fire.away_by) stmts.push(db.prepare('UPDATE fires SET away_by = NULL, away_at = NULL WHERE id = ?').bind(fire.id));
     if (alert) {
       summary.alerts++;
-      const message = src.say?.(next.alert_count) ?? alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sunsetAt, src.bring);
-      const message24 = typeof src.sunsetAt === 'string' ? alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sunsetAt, src.bring, true) : message; // §8.17: a push in its member's clock
+      const message = src.say?.(next.alert_count) ?? alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sun, src.bring);
+      const message24 = typeof src.sun?.time === 'string' ? alertMessage(fire.kind, src.title, next.alert_count, src.chore, src.startsToday, src.sun, src.bring, true) : message; // §8.17: a push in its member's clock
       const base = { fireId: next.id, alertNumber: next.alert_count };
       // §5.7, §7.5: who it is for. Nobody → the fire still steps, nothing is delivered.
       const aud = audienceOf(src, await activeMemberIds(db));

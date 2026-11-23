@@ -49,6 +49,16 @@ export function recurrenceError(r: unknown): string | null {
   return null;
 }
 
+/** §8.5 ⚑ Q411 — the Until box of an alarm or a repeating reminder: null (no end) or a date from `earliest` on (today for a new one). */
+export function untilError(until: unknown, earliest: string): string | null {
+  if (until === null || until === undefined) return null;
+  if (!isDate(until)) return 'Until must be YYYY-MM-DD.';
+  return until < earliest ? 'Pick an Until date from today on.' : null;
+}
+
+/** §8.5 — a repeat whose Until date is before `today` has no ring left. */
+export const hasEnded = (r: Recurrence | null, today: string): boolean => !!r?.until && r.until < today;
+
 /** The nth (1–4) or last (-1) given weekday (0 = Sunday) of a month, as YYYY-MM-DD. */
 export function nthWeekdayOfMonth(year: number, month1: number, weekday: number, n: SetPos): string {
   if (n === -1) {

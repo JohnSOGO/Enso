@@ -1,7 +1,7 @@
 // SPEC §4.2 — the event row: its shape, its wire view, input validation, and the
 // insert / remove-future-fires statements shared by the events, alarms and things routes,
 // and every read/write of event_optins (§7.5 — who has an optional event on).
-import { CHANNEL, isOneOf, type Action, type Channel, type SunEvent } from '../shared/vocab';
+import { CHANNEL, SUN_EVENT, isOneOf, type Action, type Channel, type SunEvent } from '../shared/vocab';
 import { isDate, isTime } from '../shared/time';
 import { recurrenceError, type Recurrence } from '../shared/recurrence';
 import { emojiError } from '../shared/emoji';
@@ -26,7 +26,7 @@ export interface EventRow {
   is_alarm: number; thing_id: string | null; optional: number; emoji: string | null;
   /** §6.3 Private events: 1 = only the people who may open it see its summary. */
   private: number;
-  /** §7.7 — set only by coordinator SQL; the event routes never show such a row. */
+  /** §7.7 — the goat item (coordinator SQL) or a sun 📌 reminder (§8.5d); the event routes never show such a row. */
   start_sun: SunEvent | null;
 }
 
@@ -49,10 +49,15 @@ export function eventView(e: EventRow) {
   };
 }
 
-export type EventInput = Omit<EventRow, 'id' | 'exdates' | 'created_by' | 'created_at' | 'updated_at' | 'deleted_at' | 'is_alarm' | 'thing_id' | 'start_sun'>;
+export type EventInput = Omit<EventRow, 'id' | 'exdates' | 'created_by' | 'created_at' | 'updated_at' | 'deleted_at' | 'is_alarm' | 'thing_id'>;
 
-/** Validates untrusted event input → row fields, or an error message. */
-export async function parseEventInput(db: D1Database, b: Record<string, unknown>): Promise<EventInput | string> {
+/** §8.5d — a sun reminder's offset may be minutes after (negative), up to this many either way. */
+export const SUN_OFFSET_MAX = 240;
+
+/** Validates untrusted event input → row fields, or an error message. `sun`: the caller (📌 reminders, §8.5d) may set `startSun`. */
+export async function parseEventInput(db: D1Database, b: Record<string, unknown>, sun = false): Promise<EventInput | string> {
+  const startSun = b.startSun ?? null;
+  if (startSun !== null && !(sun && isOneOf(SUN_EVENT, startSun) && (b.startTime === null || b.startTime === undefined))) return 'startSun is only for a sun reminder with no start time.';
   const title = str(b.title, ALERT_TITLE_MAX);
   if (!title) return `Title is required (up to ${ALERT_TITLE_MAX} characters).`;
   const notes = optStr(b.notes);
@@ -94,8 +99,8 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
     { remind_offset_min: null, remind_channels: null, renotify_min: null, max_alerts: 4, remind_random_from: null, remind_random_to: null };
   if (b.reminder !== null && b.reminder !== undefined) {
     const r = b.reminder as Record<string, unknown>;
-    const offset = intIn(r.offsetMin, 0, 1440);
-    if (offset === null) return 'Reminder offset must be 0–1440 minutes.';
+    const offset = startSun ? intIn(r.offsetMin, -SUN_OFFSET_MAX, SUN_OFFSET_MAX) : intIn(r.offsetMin, 0, 1440);
+    if (offset === null) return startSun ? `Minutes before or after must be 0–${SUN_OFFSET_MAX}.` : 'Reminder offset must be 0–1440 minutes.';
     const channels = r.channels;
     if (!Array.isArray(channels) || channels.length === 0 || !channels.every((ch) => isOneOf(CHANNEL, ch))) {
       return `Reminder channels must be a non-empty list of: ${CHANNEL.join(', ')}.`;
@@ -114,7 +119,7 @@ export async function parseEventInput(db: D1Database, b: Record<string, unknown>
   return {
     title, notes: notes ?? null, address: address?.trim() || null, bring: bring.length ? JSON.stringify(bring) : null, start_date: b.startDate, start_time: startTime, end_date: endDate as string, end_time: endTime,
     recurrence: recurrence === null ? null : JSON.stringify(recurrence), assigned_to: JSON.stringify(assigned), ...remind,
-    optional: b.optional ? 1 : 0, emoji: emoji as string | null, private: b.private ? 1 : 0,
+    optional: b.optional ? 1 : 0, emoji: emoji as string | null, private: b.private ? 1 : 0, start_sun: startSun as SunEvent | null,
   };
 }
 
@@ -142,11 +147,11 @@ export function insertEventStatement(db: D1Database, id: string, input: EventInp
   return db.prepare(
     `INSERT INTO events (id, title, notes, address, bring, start_date, start_time, end_date, end_time, recurrence, assigned_to,
        remind_offset_min, remind_channels, renotify_min, max_alerts, created_by, created_at, updated_at, thing_id, optional, emoji,
-       remind_random_from, remind_random_to, is_alarm, private)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       remind_random_from, remind_random_to, is_alarm, private, start_sun)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(id, input.title, input.notes, input.address, input.bring, input.start_date, input.start_time, input.end_date, input.end_time, input.recurrence,
     input.assigned_to, input.remind_offset_min, input.remind_channels, input.renotify_min, input.max_alerts, memberId, now, now, thingId, input.optional, input.emoji,
-    input.remind_random_from, input.remind_random_to, isAlarm ? 1 : 0, input.private);
+    input.remind_random_from, input.remind_random_to, isAlarm ? 1 : 0, input.private, input.start_sun);
 }
 
 /** §7.5 — the ids of the events this member has turned on (their on-set). */

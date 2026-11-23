@@ -1,18 +1,18 @@
 // SPEC §8.5b — Alerts → 📌 Reminders: one-off reminders that ring until Done, or (§8.5c) 🎲 random times in a window
-// on chosen days. The list (state from the server, never re-derived) and the reminder form; the chip times are whenChoice
+// on chosen days, or (§8.5d) 🌅 at sunrise / sunset on chosen days; the repeating ones may have an Until (§8.5). The list (state from the server, never re-derived) and the reminder form; the chip times are whenChoice
 // (src/shared/reminders.ts).
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
-import { ChannelChecks, DayChips, SHORT, channelsOf, daysText, flagsOf, pickOneWay } from './AlertFields';
+import { ChannelChecks, DayChips, SHORT, UntilField, channelsOf, daysText, flagsOf, pickOneWay, untilText } from './AlertFields';
 import { del, errorText, get, patch, post } from '../api';
 import { useApp, useIsFounder } from '../state';
-import { WEEKDAY, type Channel, type ReminderState } from '../../../src/shared/vocab';
+import { WEEKDAY, type Channel, type ReminderState, type SunEvent } from '../../../src/shared/vocab';
 import { addDays, utcToLocal, weekdayOf } from '../../../src/shared/time';
 import { canChange, cannotChangeText } from '../../../src/shared/roles';
 import { ALERT_TITLE_MAX } from '../../../src/shared/alert-limits';
 import {
-  AFTER_LABEL, REMINDER_RENOTIFY, REMINDER_RENOTIFY_DEFAULT, WHEN_CHOICE, WHEN_DEFAULT, WINDOW_DEFAULT, whenChoice,
-  type After, type ReminderWindow, type WhenChoiceId,
+  AFTER_LABEL, REMINDER_RENOTIFY, REMINDER_RENOTIFY_DEFAULT, SUN_REMINDER_MAX_MIN, WHEN_CHOICE, WHEN_DEFAULT, WINDOW_DEFAULT, sunDefault, whenChoice,
+  type After, type ReminderSun, type ReminderWindow, type WhenChoiceId,
 } from '../../../src/shared/reminders';
 import type { SayReminder } from '../../../src/shared/say-reading';
 import s from './Lists.module.css';
@@ -21,6 +21,16 @@ import s from './Lists.module.css';
 export interface Reminder {
   id: string; title: string; date: string; time: string; channels: Channel[]; renotifyMin: number | null;
   assignedTo: string[]; createdBy: string; state: ReminderState; dueAt: string; window: ReminderWindow | null;
+  sun: ReminderSun | null; until: string | null;
+}
+
+/** §8.5d — the sun chips' glyphs. */
+const SUN_ICON: Record<SunEvent, string> = { sunrise: '🌅', sunset: '🌇' };
+
+/** "at sunrise" / "30 min after sunrise" / "15 min before sunset" (§8.5d). */
+function sunText(s: ReminderSun): string {
+  if (s.offsetMin === 0) return `at ${s.at}`;
+  return `${Math.abs(s.offsetMin)} min ${s.offsetMin > 0 ? 'before' : 'after'} ${s.at}`;
 }
 
 const RENOTIFY_TEXT: Record<number, string> = { 15: 'Every 15 min', 30: 'Every 30 min', 60: 'Every hour' };
@@ -46,8 +56,10 @@ export function RemindersSection() {
   const who = (r: Reminder) => (r.assignedTo.length
     ? r.assignedTo.map((id) => members.find((m) => m.id === id)?.displayName ?? 'unknown member').join(', ')
     : 'Everyone');
+  const until = (r: Reminder) => (r.until ? ` · ${untilText(r.until)}` : '');
   const when = (r: Reminder) => (r.window
-    ? `🎲 ${daysText(r.window.days)} ${clock(r.window.from)}–${clock(r.window.to)}`
+    ? `🎲 ${daysText(r.window.days)} ${clock(r.window.from)}–${clock(r.window.to)}${until(r)}`
+    : r.sun ? `${SUN_ICON[r.sun.at]} ${daysText(r.sun.days)} · ${sunText(r.sun)}${until(r)}`
     : `${dayText(utcToLocal(r.dueAt, tz).date, today)} ${localTime(r.dueAt)}`);
 
   return (
@@ -56,7 +68,7 @@ export function RemindersSection() {
         <span style={{ flex: 1 }} />
         <button className="primary" onClick={() => setEditing({ reminder: null })}>＋ Add</button>
       </div>
-      <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>Something to get done. It rings, then again and again until someone taps Done. 🎲 rings at random times on the days you pick.</p>
+      <p className="muted" style={{ fontSize: '.85rem', marginBottom: 10 }}>Something to get done. It rings, then again and again until someone taps Done. 🎲 rings at random times on the days you pick; 🌅 🌇 at sunrise or sunset.</p>
       {error && <div role="alert" className="alert-error">{error}</div>}
       {list === null && !error && <p className="muted">Loading…</p>}
       {list?.length === 0 && <p className="muted">No reminders waiting.</p>}
@@ -94,6 +106,7 @@ export function ReminderForm({ reminder, start, onClose }: { reminder: Reminder 
       title: reminder?.title ?? start?.title ?? '', date: at.date, time: at.time, assignedTo: reminder?.assignedTo ?? start?.assignedTo ?? [me.id],
       ...flagsOf(reminder?.channels, founder), renotify: reminder?.renotifyMin ?? REMINDER_RENOTIFY_DEFAULT,
       random: !!window, window: window ?? WINDOW_DEFAULT, // ⚑ Q328
+      sun: reminder?.sun ?? null, until: reminder?.until ?? null, // §8.5d, §8.5
     };
   }, [reminder, start, me.id, me.after.time, tz, founder]);
   const [f, setF] = useState(init);
@@ -102,7 +115,10 @@ export function ReminderForm({ reminder, start, onClose }: { reminder: Reminder 
   const dirty = !!start || JSON.stringify(f) !== JSON.stringify(init);
   const canEdit = !reminder || canChange(reminder.createdBy, me);
   const after = afterFor(f.assignedTo);
-  const pick = (id: WhenChoiceId) => setF({ ...f, ...whenChoice(id, new Date().toISOString(), tz, after.time) });
+  const pick = (id: WhenChoiceId) => setF({ ...f, sun: null, ...whenChoice(id, new Date().toISOString(), tz, after.time) });
+  const pickSun = (at: SunEvent) => setF({ ...f, sun: f.sun ? { ...f.sun, at } : sunDefault(at) }); // ⚑ Q410
+  const setSun = (s: Partial<ReminderSun>) => f.sun && setF({ ...f, sun: { ...f.sun, ...s } });
+  const today = utcToLocal(new Date().toISOString(), tz).date;
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true); setError(null);
@@ -112,8 +128,9 @@ export function ReminderForm({ reminder, start, onClose }: { reminder: Reminder 
     const channels = channelsOf(f);
     if (!channels.length) throw new Error(pickOneWay('remind'));
     const body = f.random
-      ? { title: f.title, window: f.window, channels, assignedTo: f.assignedTo }
-      : { title: f.title, date: f.date, time: f.time, channels, renotifyMin: f.renotify, assignedTo: f.assignedTo, window: null };
+      ? { title: f.title, window: f.window, sun: null, until: f.until, channels, assignedTo: f.assignedTo }
+      : f.sun ? { title: f.title, sun: f.sun, window: null, until: f.until, channels, renotifyMin: f.renotify, assignedTo: f.assignedTo }
+      : { title: f.title, date: f.date, time: f.time, channels, renotifyMin: f.renotify, assignedTo: f.assignedTo, window: null, sun: null };
     if (reminder) await patch(`/reminders/${reminder.id}`, body); else await post('/reminders', body);
   });
 
@@ -141,16 +158,38 @@ export function ReminderForm({ reminder, start, onClose }: { reminder: Reminder 
               <input type="time" value={f.window.to} onChange={(e) => setF({ ...f, window: { ...f.window, to: e.target.value } })} />
             </label>
           </div>
+          <UntilField until={f.until} min={today} onChange={(until) => setF({ ...f, until })} />
           <p className="muted" style={{ fontSize: '.8rem', marginBottom: 10 }}>Rings once on each of those days, at a random time in between, until Done.</p>
         </> : <div className="field" role="group" aria-label="When">
           <span className="muted" style={{ fontSize: '.8rem' }}>When</span>
           <div className="row wrap" style={{ marginTop: 4 }}>
             {WHEN_CHOICE.map((w) => <button key={w.id} type="button" onClick={() => pick(w.id)}>{w.id === 'work' ? AFTER_LABEL[after.kind] : w.label}</button>)}
+            {(['sunrise', 'sunset'] as const).map((at) => (
+              <button key={at} type="button" aria-pressed={f.sun?.at === at} className={f.sun?.at === at ? 'primary' : undefined} onClick={() => pickSun(at)}>
+                {SUN_ICON[at]} {at === 'sunrise' ? 'Sunrise' : 'Sunset'}
+              </button>
+            ))}
           </div>
-          <div className="row" style={{ marginTop: 6 }}>
+          {f.sun ? <>
+            <div className="row" style={{ marginTop: 6 }}>
+              <input type="number" inputMode="numeric" min={0} max={SUN_REMINDER_MAX_MIN} aria-label="Minutes" value={Math.abs(f.sun.offsetMin)} style={{ width: 64, flex: 'none' }}
+                onChange={(e) => { const m = Math.min(SUN_REMINDER_MAX_MIN, Math.max(0, Math.round(Number(e.target.value) || 0))); setSun({ offsetMin: f.sun!.offsetMin < 0 ? -m : m }); }} />
+              <span className="muted" style={{ flex: 'none' }}>min</span>
+              <select aria-label="Before or after" value={f.sun.offsetMin < 0 ? 'after' : 'before'} style={{ flex: 1, minWidth: 0 }}
+                onChange={(e) => setSun({ offsetMin: (e.target.value === 'after' ? -1 : 1) * Math.abs(f.sun!.offsetMin) })}>
+                <option value="before">before</option><option value="after">after</option>
+              </select>
+              <select aria-label="Sunrise or sunset" value={f.sun.at} style={{ flex: 1, minWidth: 0 }} onChange={(e) => setSun({ at: e.target.value as SunEvent })}>
+                <option value="sunrise">sunrise</option><option value="sunset">sunset</option>
+              </select>
+            </div>
+            <DayChips days={f.sun.days} onChange={(days) => setSun({ days })} />
+            <UntilField until={f.until} min={today} onChange={(until) => setF({ ...f, until })} />
+            <p className="muted" style={{ fontSize: '.8rem', marginBottom: 10 }}>Rings on each of those days at that day's {f.sun.at}, until Done that day.</p>
+          </> : <div className="row" style={{ marginTop: 6 }}>
             <input type="date" aria-label="Date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} style={{ flex: 1, minWidth: 0 }} />
             <input type="time" aria-label="Time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} style={{ flex: 1, minWidth: 0 }} />
-          </div>
+          </div>}
         </div>}
         <div className="field" role="group" aria-label="Remind">
           <span className="muted" style={{ fontSize: '.8rem' }}>Remind (none = everyone)</span>
